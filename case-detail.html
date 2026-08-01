@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>案例详情 - 粤乡智匠</title>
+    <link rel="stylesheet" href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* case-detail 页面专属样式 — 通用变量和reset由styles.css提供 */
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ---- Header ---- */
+        .page-header {
+            background: var(--gradient-hero);
+            color: #fff;
+            padding: 20px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow-md);
+        }
+        .header-inner {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 1.15rem;
+            font-weight: 700;
+            text-decoration: none;
+            color: #fff;
+        }
+        .header-brand i {
+            font-size: 1.3rem;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 18px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: var(--radius-xs);
+            color: #fff;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .back-btn:hover { background: rgba(255,255,255,0.22); }
+
+        /* ---- Main ---- */
+        .main-wrap {
+            flex: 1;
+            max-width: 960px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 32px 24px 60px;
+        }
+
+        /* ---- Hero Banner ---- */
+        .case-hero {
+            background: var(--gradient-main);
+            border-radius: var(--radius);
+            padding: 48px 40px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 28px;
+        }
+        .case-hero::after {
+            content: '';
+            position: absolute;
+            top: -40%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+        }
+        .case-hero .location-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255,255,255,0.18);
+            padding: 5px 14px;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+        }
+        .case-hero h1 {
+            font-size: 1.8rem;
+            font-weight: 800;
+            margin-bottom: 10px;
+        }
+        .case-hero .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+            max-width: 520px;
+            line-height: 1.6;
+        }
+
+        /* ---- Stats Grid ---- */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-sm);
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+        }
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-md);
+        }
+        .stat-card .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--gradient-main);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+            color: #fff;
+            font-size: 1.1rem;
+        }
+        .stat-card .stat-value {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .stat-card .stat-label {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+
+        /* ---- Content Section ---- */
+        .content-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            padding: 32px;
+            box-shadow: var(--shadow-sm);
+            margin-bottom: 28px;
+        }
+        .content-card h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .content-card h2 i {
+            color: var(--accent-blue);
+        }
+        .content-card p, .content-card li {
+            font-size: 0.95rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+        .content-card ul {
+            list-style: none;
+            padding: 0;
+        }
+        .content-card ul li {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .content-card ul li:last-child { border-bottom: none; }
+        .content-card ul li::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            flex-shrink: 0;
+        }
+
+        /* ---- Timeline ---- */
+        .timeline {
+            position: relative;
+            padding-left: 28px;
+        }
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 8px;
+            top: 4px;
+            bottom: 4px;
+            width: 2px;
+            background: var(--border);
+        }
+        .timeline-item {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -24px;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            border: 2px solid var(--bg-secondary);
+            box-shadow: 0 0 0 2px var(--accent-blue);
+        }
+        .timeline-item .t-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .timeline-item .t-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ---- Quote ---- */
+        .quote-block {
+            background: linear-gradient(135deg, rgba(0,180,216,0.06), rgba(16,185,129,0.06));
+            border-left: 4px solid var(--accent-blue);
+            border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+            padding: 20px 24px;
+            margin-bottom: 28px;
+        }
+        .quote-block p {
+            font-size: 0.95rem;
+            font-style: italic;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+        .quote-block .quote-author {
+            margin-top: 10px;
+            font-size: 0.85rem;
+            font-style: normal;
+            font-weight: 600;
+            color: var(--accent-blue);
+        }
+
+        /* ---- Loading / Error ---- */
+        .loading-state {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        .spinner-lg {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-state p { color: var(--text-muted); font-size: 0.95rem; }
+
+        .error-state {
+            text-align: center;
+            padding: 80px 20px;
+        }
+        .error-state i {
+            font-size: 3rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        .error-state h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+        }
+        .error-state p {
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 22px;
+            border: none;
+            border-radius: var(--radius-xs);
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: var(--gradient-main);
+            color: #fff;
+        }
+        .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* ---- Footer ---- */
+        .page-footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border-light);
+        }
+
+        @media (max-width: 640px) {
+            .case-hero { padding: 32px 24px; }
+            .case-hero h1 { font-size: 1.4rem; }
+            .content-card { padding: 24px 20px; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <header class="page-header">
+        <div class="header-inner">
+            <a href="index.html" class="header-brand">
+                <i class="fas fa-seedling"></i> 粤乡智匠
+            </a>
+            <a href="index.html" class="back-btn">
+                <i class="fas fa-arrow-left"></i> 返回首页
+            </a>
+        </div>
+    </header>
+
+    <main class="main-wrap" id="main-content">
+        <div class="loading-state" id="loading">
+            <div class="spinner-lg"></div>
+            <p>正在加载案例详情...</p>
+        </div>
+    </main>
+
+    <footer class="page-footer">
+        <p>粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台</p>
+    </footer>
+
+    <script>
+    (async function() {
+        const main = document.getElementById('main-content');
+        const params = new URLSearchParams(window.location.search);
+        const caseId = parseInt(params.get('id'));
+
+        if (!caseId) {
+            showError('未指定案例', '请从首页选择一个案例查看详情。');
+            return;
+        }
+
+        document.title = `案例 #${caseId} - 粤乡智匠`;
+
+        try {
+            const res = await fetch('/api/resources/cases');
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+
+            if (!data.success || !data.cases) {
+                showError('案例未找到', '案例数据加载失败。');
+                return;
+            }
+
+            const c = data.cases.find(item => item.id === caseId);
+            if (!c) {
+                showError('案例未找到', `未找到ID为 ${caseId} 的案例。`);
+                return;
+            }
+
+            renderCase(c);
+        } catch (e) {
+            console.error('加载案例失败:', e);
+            showError('加载失败', `无法连接服务器（${e.message}），请确保服务已启动。`);
+        }
+
+        function renderCase(c) {
+            const stats = c.stats || {};
+            const statEntries = Object.entries(stats);
+            const statIcons = ['fa-chart-line', 'fa-users', 'fa-hand-holding-usd', 'fa-leaf', 'fa-store', 'fa-video', 'fa-trophy', 'fa-star'];
+            const statLabels = {
+                'farmers': '带动农户',
+                'income_growth': '收入增长',
+                'fans': '粉丝数',
+                'income': '月收入',
+                'certification': '认证资质',
+                'channel': '销售渠道'
+            };
+
+            // Determine extra content based on case title
+            const extraContent = getExtraContent(c.title);
+
+            document.title = `${c.title} - 粤乡智匠`;
+
+            main.innerHTML = `
+                <div class="case-hero">
+                    <div class="location-tag"><i class="fas fa-map-marker-alt"></i> ${c.location}</div>
+                    <h1>${c.title}</h1>
+                    <p class="subtitle">${c.description}</p>
+                </div>
+
+                ${statEntries.length > 0 ? `
+                <div class="stats-grid">
+                    ${statEntries.map(([k, v], i) => `
+                        <div class="stat-card">
+                            <div class="stat-icon"><i class="fas ${statIcons[i % statIcons.length]}"></i></div>
+                            <div class="stat-value">${v}</div>
+                            <div class="stat-label">${statLabels[k] || k}</div>
+                        </div>
+                    `).join('')}
+                </div>
+                ` : ''}
+
+                <div class="content-card">
+                    <h2><i class="fas fa-info-circle"></i> 案例背景</h2>
+                    <p>${extraContent.background}</p>
+                </div>
+
+                <div class="content-card">
+                    <h2><i class="fas fa-route"></i> 发展历程</h2>
+                    <div class="timeline">
+                        ${extraContent.timeline.map(t => `
+                            <div class="timeline-item">
+                                <div class="t-title">${t.title}</div>
+                                <div class="t-desc">${t.desc}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+
+                <div class="quote-block">
+                    <p>${extraContent.quote}</p>
+                    <div class="quote-author">—— ${extraContent.quoteAuthor}</div>
+                </div>
+
+                <div class="content-card">
+                    <h2><i class="fas fa-lightbulb"></i> 经验启示</h2>
+                    <ul>
+                        ${extraContent.lessons.map(l => `<li>${l}</li>`).join('')}
+                    </ul>
+                </div>
+
+                <div style="text-align:center; margin-top:12px;">
+                    <a href="index.html" class="btn btn-primary"><i class="fas fa-arrow-left"></i> 返回首页探索更多</a>
+                </div>
+            `;
+        }
+
+        function showError(title, msg) {
+            main.innerHTML = `
+                <div class="error-state">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <h3>${title}</h3>
+                    <p>${msg}</p>
+                    <a href="index.html" class="btn btn-primary"><i class="fas fa-home"></i> 返回首页</a>
+                </div>
+            `;
+        }
+
+        function getExtraContent(title) {
+            const contentMap = {
+                '梅州某村电商转型之路': {
+                    background: '梅州市某村曾是一个以传统种植业为主的客家村落，村民主要种植柚子、龙眼等水果。由于销路单一、信息闭塞，农产品长期面临"丰产不丰收"的困境。2021年，在当地政府和电商培训项目的支持下，村里几位年轻人率先尝试通过电商平台销售家乡特产，开启了这个村庄的数字化转型之路。',
+                    timeline: [
+                        { title: '2021年初 — 探索起步', desc: '3名返乡青年参加农村电商培训，开设首家淘宝店铺，主打梅州金柚。' },
+                        { title: '2021年中 — 直播破局', desc: '尝试抖音直播带货，第一场直播卖出500箱柚子，村民开始关注电商模式。' },
+                        { title: '2022年 — 规模扩大', desc: '成立村级电商合作社，带动30户农户参与，统一品牌、统一包装、统一发货。' },
+                        { title: '2023年 — 品牌升级', desc: '注册区域公共品牌，入驻拼多多、京东等平台，年销售额突破500万元。' },
+                        { title: '2024年 — 全面振兴', desc: '建成村级电商服务中心，开设短视频创作培训班，培养本地电商人才50余名。' }
+                    ],
+                    quote: '以前柚子烂在地里没人要，现在通过手机就能卖到全国各地。电商不仅改变了我们的收入，更改变了我们对未来的看法。',
+                    quoteAuthor: '村电商带头人 张伟明',
+                    lessons: [
+                        '政府引导 + 青年带头 是农村电商起步的关键组合',
+                        '直播带货是农产品上行的高效渠道，要敢于尝试新形式',
+                        '统一品牌和品控是规模化发展的基础',
+                        '培训本地人才比引进外部团队更可持续',
+                        '从单品突破到多品类经营，循序渐进降低风险'
+                    ]
+                },
+                '潮州手工艺人数字化传承': {
+                    background: '潮州木雕是国家级非物质文化遗产，但随着老一辈匠人逐渐退出，这门技艺面临后继无人的困境。90后手工艺人陈晓婷从小跟随祖父学习木雕，大学毕业后她决定用短视频记录和传播这门古老技艺，让非遗文化在数字时代焕发新生。',
+                    timeline: [
+                        { title: '2020年 — 记录起步', desc: '用手机拍摄祖父雕刻过程，发布到抖音，第一条视频获得10万播放量。' },
+                        { title: '2021年 — 内容深耕', desc: '系统学习短视频创作，形成"一刀一刻讲潮州"系列内容，粉丝突破10万。' },
+                        { title: '2022年 — 商业探索', desc: '开设线上店铺销售木雕文创产品，将传统工艺与现代设计结合，月收入过万。' },
+                        { title: '2023年 — 影响力扩大', desc: '粉丝突破50万，受邀参加非遗展览，带动周边20余名年轻人学习木雕。' },
+                        { title: '2024年 — 传承体系', desc: '建立"线上教学+线下工坊"模式，开设木雕体验课程，年接待学员超2000人。' }
+                    ],
+                    quote: '很多人说非遗是老古董，但我觉得它只是需要一个新的舞台。短视频让更多年轻人看到了潮州木雕的美，这就是最好的传承。',
+                    quoteAuthor: '潮州木雕传承人 陈晓婷',
+                    lessons: [
+                        '短视频是非遗文化传播的最佳载体之一',
+                        '传统技艺需要与现代审美结合才能吸引年轻受众',
+                        '个人IP打造是手艺人数字化转型的核心',
+                        '线上引流 + 线下体验 构成完整的商业化闭环',
+                        '让年轻人看到"钱景"才能真正解决传承问题'
+                    ]
+                },
+                '韶关有机农场品牌打造': {
+                    background: '韶关市仁化县的绿源农场曾是一个普通的小型种植场，农场主李志坚在2019年决定转型有机种植。经过三年的土壤改良和认证过程，农场获得了有机产品认证，并通过品牌化运营，从一个无名小农场成长为粤北地区知名的有机农产品品牌。',
+                    timeline: [
+                        { title: '2019年 — 转型决策', desc: '放弃化肥农药，开始三年土壤转换期，当年产量下降60%，承受巨大经济压力。' },
+                        { title: '2020年 — 坚持过渡', desc: '申请有机认证，同时学习品牌营销知识，开始在微信社群销售转换期产品。' },
+                        { title: '2021年 — 认证通过', desc: '正式获得有机产品认证，注册"绿源仁化"品牌，产品进入高端超市渠道。' },
+                        { title: '2022年 — 渠道拓展', desc: '开设天猫旗舰店，发展社区团购代理，线上线下销售额突破300万元。' },
+                        { title: '2023年 — 品牌升级', desc: '推出农场认养模式，发展休闲农业，年接待游客超5000人次，品牌溢价达300%。' }
+                    ],
+                    quote: '有机种植最难的不是技术，是前三年的坚持。当你熬过那段看不到回报的日子，市场会给你应有的认可。',
+                    quoteAuthor: '绿源农场创始人 李志坚',
+                    lessons: [
+                        '有机认证是品牌溢价的核心支撑，值得投入时间和成本',
+                        '社群营销是有机农产品冷启动的有效方式',
+                        '品牌故事比产品参数更能打动消费者',
+                        '农场认养模式创造了稳定的现金流和客户粘性',
+                        '线上线下结合才能最大化覆盖目标客群'
+                    ]
+                }
+            };
+
+            // Return matching content or a generic template
+            if (contentMap[title]) return contentMap[title];
+
+            return {
+                background: `${title}是一个具有代表性的乡村振兴案例。通过创新思维和不懈努力，当地探索出了一条适合自身发展的特色道路，为其他地区提供了宝贵的经验借鉴。`,
+                timeline: [
+                    { title: '起步阶段', desc: '发现本地资源优势，确定发展方向，组建核心团队。' },
+                    { title: '探索阶段', desc: '尝试多种经营模式，积累经验，逐步找到适合的发展路径。' },
+                    { title: '发展阶段', desc: '扩大经营规模，建立品牌影响力，带动更多农户参与。' },
+                    { title: '成熟阶段', desc: '形成可复制的模式，成为区域标杆，助力乡村振兴。' }
+                ],
+                quote: '乡村振兴需要的不仅是资金和技术，更需要敢于尝试的勇气和坚持不懈的精神。',
+                quoteAuthor: '项目负责人',
+                lessons: [
+                    '充分利用本地资源优势是成功的基础',
+                    '创新思维和数字化工具是加速发展的关键',
+                    '带动群众参与才能实现真正的乡村振兴',
+                    '品牌建设是长期竞争力的核心'
+                ]
+            };
+        }
+    })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台">
+    <title>粤乡智匠 - AI驱动的农村人才赋能平台</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
+
+    <!-- 导航栏 -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <div class="brand-logo">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <span class="brand-name">粤乡智匠</span>
+            </div>
+            <button class="hamburger-btn" id="hamburger-btn" aria-label="打开导航菜单" aria-expanded="false">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+            <div class="nav-menu" id="nav-menu" role="tablist" aria-label="主导航">
+                <button class="nav-item active" data-tab="agriculture" role="tab" aria-selected="true" aria-controls="agriculture-tab">农业技能</button>
+                <button class="nav-item" data-tab="ecommerce" role="tab" aria-selected="false" aria-controls="ecommerce-tab">电商运营</button>
+                <button class="nav-item" data-tab="crafts" role="tab" aria-selected="false" aria-controls="crafts-tab">手工传承</button>
+                <button class="nav-item" data-tab="simulation" role="tab" aria-selected="false" aria-controls="simulation-tab">虚拟实训</button>
+                <button class="nav-item" data-tab="resources" role="tab" aria-selected="false" aria-controls="resources-tab">本土资源</button>
+                <button class="nav-item" data-tab="employment" role="tab" aria-selected="false" aria-controls="employment-tab">就业对接</button>
+                <button class="nav-item teacher-only is-hidden" data-tab="teacher" role="tab" aria-selected="false" aria-controls="teacher-tab">教师管理</button>
+            </div>
+            <div class="nav-actions">
+                <div class="teacher-quick-menu is-hidden" id="teacher-quick-menu">
+                    <div class="msg-center-wrap">
+                        <button class="icon-btn" id="quick-message-btn" title="消息通知">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge is-hidden" id="message-badge">0</span>
+                        </button>
+                        <div class="msg-dropdown" id="msg-dropdown">
+                            <div class="msg-dropdown-header">
+                                <h4>消息中心</h4>
+                                <div class="msg-dropdown-actions">
+                                    <button id="msg-mark-all-read" title="全部已读"><i class="fas fa-check-double"></i></button>
+                                    <button id="msg-clear-read" title="清除已读"><i class="fas fa-trash-can"></i></button>
+                                </div>
+                            </div>
+                            <div class="msg-dropdown-tabs">
+                                <button class="msg-tab-btn active" data-tab="notifications"><i class="fas fa-bell"></i> 通知</button>
+                                <button class="msg-tab-btn" data-tab="messages"><i class="fas fa-envelope"></i> 私信</button>
+                            </div>
+                            <div class="msg-dropdown-body" id="msg-notifications-list">
+                                <div class="msg-empty">暂无通知</div>
+                            </div>
+                            <div class="msg-dropdown-body is-hidden" id="msg-messages-list">
+                                <div class="msg-empty">暂无私信</div>
+                            </div>
+                            <div class="msg-dropdown-footer">
+                                <button id="msg-compose-btn"><i class="fas fa-pen"></i> 写消息</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-info is-hidden" id="user-info">
+                    <div class="user-avatar-wrap" id="user-dropdown-trigger">
+                        <div class="avatar-circle"><i class="fas fa-user"></i></div>
+                        <div class="user-meta">
+                            <span class="user-name" id="user-name">未登录</span>
+                            <span class="user-role" id="user-role">guest</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="dropdown-menu is-hidden" id="user-dropdown-menu">
+                        <div class="dropdown-header">
+                            <span class="dropdown-name" id="dropdown-name">用户名</span>
+                            <span class="dropdown-email" id="dropdown-email">user@example.com</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="profile-settings"><i class="fas fa-user-cog"></i> 个人设置</button>
+                        <button class="dropdown-item teacher-only" id="teaching-dashboard"><i class="fas fa-tachometer-alt"></i> 教学面板</button>
+                        <div class="dropdown-divider teacher-only"></div>
+                        <button class="dropdown-item" id="help-center"><i class="fas fa-question-circle"></i> 帮助中心</button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item logout" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                    </div>
+                </div>
+                <div class="login-section" id="login-section">
+                    <button class="btn btn-primary btn-sm" id="login-btn">
+                        <i class="fas fa-sign-in-alt"></i> 登录
+                    </button>
+                </div>
+                <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="connection-dot" id="connection-status">
+                    <span class="dot"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 面包屑导航 -->
+    <div class="breadcrumb-bar" id="breadcrumb-bar">
+        <div class="container">
+            <span class="breadcrumb-item"><i class="fas fa-home"></i> 首页</span>
+            <i class="fas fa-chevron-right breadcrumb-sep"></i>
+            <span class="breadcrumb-item active" id="breadcrumb-current">农业技能</span>
+        </div>
+    </div>
+
+    <!-- Hero区域 -->
+    <section class="hero" id="hero">
+        <canvas class="hero-particles" id="hero-particles"></canvas>
+        <div class="hero-grid-lines"></div>
+        <div class="hero-content">
+            <div class="hero-badge">AI + 乡村振兴</div>
+            <h1 class="hero-title">AI驱动的<br>农村人才赋能平台</h1>
+            <p class="hero-subtitle">融合人工智能与本土文化，为广东农村人才提供技能培训、电商运营、非遗传承一站式解决方案</p>
+            <div class="hero-actions">
+                <button class="btn btn-primary btn-lg" onclick="switchTab('agriculture')">
+                    开始学习 <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="btn btn-ghost btn-lg" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+                    了解更多
+                </button>
+            </div>
+        </div>
+        <div class="hero-stats">
+            <div class="stat-item">
+                <span class="stat-number" data-target="12000">0</span>
+                <span class="stat-label">服务农户</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-number" data-target="86">0</span>
+                <span class="stat-label">培训课程</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <span class="stat-number" data-target="3500">0</span>
+                <span class="stat-label">就业对接</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- 功能导航条 -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-label">核心功能</div>
+            <h2 class="section-title">全方位赋能农村人才</h2>
+            <p class="section-desc">七大功能模块，覆盖农业技能、电商运营、非遗传承、就业对接全链条</p>
+            <div class="feature-tabs" role="tablist" aria-label="功能模块">
+                <button class="feature-tab active" data-tab="agriculture" role="tab" aria-selected="true" aria-controls="agriculture-tab">
+                    <i class="fas fa-leaf"></i>
+                    <span>农业技能</span>
+                </button>
+                <button class="feature-tab" data-tab="ecommerce">
+                    <i class="fas fa-shopping-cart"></i>
+                    <span>电商运营</span>
+                </button>
+                <button class="feature-tab" data-tab="crafts">
+                    <i class="fas fa-paint-brush"></i>
+                    <span>手工传承</span>
+                </button>
+                <button class="feature-tab" data-tab="simulation">
+                    <i class="fas fa-vr-cardboard"></i>
+                    <span>虚拟实训</span>
+                </button>
+                <button class="feature-tab" data-tab="resources">
+                    <i class="fas fa-book"></i>
+                    <span>本土资源</span>
+                </button>
+                <button class="feature-tab" data-tab="employment">
+                    <i class="fas fa-briefcase"></i>
+                    <span>就业对接</span>
+                </button>
+                <button class="feature-tab teacher-only is-hidden" data-tab="teacher">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                    <span>教师管理</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 主内容区域 -->
+    <main class="main-content" id="main-content" tabindex="-1">
+        <!-- 农业技能培训 -->
+        <div class="tab-content active" id="agriculture-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="section-label">Agriculture</div>
+                <h2 class="section-title">智能农业技能培训</h2>
+                <p class="section-desc">针对广东特色农产品，AI智能推送农时管理要点</p>
+
+                <!-- 产品选择 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-tags"></i> 选择农产品</h3>
+                    <div class="product-grid">
+                        <div class="product-card active" data-product="lychee">
+                            <div class="product-icon"><i class="fas fa-apple-alt"></i></div>
+                            <h4>荔枝</h4>
+                            <p>广东特色水果</p>
+                        </div>
+                        <div class="product-card" data-product="longan">
+                            <div class="product-icon"><i class="fas fa-circle"></i></div>
+                            <h4>龙眼</h4>
+                            <p>岭南佳果</p>
+                        </div>
+                        <div class="product-card" data-product="aquatic">
+                            <div class="product-icon"><i class="fas fa-fish"></i></div>
+                            <h4>水产养殖</h4>
+                            <p>鱼虾蟹贝</p>
+                        </div>
+                        <div class="product-card" data-product="rice">
+                            <div class="product-icon"><i class="fas fa-seedling"></i></div>
+                            <h4>水稻</h4>
+                            <p>主要粮食作物</p>
+                        </div>
+                        <div class="product-card" data-product="tea">
+                            <div class="product-icon"><i class="fas fa-mug-hot"></i></div>
+                            <h4>茶叶</h4>
+                            <p>广东名茶</p>
+                        </div>
+                        <div class="product-card" data-product="vegetable">
+                            <div class="product-icon"><i class="fas fa-carrot"></i></div>
+                            <h4>蔬菜</h4>
+                            <p>时令蔬菜</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 农时日历 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-calendar"></i> 农时智能日历</h3>
+                    <div class="calendar-layout">
+                        <div class="calendar-main">
+                            <div class="calendar-nav">
+                                <button class="icon-btn" id="prev-month" aria-label="上个月"><i class="fas fa-chevron-left"></i></button>
+                                <span class="calendar-month" id="current-month">2024年6月</span>
+                                <button class="icon-btn" id="next-month" aria-label="下个月"><i class="fas fa-chevron-right"></i></button>
+                            </div>
+                            <div class="calendar-grid" id="calendar-grid"></div>
+                        </div>
+                        <div class="calendar-tasks">
+                            <h4><i class="fas fa-tasks"></i> 本月农事要点</h4>
+                            <div class="task-list" id="farming-task-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI问答 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-robot"></i> AI农技问答</h3>
+                    <div class="qa-chat-wrap">
+                        <div class="qa-chat-flow" id="qa-chat-flow">
+                            <div class="qa-welcome">
+                                <i class="fas fa-robot"></i>
+                                <p>你好！我是AI农技专家，专注于<strong id="qa-product-label">荔枝</strong>种植指导。有什么问题尽管问我！</p>
+                            </div>
+                        </div>
+                        <div class="qa-suggestions" id="qa-suggestions">
+                            <button class="example-btn" data-question="荔枝花期如何管理？">荔枝花期管理</button>
+                            <button class="example-btn" data-question="荔枝如何防治霜疫霉病？">霜疫霉病防治</button>
+                            <button class="example-btn" data-question="荔枝膨大期施什么肥？">膨大期施肥</button>
+                            <button class="example-btn" data-question="荔枝采后怎样恢复树势？">采后管理</button>
+                        </div>
+                        <div class="qa-input-bar">
+                            <textarea id="agriculture-question" placeholder="输入你的农业问题..." rows="1"></textarea>
+                            <button class="btn btn-primary" id="ask-agriculture-btn" aria-label="发送">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="qa-toolbar">
+                            <button class="qa-toolbar-btn" id="qa-clear-btn"><i class="fas fa-trash-alt"></i> 清空对话</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 电商运营实训 -->
+        <div class="tab-content" id="ecommerce-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="section-label">E-Commerce</div>
+                <h2 class="section-title">电商运营实训</h2>
+                <p class="section-desc">模拟直播后台，AI生成带货话术，助力农产品上行</p>
+
+                <div class="module-grid">
+                    <div class="module-card" data-module="live-stream">
+                        <div class="module-icon"><i class="fas fa-video"></i></div>
+                        <h4>直播带货实训</h4>
+                        <p>模拟直播间，练习直播技巧</p>
+                        <button class="btn btn-primary btn-sm">开始实训</button>
+                    </div>
+                    <div class="module-card" data-module="product-copy">
+                        <div class="module-icon"><i class="fas fa-edit"></i></div>
+                        <h4>商品文案创作</h4>
+                        <p>AI辅助撰写商品描述</p>
+                        <button class="btn btn-primary btn-sm">开始创作</button>
+                    </div>
+                    <div class="module-card" data-module="store-design">
+                        <div class="module-icon"><i class="fas fa-store"></i></div>
+                        <h4>店铺装修指导</h4>
+                        <p>优化店铺视觉，提升转化</p>
+                        <button class="btn btn-primary btn-sm">开始设计</button>
+                    </div>
+                    <div class="module-card" data-module="customer-service">
+                        <div class="module-icon"><i class="fas fa-headset"></i></div>
+                        <h4>客户服务模拟</h4>
+                        <p>练习处理客户咨询</p>
+                        <button class="btn btn-primary btn-sm">开始练习</button>
+                    </div>
+                </div>
+
+                <!-- 直播模拟区 -->
+                <div class="live-panel is-hidden" id="live-simulation">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-broadcast-tower"></i> 直播模拟训练</h3>
+                        <div class="panel-header-actions">
+                            <span class="live-badge" id="live-badge"><i class="fas fa-circle"></i> 模拟直播中</span>
+                            <button class="icon-btn" id="close-simulation"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="live-layout">
+                        <div class="live-preview">
+                            <div class="live-cam">
+                                <div class="cam-overlay">
+                                    <i class="fas fa-video-slash"></i>
+                                    <p>摄像头预览区</p>
+                                    <span>点击开启摄像头</span>
+                                </div>
+                                <div class="cam-product-tag" id="cam-product-tag"><i class="fas fa-apple-alt"></i> <span>荔枝</span></div>
+                            </div>
+                            <div class="live-stats">
+                                <span><i class="fas fa-eye"></i> <strong id="viewer-count">0</strong> 观众</span>
+                                <span><i class="fas fa-heart"></i> <strong id="like-count">0</strong> 点赞</span>
+                                <span><i class="fas fa-comment"></i> <strong id="comment-count">0</strong> 评论</span>
+                                <span><i class="fas fa-clock"></i> <strong id="live-duration">00:00</strong></span>
+                            </div>
+                            <div class="live-comments" id="live-comments">
+                                <div class="comment-item"><span class="comment-user">系统：</span>直播间已开启，等待观众进入...</div>
+                            </div>
+                        </div>
+                        <div class="live-right-panel">
+                            <div class="live-script-panel">
+                                <div class="script-toolbar">
+                                    <h4><i class="fas fa-scroll"></i> AI带货话术</h4>
+                                    <div class="script-style-btns">
+                                        <button class="style-btn active" data-style="热情">热情型</button>
+                                        <button class="style-btn" data-style="专业">专业型</button>
+                                        <button class="style-btn" data-style="故事">故事型</button>
+                                        <button class="style-btn" data-style="高级">高级感</button>
+                                    </div>
+                                </div>
+                                <div class="script-box" id="live-script">
+                                    <div class="script-placeholder">
+                                        <i class="fas fa-magic"></i>
+                                        <p>选择话术风格，点击"生成话术"开始</p>
+                                    </div>
+                                </div>
+                                <div class="script-actions">
+                                    <button class="btn btn-success" id="generate-script"><i class="fas fa-magic"></i> 生成话术</button>
+                                    <button class="btn btn-outline btn-sm" id="copy-script"><i class="fas fa-copy"></i> 复制</button>
+                                </div>
+                            </div>
+                            <div class="ai-feedback" id="ai-feedback">
+                                <div class="feedback-header">
+                                    <h4><i class="fas fa-chart-bar"></i> AI实时评分</h4>
+                                    <button class="btn btn-outline btn-sm is-hidden" id="re-score-btn"><i class="fas fa-redo"></i> 重新评分</button>
+                                </div>
+                                <div class="feedback-placeholder" id="feedback-placeholder">
+                                    <i class="fas fa-spinner"></i>
+                                    <p>生成话术后将自动进行AI评分分析</p>
+                                </div>
+                                <div class="feedback-body is-hidden" id="feedback-body">
+                                    <div class="feedback-overall" id="feedback-overall">
+                                        <div class="overall-score" id="overall-score">-</div>
+                                        <div class="overall-label" id="overall-label">综合评分</div>
+                                        <div class="overall-grade" id="overall-grade"></div>
+                                    </div>
+                                    <div class="feedback-metrics" id="feedback-metrics"></div>
+                                    <div class="feedback-suggestions is-hidden" id="feedback-suggestions">
+                                        <h5><i class="fas fa-lightbulb"></i> 改进建议</h5>
+                                        <div class="suggestions-list" id="suggestions-list"></div>
+                                    </div>
+                                    <div class="feedback-summary is-hidden" id="feedback-summary"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 手工技能传承 -->
+        <div class="tab-content" id="crafts-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="section-label">Heritage Crafts</div>
+                <h2 class="section-title">非遗手工技能传承</h2>
+                <p class="section-desc">数字化保存传统手工艺技法，3D步骤拆解，AR虚拟操作指导</p>
+
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-palette"></i> 选择手工艺</h3>
+                    <div class="craft-grid">
+                        <div class="craft-card active" data-craft="embroidery">
+                            <div class="craft-visual"><i class="fas fa-cut"></i></div>
+                            <div class="craft-info">
+                                <h4>广绣</h4>
+                                <p>国家级非物质文化遗产</p>
+                                <span class="tag">入门级</span>
+                            </div>
+                        </div>
+                        <div class="craft-card" data-craft="woodcarving">
+                            <div class="craft-visual"><i class="fas fa-tree"></i></div>
+                            <div class="craft-info">
+                                <h4>潮汕木雕</h4>
+                                <p>传统雕刻艺术</p>
+                                <span class="tag">进阶级</span>
+                            </div>
+                        </div>
+                        <div class="craft-card" data-craft="ceramics">
+                            <div class="craft-visual"><i class="fas fa-mug-hot"></i></div>
+                            <div class="craft-info">
+                                <h4>石湾陶艺</h4>
+                                <p>佛山传统工艺</p>
+                                <span class="tag">中级</span>
+                            </div>
+                        </div>
+                        <div class="craft-card" data-craft="lacquer">
+                            <div class="craft-visual"><i class="fas fa-paint-roller"></i></div>
+                            <div class="craft-info">
+                                <h4>阳江漆器</h4>
+                                <p>传统漆艺</p>
+                                <span class="tag">高级</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3D教学 -->
+                <div class="card-section">
+                    <div class="panel-header">
+                        <h3 class="card-section-title"><i class="fas fa-cube"></i> 3D互动教学</h3>
+                        <div class="control-group">
+                            <button class="btn btn-outline btn-sm" id="slow-play"><i class="fas fa-play"></i> 慢放</button>
+                            <button class="btn btn-outline btn-sm" id="pause-play"><i class="fas fa-pause"></i> 暂停</button>
+                            <button class="btn btn-outline btn-sm" id="multi-angle"><i class="fas fa-sync-alt"></i> 多角度</button>
+                        </div>
+                    </div>
+                    <div class="learning-layout">
+                        <div class="viewer-3d">
+                            <div class="viewer-placeholder">
+                                <i class="fas fa-cube"></i>
+                                <p>3D模型加载中...</p>
+                            </div>
+                        </div>
+                        <div class="step-guide">
+                            <h4>制作步骤</h4>
+                            <div class="steps-list" id="craft-steps">
+                                <div class="step active"><span class="step-num">1</span><div><h5>准备材料</h5><p>绣布、绣针、丝线</p></div></div>
+                                <div class="step"><span class="step-num">2</span><div><h5>图案设计</h5><p>绘制或转印图案</p></div></div>
+                                <div class="step"><span class="step-num">3</span><div><h5>基础针法</h5><p>直针、扭针等</p></div></div>
+                                <div class="step"><span class="step-num">4</span><div><h5>色彩搭配</h5><p>丝线配色技巧</p></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 材料采购 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-shopping-basket"></i> 材料采购指南</h3>
+                    <div class="materials-grid">
+                        <div class="material-card">
+                            <div class="material-icon"><i class="fas fa-cut"></i></div>
+                            <h4>绣针套装</h4>
+                            <p>各种型号绣针</p>
+                            <span class="price-tag">¥35-80</span>
+                        </div>
+                        <div class="material-card">
+                            <div class="material-icon"><i class="fas fa-palette"></i></div>
+                            <h4>丝线材料</h4>
+                            <p>真丝绣线12色</p>
+                            <span class="price-tag">¥45-120</span>
+                        </div>
+                        <div class="material-card">
+                            <div class="material-icon"><i class="fas fa-scroll"></i></div>
+                            <h4>绣布底料</h4>
+                            <p>丝绸绣布</p>
+                            <span class="price-tag">¥25-60</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 虚拟实训沙盒 -->
+        <div class="tab-content" id="simulation-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="section-label">Simulation</div>
+                <h2 class="section-title">虚拟实训沙盒</h2>
+                <p class="section-desc">安全的虚拟环境中进行实践训练，AI实时指导纠错</p>
+
+                <div class="module-grid">
+                    <div class="sim-module-card" data-sim="pest-diagnosis">
+                        <div class="module-icon"><i class="fas fa-bug"></i></div>
+                        <h4>病虫害诊断</h4>
+                        <p>选择作物类型，描述症状，AI智能诊断</p>
+                        <button class="btn btn-primary btn-sm">开始实训</button>
+                    </div>
+                    <div class="sim-module-card" data-sim="live-practice">
+                        <div class="module-icon"><i class="fas fa-broadcast-tower"></i></div>
+                        <h4>直播间实训</h4>
+                        <p>5大场景，练习直播带货全流程</p>
+                        <button class="btn btn-primary btn-sm">开始练习</button>
+                    </div>
+                    <div class="sim-module-card" data-sim="craft-ar">
+                        <div class="module-icon"><i class="fas fa-hands"></i></div>
+                        <h4>手工AR指导</h4>
+                        <p>分步指导，实时纠错，学传统手艺</p>
+                        <button class="btn btn-primary btn-sm">开始体验</button>
+                    </div>
+                </div>
+
+                <!-- 病虫害诊断区 -->
+                <div class="sim-panel is-hidden" id="pest-diagnosis-area">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-bug"></i> 病虫害AI诊断实训</h3>
+                        <button class="icon-btn sim-close-btn" data-target="pest-diagnosis-area"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <div class="diagnosis-setup">
+                        <div class="crop-selector">
+                            <label>选择作物类型</label>
+                            <div class="crop-options" id="crop-options">
+                                <button class="crop-btn active" data-crop="lychee">🍎 荔枝</button>
+                                <button class="crop-btn" data-crop="longan">🟤 龙眼</button>
+                                <button class="crop-btn" data-crop="banana">🍌 香蕉</button>
+                                <button class="crop-btn" data-crop="citrus">🍊 柑橘</button>
+                            </div>
+                        </div>
+                        <div class="symptom-input-area">
+                            <label>描述症状（可选，不填则AI自动分析）</label>
+                            <textarea id="symptom-text" placeholder="例如：叶片发黄，有褐色斑点，部分果实脱落...&#10;描述越详细，诊断越准确" rows="3"></textarea>
+                        </div>
+                        <div class="diagnosis-actions">
+                            <button class="btn btn-primary" id="start-diagnosis"><i class="fas fa-search"></i> 开始AI诊断</button>
+                            <button class="btn btn-outline" id="upload-photo-btn"><i class="fas fa-camera"></i> 上传照片</button>
+                        </div>
+                        <input type="file" id="plant-image" accept="image/*" style="display:none;">
+                    </div>
+
+                    <div class="diagnosis-result is-hidden" id="diagnosis-result">
+                        <div class="result-header">
+                            <h4><i class="fas fa-stethoscope"></i> AI诊断结果</h4>
+                            <span class="severity-badge" id="severity-badge">中度</span>
+                        </div>
+                        <div class="result-info">
+                            <div class="disease-badge">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span id="disease-name"></span>
+                            </div>
+                            <div class="confidence">
+                                <label>置信度</label>
+                                <div class="progress-bar"><div class="progress-fill" id="confidence-fill"></div></div>
+                                <span id="confidence-text"></span>
+                            </div>
+                        </div>
+                        <div class="diagnosis-grid">
+                            <div class="diagnosis-section">
+                                <h5><i class="fas fa-thermometer-half"></i> 症状表现</h5>
+                                <ul id="symptoms-list"></ul>
+                            </div>
+                            <div class="diagnosis-section">
+                                <h5><i class="fas fa-prescription-bottle-alt"></i> 防治方案</h5>
+                                <ul id="treatment-list"></ul>
+                            </div>
+                            <div class="diagnosis-section">
+                                <h5><i class="fas fa-shield-alt"></i> 预防措施</h5>
+                                <ul id="prevention-list"></ul>
+                            </div>
+                        </div>
+                        <div class="diagnosis-extra">
+                            <div class="extra-item" id="timing-item">
+                                <i class="fas fa-clock"></i>
+                                <span><strong>最佳防治期：</strong><em id="timing-text"></em></span>
+                            </div>
+                            <div class="extra-item" id="note-item">
+                                <i class="fas fa-info-circle"></i>
+                                <span id="note-text"></span>
+                            </div>
+                        </div>
+                        <div class="diagnosis-actions">
+                            <button class="btn btn-outline btn-sm" id="re-diagnose"><i class="fas fa-redo"></i> 重新诊断</button>
+                            <button class="btn btn-outline btn-sm" id="copy-diagnosis"><i class="fas fa-copy"></i> 复制结果</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 直播间实训区 -->
+                <div class="sim-panel is-hidden" id="live-practice-area">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-broadcast-tower"></i> 直播间实训</h3>
+                        <button class="icon-btn sim-close-btn" data-target="live-practice-area"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <div class="live-practice-layout">
+                        <div class="scenario-sidebar">
+                            <h4>训练场景</h4>
+                            <div class="scenario-list" id="scenario-list">
+                                <div class="scenario-card active" data-scenario="opening">
+                                    <div class="scenario-icon">🎬</div>
+                                    <div class="scenario-info">
+                                        <strong>开场白</strong>
+                                        <span>30秒抓住注意力</span>
+                                    </div>
+                                </div>
+                                <div class="scenario-card" data-scenario="product_intro">
+                                    <div class="scenario-icon">📦</div>
+                                    <div class="scenario-info">
+                                        <strong>产品介绍</strong>
+                                        <span>有逻辑地展示卖点</span>
+                                    </div>
+                                </div>
+                                <div class="scenario-card" data-scenario="interaction">
+                                    <div class="scenario-icon">💬</div>
+                                    <div class="scenario-info">
+                                        <strong>互动引导</strong>
+                                        <span>提升观众参与感</span>
+                                    </div>
+                                </div>
+                                <div class="scenario-card" data-scenario="closing">
+                                    <div class="scenario-icon">🔥</div>
+                                    <div class="scenario-info">
+                                        <strong>促单话术</strong>
+                                        <span>推动观众下单</span>
+                                    </div>
+                                </div>
+                                <div class="scenario-card" data-scenario="objection">
+                                    <div class="scenario-icon">🛡️</div>
+                                    <div class="scenario-info">
+                                        <strong>异议处理</strong>
+                                        <span>应对质疑和犹豫</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="practice-main">
+                            <div class="practice-prompt" id="practice-prompt">
+                                <h4>训练任务</h4>
+                                <p id="scenario-desc">练习如何在30秒内抓住观众注意力</p>
+                                <div class="prompt-examples" id="prompt-examples">
+                                    <span class="prompt-tag">请用一句话欢迎观众并介绍今天的产品</span>
+                                    <span class="prompt-tag">设计一个引起好奇心的开场</span>
+                                    <span class="prompt-tag">用一个故事开头吸引观众</span>
+                                </div>
+                            </div>
+
+                            <div class="practice-input-area">
+                                <textarea id="practice-text" placeholder="在这里输入你的直播话术...&#10;输入完成后点击评分，AI会给你详细反馈" rows="5"></textarea>
+                                <div class="practice-actions">
+                                    <button class="btn btn-primary" id="score-practice"><i class="fas fa-star"></i> AI评分</button>
+                                    <button class="btn btn-outline btn-sm" id="clear-practice"><i class="fas fa-eraser"></i> 清空</button>
+                                </div>
+                            </div>
+
+                            <div class="practice-tips" id="practice-tips">
+                                <h5><i class="fas fa-lightbulb"></i> 技巧提示</h5>
+                                <ul>
+                                    <li>前5秒决定观众去留</li>
+                                    <li>要有悬念或利益点</li>
+                                    <li>声音要有感染力</li>
+                                </ul>
+                            </div>
+
+                            <div class="practice-score is-hidden" id="practice-score">
+                                <h4><i class="fas fa-chart-bar"></i> AI评分报告</h4>
+                                <div class="score-metrics" id="score-metrics"></div>
+                                <div class="score-feedback" id="score-feedback"></div>
+                                <div class="score-highlights" id="score-highlights"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 手工AR指导区 -->
+                <div class="sim-panel is-hidden" id="craft-ar-area">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-hands"></i> 手工AR指导</h3>
+                        <button class="icon-btn sim-close-btn" data-target="craft-ar-area"><i class="fas fa-times"></i></button>
+                    </div>
+
+                    <div class="craft-ar-layout">
+                        <div class="craft-selector">
+                            <button class="craft-ar-btn active" data-craft="embroidery">🧵 广绣</button>
+                            <button class="craft-ar-btn" data-craft="woodcarving">🪵 木雕</button>
+                            <button class="craft-ar-btn" data-craft="ceramics">🏺 陶瓷</button>
+                        </div>
+
+                        <div class="ar-viewer">
+                            <div class="ar-canvas" id="ar-canvas">
+                                <div class="ar-placeholder">
+                                    <i class="fas fa-cube"></i>
+                                    <p>3D操作预览区</p>
+                                    <span>选择步骤查看详细指导</span>
+                                </div>
+                                <div class="ar-step-display is-hidden" id="ar-step-display">
+                                    <div class="ar-step-visual">
+                                        <div class="ar-step-number" id="ar-step-number">1</div>
+                                        <div class="ar-step-title" id="ar-step-title"></div>
+                                    </div>
+                                    <div class="ar-step-animation">
+                                        <div class="hand-guide" id="hand-guide">
+                                            <i class="fas fa-hand-point-up"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="ar-steps-panel">
+                            <h4>步骤导航</h4>
+                            <div class="ar-steps-nav" id="ar-steps-nav"></div>
+                        </div>
+
+                        <div class="ar-guide-content" id="ar-guide-content">
+                            <div class="guide-section">
+                                <h5><i class="fas fa-info-circle"></i> 步骤说明</h5>
+                                <p id="guide-desc"></p>
+                            </div>
+                            <div class="guide-section">
+                                <h5><i class="fas fa-hand-pointer"></i> 操作动作</h5>
+                                <p id="guide-action"></p>
+                            </div>
+                            <div class="guide-section">
+                                <h5><i class="fas fa-check-circle"></i> 完成标准</h5>
+                                <p id="guide-check"></p>
+                            </div>
+                            <div class="guide-section">
+                                <h5><i class="fas fa-exclamation-circle"></i> 常见错误</h5>
+                                <ul id="guide-mistakes"></ul>
+                            </div>
+                            <div class="guide-section">
+                                <h5><i class="fas fa-gem"></i> 专业技巧</h5>
+                                <ul id="guide-tips"></ul>
+                            </div>
+                            <div class="guide-meta">
+                                <span id="guide-time"><i class="fas fa-clock"></i> 预计耗时：--</span>
+                                <span id="guide-step-count"><i class="fas fa-list-ol"></i> 步骤 --/--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 本土化资源库 -->
+        <div class="tab-content" id="resources-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="section-label">Local Resources</div>
+                <h2 class="section-title">本土化资源库</h2>
+                <p class="section-desc">方言交互支持、本地成功案例、政策信息推送</p>
+
+                <!-- 方言交互 -->
+                <div class="card-section dialect-section">
+                    <h3 class="card-section-title"><i class="fas fa-microphone"></i> 方言语音交互</h3>
+
+                    <div class="dialect-cards" id="dialect-cards">
+                        <div class="dialect-card active" data-dialect="cantonese">
+                            <div class="dialect-card-header">
+                                <span class="dialect-emoji">🗣️</span>
+                                <div>
+                                    <strong>粤语</strong>
+                                    <span>广州话</span>
+                                </div>
+                            </div>
+                            <div class="dialect-card-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> 广州、深圳、佛山...</span>
+                                <span><i class="fas fa-users"></i> ~7000万使用者</span>
+                            </div>
+                        </div>
+                        <div class="dialect-card" data-dialect="hakka">
+                            <div class="dialect-card-header">
+                                <span class="dialect-emoji">🏔️</span>
+                                <div>
+                                    <strong>客家话</strong>
+                                    <span>梅州话</span>
+                                </div>
+                            </div>
+                            <div class="dialect-card-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> 梅州、惠州、河源...</span>
+                                <span><i class="fas fa-users"></i> ~4500万使用者</span>
+                            </div>
+                        </div>
+                        <div class="dialect-card" data-dialect="teochew">
+                            <div class="dialect-card-header">
+                                <span class="dialect-emoji">🌊</span>
+                                <div>
+                                    <strong>潮汕话</strong>
+                                    <span>汕头话</span>
+                                </div>
+                            </div>
+                            <div class="dialect-card-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> 汕头、潮州、揭阳...</span>
+                                <span><i class="fas fa-users"></i> ~1500万使用者</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dialect-detail" id="dialect-detail">
+                        <div class="dialect-greeting">
+                            <div class="greeting-main" id="greeting-main">你好！食咗饭未？</div>
+                            <div class="greeting-meaning" id="greeting-meaning">（你好！吃饭了吗？）</div>
+                        </div>
+
+                        <div class="dialect-features" id="dialect-features">
+                            <span class="feature-tag">九声六调</span>
+                            <span class="feature-tag">保留古汉语词汇</span>
+                            <span class="feature-tag">大量外来语借词</span>
+                        </div>
+
+                        <div class="phrases-panel">
+                            <h4><i class="fas fa-language"></i> 常用短语</h4>
+                            <div class="phrases-grid" id="phrases-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="voice-chat-area">
+                        <div class="voice-chat-header">
+                            <h4><i class="fas fa-comments"></i> AI方言助手</h4>
+                            <button class="btn btn-outline btn-sm" id="clear-voice-chat"><i class="fas fa-trash-alt"></i> 清空</button>
+                        </div>
+                        <div class="voice-chat-messages" id="voice-chat-messages">
+                            <div class="voice-welcome">
+                                <i class="fas fa-robot"></i>
+                                <p>你好！我是方言农业助手，可以用普通话或方言向我提问</p>
+                            </div>
+                        </div>
+                        <div class="voice-quick-questions" id="voice-quick-questions"></div>
+                        <div class="voice-input-bar">
+                            <button class="voice-btn-small" id="voice-record-btn" title="语音输入">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <input type="text" id="voice-text-input" placeholder="输入你的问题..." />
+                            <button class="btn btn-primary btn-sm" id="voice-send-btn">
+                                <i class="fas fa-paper-plane"></i> 发送
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 成功案例 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-trophy"></i> 本地成功案例</h3>
+                    <div class="cases-grid">
+                        <div class="case-card">
+                            <div class="case-visual"><i class="fas fa-map-marker-alt"></i></div>
+                            <div class="case-body">
+                                <h4>梅州某村电商转型之路</h4>
+                                <p>从传统农业到年销售额500万的电商村</p>
+                                <div class="case-stats">
+                                    <span><i class="fas fa-users"></i> 带动30户农户</span>
+                                    <span><i class="fas fa-chart-line"></i> 收入增长300%</span>
+                                </div>
+                                <a href="case-detail.html?id=1" class="btn btn-outline btn-sm" target="_blank">查看详情 <i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>
+                        <div class="case-card">
+                            <div class="case-visual"><i class="fas fa-map-marker-alt"></i></div>
+                            <div class="case-body">
+                                <h4>潮州手工艺人数字化传承</h4>
+                                <p>非遗技艺通过短视频平台焕发新生</p>
+                                <div class="case-stats">
+                                    <span><i class="fas fa-video"></i> 粉丝50万+</span>
+                                    <span><i class="fas fa-hand-holding-usd"></i> 月入2万+</span>
+                                </div>
+                                <a href="case-detail.html?id=2" class="btn btn-outline btn-sm" target="_blank">查看详情 <i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>
+                        <div class="case-card">
+                            <div class="case-visual"><i class="fas fa-map-marker-alt"></i></div>
+                            <div class="case-body">
+                                <h4>韶关有机农场品牌打造</h4>
+                                <p>从无名小农场到区域知名品牌</p>
+                                <div class="case-stats">
+                                    <span><i class="fas fa-leaf"></i> 有机认证</span>
+                                    <span><i class="fas fa-store"></i> 线上线下结合</span>
+                                </div>
+                                <a href="case-detail.html?id=3" class="btn btn-outline btn-sm" target="_blank">查看详情 <i class="fas fa-external-link-alt"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 政策信息 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-file-alt"></i> 政策信息推送</h3>
+                    <div class="policy-filters">
+                        <button class="policy-filter active" data-filter="all">全部</button>
+                        <button class="policy-filter" data-filter="补贴">补贴</button>
+                        <button class="policy-filter" data-filter="电商">电商</button>
+                        <button class="policy-filter" data-filter="非遗">非遗</button>
+                        <button class="policy-filter" data-filter="培训">培训</button>
+                        <button class="policy-filter" data-filter="认证">认证</button>
+                    </div>
+                    <div class="policy-grid" id="policy-grid">
+                        <div class="policy-card" data-category="补贴">
+                            <div class="policy-card-top">
+                                <div class="policy-icon-lg"><i class="fas fa-hand-holding-usd"></i></div>
+                                <span class="policy-tag tag-subsidy">补贴</span>
+                            </div>
+                            <h4>农业补贴申请指南</h4>
+                            <p>2026年广东省农业补贴政策解读及申请流程</p>
+                            <div class="policy-card-footer">
+                                <span class="policy-date"><i class="far fa-calendar-alt"></i> 2026-06-01</span>
+                                <span class="policy-detail-btn">查看详情 <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                        <div class="policy-card" data-category="电商">
+                            <div class="policy-card-top">
+                                <div class="policy-icon-lg"><i class="fas fa-shopping-cart"></i></div>
+                                <span class="policy-tag tag-ecommerce">电商</span>
+                            </div>
+                            <h4>农村电商扶持政策</h4>
+                            <p>农村电商创业补贴、培训补贴、物流补贴政策汇总</p>
+                            <div class="policy-card-footer">
+                                <span class="policy-date"><i class="far fa-calendar-alt"></i> 2026-05-15</span>
+                                <span class="policy-detail-btn">查看详情 <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                        <div class="policy-card" data-category="非遗">
+                            <div class="policy-card-top">
+                                <div class="policy-icon-lg"><i class="fas fa-university"></i></div>
+                                <span class="policy-tag tag-heritage">非遗</span>
+                            </div>
+                            <h4>非遗传承人认定办法</h4>
+                            <p>非物质文化遗产代表性传承人申报指南及支持措施</p>
+                            <div class="policy-card-footer">
+                                <span class="policy-date"><i class="far fa-calendar-alt"></i> 2026-05-01</span>
+                                <span class="policy-detail-btn">查看详情 <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                        <div class="policy-card" data-category="培训">
+                            <div class="policy-card-top">
+                                <div class="policy-icon-lg"><i class="fas fa-graduation-cap"></i></div>
+                                <span class="policy-tag tag-training">培训</span>
+                            </div>
+                            <h4>农业技术培训补贴</h4>
+                            <p>高素质农民培育计划，免费培训+生活补助</p>
+                            <div class="policy-card-footer">
+                                <span class="policy-date"><i class="far fa-calendar-alt"></i> 2026-04-20</span>
+                                <span class="policy-detail-btn">查看详情 <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                        <div class="policy-card" data-category="认证">
+                            <div class="policy-card-top">
+                                <div class="policy-icon-lg"><i class="fas fa-certificate"></i></div>
+                                <span class="policy-tag tag-cert">认证</span>
+                            </div>
+                            <h4>农产品质量安全认证</h4>
+                            <p>绿色食品、有机农产品、地理标志认证奖补政策</p>
+                            <div class="policy-card-footer">
+                                <span class="policy-date"><i class="far fa-calendar-alt"></i> 2026-04-01</span>
+                                <span class="policy-detail-btn">查看详情 <i class="fas fa-arrow-right"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 就业与供应链对接 -->
+        <div class="tab-content" id="employment-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="employment-container">
+                    <div class="section-label">Employment</div>
+                    <h2 class="section-title">就业与供应链对接</h2>
+                    <p class="section-desc">技能证书认证、人才供需匹配、创业支持服务</p>
+
+                    <!-- 搜索筛选栏 -->
+                    <div class="emp-search-bar">
+                        <div class="emp-search-input-wrap">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="emp-keyword" placeholder="搜索职位、公司、技能...">
+                        </div>
+                        <select id="emp-location-filter">
+                            <option value="">工作地点</option>
+                            <option value="广州">广州</option>
+                            <option value="深圳">深圳</option>
+                            <option value="茂名">茂名</option>
+                            <option value="梅州">梅州</option>
+                            <option value="佛山">佛山</option>
+                            <option value="湛江">湛江</option>
+                            <option value="汕头">汕头</option>
+                            <option value="惠州">惠州</option>
+                            <option value="潮州">潮州</option>
+                            <option value="阳江">阳江</option>
+                        </select>
+                        <select id="emp-salary-filter">
+                            <option value="">薪资范围</option>
+                            <option value="3000-5000">3K-5K</option>
+                            <option value="5000-8000">5K-8K</option>
+                            <option value="8000-12000">8K-12K</option>
+                            <option value="12000+">12K以上</option>
+                        </select>
+                        <select id="emp-category-filter">
+                            <option value="">职位类型</option>
+                            <option value="农业技术">农业技术</option>
+                            <option value="电商运营">电商运营</option>
+                            <option value="手工工艺">手工工艺</option>
+                            <option value="乡村旅游">乡村旅游</option>
+                            <option value="物流仓储">物流仓储</option>
+                        </select>
+                        <button class="btn btn-primary" id="emp-search-btn">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+
+                    <!-- 主布局：列表 + 侧边栏 -->
+                    <div class="emp-layout">
+
+                        <!-- 左侧：主内容 -->
+                        <div class="emp-main">
+                            <div class="emp-tabs">
+                                <button class="emp-tab active" data-emp-tab="jobs">全部职位</button>
+                                <button class="emp-tab" data-emp-tab="applications">我的投递</button>
+                                <button class="emp-tab" data-emp-tab="saved">收藏职位</button>
+                            </div>
+
+                            <!-- 全部职位 -->
+                            <div class="emp-panel active" id="emp-jobs-panel">
+                                <div class="emp-job-count">共 <span id="emp-job-total">0</span> 个职位</div>
+                                <div class="emp-job-list" id="emp-job-list"></div>
+                                <div class="emp-empty" id="emp-jobs-empty" style="display:none;">
+                                    <i class="fas fa-search"></i>
+                                    <p>未找到匹配的职位</p>
+                                </div>
+                            </div>
+
+                            <!-- 我的投递 -->
+                            <div class="emp-panel" id="emp-applications-panel">
+                                <div class="emp-app-tabs">
+                                    <button class="emp-app-tab active" data-status="all">全部</button>
+                                    <button class="emp-app-tab" data-status="pending">待审核</button>
+                                    <button class="emp-app-tab" data-status="approved">已通过</button>
+                                    <button class="emp-app-tab" data-status="rejected">已拒绝</button>
+                                </div>
+                                <div class="emp-app-list" id="emp-app-list"></div>
+                            </div>
+
+                            <!-- 收藏职位 -->
+                            <div class="emp-panel" id="emp-saved-panel">
+                                <div class="emp-job-list" id="emp-saved-list"></div>
+                                <div class="emp-empty" id="emp-saved-empty" style="display:none;">
+                                    <i class="far fa-heart"></i>
+                                    <p>暂无收藏的职位</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：侧边栏 -->
+                        <div class="emp-sidebar">
+                            <!-- 快捷统计 -->
+                            <div class="emp-stats-card">
+                                <div class="emp-stat">
+                                    <span class="emp-stat-num" id="emp-stat-applied">0</span>
+                                    <span class="emp-stat-label">已投递</span>
+                                </div>
+                                <div class="emp-stat">
+                                    <span class="emp-stat-num" id="emp-stat-saved">0</span>
+                                    <span class="emp-stat-label">已收藏</span>
+                                </div>
+                                <div class="emp-stat">
+                                    <span class="emp-stat-num" id="emp-stat-messages">0</span>
+                                    <span class="emp-stat-label">消息</span>
+                                </div>
+                            </div>
+
+                            <!-- 积分 -->
+                            <div class="emp-sidebar-card emp-points-card">
+                                <div class="emp-points-header">
+                                    <div class="emp-points-icon"><i class="fas fa-coins"></i></div>
+                                    <div class="emp-points-info">
+                                        <span class="emp-points-num" id="emp-points-balance">0</span>
+                                        <span class="emp-points-label">可用积分</span>
+                                    </div>
+                                </div>
+                                <div class="emp-points-divider"></div>
+                                <div class="emp-points-exchange-title">积分兑换</div>
+                                <div class="emp-points-exchange-grid">
+                                    <div class="exchange-item">
+                                        <div class="exchange-item-icon"><i class="fas fa-seedling"></i></div>
+                                        <span class="exchange-item-name">化肥优惠券</span>
+                                        <span class="points-cost">200</span>
+                                    </div>
+                                    <div class="exchange-item">
+                                        <div class="exchange-item-icon"><i class="fas fa-box"></i></div>
+                                        <span class="exchange-item-name">种子套装</span>
+                                        <span class="points-cost">500</span>
+                                    </div>
+                                    <div class="exchange-item">
+                                        <div class="exchange-item-icon"><i class="fas fa-tools"></i></div>
+                                        <span class="exchange-item-name">农具折扣</span>
+                                        <span class="points-cost">300</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 证书摘要 -->
+                            <div class="emp-sidebar-card">
+                                <h4><i class="fas fa-certificate"></i> 技能证书</h4>
+                                <div id="emp-cert-summary"></div>
+                            </div>
+
+                            <!-- 创业支持 -->
+                            <div class="emp-sidebar-card emp-startup-card">
+                                <div class="emp-startup-header">
+                                    <div class="emp-startup-icon"><i class="fas fa-rocket"></i></div>
+                                    <div class="emp-startup-info">
+                                        <span class="emp-startup-title">创业支持</span>
+                                        <span class="emp-startup-subtitle">3项专业服务</span>
+                                    </div>
+                                </div>
+                                <div class="emp-startup-list">
+                                    <div class="emp-startup-item" data-support="0">
+                                        <div class="emp-startup-item-icon"><i class="fas fa-file-alt"></i></div>
+                                        <div class="emp-startup-item-info">
+                                            <span class="emp-startup-item-name">项目申报指导</span>
+                                            <span class="emp-startup-item-desc">农业产业化、乡村振兴项目</span>
+                                        </div>
+                                        <i class="fas fa-chevron-right emp-startup-arrow"></i>
+                                    </div>
+                                    <div class="emp-startup-item" data-support="1">
+                                        <div class="emp-startup-item-icon"><i class="fas fa-money-bill-wave"></i></div>
+                                        <div class="emp-startup-item-info">
+                                            <span class="emp-startup-item-name">资金申请协助</span>
+                                            <span class="emp-startup-item-desc">惠农贷款、创业担保</span>
+                                        </div>
+                                        <i class="fas fa-chevron-right emp-startup-arrow"></i>
+                                    </div>
+                                    <div class="emp-startup-item" data-support="2">
+                                        <div class="emp-startup-item-icon"><i class="fas fa-store"></i></div>
+                                        <div class="emp-startup-item-info">
+                                            <span class="emp-startup-item-name">市场渠道对接</span>
+                                            <span class="emp-startup-item-desc">电商、批发、直播带货</span>
+                                        </div>
+                                        <i class="fas fa-chevron-right emp-startup-arrow"></i>
+                                    </div>
+                                </div>
+                                <div class="emp-startup-footer">
+                                    <span id="emp-startup-view-all" class="emp-startup-footer-link">查看全部服务 <i class="fas fa-angle-right"></i></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 教师管理 -->
+        <div class="tab-content" id="teacher-tab" role="tabpanel" tabindex="0">
+            <div class="container">
+                <div class="section-label">Teacher Panel</div>
+                <h2 class="section-title">教师管理面板</h2>
+                <p class="section-desc">学员管理、通知公告、作业批改、签到考勤、学情分析</p>
+
+                <!-- 仪表板 -->
+                <div class="dashboard-stats" id="teacher-dashboard">
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-users"></i></div><div><h3 id="stat-total-students">-</h3><p>管理学员数</p></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-graduation-cap"></i></div><div><h3 id="stat-certificates">-</h3><p>已获证书</p></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-line"></i></div><div><h3 id="stat-completion">-</h3><p>课程完成率</p></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-star"></i></div><div><h3 id="stat-avg-score">-</h3><p>平均分数</p></div></div>
+                </div>
+
+                <!-- 子标签栏 -->
+                <div class="teacher-tabs" id="teacher-tabs">
+                    <button class="teacher-tab-btn active" data-tab="overview"><i class="fas fa-house"></i> 总览</button>
+                    <button class="teacher-tab-btn" data-tab="announcements"><i class="fas fa-bullhorn"></i> 通知公告</button>
+                    <button class="teacher-tab-btn" data-tab="assignments"><i class="fas fa-book-open"></i> 作业管理</button>
+                    <button class="teacher-tab-btn" data-tab="attendance"><i class="fas fa-clipboard-check"></i> 签到考勤</button>
+                    <button class="teacher-tab-btn" data-tab="analytics"><i class="fas fa-chart-bar"></i> 学情分析</button>
+                </div>
+
+                <!-- 总览面板 -->
+                <div class="teacher-tab-panel active" id="teacher-panel-overview">
+                    <div class="teacher-layout">
+                        <div class="teacher-main">
+                            <div class="card-section teacher-section">
+                                <div class="teacher-section-header">
+                                    <div class="teacher-section-title">
+                                        <i class="fas fa-user-graduate"></i>
+                                        <span>学员管理</span>
+                                        <span class="teacher-student-count" id="teacher-student-count">0人</span>
+                                    </div>
+                                    <div class="teacher-section-actions">
+                                        <div class="teacher-search-wrap">
+                                            <i class="fas fa-search"></i>
+                                            <input type="text" placeholder="搜索学员姓名、ID..." class="teacher-search-input" id="teacher-search">
+                                        </div>
+                                        <button class="btn btn-primary btn-sm" id="teacher-add-student-btn">
+                                            <i class="fas fa-plus"></i> 添加学员
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-wrap">
+                                    <table class="data-table teacher-table">
+                                        <thead>
+                                            <tr><th>学员ID</th><th>姓名</th><th>学习方向</th><th>进度</th><th>证书</th><th>操作</th></tr>
+                                        </thead>
+                                        <tbody id="teacher-student-tbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="teacher-sidebar">
+                            <div class="card-section teacher-report-card">
+                                <div class="teacher-report-header">
+                                    <i class="fas fa-wand-magic-sparkles"></i>
+                                    <span>AI 教学报告</span>
+                                </div>
+                                <div class="teacher-report-form">
+                                    <textarea id="teacher-report-prompt" class="teacher-report-textarea" rows="3" placeholder="告诉 AI 你想分析什么，例如：哪些学员需要重点关注？"></textarea>
+                                    <div class="teacher-report-suggestions">
+                                        <span class="suggestion-label">试试问：</span>
+                                        <button class="suggestion-chip" data-q="帮我做一份班级学习总结，包含整体概况、各方向对比、优秀学员和需要关注的学员">班级总结</button>
+                                        <button class="suggestion-chip" data-q="分析每个学员的学习进度，找出进度滞后的学员并给出干预建议">进度分析</button>
+                                        <button class="suggestion-chip" data-q="对比各方向的教学效果，分析哪个方向教得好、哪个方向需要改进">方向对比</button>
+                                        <button class="suggestion-chip" data-q="哪些学员有掉队风险？给出分级预警和具体的帮扶方案">风险预警</button>
+                                        <button class="suggestion-chip" data-q="根据当前数据预测下个月的学习完成情况，并给出教学计划建议">趋势预测</button>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm teacher-report-generate" id="teacher-report-generate-btn">
+                                        <i class="fas fa-wand-magic-sparkles"></i> 生成报告
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-section teacher-activity-card">
+                                <div class="teacher-activity-header"><i class="fas fa-clock-rotate-left"></i><span>最近动态</span></div>
+                                <div class="teacher-activity-list" id="teacher-activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 通知公告面板 -->
+                <div class="teacher-tab-panel" id="teacher-panel-announcements">
+                    <div class="teacher-panel-toolbar">
+                        <h3 class="teacher-panel-title"><i class="fas fa-bullhorn"></i> 通知公告</h3>
+                        <button class="btn btn-primary btn-sm" id="teacher-publish-ann-btn"><i class="fas fa-plus"></i> 发布通知</button>
+                    </div>
+                    <div id="teacher-announcements-list"></div>
+                </div>
+
+                <!-- 作业管理面板 -->
+                <div class="teacher-tab-panel" id="teacher-panel-assignments">
+                    <div class="teacher-panel-toolbar">
+                        <h3 class="teacher-panel-title"><i class="fas fa-book-open"></i> 作业管理</h3>
+                        <button class="btn btn-primary btn-sm" id="teacher-create-assignment-btn"><i class="fas fa-plus"></i> 发布作业</button>
+                    </div>
+                    <div class="teacher-assignment-grid" id="teacher-assignments-list"></div>
+                </div>
+
+                <!-- 签到考勤面板 -->
+                <div class="teacher-tab-panel" id="teacher-panel-attendance">
+                    <div class="teacher-panel-toolbar">
+                        <h3 class="teacher-panel-title"><i class="fas fa-clipboard-check"></i> 签到考勤</h3>
+                        <button class="btn btn-primary btn-sm" id="teacher-start-attendance-btn"><i class="fas fa-play"></i> 发起签到</button>
+                    </div>
+                    <div id="teacher-attendance-list"></div>
+                </div>
+
+                <!-- 学情分析面板 -->
+                <div class="teacher-tab-panel" id="teacher-panel-analytics">
+                    <div class="teacher-panel-toolbar">
+                        <h3 class="teacher-panel-title"><i class="fas fa-chart-bar"></i> 学情分析</h3>
+                    </div>
+                    <div class="teacher-analytics-grid" id="teacher-analytics-content"></div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <i class="fas fa-seedling"></i>
+                    <span>粤乡智匠</span>
+                </div>
+                <p class="footer-text">AI驱动的农村人才赋能平台 &copy; 2024</p>
+                <div class="footer-tech">
+                    <span>Flask</span><span>SQLite</span><span>SiliconFlow AI</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 登录模态框 -->
+    <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="login-modal-title">用户登录</h3>
+                <button class="modal-close" id="close-login-modal" aria-label="关闭登录"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="login-username">用户名</label>
+                    <input type="text" id="login-username" placeholder="输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">密码</label>
+                    <input type="password" id="login-password" placeholder="输入密码">
+                </div>
+                <div class="form-group">
+                    <label for="user-role-select">角色</label>
+                    <select id="user-role-select">
+                        <option value="student">学员</option>
+                        <option value="teacher">教师</option>
+                        <option value="admin">管理员</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="login-submit"><i class="fas fa-sign-in-alt"></i> 登录</button>
+                    <button class="btn btn-outline" id="demo-login"><i class="fas fa-eye"></i> 演示登录</button>
+                </div>
+                <div class="demo-section">
+                    <h4>演示账户</h4>
+                    <div class="demo-list">
+                        <div class="demo-account" data-username="teacher_demo" data-password="123456" data-role="teacher">
+                            <strong>教师账户</strong><span>teacher_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="student_demo" data-password="123456" data-role="student">
+                            <strong>学员账户</strong><span>student_demo / 123456</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div class="loading-overlay is-hidden" id="loading-overlay">
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <p id="loading-message">AI正在为您准备学习内容...</p>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div class="notification" id="notification" role="alert" aria-live="polite">
+        <div class="notification-inner">
+            <i class="fas fa-info-circle"></i>
+            <span class="notification-message"></span>
+        </div>
+    </div>
+
+    <!-- 浮动帮助 -->
+    <div class="floating-help" onclick="toggleShortcutsHelp()" role="button" tabindex="0" aria-label="帮助">
+        <i class="fas fa-question-circle"></i>
+    </div>
+
+    <script>
+        window.APP_CONFIG = { apiBaseUrl: '' };
+    </script>
+    <script src="js/core.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
