@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业中心 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --portal-accent: #3b82f6; --portal-accent-hover: #2563eb;
+            --portal-sidebar-bg: #ffffff; --portal-sidebar-text: #1e293b;
+            --portal-sidebar-link: #64748b; --portal-sidebar-link-hover-bg: #eff6ff;
+            --portal-sidebar-divider: #e5e7eb;
+            --portal-card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar" style="border-right:1px solid var(--portal-sidebar-divider)">
+        <div class="logo"><i class="fas fa-building"></i>企业中心</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>工作台</a>
+            <a href="#" data-page="jobs"><i class="fas fa-briefcase"></i>职位管理</a>
+            <a href="#" data-page="procurements"><i class="fas fa-shopping-basket"></i>求购管理</a>
+            <a href="#" data-page="applications"><i class="fas fa-file-alt"></i>简历管理</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">企</div><span id="sidebar-name">企业用户</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">工作台</h2>
+            </div>
+            <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
+        <div class="portal-content">
+            <div class="page active" id="page-dashboard"><div class="stat-grid" id="dash-stats"></div></div>
+            <div class="page" id="page-jobs">
+                <div class="card"><h3>发布新职位</h3><div class="form-row"><input type="text" id="job-title" placeholder="职位标题"><input type="text" id="job-salary" placeholder="薪资"></div><div class="form-row"><input type="text" id="job-location" placeholder="工作地点"><input type="text" id="job-category" placeholder="职位类别"></div><textarea id="job-desc" rows="3" placeholder="职位描述" style="margin-bottom:12px"></textarea><button class="btn btn-primary" onclick="postJob()">发布职位</button></div>
+                <div id="job-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-procurements">
+                <div class="card"><h3>发布求购</h3><div class="form-row"><input type="text" id="proc-name" placeholder="农产品名称"><input type="text" id="proc-qty" placeholder="数量"></div><div class="form-row"><input type="text" id="proc-price" placeholder="价格区间"><input type="text" id="proc-loc" placeholder="交货地点"></div><input type="text" id="proc-contact" placeholder="联系方式" style="margin-bottom:12px"><button class="btn btn-primary" onclick="postProc()">发布求购</button></div>
+                <div id="proc-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-applications"><div id="app-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+        </div>
+    </div>
+</div>
+<script>window.APP_CONFIG={apiBaseUrl:''};</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+PORTAL.init('enterprise', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = '企';
+    loadDashboard();
+});
+PORTAL.onPageChange(function(p) {
+    if (p === 'dashboard') loadDashboard();
+    else if (p === 'jobs') loadJobs();
+    else if (p === 'procurements') loadProcs();
+    else if (p === 'applications') loadApps();
+});
+
+function loadDashboard() {
+    apiCall('/api/enterprise/stats', 'GET').then(function(r) {
+        if (!r.success) return;
+        var s = r.stats;
+        document.getElementById('dash-stats').innerHTML =
+            '<div class="stat-card"><div class="num">' + s.total_jobs + '</div><div class="label">在招职位</div></div>' +
+            '<div class="stat-card"><div class="num">' + s.total_procurements + '</div><div class="label">求购信息</div></div>' +
+            '<div class="stat-card"><div class="num">' + s.total_applications + '</div><div class="label">收到简历</div></div>';
+    }).catch(function() { document.getElementById('dash-stats').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+
+function loadJobs() {
+    apiCall('/api/enterprise/jobs', 'GET').then(function(r) {
+        var list = document.getElementById('job-list');
+        if (!r.jobs || !r.jobs.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-briefcase"></i><p>暂无职位</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>标题</th><th>薪资</th><th>地点</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.jobs.map(function(j) {
+                return '<tr><td>' + j.title + '</td><td>' + j.salary + '</td><td>' + j.location + '</td>' +
+                    '<td><span class="badge ' + (j.review_status === 'approved' ? 'badge-green' : 'badge-yellow') + '">' + (j.review_status || 'approved') + '</span></td>' +
+                    '<td><button class="btn btn-danger btn-sm" onclick="delJob(' + j.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+function postJob() { var t = document.getElementById('job-title').value.trim(); if (!t) { alert('请输入职位标题'); return; } var s = document.getElementById('job-salary').value.trim(); var l = document.getElementById('job-location').value.trim(); var c = document.getElementById('job-category').value.trim(); var d = document.getElementById('job-desc').value.trim(); apiCall('/api/enterprise/jobs', 'POST', { title: t, salary: s, location: l, category: c, description: d }).then(function(r) { alert(r.message); if (r.success) { document.getElementById('job-title').value = ''; document.getElementById('job-desc').value = ''; loadJobs(); } }); }
+function delJob(id) { if (!confirm('确定删除?')) return; apiCall('/api/enterprise/jobs/' + id, 'DELETE').then(function(r) { if (r.success) loadJobs(); }); }
+
+function loadProcs() {
+    apiCall('/api/enterprise/procurements', 'GET').then(function(r) {
+        var list = document.getElementById('proc-list');
+        if (!r.procurements || !r.procurements.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-shopping-basket"></i><p>暂无求购</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>品名</th><th>数量</th><th>价格</th><th>地点</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.procurements.map(function(p) {
+                return '<tr><td>' + p.product_name + '</td><td>' + p.quantity + '</td><td>' + p.price_range + '</td><td>' + p.delivery_location + '</td>' +
+                    '<td><span class="badge ' + (p.review_status === 'approved' ? 'badge-green' : 'badge-yellow') + '">' + (p.review_status || 'pending') + '</span></td>' +
+                    '<td><button class="btn btn-danger btn-sm" onclick="delProc(' + p.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+function postProc() { var n = document.getElementById('proc-name').value.trim(); if (!n) { alert('请输入农产品名称'); return; } var q = document.getElementById('proc-qty').value.trim(); var p = document.getElementById('proc-price').value.trim(); var l = document.getElementById('proc-loc').value.trim(); var c = document.getElementById('proc-contact').value.trim(); apiCall('/api/enterprise/procurements', 'POST', { product_name: n, quantity: q, price_range: p, delivery_location: l, contact_info: c }).then(function(r) { alert(r.message); if (r.success) { document.getElementById('proc-name').value = ''; loadProcs(); } }); }
+function delProc(id) { if (!confirm('确定删除?')) return; apiCall('/api/enterprise/procurements/' + id, 'DELETE').then(function(r) { if (r.success) loadProcs(); }); }
+
+function loadApps() {
+    apiCall('/api/enterprise/applications', 'GET').then(function(r) {
+        var list = document.getElementById('app-list');
+        if (!r.applications || !r.applications.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无简历投递</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.applications.map(function(a) {
+                var sb = a.status === 'approved' ? 'badge-green' : a.status === 'rejected' ? 'badge-red' : 'badge-yellow';
+                return '<tr><td>' + (a.applicant_name || a.user_id) + '</td><td>' + a.job_title + '</td><td>' + (a.applicant_phone || '-') + '</td>' +
+                    '<td><span class="badge ' + sb + '">' + a.status + '</span></td>' +
+                    '<td><button class="btn btn-success btn-sm" onclick="updateApp(' + a.id + ',\'interview\')">面试</button> ' +
+                    '<button class="btn btn-primary btn-sm" onclick="updateApp(' + a.id + ',\'approved\')">通过</button> ' +
+                    '<button class="btn btn-danger btn-sm" onclick="updateApp(' + a.id + ',\'rejected\')">拒绝</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+function updateApp(id, status) { apiCall('/api/enterprise/applications/' + id, 'PUT', { status: status }).then(function(r) { alert(r.message); if (r.success) loadApps(); }); }
+</script>
+</body>
+</html>

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教师工作台 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --portal-accent: #10b981; --portal-accent-hover: #059669; }
+        .teacher-report-card { margin-bottom: 16px; }
+        .teacher-report-card textarea { width: 100%; border: 1px solid var(--portal-input-border); border-radius: 8px; padding: 10px; font-size: 0.9rem; resize: vertical; }
+        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .suggestion-chip { padding: 4px 10px; background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 12px; font-size: 0.8rem; cursor: pointer; border: none; }
+        .student-search { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .progress-bar-wrap { background: #e5e7eb; border-radius: 6px; height: 6px; width: 80px; }
+        .progress-bar-fill { background: var(--portal-accent); border-radius: 6px; height: 100%; }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar">
+        <div class="logo"><i class="fas fa-seedling"></i>教师工作台</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>工作台</a>
+            <a href="#" data-page="announcements"><i class="fas fa-bullhorn"></i>通知公告</a>
+            <a href="#" data-page="assignments"><i class="fas fa-book-open"></i>作业管理</a>
+            <a href="#" data-page="attendance"><i class="fas fa-clipboard-check"></i>签到考勤</a>
+            <a href="#" data-page="analytics"><i class="fas fa-chart-bar"></i>学情分析</a>
+            <a href="#" data-page="courses"><i class="fas fa-book"></i>课程管理</a>
+            <a href="#" data-page="models"><i class="fas fa-cube"></i>3D模型</a>
+            <a href="#" data-page="qa"><i class="fas fa-comments"></i>答疑互动</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">教</div><span id="sidebar-name">教师</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">工作台</h2>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <div class="msg-center-wrap" id="teacher-quick-menu" style="position:relative">
+                    <button class="btn btn-outline btn-sm" id="quick-message-btn" title="消息通知"><i class="fas fa-bell"></i></button>
+                </div>
+                <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+            </div>
+        </div>
+        <div class="portal-content">
+
+            <!-- ===== 1. 工作台 ===== -->
+            <div class="page active" id="page-dashboard">
+                <div class="stat-grid">
+                    <div class="stat-card"><div class="num" id="stat-total-students">-</div><div class="label">学员总数</div></div>
+                    <div class="stat-card"><div class="num" id="stat-certificates">-</div><div class="label">已获证书</div></div>
+                    <div class="stat-card"><div class="num" id="stat-completion">-</div><div class="label">完成率</div></div>
+                    <div class="stat-card"><div class="num" id="stat-avg-score">-</div><div class="label">平均进度</div></div>
+                </div>
+                <!-- 学员列表 -->
+                <div class="card">
+                    <div class="section-header"><h3><i class="fas fa-user-graduate"></i> 学员管理 <span id="teacher-student-count" style="font-size:0.85rem;color:var(--portal-text-muted)">0人</span></h3>
+                        <div style="display:flex;gap:8px">
+                            <input type="text" id="teacher-search" placeholder="搜索学员..." style="width:180px">
+                            <button class="btn btn-primary btn-sm" id="teacher-add-student-btn"><i class="fas fa-plus"></i> 添加</button>
+                        </div>
+                    </div>
+                    <table><thead><tr><th>ID</th><th>姓名</th><th>班级</th><th>方向</th><th>进度</th><th>状态</th><th>操作</th></tr></thead><tbody id="teacher-student-tbody"></tbody></table>
+                </div>
+                <!-- AI报告 -->
+                <div class="card teacher-report-card">
+                    <h3><i class="fas fa-wand-magic-sparkles"></i> AI 教学报告</h3>
+                    <textarea id="teacher-report-prompt" rows="3" placeholder="告诉 AI 你想分析什么..."></textarea>
+                    <div class="suggestion-chips">
+                        <button class="suggestion-chip" data-q="帮我做一份班级学习总结">班级总结</button>
+                        <button class="suggestion-chip" data-q="分析进度滞后的学员并给出干预建议">进度分析</button>
+                        <button class="suggestion-chip" data-q="对比各方向的教学效果">方向对比</button>
+                        <button class="suggestion-chip" data-q="哪些学员有掉队风险？">风险预警</button>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="teacher-report-generate-btn"><i class="fas fa-wand-magic-sparkles"></i> 生成报告</button>
+                    <div id="teacher-report-result" style="margin-top:12px"></div>
+                </div>
+            </div>
+
+            <!-- ===== 2. 通知公告 ===== -->
+            <div class="page" id="page-announcements">
+                <div class="section-header"><h3><i class="fas fa-bullhorn"></i> 通知公告</h3><button class="btn btn-primary btn-sm" id="teacher-publish-ann-btn"><i class="fas fa-plus"></i> 发布通知</button></div>
+                <div id="teacher-announcements-list"></div>
+            </div>
+
+            <!-- ===== 3. 作业管理 ===== -->
+            <div class="page" id="page-assignments">
+                <div class="section-header"><h3><i class="fas fa-book-open"></i> 作业管理</h3><button class="btn btn-primary btn-sm" id="teacher-create-assignment-btn"><i class="fas fa-plus"></i> 发布作业</button></div>
+                <div id="teacher-assignments-list"></div>
+            </div>
+
+            <!-- ===== 4. 签到考勤 ===== -->
+            <div class="page" id="page-attendance">
+                <div class="section-header"><h3><i class="fas fa-clipboard-check"></i> 签到考勤</h3><button class="btn btn-primary btn-sm" id="teacher-start-attendance-btn"><i class="fas fa-play"></i> 发起签到</button></div>
+                <div id="teacher-attendance-list"></div>
+            </div>
+
+            <!-- ===== 5. 学情分析 ===== -->
+            <div class="page" id="page-analytics">
+                <h3><i class="fas fa-chart-bar"></i> 学情分析</h3>
+                <div id="teacher-analytics-content" style="margin-top:16px"></div>
+            </div>
+
+            <!-- ===== 6. 课程管理 ===== -->
+            <div class="page" id="page-courses">
+                <div class="section-header"><h3>课程列表</h3><button class="btn btn-primary btn-sm" onclick="showCourseForm()"><i class="fas fa-plus"></i> 发布新课</button></div>
+                <div id="course-form" style="display:none" class="card">
+                    <div class="form-row"><input type="text" id="course-title" placeholder="课程标题"></div>
+                    <div class="form-row"><textarea id="course-desc" rows="3" placeholder="课程描述"></textarea></div>
+                    <div class="form-row"><select id="course-category"><option value="agriculture">农业</option><option value="ecommerce">电商</option><option value="crafts">手工</option></select></div>
+                    <button class="btn btn-primary btn-sm" onclick="createCourse()">创建</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('course-form').style.display='none'" style="margin-left:8px">取消</button>
+                </div>
+                <div id="course-list"></div>
+            </div>
+
+            <!-- ===== 7. 3D模型 ===== -->
+            <div class="page" id="page-models">
+                <div class="section-header"><h3>3D模型库</h3><button class="btn btn-primary btn-sm" onclick="showModelForm()"><i class="fas fa-plus"></i> 上传模型</button></div>
+                <div id="model-form" style="display:none" class="card">
+                    <div class="form-row"><input type="text" id="model-title" placeholder="模型标题"></div>
+                    <div class="form-row"><textarea id="model-desc" rows="2" placeholder="模型描述"></textarea></div>
+                    <div class="form-row"><select id="model-craft"><option value="embroidery">广绣</option><option value="woodcarving">潮汕木雕</option><option value="ceramics">石湾陶艺</option><option value="lacquer">阳江漆器</option></select></div>
+                    <div class="form-row"><input type="file" id="model-file"></div>
+                    <button class="btn btn-primary btn-sm" onclick="uploadModel()">上传</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('model-form').style.display='none'" style="margin-left:8px">取消</button>
+                </div>
+                <div id="model-list"></div>
+            </div>
+
+            <!-- ===== 8. 答疑互动 ===== -->
+            <div class="page" id="page-qa">
+                <h3>学生提问</h3>
+                <div id="qa-list"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- 添加学员弹窗 -->
+<div class="modal-overlay is-hidden" id="teacher-add-student-modal">
+    <div class="modal-content" style="max-width:440px">
+        <div class="modal-header"><h3>添加学员</h3><button class="modal-close" onclick="document.getElementById('teacher-add-student-modal').classList.add('is-hidden')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>姓名</label><input type="text" id="add-student-name"></div>
+            <div class="form-group"><label>班级</label><input type="text" id="add-student-class"></div>
+            <div class="form-group"><label>学习方向</label><select id="add-student-direction"><option value="荔枝种植">荔枝种植</option><option value="电商运营">电商运营</option><option value="广绣工艺">广绣工艺</option><option value="木雕技艺">木雕技艺</option></select></div>
+            <button class="btn btn-primary" id="teacher-confirm-add-student">确认添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 发布通知弹窗 -->
+<div class="modal-overlay is-hidden" id="teacher-publish-ann-modal">
+    <div class="modal-content" style="max-width:500px">
+        <div class="modal-header"><h3>发布通知</h3><button class="modal-close" onclick="document.getElementById('teacher-publish-ann-modal').classList.add('is-hidden')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><input type="text" id="publish-ann-title" placeholder="通知标题"></div>
+            <div class="form-group"><textarea id="publish-ann-content" rows="4" placeholder="通知内容"></textarea></div>
+            <div class="form-group"><select id="publish-ann-category"><option value="通知">通知</option><option value="作业">作业</option><option value="考试">考试</option></select></div>
+            <button class="btn btn-primary" id="teacher-confirm-publish-ann">发布</button>
+        </div>
+    </div>
+</div>
+
+<!-- 发布作业弹窗 -->
+<div class="modal-overlay is-hidden" id="teacher-create-assignment-modal">
+    <div class="modal-content" style="max-width:500px">
+        <div class="modal-header"><h3>发布作业</h3><button class="modal-close" onclick="document.getElementById('teacher-create-assignment-modal').classList.add('is-hidden')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><input type="text" id="create-assignment-title" placeholder="作业标题"></div>
+            <div class="form-group"><textarea id="create-assignment-desc" rows="3" placeholder="作业描述"></textarea></div>
+            <div class="form-row"><select id="create-assignment-direction"><option value="">全部方向</option><option value="荔枝种植">荔枝种植</option><option value="电商运营">电商运营</option><option value="广绣工艺">广绣工艺</option></select><input type="date" id="create-assignment-deadline"></div>
+            <button class="btn btn-primary" id="teacher-confirm-create-assignment">发布</button>
+        </div>
+    </div>
+</div>
+
+<script>window.APP_CONFIG = { apiBaseUrl: '' };</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+// ---- 会话初始化 ----
+PORTAL.init('teacher', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = (AppState.user.name || '教')[0];
+    loadDashboard();
+});
+
+PORTAL.onPageChange(function(page) {
+    if (page === 'dashboard') loadDashboard();
+    else if (page === 'announcements') loadAnnouncements();
+    else if (page === 'assignments') loadAssignments();
+    else if (page === 'attendance') loadAttendance();
+    else if (page === 'analytics') loadAnalytics();
+    else if (page === 'courses') loadCourses();
+    else if (page === 'models') loadModels();
+    else if (page === 'qa') loadQA();
+});
+
+// ==================== 工作台 ====================
+function loadDashboard() {
+    apiCall('/api/teacher/dashboard', 'GET').then(function(r) {
+        if (r.success && r.dashboard) {
+            var s = r.dashboard.stats;
+            document.getElementById('stat-total-students').textContent = s.total_students || 0;
+            document.getElementById('stat-certificates').textContent = s.certificates_earned || 0;
+            document.getElementById('stat-completion').textContent = (s.completion_rate || 0) + '%';
+            document.getElementById('stat-avg-score').textContent = (s.avg_score || 0) + '%';
+        }
+    });
+    loadStudents();
+}
+
+// ==================== 学员管理 ====================
+function loadStudents() {
+    var q = document.getElementById('teacher-search') ? document.getElementById('teacher-search').value : '';
+    apiCall('/api/teacher/students' + (q ? '?search=' + encodeURIComponent(q) : ''), 'GET').then(function(r) {
+        var tbody = document.getElementById('teacher-student-tbody');
+        var count = document.getElementById('teacher-student-count');
+        if (!r.students || !r.students.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--portal-text-muted)">暂无学员</td></tr>';
+            if (count) count.textContent = '0人';
+            return;
+        }
+        if (count) count.textContent = r.students.length + '人';
+        tbody.innerHTML = r.students.map(function(s) {
+            return '<tr><td>' + s.id + '</td><td>' + s.name + '</td><td>' + (s.class_name || '-') + '</td><td>' + (s.direction || '-') + '</td>' +
+                '<td><div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + s.progress + '%"></div></div> ' + s.progress + '%</td>' +
+                '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-red') + '">' + (s.status === 'active' ? '在读' : '停课') + '</span></td>' +
+                '<td><button class="btn btn-outline btn-sm" onclick="editStudent(\'' + s.id + '\')">编辑</button> <button class="btn btn-danger btn-sm" onclick="delStudent(\'' + s.id + '\')">删除</button></td></tr>';
+        }).join('');
+    });
+}
+document.getElementById('teacher-search').addEventListener('input', function() { loadStudents(); });
+
+document.getElementById('teacher-add-student-btn').addEventListener('click', function() {
+    document.getElementById('teacher-add-student-modal').classList.remove('is-hidden');
+});
+document.getElementById('teacher-confirm-add-student').addEventListener('click', function() {
+    var n = document.getElementById('add-student-name').value.trim();
+    var c = document.getElementById('add-student-class').value.trim();
+    var d = document.getElementById('add-student-direction').value;
+    if (!n) { alert('请输入姓名'); return; }
+    apiCall('/api/teacher/students/add', 'POST', { name: n, class_name: c, direction: d }).then(function(r) {
+        alert(r.message);
+        if (r.success) { document.getElementById('teacher-add-student-modal').classList.add('is-hidden'); loadStudents(); loadDashboard(); }
+    });
+});
+
+function editStudent(id) {
+    apiCall('/api/teacher/students/' + id, 'GET').then(function(r) {
+        if (!r.success) return;
+        var s = r.student;
+        var nn = prompt('姓名:', s.name); if (!nn) return;
+        var nc = prompt('班级:', s.class_name || '');
+        var nd = prompt('方向:', s.direction || '');
+        var np = parseInt(prompt('进度(0-100):', s.progress)) || 0;
+        var ns = prompt('状态(active/suspended):', s.status);
+        apiCall('/api/teacher/students/' + id, 'PUT', { name: nn, class_name: nc, direction: nd, progress: np, status: ns }).then(function(r2) {
+            if (r2.success) loadStudents();
+        });
+    });
+}
+function delStudent(id) { if (!confirm('确定删除?')) return; apiCall('/api/teacher/students/' + id, 'DELETE').then(function(r) { if (r.success) loadStudents(); }); }
+
+// AI 报告
+document.querySelectorAll('.suggestion-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+        document.getElementById('teacher-report-prompt').value = this.dataset.q;
+    });
+});
+document.getElementById('teacher-report-generate-btn').addEventListener('click', function() {
+    var prompt = document.getElementById('teacher-report-prompt').value.trim();
+    if (!prompt) { alert('请输入分析需求'); return; }
+    var result = document.getElementById('teacher-report-result');
+    result.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> AI 正在生成报告...</div>';
+    apiCall('/api/teacher/reports/generate', 'POST', { prompt: prompt }).then(function(r) {
+        if (r.success) {
+            result.innerHTML = '<div class="card" style="white-space:pre-wrap;font-size:0.9rem;line-height:1.6">' + (r.report.content || '') + '</div>';
+        } else {
+            result.innerHTML = '<p style="color:#ef4444">生成失败: ' + (r.message || '未知错误') + '</p>';
+        }
+    });
+});
+
+// ==================== 通知公告 ====================
+function loadAnnouncements() {
+    apiCall('/api/teacher/announcements', 'GET').then(function(r) {
+        var list = document.getElementById('teacher-announcements-list');
+        if (!r.announcements || !r.announcements.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-bullhorn"></i><p>暂无公告</p></div>'; return; }
+        list.innerHTML = r.announcements.map(function(a) {
+            return '<div class="card" style="padding:16px"><h4>' + (a.pinned ? '📌 ' : '') + a.title + ' <span style="font-size:0.8rem;color:var(--portal-text-muted)">[' + a.category + ']</span></h4><p style="font-size:0.9rem;margin-top:4px">' + a.content + '</p><small style="color:var(--portal-text-muted)">' + a.created_at + '</small> <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="delAnnouncement(' + a.id + ')">删除</button></div>';
+        }).join('');
+    });
+}
+document.getElementById('teacher-publish-ann-btn').addEventListener('click', function() {
+    document.getElementById('teacher-publish-ann-modal').classList.remove('is-hidden');
+});
+document.getElementById('teacher-confirm-publish-ann').addEventListener('click', function() {
+    var t = document.getElementById('publish-ann-title').value.trim();
+    var c = document.getElementById('publish-ann-content').value.trim();
+    var cat = document.getElementById('publish-ann-category').value;
+    if (!t || !c) { alert('标题和内容不能为空'); return; }
+    apiCall('/api/teacher/announcements', 'POST', { title: t, content: c, category: cat }).then(function(r) {
+        alert(r.message);
+        if (r.success) { document.getElementById('teacher-publish-ann-modal').classList.add('is-hidden'); loadAnnouncements(); }
+    });
+});
+function delAnnouncement(id) { if (!confirm('确定删除?')) return; apiCall('/api/teacher/announcements/' + id, 'DELETE').then(function(r) { if (r.success) loadAnnouncements(); }); }
+
+// ==================== 作业管理 ====================
+function loadAssignments() {
+    apiCall('/api/teacher/assignments', 'GET').then(function(r) {
+        var list = document.getElementById('teacher-assignments-list');
+        if (!r.assignments || !r.assignments.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-book-open"></i><p>暂无作业</p></div>'; return; }
+        list.innerHTML = r.assignments.map(function(a) {
+            return '<div class="card" style="padding:16px"><h4>' + a.title + '</h4><p style="font-size:0.85rem;color:var(--portal-text-muted)">' + a.description + '</p><small>方向: ' + (a.direction || '全部') + ' | 截止: ' + (a.deadline || '不限') + '</small></div>';
+        }).join('');
+    });
+}
+document.getElementById('teacher-create-assignment-btn').addEventListener('click', function() {
+    document.getElementById('teacher-create-assignment-modal').classList.remove('is-hidden');
+});
+document.getElementById('teacher-confirm-create-assignment').addEventListener('click', function() {
+    var t = document.getElementById('create-assignment-title').value.trim();
+    var d = document.getElementById('create-assignment-desc').value.trim();
+    var dir = document.getElementById('create-assignment-direction').value;
+    var dl = document.getElementById('create-assignment-deadline').value;
+    if (!t) { alert('请输入作业标题'); return; }
+    apiCall('/api/teacher/assignments', 'POST', { title: t, description: d, direction: dir, deadline: dl }).then(function(r) {
+        alert(r.message);
+        if (r.success) { document.getElementById('teacher-create-assignment-modal').classList.add('is-hidden'); loadAssignments(); }
+    });
+});
+
+// ==================== 签到考勤 ====================
+function loadAttendance() {
+    apiCall('/api/teacher/attendance', 'GET').then(function(r) {
+        var list = document.getElementById('teacher-attendance-list');
+        if (!r.attendances || !r.attendances.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-clipboard-check"></i><p>暂无签到记录</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>标题</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>' +
+            r.attendances.map(function(a) {
+                return '<tr><td>' + a.title + '</td><td><span class="badge ' + (a.status === 'open' ? 'badge-green' : 'badge-yellow') + '">' + (a.status === 'open' ? '进行中' : '已结束') + '</span></td><td>' + a.created_at + '</td><td><button class="btn btn-outline btn-sm" onclick="viewAttendance(' + a.id + ')">查看</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+document.getElementById('teacher-start-attendance-btn').addEventListener('click', function() {
+    apiCall('/api/teacher/attendance', 'POST', {}).then(function(r) {
+        alert(r.message); if (r.success) loadAttendance();
+    });
+});
+function viewAttendance(id) {
+    apiCall('/api/teacher/attendance/' + id, 'GET').then(function(r) {
+        if (!r.success) return;
+        var a = r.attendance;
+        var recs = r.records || [];
+        var html = '<h4>' + a.title + '</h4><p>状态: ' + a.status + '</p><table><thead><tr><th>学员ID</th><th>状态</th><th>时间</th></tr></thead><tbody>' +
+            recs.map(function(rec) { return '<tr><td>' + rec.student_id + '</td><td>' + rec.check_status + '</td><td>' + rec.checked_at + '</td></tr>'; }).join('') + '</tbody></table>';
+        var result = document.getElementById('teacher-attendance-list');
+        result.innerHTML = '<div class="card">' + html + '<button class="btn btn-outline btn-sm" onclick="loadAttendance()" style="margin-top:8px">返回</button></div>';
+    });
+}
+
+// ==================== 学情分析 ====================
+function loadAnalytics() {
+    apiCall('/api/teacher/analytics', 'GET').then(function(r) {
+        var el = document.getElementById('teacher-analytics-content');
+        if (!r.success) { el.innerHTML = '<div class="empty-state"><i class="fas fa-chart-bar"></i><p>暂无数据</p></div>'; return; }
+        var a = r.analytics;
+        var html = '<div class="stat-grid">';
+        if (a.progress_distribution) {
+            html += '<div class="card"><h4>进度分布</h4>' + a.progress_distribution.map(function(d) {
+                return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span style="width:60px;font-size:0.85rem">' + d.label + '</span><div class="progress-bar-wrap" style="flex:1"><div class="progress-bar-fill" style="width:' + (d.count * 10) + '%"></div></div><span style="font-size:0.85rem">' + d.count + '人</span></div>';
+            }).join('') + '</div>';
+        }
+        if (a.direction_distribution) {
+            html += '<div class="card"><h4>方向分布</h4>' + a.direction_distribution.map(function(d) {
+                return '<div style="margin:4px 0;font-size:0.9rem"><strong>' + (d.direction || '未分类') + '</strong>: ' + d.count + '人</div>';
+            }).join('') + '</div>';
+        }
+        if (a.direction_progress) {
+            html += '<div class="card"><h4>各方向平均进度</h4>' + a.direction_progress.map(function(d) {
+                return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span style="width:80px;font-size:0.85rem">' + d.direction + '</span><div class="progress-bar-wrap" style="flex:1"><div class="progress-bar-fill" style="width:' + d.avg_progress + '%"></div></div><span style="font-size:0.85rem">' + d.avg_progress + '%</span></div>';
+            }).join('') + '</div>';
+        }
+        html += '</div>';
+        el.innerHTML = html;
+    });
+}
+
+// ==================== 课程管理 ====================
+function showCourseForm() { document.getElementById('course-form').style.display = 'block'; }
+function showModelForm() { document.getElementById('model-form').style.display = 'block'; }
+
+function createCourse() {
+    var t = document.getElementById('course-title').value.trim();
+    var d = document.getElementById('course-desc').value.trim();
+    var c = document.getElementById('course-category').value;
+    if (!t) { alert('请输入课程标题'); return; }
+    apiCall('/api/teacher/courses', 'POST', { title: t, description: d, category: c }).then(function(r) {
+        alert(r.message);
+        if (r.success) { document.getElementById('course-form').style.display = 'none'; loadCourses(); }
+    });
+}
+
+function loadCourses() {
+    var el = document.getElementById('course-list');
+    el.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载中...</div>';
+    apiCall('/api/teacher/courses', 'GET').then(function(r) {
+        if (!r.courses || !r.courses.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-book-open"></i><p>暂无课程</p></div>'; return; }
+        el.innerHTML = '<table><thead><tr><th>标题</th><th>分类</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.courses.map(function(c) {
+                return '<tr><td>' + c.title + '</td><td>' + c.category + '</td>' +
+                    '<td><span class="badge ' + (c.review_status === 'approved' ? 'badge-green' : 'badge-yellow') + '">' + (c.review_status || 'pending') + '</span></td>' +
+                    '<td><button class="btn btn-outline btn-sm" onclick="uploadMaterial(' + c.id + ')">素材</button> <button class="btn btn-danger btn-sm" onclick="delCourse(' + c.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() { el.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+
+function uploadMaterial(cid) {
+    var inp = document.createElement('input'); inp.type = 'file';
+    inp.onchange = function() {
+        var fd = new FormData(); fd.append('file', inp.files[0]);
+        fetch((window.APP_CONFIG.apiBaseUrl || '') + '/api/teacher/courses/' + cid + '/materials',
+            { method: 'POST', headers: { 'X-Session-Id': AppState.sessionId }, body: fd })
+            .then(function(r) { return r.json(); }).then(function(r) { alert(r.message); });
+    };
+    inp.click();
+}
+function delCourse(id) { if (!confirm('确定删除?')) return; apiCall('/api/teacher/courses/' + id, 'DELETE').then(function(r) { if (r.success) loadCourses(); }); }
+
+function uploadModel() {
+    var t = document.getElementById('model-title').value.trim();
+    var d = document.getElementById('model-desc').value.trim();
+    var c = document.getElementById('model-craft').value;
+    var f = document.getElementById('model-file').files[0];
+    if (!f) { alert('请选择文件'); return; }
+    var fd = new FormData(); fd.append('file', f); fd.append('title', t); fd.append('description', d); fd.append('craft_type', c);
+    fetch((window.APP_CONFIG.apiBaseUrl || '') + '/api/teacher/models-3d',
+        { method: 'POST', headers: { 'X-Session-Id': AppState.sessionId }, body: fd })
+        .then(function(r) { return r.json(); }).then(function(r) {
+            alert(r.message); if (r.success) { document.getElementById('model-form').style.display = 'none'; loadModels(); }
+        });
+}
+
+function loadModels() {
+    var el = document.getElementById('model-list');
+    el.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载中...</div>';
+    apiCall('/api/teacher/models-3d', 'GET').then(function(r) {
+        if (!r.models || !r.models.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-cube"></i><p>暂无模型</p></div>'; return; }
+        el.innerHTML = '<table><thead><tr><th>标题</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.models.map(function(m) {
+                return '<tr><td>' + m.title + '</td><td>' + m.craft_type + '</td>' +
+                    '<td><span class="badge ' + (m.review_status === 'approved' ? 'badge-green' : 'badge-yellow') + '">' + (m.review_status || 'pending') + '</span></td>' +
+                    '<td><button class="btn btn-danger btn-sm" onclick="delModel(' + m.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() { el.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+function delModel(id) { if (!confirm('确定删除?')) return; apiCall('/api/teacher/models-3d/' + id, 'DELETE').then(function(r) { if (r.success) loadModels(); }); }
+
+function loadQA() {
+    var el = document.getElementById('qa-list');
+    el.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载中...</div>';
+    apiCall('/api/comments?target_type=course&target_id=0', 'GET').then(function(r) {
+        if (!r.comments || !r.comments.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-comment-dots"></i><p>暂无提问</p></div>'; return; }
+        el.innerHTML = r.comments.map(function(c) {
+            return '<div class="card" style="padding:12px"><strong>' + (c.user_name || c.user_id) + '</strong>: ' + c.content + ' <small style="color:var(--portal-text-muted)">' + (c.created_at || '').slice(0, 16) + '</small></div>';
+        }).join('');
+    }).catch(function() { el.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+</script>
+</body>
+</html>

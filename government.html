@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>政务工作台 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --portal-accent: #f59e0b; --portal-accent-hover: #d97706;
+            --portal-sidebar-bg: #1a2332; --portal-sidebar-divider: #334155;
+            --portal-sidebar-link-hover-bg: #1e293b;
+            --portal-body-bg: #f0f4f8;
+        }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar">
+        <div class="logo"><i class="fas fa-landmark"></i>政务工作台</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-chart-pie"></i>数据大屏</a>
+            <a href="#" data-page="policies"><i class="fas fa-file-alt"></i>政策管理</a>
+            <a href="#" data-page="news"><i class="fas fa-newspaper"></i>新闻资讯</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">政</div><span id="sidebar-name">政府人员</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">数据大屏</h2>
+            </div>
+            <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
+        <div class="portal-content">
+            <div class="page active" id="page-dashboard"><div id="dash-content"><div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载数据...</div></div></div>
+            <div class="page" id="page-policies">
+                <div class="card"><input type="text" id="policy-title" placeholder="政策标题"><textarea id="policy-content" rows="5" placeholder="政策内容" style="margin-top:8px"></textarea><select id="policy-cat" style="margin-top:8px"><option value="补贴">补贴</option><option value="电商">电商</option><option value="非遗">非遗</option><option value="培训">培训</option><option value="认证">认证</option><option value="general">综合</option></select><button class="btn btn-primary" style="margin-top:8px" onclick="pubPolicy()">发布政策</button></div>
+                <div id="policy-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-news">
+                <div class="card"><input type="text" id="news-title" placeholder="新闻标题"><textarea id="news-content" rows="5" placeholder="新闻内容" style="margin-top:8px"></textarea><select id="news-cat" style="margin-top:8px"><option value="news">新闻</option><option value="alert">灾害预警</option><option value="policy_update">政策更新</option></select><button class="btn btn-primary" style="margin-top:8px" onclick="pubNews()">发布资讯</button></div>
+                <div id="news-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>window.APP_CONFIG={apiBaseUrl:''};</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+PORTAL.init('government', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = '政';
+    loadDash();
+});
+PORTAL.onPageChange(function(p) {
+    if (p === 'dashboard') loadDash();
+    else if (p === 'policies') loadPolicies();
+    else if (p === 'news') loadNews();
+});
+
+function loadDash() {
+    apiCall('/api/government/dashboard', 'GET').then(function(r) {
+        if (!r.success) return;
+        var d = r.overview;
+        var html = '<div class="stat-grid">' +
+            ['<div class="stat-card"><div class="num">' + d.users.total + '</div><div class="label">👥 总用户</div><p style="font-size:0.8rem;color:var(--portal-text-muted)">学员 ' + d.users.students + ' · 教师 ' + d.users.teachers + ' · 企业 ' + d.users.enterprises + '</p></div>',
+             '<div class="stat-card"><div class="num">' + d.training.total_students + '人</div><div class="label">📚 培训学员</div><p style="font-size:0.8rem;color:var(--portal-text-muted)">均进度 ' + d.training.avg_progress + '% · 完成率 ' + d.training.completion_rate + '%</p></div>',
+             '<div class="stat-card"><div class="num">' + d.employment.total_jobs + '</div><div class="label">💼 岗位数</div><p style="font-size:0.8rem;color:var(--portal-text-muted)">' + d.employment.total_applications + ' 申请 · ' + d.employment.match_rate + '% 匹配</p></div>',
+             '<div class="stat-card"><div class="num">' + d.content.courses + '</div><div class="label">📄 内容生产</div><p style="font-size:0.8rem;color:var(--portal-text-muted)">课程 ' + d.content.courses + ' · 政策 ' + d.content.policies + ' · 新闻 ' + d.content.news + '</p></div>',
+             '<div class="stat-card"><div class="num">' + d.certificates.earned + '</div><div class="label">🎖 已获证书</div><p style="font-size:0.8rem;color:var(--portal-text-muted)">获证率 ' + d.certificates.earn_rate + '%</p></div>',
+             '<div class="stat-card"><div class="num">' + d.community.discussions + '</div><div class="label">💬 讨论帖</div><p style="font-size:0.8rem;color:var(--portal-text-muted)">' + d.community.comments + ' 条评论</p></div>'
+            ].join('') + '</div>';
+        if (r.regions && r.regions.length) html += '<div class="card"><h3>地区分布</h3><p style="font-size:0.9rem">' + r.regions.map(function(x) { return x.region + ': ' + x.count + '人'; }).join(' · ') + '</p></div>';
+        if (r.directions && r.directions.length) html += '<div class="card"><h3>培训方向</h3><p style="font-size:0.9rem">' + r.directions.map(function(x) { return x.direction + ': ' + x.count + '人 (均' + x.avg_progress + '%)'; }).join(' · ') + '</p></div>';
+        document.getElementById('dash-content').innerHTML = html;
+    }).catch(function() { document.getElementById('dash-content').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>数据加载失败</p></div>'; });
+}
+
+function loadPolicies() {
+    apiCall('/api/government/policies', 'GET').then(function(r) {
+        var list = document.getElementById('policy-list');
+        if (!r.policies || !r.policies.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无政策</p></div>'; return; }
+        list.innerHTML = r.policies.map(function(p) {
+            return '<div class="card"><h4>' + p.title + ' <span style="font-size:0.8rem;color:var(--portal-text-muted)">[' + p.category + ']</span></h4><p style="font-size:0.85rem;color:var(--portal-text-muted);margin-top:4px">' + p.content.slice(0, 200) + '...</p><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-outline btn-sm" onclick="togglePolicy(' + p.id + ',' + p.is_published + ')">' + (p.is_published ? '下架' : '上架') + '</button><button class="btn btn-danger btn-sm" onclick="delPolicy(' + p.id + ')">删除</button></div></div>';
+        }).join('');
+    });
+}
+function pubPolicy() { var t = document.getElementById('policy-title').value.trim(); var c = document.getElementById('policy-content').value.trim(); var cat = document.getElementById('policy-cat').value; if (!t || !c) { alert('标题和内容不能为空'); return; } apiCall('/api/government/policies', 'POST', { title: t, content: c, category: cat }).then(function(r) { alert(r.message); if (r.success) { document.getElementById('policy-title').value = ''; document.getElementById('policy-content').value = ''; loadPolicies(); } }); }
+function togglePolicy(id, pub) { apiCall('/api/government/policies/' + id, 'PUT', { is_published: pub ? 0 : 1 }).then(function(r) { if (r.success) loadPolicies(); }); }
+function delPolicy(id) { if (!confirm('确定删除?')) return; apiCall('/api/government/policies/' + id, 'DELETE').then(function(r) { if (r.success) loadPolicies(); }); }
+
+function loadNews() {
+    apiCall('/api/government/news', 'GET').then(function(r) {
+        var list = document.getElementById('news-list');
+        if (!r.news || !r.news.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-newspaper"></i><p>暂无新闻</p></div>'; return; }
+        list.innerHTML = r.news.map(function(n) {
+            return '<div class="card"><h4>' + n.title + ' <span style="font-size:0.8rem;color:var(--portal-text-muted)">[' + n.category + ']</span></h4><p style="font-size:0.85rem;color:var(--portal-text-muted);margin-top:4px">' + n.content.slice(0, 200) + '...</p><button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="delNews(' + n.id + ')">删除</button></div>';
+        }).join('');
+    });
+}
+function pubNews() { var t = document.getElementById('news-title').value.trim(); var c = document.getElementById('news-content').value.trim(); var cat = document.getElementById('news-cat').value; if (!t || !c) { alert('标题和内容不能为空'); return; } apiCall('/api/government/news', 'POST', { title: t, content: c, category: cat }).then(function(r) { alert(r.message); if (r.success) { document.getElementById('news-title').value = ''; document.getElementById('news-content').value = ''; loadNews(); } }); }
+function delNews(id) { if (!confirm('确定删除?')) return; apiCall('/api/government/news/' + id, 'DELETE').then(function(r) { if (r.success) loadNews(); }); }
+</script>
+</body>
+</html>

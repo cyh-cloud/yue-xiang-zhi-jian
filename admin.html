@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统管理 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --portal-accent: #10b981; --portal-accent-hover: #059669;
+            --portal-sidebar-bg: #1e293b; --portal-sidebar-divider: #334155;
+            --portal-sidebar-link-hover-bg: #334155;
+            --portal-body-bg: #0f172a; --portal-content-bg: #0f172a;
+            --portal-card-bg: #1e293b; --portal-card-border: #334155;
+            --portal-card-shadow: none; --portal-text: #e2e8f0;
+            --portal-text-muted: #94a3b8;
+            --portal-input-bg: #0f172a; --portal-input-border: #475569;
+            --portal-table-border: #334155; --portal-table-th-bg: #0f172a;
+            --portal-topbar-bg: #1e293b;
+        }
+        .portal-topbar { background: var(--portal-card-bg); }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar">
+        <div class="logo"><i class="fas fa-shield-alt"></i>系统管理</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>仪表盘</a>
+            <a href="#" data-page="users"><i class="fas fa-users"></i>用户管理</a>
+            <a href="#" data-page="reviews"><i class="fas fa-check-circle"></i>内容审核</a>
+            <a href="#" data-page="carousels"><i class="fas fa-images"></i>轮播图</a>
+            <a href="#" data-page="announcements"><i class="fas fa-bullhorn"></i>系统公告</a>
+            <a href="#" data-page="content"><i class="fas fa-shield"></i>内容监管</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">管</div><span id="sidebar-name">管理员</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">仪表盘</h2>
+            </div>
+            <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
+        <div class="portal-content">
+            <div class="page active" id="page-dashboard">
+                <div class="stat-grid" id="dash-stats"></div>
+                <div class="card"><h3>待处理</h3><div id="dash-pending"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+            </div>
+            <div class="page" id="page-users">
+                <div class="form-row"><input type="text" id="user-search" placeholder="搜索用户名/姓名"><select id="user-role-filter"><option value="">全部角色</option><option value="student">学员</option><option value="teacher">教师</option><option value="enterprise">企业</option><option value="government">政府</option></select></div>
+                <div id="user-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-reviews">
+                <div class="form-row"><select id="review-filter"><option value="">全部类型</option><option value="course">课程</option><option value="job">职位</option><option value="procurement">求购</option><option value="model_3d">3D模型</option></select></div>
+                <div id="review-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-carousels">
+                <div class="section-header"><h3>轮播图列表</h3><button class="btn btn-primary" onclick="addCarousel()"><i class="fas fa-plus"></i> 添加</button></div>
+                <div id="carousel-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-announcements">
+                <div class="card"><input type="text" id="ann-title" placeholder="公告标题"><textarea id="ann-content" rows="3" placeholder="公告内容" style="margin-top:8px"></textarea><button class="btn btn-primary" style="margin-top:8px" onclick="publishAnn()">发布公告</button></div>
+                <div id="ann-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-content"><h3>讨论帖管理</h3><div id="disc-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+        </div>
+    </div>
+</div>
+<script>window.APP_CONFIG={apiBaseUrl:''};</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+PORTAL.init('super_admin', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = '管';
+    loadDashboard();
+});
+
+PORTAL.onPageChange(function(p) {
+    if (p === 'dashboard') loadDashboard();
+    else if (p === 'users') loadUsers();
+    else if (p === 'reviews') loadReviews();
+    else if (p === 'carousels') loadCarousels();
+    else if (p === 'announcements') loadAnnouncements();
+    else if (p === 'content') loadContent();
+});
+
+function loadDashboard() {
+    apiCall('/api/government/dashboard', 'GET').then(function(r) {
+        if (!r.success) return;
+        var d = r.overview;
+        document.getElementById('dash-stats').innerHTML =
+            '<div class="stat-card"><div class="num">' + d.users.total + '</div><div class="label">总用户</div></div>' +
+            '<div class="stat-card"><div class="num">' + d.training.total_students + '</div><div class="label">学员</div></div>' +
+            '<div class="stat-card"><div class="num">' + d.employment.total_jobs + '</div><div class="label">岗位</div></div>' +
+            '<div class="stat-card"><div class="num">' + d.content.courses + '</div><div class="label">课程</div></div>';
+    });
+    apiCall('/api/admin/reviews', 'GET').then(function(r) {
+        document.getElementById('dash-pending').textContent = r.reviews ? '待审核: ' + r.reviews.length + ' 项' : '暂无待审核';
+    });
+}
+
+function loadUsers() {
+    var q = document.getElementById('user-search').value;
+    var role = document.getElementById('user-role-filter').value;
+    apiCall('/api/admin/users?search=' + encodeURIComponent(q) + '&role=' + role, 'GET').then(function(r) {
+        var list = document.getElementById('user-list');
+        if (!r.users || !r.users.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>暂无用户</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.users.map(function(u) {
+                return '<tr><td>' + u.username + '</td><td>' + u.name + '</td><td>' + u.role + '</td>' +
+                    '<td><span class="badge ' + (u.status === 'active' ? 'badge-green' : 'badge-red') + '">' + u.status + '</span></td>' +
+                    '<td><button class="btn btn-primary btn-sm" onclick="editUser(\'' + u.username + '\',\'' + u.role + '\',\'' + u.status + '\')">编辑</button> ' +
+                    '<button class="btn btn-danger btn-sm" onclick="delUser(\'' + u.username + '\')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() { document.getElementById('user-list').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+document.getElementById('user-search').addEventListener('input', loadUsers);
+document.getElementById('user-role-filter').addEventListener('change', loadUsers);
+
+function editUser(id, role, status) {
+    var nr = prompt('角色 (student/teacher/enterprise/government/super_admin):', role); if (!nr) return;
+    var ns = prompt('状态 (active/suspended):', status); if (!ns) return;
+    apiCall('/api/admin/users/' + id, 'PUT', { role: nr, status: ns }).then(function(r) { alert(r.message); if (r.success) loadUsers(); });
+}
+function delUser(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/users/' + id, 'DELETE').then(function(r) { alert(r.message); if (r.success) loadUsers(); }); }
+
+function loadReviews() {
+    var t = document.getElementById('review-filter').value;
+    apiCall('/api/admin/reviews?content_type=' + t, 'GET').then(function(r) {
+        var list = document.getElementById('review-list');
+        if (!r.reviews || !r.reviews.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i><p>暂无待审核</p></div>'; return; }
+        list.innerHTML = r.reviews.map(function(rv) {
+            return '<div class="card"><div><strong>' + rv.content_type + '</strong> <span class="badge badge-yellow">' + rv.status + '</span></div><div style="margin-top:4px;font-size:0.85rem;color:var(--portal-text-muted)">提交者: ' + rv.submitter_id + ' | ' + rv.created_at + '</div><div style="margin-top:8px;display:flex;gap:8px"><button class="btn btn-success" onclick="approveReview(' + rv.id + ')">通过</button><button class="btn btn-danger" onclick="rejectReview(' + rv.id + ')">驳回</button></div></div>';
+        }).join('');
+    });
+}
+document.getElementById('review-filter').addEventListener('change', loadReviews);
+
+function approveReview(id) { apiCall('/api/admin/reviews/' + id + '/approve', 'POST').then(function(r) { alert(r.message); if (r.success) loadReviews(); }); }
+function rejectReview(id) { var c = prompt('驳回理由(可选):', ''); apiCall('/api/admin/reviews/' + id + '/reject', 'POST', { comment: c || '' }).then(function(r) { alert(r.message); if (r.success) loadReviews(); }); }
+
+function loadCarousels() {
+    apiCall('/api/admin/carousels', 'GET').then(function(r) {
+        var list = document.getElementById('carousel-list');
+        if (!r.carousels || !r.carousels.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-images"></i><p>暂无轮播图</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>标题</th><th>图片</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.carousels.map(function(c) {
+                return '<tr><td>' + c.title + '</td><td><img src="' + c.image_url + '" style="max-width:100px;max-height:50px"></td><td>' + c.sort_order + '</td>' +
+                    '<td>' + (c.is_active ? '启用' : '禁用') + '</td>' +
+                    '<td><button class="btn btn-primary btn-sm" onclick="toggleCar(' + c.id + ',' + c.is_active + ')">' + (c.is_active ? '禁用' : '启用') + '</button> ' +
+                    '<button class="btn btn-danger btn-sm" onclick="delCar(' + c.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+function addCarousel() { var t = prompt('标题:'); if (!t) return; var u = prompt('图片URL:'); if (!u) return; var l = prompt('链接URL:', ''); apiCall('/api/admin/carousels', 'POST', { title: t, image_url: u, link_url: l }).then(function(r) { alert(r.message); if (r.success) loadCarousels(); }); }
+function toggleCar(id, act) { apiCall('/api/admin/carousels/' + id, 'PUT', { is_active: act ? 0 : 1 }).then(function(r) { if (r.success) loadCarousels(); }); }
+function delCar(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/carousels/' + id, 'DELETE').then(function(r) { if (r.success) loadCarousels(); }); }
+
+function loadAnnouncements() {
+    apiCall('/api/admin/system-announcements', 'GET').then(function(r) {
+        var list = document.getElementById('ann-list');
+        if (!r.announcements || !r.announcements.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-bullhorn"></i><p>暂无公告</p></div>'; return; }
+        list.innerHTML = r.announcements.map(function(a) {
+            return '<div class="card"><h4>' + (a.is_pinned ? '📌 ' : '') + a.title + '</h4><p style="font-size:0.85rem;color:var(--portal-text-muted);margin-top:4px">' + a.content.slice(0, 200) + '</p><div style="margin-top:8px"><button class="btn btn-danger btn-sm" onclick="delAnn(' + a.id + ')">删除</button></div></div>';
+        }).join('');
+    });
+}
+function publishAnn() { var t = document.getElementById('ann-title').value.trim(); var c = document.getElementById('ann-content').value.trim(); if (!t || !c) { alert('标题和内容不能为空'); return; } apiCall('/api/admin/system-announcements', 'POST', { title: t, content: c }).then(function(r) { alert(r.message); if (r.success) { document.getElementById('ann-title').value = ''; document.getElementById('ann-content').value = ''; loadAnnouncements(); } }); }
+function delAnn(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/system-announcements/' + id, 'DELETE').then(function(r) { if (r.success) loadAnnouncements(); }); }
+
+function loadContent() {
+    apiCall('/api/discussions', 'GET').then(function(r) {
+        var list = document.getElementById('disc-list');
+        if (!r.discussions || !r.discussions.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-shield"></i><p>暂无帖子</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>标题</th><th>作者</th><th>时间</th><th>操作</th></tr></thead><tbody>' +
+            r.discussions.map(function(d) { return '<tr><td>' + d.title + '</td><td>' + (d.user_name || '') + '</td><td>' + (d.created_at || '').slice(0, 16) + '</td><td><button class="btn btn-danger btn-sm" onclick="delDisc(' + d.id + ')">删除</button></td></tr>'; }).join('') + '</tbody></table>';
+    });
+}
+function delDisc(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/discussions/' + id, 'DELETE').then(function(r) { alert(r.message); if (r.success) loadContent(); }); }
+</script>
+</body>
+</html>

@@ -2328,6 +2328,10 @@ def get_success_case(case_id):
 
 @app.route('/api/resources/policies', methods=['GET'])
 def get_policies():
+    # 优先使用政府政策表，降级到旧表
+    gp = database.get_government_policies()
+    if gp:
+        return jsonify({"success": True, "policies": gp})
     policies = database.get_policies()
     return jsonify({"success": True, "policies": policies})
 
@@ -3579,11 +3583,16 @@ def login():
 
     user = database.authenticate_user(username, password)
     if user:
+        if user.get('status') == 'suspended':
+            return jsonify({"success": False, "message": "账号已被停用，请联系管理员"}), 403
         session_id = database.create_session(username)
         return jsonify({
             "success": True,
             "session_id": session_id,
-            "user": {"id": user['username'], "name": user['name'], "role": user['role'], "email": user.get('email', '')}
+            "user": {"id": user['username'], "name": user['name'], "role": user['role'],
+                     "email": user.get('email', ''), "phone": user.get('phone', ''),
+                     "avatar_url": user.get('avatar_url', ''), "company_name": user.get('company_name', ''),
+                     "region": user.get('region', ''), "status": user.get('status', 'active')}
         })
 
     return jsonify({"success": False, "message": "用户名或密码错误"}), 401
@@ -3696,6 +3705,831 @@ def call_ai_service(system_prompt, user_message, temperature=0.3, max_tokens=100
     result = response.json()
     return result['choices'][0]['message']['content']
 
+
+
+
+# ==================== 辅助函数 ====================
+
+def _get_session_user():
+    """从请求头获取当前登录用户，未登录返回 None"""
+    session_id = request.headers.get('X-Session-Id', '')
+    if not session_id:
+        return None
+    session = database.get_session(session_id)
+    if not session:
+        return None
+    user = database.get_user_by_id(session['user_id'])
+    return user
+
+
+def _require_role(*roles):
+    """角色权限装饰器：检查当前用户是否拥有指定角色"""
+    from functools import wraps
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            user = _get_session_user()
+            if not user:
+                return jsonify({"success": False, "message": "请先登录"}), 401
+            if user['role'] not in roles:
+                return jsonify({"success": False, "message": "权限不足"}), 403
+            if user.get('status') == 'suspended':
+                return jsonify({"success": False, "message": "账号已被停用"}), 403
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# ==================== 用户注册 ====================
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """用户注册"""
+    data = request.get_json()
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    name = data.get('name', '').strip()
+    role = data.get('role', 'student')
+    email = data.get('email', '').strip()
+    phone = data.get('phone', '').strip()
+    company_name = data.get('company_name', '').strip()
+    region = data.get('region', '').strip()
+
+    if not username or not password or not name:
+        return jsonify({"success": False, "message": "用户名、密码和姓名不能为空"}), 400
+    if len(password) < 6:
+        return jsonify({"success": False, "message": "密码至少6位"}), 400
+    if role not in ('student', 'teacher', 'enterprise'):
+        return jsonify({"success": False, "message": "无效的角色类型"}), 400
+
+    user_id, msg = database.register_user(username, password, name, role,
+                                          email, phone, company_name, region)
+    if user_id:
+        session_id = database.create_session(username)
+        user = database.get_user_by_id(username)
+        return jsonify({
+            "success": True,
+            "message": msg,
+            "session_id": session_id,
+            "user": {"id": user['username'], "name": user['name'], "role": user['role'],
+                     "email": user.get('email', ''), "phone": user.get('phone', ''),
+                     "avatar_url": user.get('avatar_url', ''), "company_name": user.get('company_name', ''),
+                     "region": user.get('region', ''), "status": user.get('status', 'active')}
+        })
+    return jsonify({"success": False, "message": msg}), 400
+
+
+# ==================== 超级管理员 API ====================
+
+@app.route('/api/admin/users', methods=['GET'])
+def admin_get_users():
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    search = request.args.get('search', '')
+    role_filter = request.args.get('role', '')
+    users = database.get_all_users(search=search or None, role=role_filter or None)
+    return jsonify({"success": True, "users": users})
+
+
+@app.route('/api/admin/users/<user_id>', methods=['PUT'])
+def admin_update_user(user_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    database.update_user_by_admin(user_id,
+        name=data.get('name'), role=data.get('role'), status=data.get('status'),
+        phone=data.get('phone'), email=data.get('email'))
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/admin/users/<user_id>', methods=['DELETE'])
+def admin_delete_user(user_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_user_by_admin(user_id)
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ---- 内容审核 ----
+
+@app.route('/api/admin/reviews', methods=['GET'])
+def admin_get_reviews():
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    content_type = request.args.get('content_type', '')
+    reviews = database.get_pending_reviews(content_type=content_type or None)
+
+    # 关联审核内容详情
+    enriched = []
+    for r in reviews:
+        rd = dict(r)
+        rd['detail'] = None
+        ct, cid = r['content_type'], r['content_id']
+        if ct == 'course':
+            rd['detail'] = database.get_course(cid)
+        elif ct == 'job':
+            rd['detail'] = database.get_job_by_id(cid)
+        elif ct == 'procurement':
+            conn = database.get_connection()
+            row = conn.execute("SELECT * FROM procurements WHERE id=?", (cid,)).fetchone()
+            conn.close()
+            rd['detail'] = dict(row) if row else None
+        elif ct == 'model_3d':
+            conn = database.get_connection()
+            row = conn.execute("SELECT * FROM models_3d WHERE id=?", (cid,)).fetchone()
+            conn.close()
+            rd['detail'] = dict(row) if row else None
+        enriched.append(rd)
+    return jsonify({"success": True, "reviews": enriched})
+
+
+@app.route('/api/admin/reviews/<int:review_id>/approve', methods=['POST'])
+def admin_approve_review(review_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.approve_review(review_id, user['username'])
+    return jsonify({"success": True, "message": "已审核通过"})
+
+
+@app.route('/api/admin/reviews/<int:review_id>/reject', methods=['POST'])
+def admin_reject_review(review_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    comment = data.get('comment', '')
+    database.reject_review(review_id, user['username'], comment)
+    return jsonify({"success": True, "message": "已驳回"})
+
+
+# ---- 轮播图管理 ----
+
+@app.route('/api/admin/carousels', methods=['GET'])
+def admin_get_carousels():
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    carousels = database.get_carousels(active_only=False)
+    return jsonify({"success": True, "carousels": carousels})
+
+
+@app.route('/api/admin/carousels', methods=['POST'])
+def admin_add_carousel():
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    car_id = database.add_carousel(
+        data.get('title', ''), data.get('image_url', ''),
+        data.get('link_url', ''), data.get('sort_order', 0))
+    return jsonify({"success": True, "id": car_id, "message": "添加成功"})
+
+
+@app.route('/api/admin/carousels/<int:car_id>', methods=['PUT'])
+def admin_update_carousel(car_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    database.update_carousel(car_id, **{k: v for k, v in data.items()
+        if k in ('title', 'image_url', 'link_url', 'sort_order', 'is_active')})
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/admin/carousels/<int:car_id>', methods=['DELETE'])
+def admin_delete_carousel(car_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_carousel(car_id)
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ---- 系统公告管理 ----
+
+@app.route('/api/admin/system-announcements', methods=['GET'])
+def admin_get_system_announcements():
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    anns = database.get_system_announcements(active_only=False)
+    return jsonify({"success": True, "announcements": anns})
+
+
+@app.route('/api/admin/system-announcements', methods=['POST'])
+def admin_add_system_announcement():
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    ann_id = database.add_system_announcement(
+        data.get('title', ''), data.get('content', ''),
+        data.get('is_pinned', 0), user['username'])
+    return jsonify({"success": True, "id": ann_id, "message": "发布成功"})
+
+
+@app.route('/api/admin/system-announcements/<int:ann_id>', methods=['DELETE'])
+def admin_delete_system_announcement(ann_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_system_announcement(ann_id)
+    return jsonify({"success": True, "message": "已删除"})
+
+
+# ---- 内容监管 ----
+
+@app.route('/api/admin/comments/<int:comment_id>', methods=['DELETE'])
+def admin_delete_comment(comment_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.soft_delete_comment(comment_id, user['username'])
+    return jsonify({"success": True, "message": "已删除违规评论"})
+
+
+@app.route('/api/admin/discussions/<int:disc_id>', methods=['DELETE'])
+def admin_delete_discussion(disc_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.soft_delete_discussion(disc_id)
+    return jsonify({"success": True, "message": "已删除违规帖子"})
+
+
+# ==================== 政府人员 API ====================
+
+# ---- 政策管理 ----
+
+@app.route('/api/government/policies', methods=['GET'])
+def gov_get_policies():
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    policies = database.get_all_government_policies()
+    return jsonify({"success": True, "policies": policies})
+
+
+@app.route('/api/government/policies', methods=['POST'])
+def gov_create_policy():
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    policy_id = database.create_policy(
+        data.get('title', ''), data.get('content', ''),
+        data.get('category', 'general'), user['username'])
+    return jsonify({"success": True, "id": policy_id, "message": "政策发布成功"})
+
+
+@app.route('/api/government/policies/<int:policy_id>', methods=['PUT'])
+def gov_update_policy(policy_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    database.update_policy(policy_id, **{k: v for k, v in data.items()
+        if k in ('title', 'content', 'category', 'is_published')})
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/government/policies/<int:policy_id>', methods=['DELETE'])
+def gov_delete_policy(policy_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_policy(policy_id)
+    return jsonify({"success": True, "message": "已删除"})
+
+
+# ---- 新闻资讯 ----
+
+@app.route('/api/government/news', methods=['GET'])
+def gov_get_news():
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    category = request.args.get('category', '')
+    news_list, total = database.get_news(category=category or None, page=1, page_size=50)
+    return jsonify({"success": True, "news": news_list, "total": total})
+
+
+@app.route('/api/government/news', methods=['POST'])
+def gov_create_news():
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    news_id = database.create_news(
+        data.get('title', ''), data.get('content', ''),
+        user['username'], data.get('category', 'news'))
+    return jsonify({"success": True, "id": news_id, "message": "资讯发布成功"})
+
+
+@app.route('/api/government/news/<int:news_id>', methods=['PUT'])
+def gov_update_news(news_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    database.update_news(news_id, **{k: v for k, v in data.items()
+        if k in ('title', 'content', 'category', 'is_published')})
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/government/news/<int:news_id>', methods=['DELETE'])
+def gov_delete_news(news_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_news(news_id)
+    return jsonify({"success": True, "message": "已删除"})
+
+
+# ---- 数据大屏 ----
+
+@app.route('/api/government/dashboard', methods=['GET'])
+def gov_dashboard():
+    user = _get_session_user()
+    if not user or user['role'] != 'government':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    overview = database.get_dashboard_overview()
+    regions = database.get_dashboard_region_stats()
+    directions = database.get_dashboard_direction_stats()
+    return jsonify({"success": True, "overview": overview,
+                    "regions": regions, "directions": directions})
+
+
+# ==================== 教师扩展 API ====================
+
+# ---- 课程管理 ----
+
+@app.route('/api/teacher/courses', methods=['GET'])
+def teacher_get_courses():
+    user = _get_session_user()
+    if not user or user['role'] not in ('teacher', 'super_admin'):
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    courses = database.get_courses(teacher_id=user['username'], published_only=False)
+    return jsonify({"success": True, "courses": courses})
+
+
+@app.route('/api/teacher/courses', methods=['POST'])
+def teacher_create_course():
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    course_id = database.create_course(
+        data.get('title', ''), data.get('description', ''),
+        data.get('category', ''), user['username'],
+        data.get('cover_url', ''))
+    return jsonify({"success": True, "id": course_id, "message": "课程创建成功，等待审核"})
+
+
+@app.route('/api/teacher/courses/<int:course_id>', methods=['PUT'])
+def teacher_update_course(course_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    database.update_course(course_id, **{k: v for k, v in data.items()
+        if k in ('title', 'description', 'category', 'cover_url')})
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/teacher/courses/<int:course_id>', methods=['DELETE'])
+def teacher_delete_course(course_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_course(course_id)
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ---- 课程素材 ----
+
+@app.route('/api/teacher/courses/<int:course_id>/materials', methods=['GET'])
+def teacher_get_materials(course_id):
+    materials = database.get_course_materials(course_id)
+    return jsonify({"success": True, "materials": materials})
+
+
+@app.route('/api/teacher/courses/<int:course_id>/materials', methods=['POST'])
+def teacher_add_material(course_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    if 'file' not in request.files:
+        return jsonify({"success": False, "message": "请选择文件"}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({"success": False, "message": "文件名为空"}), 400
+    # 保存文件
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{f.filename}"
+    filepath = os.path.join('uploads', 'courses', str(course_id), filename)
+    os.makedirs(os.path.dirname(os.path.join(_BASE_DIR, filepath)), exist_ok=True)
+    f.save(os.path.join(_BASE_DIR, filepath))
+    # 判断类型
+    ext = f.filename.rsplit('.', 1)[-1].lower() if '.' in f.filename else ''
+    if ext in ('mp4', 'avi', 'mov', 'webm', 'mkv'):
+        mtype = 'video'
+    elif ext == 'pdf':
+        mtype = 'pdf'
+    else:
+        mtype = 'other'
+    mat_id = database.add_course_material(course_id, mtype, f.filename, filepath)
+    return jsonify({"success": True, "id": mat_id, "message": "上传成功"})
+
+
+@app.route('/api/teacher/materials/<int:mat_id>', methods=['DELETE'])
+def teacher_delete_material(mat_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    filepath = database.delete_course_material(mat_id)
+    if filepath:
+        full = os.path.join(_BASE_DIR, filepath)
+        if os.path.exists(full):
+            os.remove(full)
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ---- 3D 模型管理 ----
+
+@app.route('/api/teacher/models-3d', methods=['GET'])
+def teacher_get_models_3d():
+    user = _get_session_user()
+    if not user or user['role'] not in ('teacher', 'super_admin'):
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    models = database.get_models_3d(teacher_id=user['username'] if user['role'] == 'teacher' else None,
+                                    published_only=False)
+    return jsonify({"success": True, "models": models})
+
+
+@app.route('/api/teacher/models-3d', methods=['POST'])
+def teacher_create_model_3d():
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    if 'file' not in request.files:
+        return jsonify({"success": False, "message": "请选择模型文件"}), 400
+    f = request.files['file']
+    if not f.filename:
+        return jsonify({"success": False, "message": "文件名为空"}), 400
+    title = request.form.get('title', f.filename)
+    description = request.form.get('description', '')
+    craft_type = request.form.get('craft_type', '')
+    # 保存文件
+    filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{f.filename}"
+    filepath = os.path.join('uploads', 'models_3d', filename)
+    os.makedirs(os.path.dirname(os.path.join(_BASE_DIR, filepath)), exist_ok=True)
+    f.save(os.path.join(_BASE_DIR, filepath))
+    model_id = database.create_model_3d(title, description, craft_type,
+                                         filepath, f.filename, 0, user['username'])
+    return jsonify({"success": True, "id": model_id, "message": "3D模型上传成功，等待审核"})
+
+
+@app.route('/api/teacher/models-3d/<int:model_id>', methods=['DELETE'])
+def teacher_delete_model_3d(model_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'teacher':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    filepath = database.delete_model_3d(model_id)
+    if filepath:
+        full = os.path.join(_BASE_DIR, filepath)
+        if os.path.exists(full):
+            os.remove(full)
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ==================== 企业用户 API ====================
+
+# ---- 职位管理 ----
+
+@app.route('/api/enterprise/jobs', methods=['GET'])
+def enterprise_get_jobs():
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    conn = database.get_connection()
+    rows = conn.execute(
+        "SELECT * FROM job_listings WHERE enterprise_id = ? ORDER BY posted_at DESC",
+        (user['username'],)).fetchall()
+    conn.close()
+    jobs = []
+    for r in rows:
+        d = dict(r)
+        d['requirements'] = json.loads(d['requirements'])
+        jobs.append(d)
+    return jsonify({"success": True, "jobs": jobs})
+
+
+@app.route('/api/enterprise/jobs', methods=['POST'])
+def enterprise_create_job():
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    conn = database.get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO job_listings (title, company, salary, requirements, description, "
+        "location, category, job_type, education, experience, company_size, industry, "
+        "enterprise_id, review_status, posted_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+        (data.get('title', ''), user.get('company_name', data.get('company', '')),
+         data.get('salary', ''), json.dumps(data.get('requirements', [])),
+         data.get('description', ''), data.get('location', ''),
+         data.get('category', ''), data.get('job_type', '全职'),
+         data.get('education', ''), data.get('experience', ''),
+         user.get('company_name', ''), data.get('industry', ''),
+         user['username'], 'pending'))
+    conn.commit()
+    job_id = cursor.lastrowid
+    conn.close()
+    database.create_content_review('job', job_id, user['username'])
+    return jsonify({"success": True, "id": job_id, "message": "职位发布成功，等待审核"})
+
+
+@app.route('/api/enterprise/jobs/<int:job_id>', methods=['PUT'])
+def enterprise_update_job(job_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    conn = database.get_connection()
+    updates = []
+    params = []
+    for k in ('title', 'company', 'salary', 'description', 'location',
+              'category', 'job_type', 'education', 'experience', 'industry'):
+        if k in data and data[k] is not None:
+            updates.append(f"{k}=?"); params.append(data[k])
+    if 'requirements' in data:
+        updates.append("requirements=?"); params.append(json.dumps(data['requirements']))
+    if updates:
+        params.append(job_id)
+        conn.execute(f"UPDATE job_listings SET {', '.join(updates)} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/enterprise/jobs/<int:job_id>', methods=['DELETE'])
+def enterprise_delete_job(job_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    conn = database.get_connection()
+    conn.execute("DELETE FROM job_listings WHERE id = ?", (job_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ---- 求购管理 ----
+
+@app.route('/api/enterprise/procurements', methods=['GET'])
+def enterprise_get_procurements():
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    procs = database.get_procurements(enterprise_id=user['username'], published_only=False)
+    return jsonify({"success": True, "procurements": procs})
+
+
+@app.route('/api/enterprise/procurements', methods=['POST'])
+def enterprise_create_procurement():
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    proc_id = database.create_procurement(
+        data.get('product_name', ''), user['username'],
+        data.get('specification', ''), data.get('quantity', ''),
+        data.get('price_range', ''), data.get('delivery_location', ''),
+        data.get('deadline', ''), data.get('contact_info', ''),
+        data.get('description', ''))
+    return jsonify({"success": True, "id": proc_id, "message": "求购发布成功，等待审核"})
+
+
+@app.route('/api/enterprise/procurements/<int:proc_id>', methods=['PUT'])
+def enterprise_update_procurement(proc_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    database.update_procurement(proc_id, **data)
+    return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/enterprise/procurements/<int:proc_id>', methods=['DELETE'])
+def enterprise_delete_procurement(proc_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    database.delete_procurement(proc_id)
+    return jsonify({"success": True, "message": "删除成功"})
+
+
+# ---- 简历管理 ----
+
+@app.route('/api/enterprise/applications', methods=['GET'])
+def enterprise_get_applications():
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    conn = database.get_connection()
+    rows = conn.execute("""
+        SELECT ja.*, jl.title as job_title, u.name as applicant_name,
+               u.phone as applicant_phone, u.email as applicant_email, u.bio as applicant_bio
+        FROM job_applications ja
+        JOIN job_listings jl ON ja.job_id = jl.id
+        JOIN users u ON ja.user_id = u.username
+        WHERE jl.enterprise_id = ?
+        ORDER BY ja.applied_at DESC
+    """, (user['username'],)).fetchall()
+    conn.close()
+    return jsonify({"success": True, "applications": [dict(r) for r in rows]})
+
+
+@app.route('/api/enterprise/applications/<int:app_id>', methods=['PUT'])
+def enterprise_update_application(app_id):
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    data = request.get_json()
+    new_status = data.get('status', '')
+    if new_status not in ('approved', 'rejected', 'interview'):
+        return jsonify({"success": False, "message": "无效的状态"}), 400
+    conn = database.get_connection()
+    conn.execute("UPDATE job_applications SET status = ? WHERE id = ?", (new_status, app_id))
+    conn.commit()
+    conn.close()
+    status_labels = {'approved': '已通过', 'rejected': '已拒绝', 'interview': '已通知面试'}
+    return jsonify({"success": True, "message": f"状态已更新为：{status_labels.get(new_status, new_status)}"})
+
+
+@app.route('/api/enterprise/stats', methods=['GET'])
+def enterprise_get_stats():
+    user = _get_session_user()
+    if not user or user['role'] != 'enterprise':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    conn = database.get_connection()
+    total_jobs = conn.execute(
+        "SELECT COUNT(*) FROM job_listings WHERE enterprise_id = ?",
+        (user['username'],)).fetchone()[0]
+    total_procs = conn.execute(
+        "SELECT COUNT(*) FROM procurements WHERE enterprise_id = ?",
+        (user['username'],)).fetchone()[0]
+    total_apps = conn.execute("""
+        SELECT COUNT(*) FROM job_applications ja
+        JOIN job_listings jl ON ja.job_id = jl.id
+        WHERE jl.enterprise_id = ?
+    """, (user['username'],)).fetchone()[0]
+    conn.close()
+    return jsonify({"success": True, "stats": {
+        "total_jobs": total_jobs,
+        "total_procurements": total_procs,
+        "total_applications": total_apps
+    }})
+
+
+# ==================== 公开 API ====================
+
+# ---- 轮播图（公开） ----
+
+@app.route('/api/carousels', methods=['GET'])
+def public_get_carousels():
+    carousels = database.get_carousels(active_only=True)
+    return jsonify({"success": True, "carousels": carousels})
+
+
+# ---- 系统公告（公开） ----
+
+@app.route('/api/system-announcements', methods=['GET'])
+def public_get_system_announcements():
+    anns = database.get_system_announcements(active_only=True)
+    return jsonify({"success": True, "announcements": anns})
+
+
+# ---- 新闻资讯（公开） ----
+
+@app.route('/api/resources/news', methods=['GET'])
+def public_get_news():
+    category = request.args.get('category', '')
+    page = request.args.get('page', 1, type=int)
+    news_list, total = database.get_news(category=category or None, page=page)
+    return jsonify({"success": True, "news": news_list, "total": total})
+
+
+@app.route('/api/resources/news/<int:news_id>', methods=['GET'])
+def public_get_news_detail(news_id):
+    news = database.get_news_by_id(news_id)
+    if not news:
+        return jsonify({"success": False, "message": "资讯不存在"}), 404
+    return jsonify({"success": True, "news": news})
+
+
+# ---- 公开课程（用户端可见） ----
+
+@app.route('/api/teacher/public-courses', methods=['GET'])
+def public_get_courses():
+    courses = database.get_courses(published_only=True)
+    return jsonify({"success": True, "courses": courses})
+
+
+@app.route('/api/teacher/public-courses/<int:course_id>', methods=['GET'])
+def public_get_course_detail(course_id):
+    course = database.get_course(course_id)
+    if not course:
+        return jsonify({"success": False, "message": "课程不存在"}), 404
+    materials = database.get_course_materials(course_id)
+    return jsonify({"success": True, "course": course, "materials": materials})
+
+
+# ---- 公开3D模型（用户端可见） ----
+
+@app.route('/api/teacher/public-models-3d', methods=['GET'])
+def public_get_models_3d():
+    craft_type = request.args.get('craft_type', '')
+    models = database.get_models_3d(published_only=True)
+    if craft_type:
+        models = [m for m in models if m.get('craft_type') == craft_type]
+    return jsonify({"success": True, "models": models})
+
+
+# ---- 公开求购（用户端可见） ----
+
+@app.route('/api/employment/procurements', methods=['GET'])
+def public_get_procurements():
+    procs = database.get_procurements(status='active', published_only=True)
+    return jsonify({"success": True, "procurements": procs})
+
+
+# ---- 评论系统 ----
+
+@app.route('/api/comments', methods=['GET'])
+def public_get_comments():
+    target_type = request.args.get('target_type', '')
+    target_id = request.args.get('target_id', 0, type=int)
+    if not target_type or not target_id:
+        return jsonify({"success": False, "message": "参数不完整"}), 400
+    comments = database.get_comments(target_type, target_id)
+    return jsonify({"success": True, "comments": comments})
+
+
+@app.route('/api/comments', methods=['POST'])
+def public_add_comment():
+    user = _get_session_user()
+    if not user:
+        return jsonify({"success": False, "message": "请先登录"}), 401
+    data = request.get_json()
+    target_type = data.get('target_type', '')
+    target_id = data.get('target_id', 0)
+    content = data.get('content', '').strip()
+    if not target_type or not target_id or not content:
+        return jsonify({"success": False, "message": "参数不完整"}), 400
+    comment_id = database.add_comment(target_type, target_id, user['username'], content)
+    return jsonify({"success": True, "id": comment_id, "message": "评论成功"})
+
+
+# ---- 讨论区 ----
+
+@app.route('/api/discussions', methods=['GET'])
+def public_get_discussions():
+    category = request.args.get('category', '')
+    page = request.args.get('page', 1, type=int)
+    discs, total = database.get_discussions(category=category or None, page=page)
+    return jsonify({"success": True, "discussions": discs, "total": total})
+
+
+@app.route('/api/discussions', methods=['POST'])
+def public_create_discussion():
+    user = _get_session_user()
+    if not user:
+        return jsonify({"success": False, "message": "请先登录"}), 401
+    data = request.get_json()
+    title = data.get('title', '').strip()
+    content = data.get('content', '').strip()
+    category = data.get('category', 'general')
+    if not title or not content:
+        return jsonify({"success": False, "message": "标题和内容不能为空"}), 400
+    disc_id = database.create_discussion(title, content, category, user['username'])
+    return jsonify({"success": True, "id": disc_id, "message": "发布成功"})
+
+
+@app.route('/api/discussions/<int:disc_id>', methods=['GET'])
+def public_get_discussion(disc_id):
+    disc = database.get_discussion(disc_id)
+    if not disc:
+        return jsonify({"success": False, "message": "帖子不存在"}), 404
+    comments = database.get_comments('discussion', disc_id)
+    return jsonify({"success": True, "discussion": disc, "comments": comments})
 
 # ==================== 静态文件兜底（必须放最后） ====================
 

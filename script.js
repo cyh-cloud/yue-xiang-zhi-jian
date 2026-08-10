@@ -102,6 +102,7 @@ function restoreSession() {
                 if (data.success) {
                     AppState.user = data.user;
                     updateUserUI();
+                    if (typeof onLoginSuccess === 'function') onLoginSuccess();
                 } else {
                     localStorage.removeItem(STORAGE_KEYS.SESSION);
                 }
@@ -164,6 +165,11 @@ function setupFeatureTabs() {
 }
 
 function switchTab(tabName) {
+    // ===== 权限守卫 =====
+    if (AppState.user && !isTabAllowed(tabName, AppState.user.role)) {
+        showNotification("无权访问该页面", "error");
+        tabName = ROLE_DEFAULT[AppState.user.role] || "agriculture";
+    }
     // 更新导航栏active + ARIA
     document.querySelectorAll('.nav-item').forEach(item => {
         const isActive = item.getAttribute('data-tab') === tabName;
@@ -204,7 +210,8 @@ function switchTab(tabName) {
         const tabNames = {
             agriculture: '农业技能', ecommerce: '电商运营', crafts: '手工传承',
             simulation: '虚拟实训', resources: '本土资源', employment: '就业对接',
-            teacher: '教师管理'
+            teacher: '教师管理', admin: '系统管理', government: '政府工作台',
+            enterprise: '企业中心', discussions: '讨论社区'
         };
         const breadcrumb = document.getElementById('breadcrumb-current');
         const breadcrumbBar = document.getElementById('breadcrumb-bar');
@@ -216,6 +223,11 @@ function switchTab(tabName) {
         if (tabName === 'teacher') loadTeacherDashboard();
         // 切到就业tab时刷新数据
         if (tabName === 'employment') loadEmploymentData();
+        // 新面板数据加载
+        if (tabName === 'admin') loadAdminUsers();
+        if (tabName === 'government') loadGovDashboard();
+        if (tabName === 'enterprise') loadEnterpriseJobs();
+        if (tabName === 'discussions') loadDiscussions();
     }, 200);
 }
 
@@ -254,9 +266,13 @@ function setupLoginModal() {
 
     loginBtn?.addEventListener('click', () => {
         loginModal.classList.remove('is-hidden');
+        resetAuthTabs();
         trapFocus(loginModal);
     });
-    closeBtn?.addEventListener('click', () => loginModal.classList.add('is-hidden'));
+    closeBtn?.addEventListener('click', () => {
+        loginModal.classList.add('is-hidden');
+        resetAuthTabs();
+    });
     submitBtn?.addEventListener('click', handleLogin);
     demoBtn?.addEventListener('click', handleDemoLogin);
     logoutBtn?.addEventListener('click', handleLogout);
@@ -295,9 +311,16 @@ async function handleLogin() {
                 user: data.user
             }));
             document.getElementById('login-modal').classList.add('is-hidden');
+            // 角色分流：跳转到独立门户
+            var _role = data.user.role;
+            if (_role === 'super_admin') { location.href = 'admin.html'; return; }
+            if (_role === 'government') { location.href = 'government.html'; return; }
+            if (_role === 'enterprise') { location.href = 'enterprise.html'; return; }
+            if (_role === 'teacher') { location.href = 'teacher.html'; return; }
             updateUserUI();
             showNotification(`欢迎回来，${data.user.name}！`, 'success');
             loadUserData();
+            if (typeof onLoginSuccess === 'function') onLoginSuccess();
         } else {
             showNotification(data.message || '登录失败', 'error');
         }
@@ -315,17 +338,12 @@ function handleDemoLogin() {
 }
 
 async function handleLogout() {
-    if (AppState.sessionId) {
-        try { await apiCall('/api/auth/logout', 'POST', { session_id: AppState.sessionId }); } catch(e) {}
-    }
+    apiCall("/api/auth/logout", "POST", { session_id: AppState.sessionId });
     AppState.sessionId = null;
     AppState.user = null;
-    localStorage.removeItem('yuexiang_session');
-    document.getElementById('login-section').classList.remove('is-hidden');
-    document.getElementById('user-info').classList.add('is-hidden');
-    document.getElementById('teacher-quick-menu').classList.add('is-hidden');
-    document.querySelectorAll('.teacher-only').forEach(el => el.classList.add('is-hidden'));
-    showNotification('已退出登录', 'info');
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    resetToPublicView();
+    showNotification("已退出登录", "info");
 }
 
 function updateUserUI() {
@@ -5905,3 +5923,1517 @@ function setupSmoothScroll() {
 
 window.switchTab = switchTab;
 window.toggleShortcutsHelp = toggleShortcutsHelp;
+
+
+// ==================== 注册/登录 Tab 切换 ====================
+
+function setupAuthTabs() {
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const loginForm = document.getElementById('auth-login-form');
+    const regForm = document.getElementById('auth-register-form');
+    if (!tabLogin || !tabRegister) return;
+
+    tabLogin.addEventListener('click', () => {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+    });
+
+    tabRegister.addEventListener('click', () => {
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+        // 实际切换
+        loginForm.classList.add('is-hidden');
+        regForm.classList.remove('is-hidden');
+    });
+
+    // 注册角色选择 - 显示/隐藏公司名
+    const regRole = document.getElementById('reg-role');
+    const companyGroup = document.getElementById('reg-company-group');
+    if (regRole && companyGroup) {
+        regRole.addEventListener('change', () => {
+            companyGroup.classList.toggle('is-hidden', regRole.value !== 'enterprise');
+        });
+    }
+}
+
+
+// 重置认证Tab到登录状态
+function resetAuthTabs() {
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const loginForm = document.getElementById('auth-login-form');
+    const regForm = document.getElementById('auth-register-form');
+    if (tabLogin && tabRegister) {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+    }
+    if (loginForm && regForm) {
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+    }
+}
+
+// ==================== 注册处理 ====================
+
+function setupRegister() {
+    const btn = document.getElementById('register-submit');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value.trim();
+        const name = document.getElementById('reg-name').value.trim();
+        const role = document.getElementById('reg-role').value;
+        const phone = document.getElementById('reg-phone').value.trim();
+        const region = document.getElementById('reg-region').value.trim();
+        const company = document.getElementById('reg-company')?.value.trim() || '';
+
+        if (!username || !password || !name) {
+            showNotification('请填写用户名、密码和姓名', 'error');
+            return;
+        }
+        if (password.length < 6) {
+            showNotification('密码至少6位', 'error');
+            return;
+        }
+
+        try {
+            const resp = await apiCall('/api/auth/register', 'POST', {
+                username, password, name, role, phone, company_name: company, region
+            });
+            if (resp.success) {
+                AppState.sessionId = resp.session_id;
+                AppState.user = resp.user;
+                saveSession();
+                document.getElementById('login-modal').classList.add('is-hidden');
+                resetAuthTabs();
+                // 角色分流
+                var _r = resp.user.role;
+                if (_r === 'super_admin') { location.href = 'admin.html'; return; }
+                if (_r === 'government') { location.href = 'government.html'; return; }
+                if (_r === 'enterprise') { location.href = 'enterprise.html'; return; }
+                if (_r === 'teacher') { location.href = 'teacher.html'; return; }
+                onLoginSuccess();
+                showNotification(resp.message || '注册成功', 'success');
+            } else {
+                showNotification(resp.message || '注册失败', 'error');
+            }
+        } catch (e) {
+            showNotification('注册失败：' + e.message, 'error');
+        }
+    });
+}
+
+
+// ==================== 角色权限配置 ====================
+
+const ROLE_NAV = {
+    student:     ['agriculture', 'ecommerce', 'crafts', 'simulation', 'resources', 'employment', 'discussions'],
+    teacher:     ['agriculture', 'ecommerce', 'crafts', 'simulation', 'resources', 'employment', 'teacher', 'discussions'],
+    super_admin: ['admin'],
+    government:  ['government'],
+    enterprise:  ['enterprise']
+};
+
+const ROLE_DEFAULT = {
+    student: 'agriculture', teacher: 'teacher', super_admin: 'admin',
+    government: 'government', enterprise: 'enterprise'
+};
+
+function getAllowedTabs(role) {
+    return ROLE_NAV[role] || ROLE_NAV['student'];
+}
+
+function isTabAllowed(tabName, role) {
+    return getAllowedTabs(role).includes(tabName);
+}
+
+
+// ==================== 角色UI切换 ====================
+
+function applyRoleVisibility(role) {
+    // 1) 导航栏：只显示该角色允许的 tab，隐藏其余
+    document.querySelectorAll('#nav-menu .nav-item').forEach(btn => {
+        const tab = btn.getAttribute('data-tab');
+        const allowed = isTabAllowed(tab, role);
+        btn.classList.toggle('is-hidden', !allowed);
+        if (!allowed) {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-selected', 'false');
+        }
+    });
+
+    // 2) 页面区域：隐藏不属于该角色的 Hero / Features
+    const hero = document.getElementById('hero');
+    const features = document.getElementById('features');
+    const isPublicRole = (role === 'student' || role === 'teacher');
+    if (hero) hero.classList.toggle('is-hidden', !isPublicRole);
+    if (features) features.classList.toggle('is-hidden', !isPublicRole);
+
+    // 3) 教师快速菜单
+    const quickMenu = document.getElementById('teacher-quick-menu');
+    if (quickMenu) quickMenu.classList.toggle('is-hidden', role !== 'teacher');
+}
+
+function onLoginSuccess() {
+    const user = AppState.user;
+    if (!user) return;
+    updateUserUI(user);
+
+    const role = user.role;
+    applyRoleVisibility(role);
+
+    // 强制跳转到角色默认首页
+    const defaultTab = ROLE_DEFAULT[role] || 'agriculture';
+    switchTab(defaultTab);
+
+    // 触发首次数据加载
+    if (role === 'super_admin') loadAdminUsers();
+    else if (role === 'government') loadGovDashboard();
+    else if (role === 'enterprise') loadEnterpriseJobs();
+    else if (role === 'teacher') loadTeacherDashboard();
+}
+
+
+
+
+
+// ==================== 公开视图恢复 ====================
+
+function resetToPublicView() {
+    // 显示所有公开导航项 (student tabs)
+    document.querySelectorAll("#nav-menu .nav-item").forEach(function(btn) {
+        var tab = btn.getAttribute("data-tab");
+        var allowed = ROLE_NAV["student"].indexOf(tab) >= 0;
+        btn.classList.toggle("is-hidden", !allowed);
+        btn.classList.remove("active");
+        btn.setAttribute("aria-selected", "false");
+    });
+    // 恢复 Hero / Features
+    var hero = document.getElementById("hero");
+    var features = document.getElementById("features");
+    if (hero) hero.classList.remove("is-hidden");
+    if (features) features.classList.remove("is-hidden");
+    // 隐藏教师快速菜单
+    var quickMenu = document.getElementById("teacher-quick-menu");
+    if (quickMenu) quickMenu.classList.add("is-hidden");
+    // 更新UI到未登录状态
+    var loginSection = document.getElementById("login-section");
+    var userInfo = document.getElementById("user-info");
+    if (loginSection) loginSection.classList.remove("is-hidden");
+    if (userInfo) userInfo.classList.add("is-hidden");
+    // 回到农业技能首页
+    switchTab("agriculture");
+}
+
+function saveSession() {
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+        sessionId: AppState.sessionId,
+        user: AppState.user
+    }));
+}
+
+
+// ==================== 超级管理员功能 ====================
+
+function loadAdminUsers() {
+    apiCall('/api/admin/users', 'GET').then(resp => {
+        const list = document.getElementById('admin-users-list');
+        if (!list) return;
+        if (!resp.users || resp.users.length === 0) {
+            list.innerHTML = '<p>暂无用户数据</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>地区</th><th>注册时间</th><th>操作</th></tr></thead><tbody>
+            ${resp.users.map(u => `<tr>
+                <td>${u.username}</td><td>${u.name}</td><td>${u.role}</td>
+                <td><span class="status-badge status-${u.status}">${u.status}</span></td>
+                <td>${u.region || '-'}</td><td>${(u.created_at || '').slice(0,10)}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs" onclick="adminUpdateUser('${u.username}','${u.role}','${u.status}')">编辑</button>
+                    ${u.status !== 'suspended' ? `<button class="btn btn-xs btn-danger" onclick="adminSuspendUser('${u.username}')">停用</button>` : `<button class="btn btn-xs" onclick="adminUnsuspendUser('${u.username}')">启用</button>`}
+                    <button class="btn btn-xs btn-danger" onclick="adminDeleteUser('${u.username}')">删除</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function adminUpdateUser(userId, currentRole, currentStatus) {
+    const newRole = prompt('新角色 (student/teacher/enterprise/government/super_admin)：', currentRole);
+    if (!newRole) return;
+    const newStatus = prompt('新状态 (active/suspended)：', currentStatus);
+    if (!newStatus) return;
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { role: newRole, status: newStatus }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminSuspendUser(userId) {
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'suspended' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminUnsuspendUser(userId) {
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'active' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminDeleteUser(userId) {
+    if (!confirm(`确定删除用户 ${userId} 吗？此操作不可撤销。`)) return;
+    apiCall(`/api/admin/users/${userId}`, 'DELETE').then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function loadAdminReviews() {
+    const type = document.getElementById('admin-review-filter')?.value || '';
+    apiCall(`/api/admin/reviews?content_type=${type}`, 'GET').then(resp => {
+        const list = document.getElementById('admin-reviews-list');
+        if (!list) return;
+        if (!resp.reviews || resp.reviews.length === 0) {
+            list.innerHTML = '<p>暂无待审核内容</p>';
+            return;
+        }
+        list.innerHTML = resp.reviews.map(r => `
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="review-type">${r.content_type}</span>
+                    <span class="review-status">${r.status}</span>
+                    <span>${r.created_at?.slice(0,16) || ''}</span>
+                </div>
+                <div class="review-body">
+                    ${r.detail ? `<pre>${JSON.stringify(r.detail, null, 2).slice(0,300)}</pre>` : '无详情'}
+                </div>
+                <div class="review-actions">
+                    <button class="btn btn-sm btn-success" onclick="adminApproveReview(${r.id})">通过</button>
+                    <button class="btn btn-sm btn-danger" onclick="adminRejectReview(${r.id})">驳回</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function adminApproveReview(id) {
+    apiCall(`/api/admin/reviews/${id}/approve`, 'POST').then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminReviews();
+    });
+}
+
+function adminRejectReview(id) {
+    const comment = prompt('驳回理由（可选）：', '');
+    apiCall(`/api/admin/reviews/${id}/reject`, 'POST', { comment: comment || '' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminReviews();
+    });
+}
+
+function loadAdminCarousels() {
+    apiCall('/api/admin/carousels', 'GET').then(resp => {
+        const list = document.getElementById('admin-carousels-list');
+        if (!list) return;
+        if (!resp.carousels || resp.carousels.length === 0) {
+            list.innerHTML = '<p>暂无轮播图</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>标题</th><th>图片</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            ${resp.carousels.map(c => `<tr>
+                <td>${c.title}</td><td><img src="${c.image_url}" style="max-width:120px;max-height:60px"></td>
+                <td>${c.sort_order}</td><td>${c.is_active ? '启用' : '禁用'}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs" onclick="adminToggleCarousel(${c.id},${c.is_active})">${c.is_active ? '禁用' : '启用'}</button>
+                    <button class="btn btn-xs btn-danger" onclick="adminDeleteCarousel(${c.id})">删除</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function adminToggleCarousel(id, active) {
+    apiCall(`/api/admin/carousels/${id}`, 'PUT', { is_active: active ? 0 : 1 }).then(resp => {
+        if (resp.success) loadAdminCarousels();
+    });
+}
+
+function adminDeleteCarousel(id) {
+    if (!confirm('确定删除此轮播图？')) return;
+    apiCall(`/api/admin/carousels/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadAdminCarousels();
+    });
+}
+
+function setupAdminCarouselAdd() {
+    const btn = document.getElementById('admin-add-carousel-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = prompt('轮播图标题：');
+        if (!title) return;
+        const image_url = prompt('图片URL：');
+        if (!image_url) return;
+        const link_url = prompt('链接URL（可选）：', '');
+        const sort_order = parseInt(prompt('排序（数字）：', '0')) || 0;
+        apiCall('/api/admin/carousels', 'POST', { title, image_url, link_url, sort_order }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadAdminCarousels();
+        });
+    });
+}
+
+function loadAdminAnnouncements() {
+    apiCall('/api/admin/system-announcements', 'GET').then(resp => {
+        const list = document.getElementById('admin-announcements-list');
+        if (!list) return;
+        if (!resp.announcements || resp.announcements.length === 0) {
+            list.innerHTML = '<p>暂无公告</p>';
+            return;
+        }
+        list.innerHTML = resp.announcements.map(a => `
+            <div class="announcement-card">
+                <h4>${a.title} ${a.is_pinned ? '📌' : ''}</h4>
+                <p>${a.content.slice(0,200)}</p>
+                <small>${a.created_at?.slice(0,16) || ''}</small>
+                <button class="btn btn-xs btn-danger" onclick="adminDeleteAnnouncement(${a.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function adminDeleteAnnouncement(id) {
+    if (!confirm('确定删除此公告？')) return;
+    apiCall(`/api/admin/system-announcements/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadAdminAnnouncements();
+    });
+}
+
+function setupAdminAnnouncementPublish() {
+    const btn = document.getElementById('admin-publish-ann');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('admin-ann-title').value.trim();
+        const content = document.getElementById('admin-ann-content').value.trim();
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/admin/system-announcements', 'POST', { title, content }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('admin-ann-title').value = '';
+                document.getElementById('admin-ann-content').value = '';
+                loadAdminAnnouncements();
+            }
+        });
+    });
+}
+
+
+// ==================== 政府人员功能 ====================
+
+function loadGovDashboard() {
+    apiCall('/api/government/dashboard', 'GET').then(resp => {
+        const content = document.getElementById('gov-dashboard-content');
+        if (!content || !resp.success) return;
+        const d = resp.overview;
+        const dirs = (resp.directions || []).map(d => `${d.direction}: ${d.count}人 (均${d.avg_progress}%)`).join('<br>');
+        content.innerHTML = `
+            <div class="dashboard-cards">
+                <div class="dash-card"><h4>👥 用户</h4>
+                    <p>总计 ${d.users.total} | 学员 ${d.users.students} | 教师 ${d.users.teachers} | 企业 ${d.users.enterprises}</p></div>
+                <div class="dash-card"><h4>📚 培训</h4>
+                    <p>学员 ${d.training.total_students} | 平均进度 ${d.training.avg_progress}% | 完成率 ${d.training.completion_rate}%</p></div>
+                <div class="dash-card"><h4>💼 就业</h4>
+                    <p>岗位 ${d.employment.total_jobs} | 申请 ${d.employment.total_applications} | 匹配率 ${d.employment.match_rate}%</p></div>
+                <div class="dash-card"><h4>📄 内容</h4>
+                    <p>课程 ${d.content.courses} | 政策 ${d.content.policies} | 新闻 ${d.content.news} | 求购 ${d.content.procurements}</p></div>
+                <div class="dash-card"><h4>🎖 证书</h4>
+                    <p>总数 ${d.certificates.total} | 已获 ${d.certificates.earned} | 获证率 ${d.certificates.earn_rate}%</p></div>
+                <div class="dash-card"><h4>💬 社区</h4>
+                    <p>讨论 ${d.community.discussions} | 评论 ${d.community.comments}</p></div>
+            </div>
+            <div class="dashboard-section"><h4>各地区分布</h4><p>${(resp.regions || []).map(r => `${r.region}: ${r.count}人`).join(' | ') || '暂无数据'}</p></div>
+            <div class="dashboard-section"><h4>培训方向分布</h4><p>${dirs || '暂无数据'}</p></div>`;
+    });
+}
+
+function loadGovPolicies() {
+    apiCall('/api/government/policies', 'GET').then(resp => {
+        const list = document.getElementById('gov-policies-list');
+        if (!list) return;
+        if (!resp.policies || resp.policies.length === 0) {
+            list.innerHTML = '<p>暂无政策</p>';
+            return;
+        }
+        list.innerHTML = resp.policies.map(p => `
+            <div class="policy-card">
+                <h4>${p.title} <small>${p.category}</small></h4>
+                <p>${p.content.slice(0,200)}...</p>
+                <div class="table-actions">
+                    <button class="btn btn-xs" onclick="govTogglePolicy(${p.id},${p.is_published})">${p.is_published ? '下架' : '上架'}</button>
+                    <button class="btn btn-xs btn-danger" onclick="govDeletePolicy(${p.id})">删除</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function govTogglePolicy(id, published) {
+    apiCall(`/api/government/policies/${id}`, 'PUT', { is_published: published ? 0 : 1 }).then(resp => {
+        if (resp.success) loadGovPolicies();
+    });
+}
+
+function govDeletePolicy(id) {
+    if (!confirm('确定删除此政策？')) return;
+    apiCall(`/api/government/policies/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadGovPolicies();
+    });
+}
+
+function setupGovPolicyPublish() {
+    const btn = document.getElementById('gov-publish-policy');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('gov-policy-title').value.trim();
+        const content = document.getElementById('gov-policy-content').value.trim();
+        const category = document.getElementById('gov-policy-category').value;
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/government/policies', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('gov-policy-title').value = '';
+                document.getElementById('gov-policy-content').value = '';
+                loadGovPolicies();
+            }
+        });
+    });
+}
+
+function loadGovNews() {
+    apiCall('/api/government/news', 'GET').then(resp => {
+        const list = document.getElementById('gov-news-list');
+        if (!list) return;
+        if (!resp.news || resp.news.length === 0) {
+            list.innerHTML = '<p>暂无新闻资讯</p>';
+            return;
+        }
+        list.innerHTML = resp.news.map(n => `
+            <div class="news-card">
+                <h4>${n.title} <small>${n.category}</small></h4>
+                <p>${n.content.slice(0,200)}...</p>
+                <div class="table-actions">
+                    <button class="btn btn-xs btn-danger" onclick="govDeleteNews(${n.id})">删除</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function govDeleteNews(id) {
+    if (!confirm('确定删除此资讯？')) return;
+    apiCall(`/api/government/news/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadGovNews();
+    });
+}
+
+function setupGovNewsPublish() {
+    const btn = document.getElementById('gov-publish-news');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('gov-news-title').value.trim();
+        const content = document.getElementById('gov-news-content').value.trim();
+        const category = document.getElementById('gov-news-category').value;
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/government/news', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('gov-news-title').value = '';
+                document.getElementById('gov-news-content').value = '';
+                loadGovNews();
+            }
+        });
+    });
+}
+
+
+// ==================== 企业功能 ====================
+
+function loadEnterpriseJobs() {
+    apiCall('/api/enterprise/jobs', 'GET').then(resp => {
+        const list = document.getElementById('ent-jobs-list');
+        if (!list) return;
+        if (!resp.jobs || resp.jobs.length === 0) {
+            list.innerHTML = '<p>暂无职位</p>';
+            return;
+        }
+        list.innerHTML = resp.jobs.map(j => `
+            <div class="job-card">
+                <h4>${j.title}</h4>
+                <p>${j.company} | ${j.salary} | ${j.location}</p>
+                <span class="status-badge">${j.review_status || 'approved'}</span>
+                <button class="btn btn-xs btn-danger" onclick="entDeleteJob(${j.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function entDeleteJob(id) {
+    if (!confirm('确定删除此职位？')) return;
+    apiCall(`/api/enterprise/jobs/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadEnterpriseJobs();
+    });
+}
+
+function setupEntAddJob() {
+    const btn = document.getElementById('ent-add-job-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = prompt('职位标题：');
+        if (!title) return;
+        const salary = prompt('薪资（如：5000-8000元/月）：', '');
+        const location = prompt('工作地点：', '');
+        const category = prompt('职位类别：', '');
+        const description = prompt('职位描述：', '');
+        apiCall('/api/enterprise/jobs', 'POST', { title, salary, location, category, description }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadEnterpriseJobs();
+        });
+    });
+}
+
+function loadEnterpriseProcurements() {
+    apiCall('/api/enterprise/procurements', 'GET').then(resp => {
+        const list = document.getElementById('ent-procs-list');
+        if (!list) return;
+        if (!resp.procurements || resp.procurements.length === 0) {
+            list.innerHTML = '<p>暂无求购</p>';
+            return;
+        }
+        list.innerHTML = resp.procurements.map(p => `
+            <div class="proc-card">
+                <h4>${p.product_name}</h4>
+                <p>${p.quantity || '-'} | ${p.price_range || '-'} | ${p.delivery_location || '-'}</p>
+                <span class="status-badge">${p.review_status || 'pending'}</span>
+                <button class="btn btn-xs btn-danger" onclick="entDeleteProc(${p.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function entDeleteProc(id) {
+    if (!confirm('确定删除此求购？')) return;
+    apiCall(`/api/enterprise/procurements/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadEnterpriseProcurements();
+    });
+}
+
+function setupEntAddProc() {
+    const btn = document.getElementById('ent-add-proc-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const product_name = prompt('农产品名称：');
+        if (!product_name) return;
+        const quantity = prompt('采购数量：', '');
+        const price_range = prompt('期望价格区间：', '');
+        const delivery_location = prompt('交货地点：', '');
+        const contact_info = prompt('联系方式：', '');
+        apiCall('/api/enterprise/procurements', 'POST', {
+            product_name, quantity, price_range, delivery_location, contact_info
+        }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadEnterpriseProcurements();
+        });
+    });
+}
+
+function loadEnterpriseApplications() {
+    apiCall('/api/enterprise/applications', 'GET').then(resp => {
+        const list = document.getElementById('ent-apps-list');
+        if (!list) return;
+        if (!resp.applications || resp.applications.length === 0) {
+            list.innerHTML = '<p>暂无简历投递</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>
+            ${resp.applications.map(a => `<tr>
+                <td>${a.applicant_name || a.user_id}</td><td>${a.job_title}</td><td>${a.applicant_phone || '-'}</td>
+                <td><span class="status-badge">${a.status}</span></td><td>${(a.applied_at || '').slice(0,10)}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs btn-success" onclick="entUpdateApp(${a.id},'interview')">面试</button>
+                    <button class="btn btn-xs" onclick="entUpdateApp(${a.id},'approved')">通过</button>
+                    <button class="btn btn-xs btn-danger" onclick="entUpdateApp(${a.id},'rejected')">拒绝</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function entUpdateApp(appId, status) {
+    apiCall(`/api/enterprise/applications/${appId}`, 'PUT', { status }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadEnterpriseApplications();
+    });
+}
+
+
+// ==================== 讨论社区 ====================
+
+function loadDiscussions() {
+    const categoryMap = { 'disc-general': 'general', 'disc-agriculture': 'agriculture', 'disc-ecommerce': 'ecommerce', 'disc-crafts': 'crafts' };
+    const activeTab = document.querySelector('#discussions-tab .sub-tab-btn.active');
+    const cat = activeTab ? (categoryMap[activeTab.dataset.subtab] || 'general') : 'general';
+    apiCall(`/api/discussions?category=${cat}`, 'GET').then(resp => {
+        const list = document.getElementById('discussions-list');
+        if (!list) return;
+        if (!resp.discussions || resp.discussions.length === 0) {
+            list.innerHTML = '<p>暂无讨论帖，快来发第一个帖子吧！</p>';
+            return;
+        }
+        list.innerHTML = resp.discussions.map(d => `
+            <div class="discussion-card">
+                <h4><a href="#" onclick="viewDiscussion(${d.id});return false">${d.title}</a> ${d.is_pinned ? '📌' : ''}</h4>
+                <p>${d.content.slice(0,150)}...</p>
+                <small>${d.user_name || d.user_id} | ${d.created_at?.slice(0,16) || ''} | 👁 ${d.view_count} | 💬 ${d.comment_count}</small>
+            </div>`).join('');
+    });
+}
+
+function viewDiscussion(id) {
+    apiCall(`/api/discussions/${id}`, 'GET').then(resp => {
+        if (!resp.success) return showNotification(resp.message, 'error');
+        const d = resp.discussion;
+        const comments = resp.comments || [];
+        let html = `<div class="modal-content" style="max-width:700px">
+            <div class="modal-header"><h3>${d.title}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button></div>
+            <div class="modal-body">
+                <p>${d.content}</p><small>${d.user_name} | ${d.created_at?.slice(0,16) || ''} | 👁 ${d.view_count}</small>
+                <hr><h4>评论 (${comments.length})</h4>
+                ${comments.map(c => `<div class="comment-item"><strong>${c.user_name || c.user_id}</strong>: ${c.content} <small>${c.created_at?.slice(0,16) || ''}</small></div>`).join('')}
+                ${AppState.user ? `<div class="form-group"><textarea id="disc-comment-content" placeholder="写评论..." rows="2" class="full-width"></textarea></div>
+                <button class="btn btn-primary btn-sm" onclick="postDiscussionComment(${id})">发表评论</button>` : '<p>请登录后评论</p>'}
+            </div></div>`;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    });
+}
+
+function postDiscussionComment(discId) {
+    const content = document.getElementById('disc-comment-content')?.value.trim();
+    if (!content) { showNotification('请输入评论内容', 'error'); return; }
+    apiCall('/api/comments', 'POST', { target_type: 'discussion', target_id: discId, content }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) {
+            document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
+            viewDiscussion(discId);
+        }
+    });
+}
+
+function setupNewDiscussion() {
+    const btn = document.getElementById('new-discussion-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        if (!AppState.user) { showNotification('请先登录', 'error'); return; }
+        const title = prompt('帖子标题：');
+        if (!title) return;
+        const content = prompt('帖子内容：');
+        if (!content) return;
+        const category = document.querySelector('#discussions-tab .sub-tab-btn.active')?.dataset.subtab?.replace('disc-', '') || 'general';
+        apiCall('/api/discussions', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadDiscussions();
+        });
+    });
+}
+
+
+// ==================== 子Tab切换（管理员/政府/企业面板） ====================
+
+function setupAdminSubTabs() {
+    document.querySelectorAll('.admin-sub-tabs').forEach(tabBar => {
+        tabBar.addEventListener('click', e => {
+            if (!e.target.classList.contains('sub-tab-btn')) return;
+            const subtab = e.target.dataset.subtab;
+            const panel = e.target.closest('.tab-content');
+            // 更新按钮状态
+            tabBar.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            // 显示对应面板
+            panel.querySelectorAll('.sub-tab-panel').forEach(p => p.classList.add('is-hidden'));
+            const targetPanel = document.getElementById(`${subtab}-panel`);
+            if (targetPanel) targetPanel.classList.remove('is-hidden');
+            // 加载数据
+            if (subtab === 'admin-users') loadAdminUsers();
+            else if (subtab === 'admin-reviews') loadAdminReviews();
+            else if (subtab === 'admin-carousels') loadAdminCarousels();
+            else if (subtab === 'admin-announcements') loadAdminAnnouncements();
+            else if (subtab === 'gov-dashboard') loadGovDashboard();
+            else if (subtab === 'gov-policies') loadGovPolicies();
+            else if (subtab === 'gov-news') loadGovNews();
+            else if (subtab === 'ent-jobs') loadEnterpriseJobs();
+            else if (subtab === 'ent-procurements') loadEnterpriseProcurements();
+            else if (subtab === 'ent-applications') loadEnterpriseApplications();
+            else if (subtab.startsWith('disc-')) loadDiscussions();
+        });
+    });
+}
+
+
+// ==================== 初始化所有新功能 ====================
+
+function setupNewFeatures() {
+    setupAuthTabs();
+    setupRegister();
+    setupAdminSubTabs();
+    setupAdminCarouselAdd();
+    setupAdminAnnouncementPublish();
+    setupGovPolicyPublish();
+    setupGovNewsPublish();
+    setupEntAddJob();
+    setupEntAddProc();
+    setupNewDiscussion();
+}
+
+// 追加到 DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    try { setupNewFeatures(); } catch(e) { console.error('setupNewFeatures error:', e); }
+});
+
+// 管理员搜索功能
+(function() {
+    document.addEventListener('input', function(e) {
+        if (e.target.id === 'admin-user-search' || e.target.id === 'admin-role-filter') {
+            loadAdminUsers();
+        } else if (e.target.id === 'admin-review-filter') {
+            loadAdminReviews();
+        }
+    });
+})();
+
+
+// ==================== 注册/登录 Tab 切换 ====================
+
+function setupAuthTabs() {
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const loginForm = document.getElementById('auth-login-form');
+    const regForm = document.getElementById('auth-register-form');
+    if (!tabLogin || !tabRegister) return;
+
+    tabLogin.addEventListener('click', () => {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+    });
+
+    tabRegister.addEventListener('click', () => {
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+        // 实际切换
+        loginForm.classList.add('is-hidden');
+        regForm.classList.remove('is-hidden');
+    });
+
+    // 注册角色选择 - 显示/隐藏公司名
+    const regRole = document.getElementById('reg-role');
+    const companyGroup = document.getElementById('reg-company-group');
+    if (regRole && companyGroup) {
+        regRole.addEventListener('change', () => {
+            companyGroup.classList.toggle('is-hidden', regRole.value !== 'enterprise');
+        });
+    }
+}
+
+
+// 重置认证Tab到登录状态
+function resetAuthTabs() {
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const loginForm = document.getElementById('auth-login-form');
+    const regForm = document.getElementById('auth-register-form');
+    if (tabLogin && tabRegister) {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+    }
+    if (loginForm && regForm) {
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+    }
+}
+
+// ==================== 注册处理 ====================
+
+function setupRegister() {
+    const btn = document.getElementById('register-submit');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value.trim();
+        const name = document.getElementById('reg-name').value.trim();
+        const role = document.getElementById('reg-role').value;
+        const phone = document.getElementById('reg-phone').value.trim();
+        const region = document.getElementById('reg-region').value.trim();
+        const company = document.getElementById('reg-company')?.value.trim() || '';
+
+        if (!username || !password || !name) {
+            showNotification('请填写用户名、密码和姓名', 'error');
+            return;
+        }
+        if (password.length < 6) {
+            showNotification('密码至少6位', 'error');
+            return;
+        }
+
+        try {
+            const resp = await apiCall('/api/auth/register', 'POST', {
+                username, password, name, role, phone, company_name: company, region
+            });
+            if (resp.success) {
+                AppState.sessionId = resp.session_id;
+                AppState.user = resp.user;
+                saveSession();
+                document.getElementById('login-modal').classList.add('is-hidden');
+                resetAuthTabs();
+                // 角色分流
+                var _r = resp.user.role;
+                if (_r === 'super_admin') { location.href = 'admin.html'; return; }
+                if (_r === 'government') { location.href = 'government.html'; return; }
+                if (_r === 'enterprise') { location.href = 'enterprise.html'; return; }
+                if (_r === 'teacher') { location.href = 'teacher.html'; return; }
+                onLoginSuccess();
+                showNotification(resp.message || '注册成功', 'success');
+            } else {
+                showNotification(resp.message || '注册失败', 'error');
+            }
+        } catch (e) {
+            showNotification('注册失败：' + e.message, 'error');
+        }
+    });
+}
+
+
+// ==================== 角色UI切换 ====================
+
+function onLoginSuccess() {
+    const user = AppState.user;
+    if (!user) return;
+    updateUserUI(user);
+
+    // 显示/隐藏角色专属元素
+    document.querySelectorAll('.teacher-only').forEach(el => {
+        el.classList.toggle('is-hidden', user.role !== 'teacher');
+    });
+    document.querySelectorAll('.admin-only').forEach(el => {
+        el.classList.toggle('is-hidden', user.role !== 'super_admin');
+    });
+    document.querySelectorAll('.gov-only').forEach(el => {
+        el.classList.toggle('is-hidden', user.role !== 'government');
+    });
+    document.querySelectorAll('.enterprise-only').forEach(el => {
+        el.classList.toggle('is-hidden', user.role !== 'enterprise');
+    });
+
+    // 教师快速菜单
+    const quickMenu = document.getElementById('teacher-quick-menu');
+    if (quickMenu) {
+        quickMenu.classList.toggle('is-hidden', user.role !== 'teacher');
+    }
+
+    // 根据角色跳转到对应面板
+    if (user.role === 'super_admin') {
+        switchTab('admin');
+        loadAdminUsers();
+    } else if (user.role === 'government') {
+        switchTab('government');
+        loadGovDashboard();
+    } else if (user.role === 'enterprise') {
+        switchTab('enterprise');
+        loadEnterpriseJobs();
+    }
+}
+
+
+function saveSession() {
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+        sessionId: AppState.sessionId,
+        user: AppState.user
+    }));
+}
+
+
+// ==================== 超级管理员功能 ====================
+
+function loadAdminUsers() {
+    apiCall('/api/admin/users', 'GET').then(resp => {
+        const list = document.getElementById('admin-users-list');
+        if (!list) return;
+        if (!resp.users || resp.users.length === 0) {
+            list.innerHTML = '<p>暂无用户数据</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>地区</th><th>注册时间</th><th>操作</th></tr></thead><tbody>
+            ${resp.users.map(u => `<tr>
+                <td>${u.username}</td><td>${u.name}</td><td>${u.role}</td>
+                <td><span class="status-badge status-${u.status}">${u.status}</span></td>
+                <td>${u.region || '-'}</td><td>${(u.created_at || '').slice(0,10)}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs" onclick="adminUpdateUser('${u.username}','${u.role}','${u.status}')">编辑</button>
+                    ${u.status !== 'suspended' ? `<button class="btn btn-xs btn-danger" onclick="adminSuspendUser('${u.username}')">停用</button>` : `<button class="btn btn-xs" onclick="adminUnsuspendUser('${u.username}')">启用</button>`}
+                    <button class="btn btn-xs btn-danger" onclick="adminDeleteUser('${u.username}')">删除</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function adminUpdateUser(userId, currentRole, currentStatus) {
+    const newRole = prompt('新角色 (student/teacher/enterprise/government/super_admin)：', currentRole);
+    if (!newRole) return;
+    const newStatus = prompt('新状态 (active/suspended)：', currentStatus);
+    if (!newStatus) return;
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { role: newRole, status: newStatus }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminSuspendUser(userId) {
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'suspended' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminUnsuspendUser(userId) {
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'active' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminDeleteUser(userId) {
+    if (!confirm(`确定删除用户 ${userId} 吗？此操作不可撤销。`)) return;
+    apiCall(`/api/admin/users/${userId}`, 'DELETE').then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function loadAdminReviews() {
+    const type = document.getElementById('admin-review-filter')?.value || '';
+    apiCall(`/api/admin/reviews?content_type=${type}`, 'GET').then(resp => {
+        const list = document.getElementById('admin-reviews-list');
+        if (!list) return;
+        if (!resp.reviews || resp.reviews.length === 0) {
+            list.innerHTML = '<p>暂无待审核内容</p>';
+            return;
+        }
+        list.innerHTML = resp.reviews.map(r => `
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="review-type">${r.content_type}</span>
+                    <span class="review-status">${r.status}</span>
+                    <span>${r.created_at?.slice(0,16) || ''}</span>
+                </div>
+                <div class="review-body">
+                    ${r.detail ? `<pre>${JSON.stringify(r.detail, null, 2).slice(0,300)}</pre>` : '无详情'}
+                </div>
+                <div class="review-actions">
+                    <button class="btn btn-sm btn-success" onclick="adminApproveReview(${r.id})">通过</button>
+                    <button class="btn btn-sm btn-danger" onclick="adminRejectReview(${r.id})">驳回</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function adminApproveReview(id) {
+    apiCall(`/api/admin/reviews/${id}/approve`, 'POST').then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminReviews();
+    });
+}
+
+function adminRejectReview(id) {
+    const comment = prompt('驳回理由（可选）：', '');
+    apiCall(`/api/admin/reviews/${id}/reject`, 'POST', { comment: comment || '' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminReviews();
+    });
+}
+
+function loadAdminCarousels() {
+    apiCall('/api/admin/carousels', 'GET').then(resp => {
+        const list = document.getElementById('admin-carousels-list');
+        if (!list) return;
+        if (!resp.carousels || resp.carousels.length === 0) {
+            list.innerHTML = '<p>暂无轮播图</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>标题</th><th>图片</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            ${resp.carousels.map(c => `<tr>
+                <td>${c.title}</td><td><img src="${c.image_url}" style="max-width:120px;max-height:60px"></td>
+                <td>${c.sort_order}</td><td>${c.is_active ? '启用' : '禁用'}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs" onclick="adminToggleCarousel(${c.id},${c.is_active})">${c.is_active ? '禁用' : '启用'}</button>
+                    <button class="btn btn-xs btn-danger" onclick="adminDeleteCarousel(${c.id})">删除</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function adminToggleCarousel(id, active) {
+    apiCall(`/api/admin/carousels/${id}`, 'PUT', { is_active: active ? 0 : 1 }).then(resp => {
+        if (resp.success) loadAdminCarousels();
+    });
+}
+
+function adminDeleteCarousel(id) {
+    if (!confirm('确定删除此轮播图？')) return;
+    apiCall(`/api/admin/carousels/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadAdminCarousels();
+    });
+}
+
+function setupAdminCarouselAdd() {
+    const btn = document.getElementById('admin-add-carousel-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = prompt('轮播图标题：');
+        if (!title) return;
+        const image_url = prompt('图片URL：');
+        if (!image_url) return;
+        const link_url = prompt('链接URL（可选）：', '');
+        const sort_order = parseInt(prompt('排序（数字）：', '0')) || 0;
+        apiCall('/api/admin/carousels', 'POST', { title, image_url, link_url, sort_order }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadAdminCarousels();
+        });
+    });
+}
+
+function loadAdminAnnouncements() {
+    apiCall('/api/admin/system-announcements', 'GET').then(resp => {
+        const list = document.getElementById('admin-announcements-list');
+        if (!list) return;
+        if (!resp.announcements || resp.announcements.length === 0) {
+            list.innerHTML = '<p>暂无公告</p>';
+            return;
+        }
+        list.innerHTML = resp.announcements.map(a => `
+            <div class="announcement-card">
+                <h4>${a.title} ${a.is_pinned ? '📌' : ''}</h4>
+                <p>${a.content.slice(0,200)}</p>
+                <small>${a.created_at?.slice(0,16) || ''}</small>
+                <button class="btn btn-xs btn-danger" onclick="adminDeleteAnnouncement(${a.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function adminDeleteAnnouncement(id) {
+    if (!confirm('确定删除此公告？')) return;
+    apiCall(`/api/admin/system-announcements/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadAdminAnnouncements();
+    });
+}
+
+function setupAdminAnnouncementPublish() {
+    const btn = document.getElementById('admin-publish-ann');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('admin-ann-title').value.trim();
+        const content = document.getElementById('admin-ann-content').value.trim();
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/admin/system-announcements', 'POST', { title, content }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('admin-ann-title').value = '';
+                document.getElementById('admin-ann-content').value = '';
+                loadAdminAnnouncements();
+            }
+        });
+    });
+}
+
+
+// ==================== 政府人员功能 ====================
+
+function loadGovDashboard() {
+    apiCall('/api/government/dashboard', 'GET').then(resp => {
+        const content = document.getElementById('gov-dashboard-content');
+        if (!content || !resp.success) return;
+        const d = resp.overview;
+        const dirs = (resp.directions || []).map(d => `${d.direction}: ${d.count}人 (均${d.avg_progress}%)`).join('<br>');
+        content.innerHTML = `
+            <div class="dashboard-cards">
+                <div class="dash-card"><h4>👥 用户</h4>
+                    <p>总计 ${d.users.total} | 学员 ${d.users.students} | 教师 ${d.users.teachers} | 企业 ${d.users.enterprises}</p></div>
+                <div class="dash-card"><h4>📚 培训</h4>
+                    <p>学员 ${d.training.total_students} | 平均进度 ${d.training.avg_progress}% | 完成率 ${d.training.completion_rate}%</p></div>
+                <div class="dash-card"><h4>💼 就业</h4>
+                    <p>岗位 ${d.employment.total_jobs} | 申请 ${d.employment.total_applications} | 匹配率 ${d.employment.match_rate}%</p></div>
+                <div class="dash-card"><h4>📄 内容</h4>
+                    <p>课程 ${d.content.courses} | 政策 ${d.content.policies} | 新闻 ${d.content.news} | 求购 ${d.content.procurements}</p></div>
+                <div class="dash-card"><h4>🎖 证书</h4>
+                    <p>总数 ${d.certificates.total} | 已获 ${d.certificates.earned} | 获证率 ${d.certificates.earn_rate}%</p></div>
+                <div class="dash-card"><h4>💬 社区</h4>
+                    <p>讨论 ${d.community.discussions} | 评论 ${d.community.comments}</p></div>
+            </div>
+            <div class="dashboard-section"><h4>各地区分布</h4><p>${(resp.regions || []).map(r => `${r.region}: ${r.count}人`).join(' | ') || '暂无数据'}</p></div>
+            <div class="dashboard-section"><h4>培训方向分布</h4><p>${dirs || '暂无数据'}</p></div>`;
+    });
+}
+
+function loadGovPolicies() {
+    apiCall('/api/government/policies', 'GET').then(resp => {
+        const list = document.getElementById('gov-policies-list');
+        if (!list) return;
+        if (!resp.policies || resp.policies.length === 0) {
+            list.innerHTML = '<p>暂无政策</p>';
+            return;
+        }
+        list.innerHTML = resp.policies.map(p => `
+            <div class="policy-card">
+                <h4>${p.title} <small>${p.category}</small></h4>
+                <p>${p.content.slice(0,200)}...</p>
+                <div class="table-actions">
+                    <button class="btn btn-xs" onclick="govTogglePolicy(${p.id},${p.is_published})">${p.is_published ? '下架' : '上架'}</button>
+                    <button class="btn btn-xs btn-danger" onclick="govDeletePolicy(${p.id})">删除</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function govTogglePolicy(id, published) {
+    apiCall(`/api/government/policies/${id}`, 'PUT', { is_published: published ? 0 : 1 }).then(resp => {
+        if (resp.success) loadGovPolicies();
+    });
+}
+
+function govDeletePolicy(id) {
+    if (!confirm('确定删除此政策？')) return;
+    apiCall(`/api/government/policies/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadGovPolicies();
+    });
+}
+
+function setupGovPolicyPublish() {
+    const btn = document.getElementById('gov-publish-policy');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('gov-policy-title').value.trim();
+        const content = document.getElementById('gov-policy-content').value.trim();
+        const category = document.getElementById('gov-policy-category').value;
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/government/policies', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('gov-policy-title').value = '';
+                document.getElementById('gov-policy-content').value = '';
+                loadGovPolicies();
+            }
+        });
+    });
+}
+
+function loadGovNews() {
+    apiCall('/api/government/news', 'GET').then(resp => {
+        const list = document.getElementById('gov-news-list');
+        if (!list) return;
+        if (!resp.news || resp.news.length === 0) {
+            list.innerHTML = '<p>暂无新闻资讯</p>';
+            return;
+        }
+        list.innerHTML = resp.news.map(n => `
+            <div class="news-card">
+                <h4>${n.title} <small>${n.category}</small></h4>
+                <p>${n.content.slice(0,200)}...</p>
+                <div class="table-actions">
+                    <button class="btn btn-xs btn-danger" onclick="govDeleteNews(${n.id})">删除</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function govDeleteNews(id) {
+    if (!confirm('确定删除此资讯？')) return;
+    apiCall(`/api/government/news/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadGovNews();
+    });
+}
+
+function setupGovNewsPublish() {
+    const btn = document.getElementById('gov-publish-news');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('gov-news-title').value.trim();
+        const content = document.getElementById('gov-news-content').value.trim();
+        const category = document.getElementById('gov-news-category').value;
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/government/news', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('gov-news-title').value = '';
+                document.getElementById('gov-news-content').value = '';
+                loadGovNews();
+            }
+        });
+    });
+}
+
+
+// ==================== 企业功能 ====================
+
+function loadEnterpriseJobs() {
+    apiCall('/api/enterprise/jobs', 'GET').then(resp => {
+        const list = document.getElementById('ent-jobs-list');
+        if (!list) return;
+        if (!resp.jobs || resp.jobs.length === 0) {
+            list.innerHTML = '<p>暂无职位</p>';
+            return;
+        }
+        list.innerHTML = resp.jobs.map(j => `
+            <div class="job-card">
+                <h4>${j.title}</h4>
+                <p>${j.company} | ${j.salary} | ${j.location}</p>
+                <span class="status-badge">${j.review_status || 'approved'}</span>
+                <button class="btn btn-xs btn-danger" onclick="entDeleteJob(${j.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function entDeleteJob(id) {
+    if (!confirm('确定删除此职位？')) return;
+    apiCall(`/api/enterprise/jobs/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadEnterpriseJobs();
+    });
+}
+
+function setupEntAddJob() {
+    const btn = document.getElementById('ent-add-job-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = prompt('职位标题：');
+        if (!title) return;
+        const salary = prompt('薪资（如：5000-8000元/月）：', '');
+        const location = prompt('工作地点：', '');
+        const category = prompt('职位类别：', '');
+        const description = prompt('职位描述：', '');
+        apiCall('/api/enterprise/jobs', 'POST', { title, salary, location, category, description }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadEnterpriseJobs();
+        });
+    });
+}
+
+function loadEnterpriseProcurements() {
+    apiCall('/api/enterprise/procurements', 'GET').then(resp => {
+        const list = document.getElementById('ent-procs-list');
+        if (!list) return;
+        if (!resp.procurements || resp.procurements.length === 0) {
+            list.innerHTML = '<p>暂无求购</p>';
+            return;
+        }
+        list.innerHTML = resp.procurements.map(p => `
+            <div class="proc-card">
+                <h4>${p.product_name}</h4>
+                <p>${p.quantity || '-'} | ${p.price_range || '-'} | ${p.delivery_location || '-'}</p>
+                <span class="status-badge">${p.review_status || 'pending'}</span>
+                <button class="btn btn-xs btn-danger" onclick="entDeleteProc(${p.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function entDeleteProc(id) {
+    if (!confirm('确定删除此求购？')) return;
+    apiCall(`/api/enterprise/procurements/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadEnterpriseProcurements();
+    });
+}
+
+function setupEntAddProc() {
+    const btn = document.getElementById('ent-add-proc-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const product_name = prompt('农产品名称：');
+        if (!product_name) return;
+        const quantity = prompt('采购数量：', '');
+        const price_range = prompt('期望价格区间：', '');
+        const delivery_location = prompt('交货地点：', '');
+        const contact_info = prompt('联系方式：', '');
+        apiCall('/api/enterprise/procurements', 'POST', {
+            product_name, quantity, price_range, delivery_location, contact_info
+        }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadEnterpriseProcurements();
+        });
+    });
+}
+
+function loadEnterpriseApplications() {
+    apiCall('/api/enterprise/applications', 'GET').then(resp => {
+        const list = document.getElementById('ent-apps-list');
+        if (!list) return;
+        if (!resp.applications || resp.applications.length === 0) {
+            list.innerHTML = '<p>暂无简历投递</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>
+            ${resp.applications.map(a => `<tr>
+                <td>${a.applicant_name || a.user_id}</td><td>${a.job_title}</td><td>${a.applicant_phone || '-'}</td>
+                <td><span class="status-badge">${a.status}</span></td><td>${(a.applied_at || '').slice(0,10)}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs btn-success" onclick="entUpdateApp(${a.id},'interview')">面试</button>
+                    <button class="btn btn-xs" onclick="entUpdateApp(${a.id},'approved')">通过</button>
+                    <button class="btn btn-xs btn-danger" onclick="entUpdateApp(${a.id},'rejected')">拒绝</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function entUpdateApp(appId, status) {
+    apiCall(`/api/enterprise/applications/${appId}`, 'PUT', { status }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadEnterpriseApplications();
+    });
+}
+
+
+// ==================== 讨论社区 ====================
+
+function loadDiscussions() {
+    const categoryMap = { 'disc-general': 'general', 'disc-agriculture': 'agriculture', 'disc-ecommerce': 'ecommerce', 'disc-crafts': 'crafts' };
+    const activeTab = document.querySelector('#discussions-tab .sub-tab-btn.active');
+    const cat = activeTab ? (categoryMap[activeTab.dataset.subtab] || 'general') : 'general';
+    apiCall(`/api/discussions?category=${cat}`, 'GET').then(resp => {
+        const list = document.getElementById('discussions-list');
+        if (!list) return;
+        if (!resp.discussions || resp.discussions.length === 0) {
+            list.innerHTML = '<p>暂无讨论帖，快来发第一个帖子吧！</p>';
+            return;
+        }
+        list.innerHTML = resp.discussions.map(d => `
+            <div class="discussion-card">
+                <h4><a href="#" onclick="viewDiscussion(${d.id});return false">${d.title}</a> ${d.is_pinned ? '📌' : ''}</h4>
+                <p>${d.content.slice(0,150)}...</p>
+                <small>${d.user_name || d.user_id} | ${d.created_at?.slice(0,16) || ''} | 👁 ${d.view_count} | 💬 ${d.comment_count}</small>
+            </div>`).join('');
+    });
+}
+
+function viewDiscussion(id) {
+    apiCall(`/api/discussions/${id}`, 'GET').then(resp => {
+        if (!resp.success) return showNotification(resp.message, 'error');
+        const d = resp.discussion;
+        const comments = resp.comments || [];
+        let html = `<div class="modal-content" style="max-width:700px">
+            <div class="modal-header"><h3>${d.title}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button></div>
+            <div class="modal-body">
+                <p>${d.content}</p><small>${d.user_name} | ${d.created_at?.slice(0,16) || ''} | 👁 ${d.view_count}</small>
+                <hr><h4>评论 (${comments.length})</h4>
+                ${comments.map(c => `<div class="comment-item"><strong>${c.user_name || c.user_id}</strong>: ${c.content} <small>${c.created_at?.slice(0,16) || ''}</small></div>`).join('')}
+                ${AppState.user ? `<div class="form-group"><textarea id="disc-comment-content" placeholder="写评论..." rows="2" class="full-width"></textarea></div>
+                <button class="btn btn-primary btn-sm" onclick="postDiscussionComment(${id})">发表评论</button>` : '<p>请登录后评论</p>'}
+            </div></div>`;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    });
+}
+
+function postDiscussionComment(discId) {
+    const content = document.getElementById('disc-comment-content')?.value.trim();
+    if (!content) { showNotification('请输入评论内容', 'error'); return; }
+    apiCall('/api/comments', 'POST', { target_type: 'discussion', target_id: discId, content }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) {
+            document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
+            viewDiscussion(discId);
+        }
+    });
+}
+
+function setupNewDiscussion() {
+    const btn = document.getElementById('new-discussion-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        if (!AppState.user) { showNotification('请先登录', 'error'); return; }
+        const title = prompt('帖子标题：');
+        if (!title) return;
+        const content = prompt('帖子内容：');
+        if (!content) return;
+        const category = document.querySelector('#discussions-tab .sub-tab-btn.active')?.dataset.subtab?.replace('disc-', '') || 'general';
+        apiCall('/api/discussions', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadDiscussions();
+        });
+    });
+}
+
+
+// ==================== 子Tab切换（管理员/政府/企业面板） ====================
+
+function setupAdminSubTabs() {
+    document.querySelectorAll('.admin-sub-tabs').forEach(tabBar => {
+        tabBar.addEventListener('click', e => {
+            if (!e.target.classList.contains('sub-tab-btn')) return;
+            const subtab = e.target.dataset.subtab;
+            const panel = e.target.closest('.tab-content');
+            // 更新按钮状态
+            tabBar.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            // 显示对应面板
+            panel.querySelectorAll('.sub-tab-panel').forEach(p => p.classList.add('is-hidden'));
+            const targetPanel = document.getElementById(`${subtab}-panel`);
+            if (targetPanel) targetPanel.classList.remove('is-hidden');
+            // 加载数据
+            if (subtab === 'admin-users') loadAdminUsers();
+            else if (subtab === 'admin-reviews') loadAdminReviews();
+            else if (subtab === 'admin-carousels') loadAdminCarousels();
+            else if (subtab === 'admin-announcements') loadAdminAnnouncements();
+            else if (subtab === 'gov-dashboard') loadGovDashboard();
+            else if (subtab === 'gov-policies') loadGovPolicies();
+            else if (subtab === 'gov-news') loadGovNews();
+            else if (subtab === 'ent-jobs') loadEnterpriseJobs();
+            else if (subtab === 'ent-procurements') loadEnterpriseProcurements();
+            else if (subtab === 'ent-applications') loadEnterpriseApplications();
+            else if (subtab.startsWith('disc-')) loadDiscussions();
+        });
+    });
+}
+
+
+// ==================== 初始化所有新功能 ====================
+
+function setupNewFeatures() {
+    setupAuthTabs();
+    setupRegister();
+    setupAdminSubTabs();
+    setupAdminCarouselAdd();
+    setupAdminAnnouncementPublish();
+    setupGovPolicyPublish();
+    setupGovNewsPublish();
+    setupEntAddJob();
+    setupEntAddProc();
+    setupNewDiscussion();
+}
+
+// 追加到 DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    try { setupNewFeatures(); } catch(e) { console.error('setupNewFeatures error:', e); }
+});
+
+// 管理员搜索功能
+(function() {
+    document.addEventListener('input', function(e) {
+        if (e.target.id === 'admin-user-search' || e.target.id === 'admin-role-filter') {
+            loadAdminUsers();
+        } else if (e.target.id === 'admin-review-filter') {
+            loadAdminReviews();
+        }
+    });
+})();

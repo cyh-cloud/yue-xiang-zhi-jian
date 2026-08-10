@@ -58,7 +58,25 @@ def init_db():
             name TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'student',
             email TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            avatar_url TEXT DEFAULT '',
+            bio TEXT DEFAULT '',
+            company_name TEXT DEFAULT '',
+            region TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
             created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS content_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_type TEXT NOT NULL,
+            content_id INTEGER NOT NULL,
+            submitter_id TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            review_comment TEXT DEFAULT '',
+            reviewed_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            reviewed_at TEXT DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS user_sessions (
@@ -204,11 +222,145 @@ def init_db():
             saved_at TEXT DEFAULT (datetime('now','localtime')),
             UNIQUE(user_id, job_id)
         );
+
+        CREATE TABLE IF NOT EXISTS carousels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            image_url TEXT NOT NULL,
+            link_url TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS system_announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_pinned INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS courses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            category TEXT DEFAULT '',
+            teacher_id TEXT NOT NULL,
+            cover_url TEXT DEFAULT '',
+            review_status TEXT DEFAULT 'pending',
+            is_published INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS course_materials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id INTEGER NOT NULL,
+            material_type TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS models_3d (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            craft_type TEXT DEFAULT '',
+            file_path TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            thumbnail_url TEXT DEFAULT '',
+            teacher_id TEXT NOT NULL,
+            review_status TEXT DEFAULT 'pending',
+            is_published INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target_type TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_deleted INTEGER DEFAULT 0,
+            deleted_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS discussions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            user_id TEXT NOT NULL,
+            is_pinned INTEGER DEFAULT 0,
+            is_deleted INTEGER DEFAULT 0,
+            view_count INTEGER DEFAULT 0,
+            comment_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS procurements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_name TEXT NOT NULL,
+            specification TEXT DEFAULT '',
+            quantity TEXT DEFAULT '',
+            price_range TEXT DEFAULT '',
+            delivery_location TEXT DEFAULT '',
+            deadline TEXT DEFAULT '',
+            contact_info TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            enterprise_id TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            review_status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS news_articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'news',
+            author_id TEXT NOT NULL,
+            is_published INTEGER DEFAULT 1,
+            view_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS government_policies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            author_id TEXT NOT NULL,
+            is_published INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        );
     ''')
+
+    # 扩展 users 表结构（兼容已有数据库）
+    user_cols = {row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()}
+    user_new_cols = {
+        'phone': "TEXT DEFAULT ''",
+        'avatar_url': "TEXT DEFAULT ''",
+        'bio': "TEXT DEFAULT ''",
+        'company_name': "TEXT DEFAULT ''",
+        'region': "TEXT DEFAULT ''",
+        'status': "TEXT DEFAULT 'active'",
+    }
+    for col, typedef in user_new_cols.items():
+        if col not in user_cols:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
 
     # 扩展 job_listings 表结构
     existing_cols = {row[1] for row in cursor.execute("PRAGMA table_info(job_listings)").fetchall()}
-    new_cols = {
+    job_new_cols = {
         'location': "TEXT DEFAULT ''",
         'category': "TEXT DEFAULT ''",
         'job_type': "TEXT DEFAULT '全职'",
@@ -218,8 +370,10 @@ def init_db():
         'industry': "TEXT DEFAULT ''",
         'company_logo': "TEXT DEFAULT ''",
         'posted_at': "TEXT DEFAULT ''",
+        'enterprise_id': "TEXT DEFAULT ''",
+        'review_status': "TEXT DEFAULT 'approved'",
     }
-    for col, typedef in new_cols.items():
+    for col, typedef in job_new_cols.items():
         if col not in existing_cols:
             cursor.execute(f"ALTER TABLE job_listings ADD COLUMN {col} {typedef}")
 
@@ -234,6 +388,16 @@ def init_db():
         job_count = cursor.execute("SELECT COUNT(*) FROM job_listings").fetchone()[0]
         if job_count < len(JOBS_DATA):
             _seed_jobs(cursor)
+        # 如果政府政策表为空，填充初始数据
+        gp_count = cursor.execute("SELECT COUNT(*) FROM government_policies").fetchone()[0]
+        if gp_count == 0:
+            _seed_government_policies(cursor)
+        # 如果轮播图为空，填充默认数据
+        car_count = cursor.execute("SELECT COUNT(*) FROM carousels").fetchone()[0]
+        if car_count == 0:
+            _seed_carousels(cursor)
+        # 如果缺少新角色演示账户，补充创建
+        _ensure_demo_accounts(cursor)
 
     conn.commit()
     conn.close()
@@ -794,8 +958,17 @@ JOBS_DATA = [
 def _seed_data(cursor):
     """填充种子数据"""
     # 用户
+    admin_pw = hash_password('admin123')
+    gov_pw = hash_password('123456')
+    enterprise_pw = hash_password('123456')
     teacher_pw = hash_password('123456')
     student_pw = hash_password('123456')
+    cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                   ('admin_demo', admin_pw, '系统管理员', 'super_admin'))
+    cursor.execute("INSERT INTO users (username, password_hash, name, role, region) VALUES (?, ?, ?, ?, ?)",
+                   ('gov_demo', gov_pw, '王主任', 'government', '广东省农业农村厅'))
+    cursor.execute("INSERT INTO users (username, password_hash, name, role, company_name, region) VALUES (?, ?, ?, ?, ?, ?)",
+                   ('enterprise_demo', enterprise_pw, '陈经理', 'enterprise', '广州鲜果汇电商有限公司', '广州'))
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
                    ('teacher_demo', teacher_pw, '张老师', 'teacher'))
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
@@ -807,8 +980,9 @@ def _seed_data(cursor):
                        {"action": "完成课程", "points": 50, "date": "2024-06-10"},
                        {"action": "通过考试", "points": 100, "date": "2024-06-08"}
                    ])))
-    cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, ?, ?)",
-                   ('teacher_demo', 0, '[]'))
+    for uid in ('admin_demo', 'gov_demo', 'enterprise_demo', 'teacher_demo'):
+        cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, ?, ?)",
+                       (uid, 0, '[]'))
 
     # 证书
     for uid in ('student_demo', 'teacher_demo'):
@@ -845,9 +1019,54 @@ def _seed_data(cursor):
         cursor.execute("INSERT INTO job_listings (title, company, salary, requirements, description, location, category, job_type, education, experience, company_size, industry, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                        (title, company, salary, reqs, desc, loc, cat, jtype, edu, exp, csize, industry, posted))
 
+    # 政府政策（存到 government_policies 表）
+    for title, content, cat, date in POLICIES_DATA:
+        cursor.execute("INSERT INTO government_policies (title, content, category, author_id) VALUES (?, ?, ?, ?)",
+                       (title, content, cat, 'gov_demo'))
+
+    # 轮播图种子数据
+    carousels = [
+        ("粤乡智匠正式上线", "https://placehold.co/1200x400/10b981/white?text=粤乡智匠", "", 0),
+        ("乡村振兴政策解读", "https://placehold.co/1200x400/00b4d8/white?text=政策解读", "/resources", 1),
+        ("非遗技艺传承计划", "https://placehold.co/1200x400/8b5cf6/white?text=非遗传承", "/crafts", 2),
+    ]
+    for title, img, link, sort in carousels:
+        cursor.execute("INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
+                       (title, img, link, sort))
+
+    # 系统公告种子数据
+    cursor.execute("INSERT INTO system_announcements (title, content, is_pinned, created_by) VALUES (?, ?, ?, ?)",
+                   ('欢迎使用粤乡智匠平台', '粤乡智匠是基于AI实训系统的农村本土人才赋能平台，致力于为广东乡村振兴培养实用型人才。', 1, 'admin_demo'))
+
+    # 讨论区种子数据
+    cursor.execute("INSERT INTO discussions (title, content, category, user_id) VALUES (?, ?, ?, ?)",
+                   ('荔枝种植经验交流', '各位种植荔枝的老乡，今年荔枝花期管理有什么心得？欢迎分享！', 'agriculture', 'student_demo'))
+    cursor.execute("INSERT INTO discussions (title, content, category, user_id) VALUES (?, ?, ?, ?)",
+                   ('电商直播新手问答', '刚开始做直播带货，想请教各位前辈有什么注意事项？', 'ecommerce', 'student_demo'))
+
+
+def _seed_government_policies(cursor):
+    """已有数据库时，补充政府政策数据"""
+    for title, content, cat, date in POLICIES_DATA:
+        cursor.execute("INSERT INTO government_policies (title, content, category, author_id) VALUES (?, ?, ?, ?)",
+                       (title, content, cat, 'gov_demo'))
+
+
+def _seed_carousels(cursor):
+    """已有数据库时，补充默认轮播图"""
+    carousels = [
+        ("粤乡智匠正式上线", "https://placehold.co/1200x400/10b981/white?text=粤乡智匠", "", 0),
+        ("乡村振兴政策解读", "https://placehold.co/1200x400/00b4d8/white?text=政策解读", "/resources", 1),
+        ("非遗技艺传承计划", "https://placehold.co/1200x400/8b5cf6/white?text=非遗传承", "/crafts", 2),
+    ]
+    for title, img, link, sort in carousels:
+        cursor.execute("INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
+                       (title, img, link, sort))
+
 
 def _refresh_policies(cursor):
     """刷新政策内容（已有数据时更新政策详情）"""
+    # 更新旧 policies 表
     rows = cursor.execute("SELECT title, length(content) FROM policies").fetchall()
     need_refresh = any(r[1] < 200 for r in rows) if rows else True
     if not need_refresh:
@@ -856,6 +1075,29 @@ def _refresh_policies(cursor):
     for title, content, cat, date in POLICIES_DATA:
         cursor.execute("INSERT INTO policies (title, content, category, date) VALUES (?, ?, ?, ?)",
                        (title, content, cat, date))
+    # 同时更新 government_policies 表（如果为空）
+    gp_count = cursor.execute("SELECT COUNT(*) FROM government_policies").fetchone()[0]
+    if gp_count == 0:
+        for title, content, cat, date in POLICIES_DATA:
+            cursor.execute("INSERT INTO government_policies (title, content, category, author_id) VALUES (?, ?, ?, ?)",
+                           (title, content, cat, 'gov_demo'))
+
+
+def _ensure_demo_accounts(cursor):
+    """已有数据库时，补充缺少的新角色演示账户"""
+    demo_accounts = [
+        ('admin_demo', 'admin123', '系统管理员', 'super_admin', ''),
+        ('gov_demo', '123456', '王主任', 'government', '广东省农业农村厅'),
+        ('enterprise_demo', '123456', '陈经理', 'enterprise', '广州'),
+    ]
+    for username, password, name, role, region in demo_accounts:
+        existing = cursor.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not existing:
+            pw_hash = hash_password(password)
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, name, role, region) VALUES (?, ?, ?, ?, ?)",
+                (username, pw_hash, name, role, region))
+            cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, 0, '[]')", (username,))
 
 
 def _refresh_policies_OLD():
@@ -1653,3 +1895,801 @@ def get_dashboard_stats():
         "completion_rate": completion_rate,
         "avg_score": int(avg_progress)
     }
+
+# ==================== 用户注册和管理 ====================
+
+def register_user(username, password, name, role='student', email='', phone='',
+                  company_name='', region=''):
+    """注册新用户"""
+    conn = get_connection()
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        conn.close()
+        return None, "用户名已存在"
+    pw_hash = hash_password(password)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO users (username, password_hash, name, role, email, phone, company_name, region) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (username, pw_hash, name, role, email, phone, company_name, region))
+    conn.commit()
+    conn.close()
+    return username, "注册成功"
+
+
+def get_user_by_id(user_id):
+    """根据用户名获取用户信息"""
+    conn = get_connection()
+    user = conn.execute("SELECT * FROM users WHERE username = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(user) if user else None
+
+
+def get_all_users(search=None, role=None):
+    """获取所有用户列表（管理员视角）"""
+    conn = get_connection()
+    query = "SELECT * FROM users WHERE 1=1"
+    params = []
+    if search:
+        query += " AND (username LIKE ? OR name LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%'])
+    if role:
+        query += " AND role = ?"
+        params.append(role)
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def update_user_by_admin(user_id, name=None, role=None, status=None, phone=None, email=None):
+    """管理员编辑用户"""
+    conn = get_connection()
+    user = conn.execute("SELECT * FROM users WHERE username = ?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return False
+    updates = []
+    params = []
+    if name is not None:
+        updates.append("name = ?"); params.append(name)
+    if role is not None:
+        updates.append("role = ?"); params.append(role)
+    if status is not None:
+        updates.append("status = ?"); params.append(status)
+    if phone is not None:
+        updates.append("phone = ?"); params.append(phone)
+    if email is not None:
+        updates.append("email = ?"); params.append(email)
+    if updates:
+        params.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = ?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_user_by_admin(user_id):
+    """管理员删除用户"""
+    conn = get_connection()
+    conn.execute("DELETE FROM users WHERE username = ?", (user_id,))
+    conn.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM points WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def update_user_profile(user_id, name=None, email=None, phone=None, avatar_url=None,
+                        bio=None, company_name=None, region=None):
+    """更新用户个人资料（扩展版）"""
+    conn = get_connection()
+    updates = []
+    params = []
+    if name is not None: updates.append("name = ?"); params.append(name)
+    if email is not None: updates.append("email = ?"); params.append(email)
+    if phone is not None: updates.append("phone = ?"); params.append(phone)
+    if avatar_url is not None: updates.append("avatar_url = ?"); params.append(avatar_url)
+    if bio is not None: updates.append("bio = ?"); params.append(bio)
+    if company_name is not None: updates.append("company_name = ?"); params.append(company_name)
+    if region is not None: updates.append("region = ?"); params.append(region)
+    if updates:
+        params.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = ?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 内容审核 ====================
+
+def create_content_review(content_type, content_id, submitter_id):
+    """创建内容审核记录"""
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO content_reviews (content_type, content_id, submitter_id) VALUES (?, ?, ?)",
+        (content_type, content_id, submitter_id))
+    conn.commit()
+    conn.close()
+
+
+def get_pending_reviews(content_type=None):
+    """获取待审核列表"""
+    conn = get_connection()
+    if content_type:
+        rows = conn.execute(
+            "SELECT * FROM content_reviews WHERE status = 'pending' AND content_type = ? ORDER BY created_at DESC",
+            (content_type,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM content_reviews WHERE status = 'pending' ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def approve_review(review_id, reviewer_id):
+    """审核通过"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE content_reviews SET status='approved', reviewed_by=?, reviewed_at=datetime('now','localtime') WHERE id=?",
+        (reviewer_id, review_id))
+    review = conn.execute("SELECT * FROM content_reviews WHERE id=?", (review_id,)).fetchone()
+    if review:
+        ct, cid = review['content_type'], review['content_id']
+        if ct == 'course':
+            conn.execute("UPDATE courses SET review_status='approved', is_published=1 WHERE id=?", (cid,))
+        elif ct == 'job':
+            conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (cid,))
+        elif ct == 'procurement':
+            conn.execute("UPDATE procurements SET review_status='approved' WHERE id=?", (cid,))
+        elif ct == 'model_3d':
+            conn.execute("UPDATE models_3d SET review_status='approved', is_published=1 WHERE id=?", (cid,))
+    conn.commit()
+    conn.close()
+
+
+def reject_review(review_id, reviewer_id, comment=''):
+    """审核拒绝"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE content_reviews SET status='rejected', reviewed_by=?, review_comment=?, reviewed_at=datetime('now','localtime') WHERE id=?",
+        (reviewer_id, comment, review_id))
+    conn.commit()
+    conn.close()
+
+
+def get_review_by_content(content_type, content_id):
+    """获取内容的审核记录"""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM content_reviews WHERE content_type=? AND content_id=? ORDER BY id DESC LIMIT 1",
+        (content_type, content_id)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ==================== 轮播图 ====================
+
+def get_carousels(active_only=True):
+    """获取轮播图列表"""
+    conn = get_connection()
+    if active_only:
+        rows = conn.execute(
+            "SELECT * FROM carousels WHERE is_active=1 ORDER BY sort_order").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM carousels ORDER BY sort_order").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_carousel(title, image_url, link_url='', sort_order=0):
+    """添加轮播图"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
+        (title, image_url, link_url, sort_order))
+    conn.commit()
+    car_id = cursor.lastrowid
+    conn.close()
+    return car_id
+
+
+def update_carousel(car_id, **kwargs):
+    """更新轮播图"""
+    conn = get_connection()
+    allowed = {'title', 'image_url', 'link_url', 'sort_order', 'is_active'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [car_id]
+        conn.execute(f"UPDATE carousels SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_carousel(car_id):
+    """删除轮播图"""
+    conn = get_connection()
+    conn.execute("DELETE FROM carousels WHERE id=?", (car_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 系统公告 ====================
+
+def get_system_announcements(active_only=True):
+    """获取系统公告"""
+    conn = get_connection()
+    if active_only:
+        rows = conn.execute(
+            "SELECT * FROM system_announcements WHERE is_active=1 ORDER BY is_pinned DESC, created_at DESC"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM system_announcements ORDER BY is_pinned DESC, created_at DESC"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_system_announcement(title, content, is_pinned=0, created_by=''):
+    """新增系统公告"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO system_announcements (title, content, is_pinned, created_by) VALUES (?, ?, ?, ?)",
+        (title, content, is_pinned, created_by))
+    conn.commit()
+    ann_id = cursor.lastrowid
+    conn.close()
+    return ann_id
+
+
+def delete_system_announcement(ann_id):
+    """删除系统公告（软删除）"""
+    conn = get_connection()
+    conn.execute("UPDATE system_announcements SET is_active=0 WHERE id=?", (ann_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 课程 ====================
+
+def create_course(title, description, category, teacher_id, cover_url=''):
+    """教师创建课程"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO courses (title, description, category, teacher_id, cover_url) VALUES (?, ?, ?, ?, ?)",
+        (title, description, category, teacher_id, cover_url))
+    conn.commit()
+    course_id = cursor.lastrowid
+    conn.close()
+    # 创建审核记录
+    create_content_review('course', course_id, teacher_id)
+    return course_id
+
+
+def get_courses(teacher_id=None, published_only=True):
+    """获取课程列表"""
+    conn = get_connection()
+    query = "SELECT * FROM courses WHERE 1=1"
+    params = []
+    if teacher_id:
+        query += " AND teacher_id = ?"
+        params.append(teacher_id)
+    if published_only:
+        query += " AND is_published = 1"
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_course(course_id):
+    """获取单个课程"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM courses WHERE id = ?", (course_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_course(course_id, **kwargs):
+    """更新课程"""
+    conn = get_connection()
+    allowed = {'title', 'description', 'category', 'cover_url'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [course_id]
+        conn.execute(f"UPDATE courses SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_course(course_id):
+    """删除课程及关联素材"""
+    conn = get_connection()
+    conn.execute("DELETE FROM course_materials WHERE course_id = ?", (course_id,))
+    conn.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+    conn.execute("DELETE FROM content_reviews WHERE content_type='course' AND content_id=?", (course_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 课程素材 ====================
+
+def add_course_material(course_id, material_type, file_name, file_path, file_size=0):
+    """添加课程素材"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO course_materials (course_id, material_type, file_name, file_path, file_size) VALUES (?, ?, ?, ?, ?)",
+        (course_id, material_type, file_name, file_path, file_size))
+    conn.commit()
+    mat_id = cursor.lastrowid
+    conn.close()
+    return mat_id
+
+
+def get_course_materials(course_id):
+    """获取课程素材列表"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM course_materials WHERE course_id = ? ORDER BY sort_order", (course_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_course_material(mat_id):
+    """删除课程素材"""
+    conn = get_connection()
+    row = conn.execute("SELECT file_path FROM course_materials WHERE id = ?", (mat_id,)).fetchone()
+    conn.execute("DELETE FROM course_materials WHERE id = ?", (mat_id,))
+    conn.commit()
+    conn.close()
+    return row['file_path'] if row else None
+
+
+# ==================== 3D 模型 ====================
+
+def create_model_3d(title, description, craft_type, file_path, file_name, file_size, teacher_id, thumbnail_url=''):
+    """上传3D模型"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO models_3d (title, description, craft_type, file_path, file_name, file_size, thumbnail_url, teacher_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (title, description, craft_type, file_path, file_name, file_size, thumbnail_url, teacher_id))
+    conn.commit()
+    model_id = cursor.lastrowid
+    conn.close()
+    create_content_review('model_3d', model_id, teacher_id)
+    return model_id
+
+
+def get_models_3d(teacher_id=None, published_only=True):
+    """获取3D模型列表"""
+    conn = get_connection()
+    query = "SELECT * FROM models_3d WHERE 1=1"
+    params = []
+    if teacher_id:
+        query += " AND teacher_id = ?"
+        params.append(teacher_id)
+    if published_only:
+        query += " AND is_published = 1"
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_model_3d(model_id):
+    """删除3D模型"""
+    conn = get_connection()
+    row = conn.execute("SELECT file_path FROM models_3d WHERE id = ?", (model_id,)).fetchone()
+    conn.execute("DELETE FROM models_3d WHERE id = ?", (model_id,))
+    conn.execute("DELETE FROM content_reviews WHERE content_type='model_3d' AND content_id=?", (model_id,))
+    conn.commit()
+    conn.close()
+    return row['file_path'] if row else None
+
+
+# ==================== 评论 ====================
+
+def add_comment(target_type, target_id, user_id, content):
+    """添加评论"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO comments (target_type, target_id, user_id, content) VALUES (?, ?, ?, ?)",
+        (target_type, target_id, user_id, content))
+    conn.commit()
+    comment_id = cursor.lastrowid
+    # 更新讨论区评论计数
+    if target_type == 'discussion':
+        conn.execute("UPDATE discussions SET comment_count = comment_count + 1 WHERE id = ?", (target_id,))
+        conn.commit()
+    conn.close()
+    return comment_id
+
+
+def get_comments(target_type, target_id):
+    """获取评论列表"""
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT c.*, u.name as user_name, u.avatar_url
+           FROM comments c LEFT JOIN users u ON c.user_id = u.username
+           WHERE c.target_type = ? AND c.target_id = ? AND c.is_deleted = 0
+           ORDER BY c.created_at ASC""",
+        (target_type, target_id)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def soft_delete_comment(comment_id, deleted_by=''):
+    """软删除评论"""
+    conn = get_connection()
+    conn.execute("UPDATE comments SET is_deleted=1, deleted_by=? WHERE id=?", (deleted_by, comment_id))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 讨论区 ====================
+
+def create_discussion(title, content, category, user_id):
+    """创建讨论帖"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO discussions (title, content, category, user_id) VALUES (?, ?, ?, ?)",
+        (title, content, category, user_id))
+    conn.commit()
+    disc_id = cursor.lastrowid
+    conn.close()
+    return disc_id
+
+
+def get_discussions(category=None, page=1, page_size=20):
+    """获取讨论区列表（分页）"""
+    conn = get_connection()
+    query = "SELECT d.*, u.name as user_name FROM discussions d LEFT JOIN users u ON d.user_id = u.username WHERE d.is_deleted = 0"
+    params = []
+    if category:
+        query += " AND d.category = ?"
+        params.append(category)
+    query += " ORDER BY d.is_pinned DESC, d.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([page_size, (page - 1) * page_size])
+    rows = conn.execute(query, params).fetchall()
+    total = conn.execute(
+        "SELECT COUNT(*) FROM discussions WHERE is_deleted = 0" +
+        (f" AND category = ?" if category else ""),
+        (category,) if category else ()).fetchone()[0]
+    conn.close()
+    return [dict(r) for r in rows], total
+
+
+def get_discussion(disc_id):
+    """获取讨论详情"""
+    conn = get_connection()
+    conn.execute("UPDATE discussions SET view_count = view_count + 1 WHERE id = ?", (disc_id,))
+    row = conn.execute(
+        "SELECT d.*, u.name as user_name FROM discussions d LEFT JOIN users u ON d.user_id = u.username WHERE d.id = ?",
+        (disc_id,)).fetchone()
+    conn.commit()
+    conn.close()
+    return dict(row) if row else None
+
+
+def soft_delete_discussion(disc_id):
+    """软删除讨论帖"""
+    conn = get_connection()
+    conn.execute("UPDATE discussions SET is_deleted = 1 WHERE id = ?", (disc_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 农产品求购 ====================
+
+def create_procurement(product_name, enterprise_id, specification='', quantity='',
+                       price_range='', delivery_location='', deadline='',
+                       contact_info='', description=''):
+    """企业发布求购"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO procurements (product_name, specification, quantity, price_range, "
+        "delivery_location, deadline, contact_info, description, enterprise_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (product_name, specification, quantity, price_range, delivery_location,
+         deadline, contact_info, description, enterprise_id))
+    conn.commit()
+    proc_id = cursor.lastrowid
+    conn.close()
+    create_content_review('procurement', proc_id, enterprise_id)
+    return proc_id
+
+
+def get_procurements(enterprise_id=None, status=None, published_only=True):
+    """获取求购列表"""
+    conn = get_connection()
+    query = "SELECT p.*, u.company_name, u.region as enterprise_region FROM procurements p LEFT JOIN users u ON p.enterprise_id = u.username WHERE 1=1"
+    params = []
+    if enterprise_id:
+        query += " AND p.enterprise_id = ?"
+        params.append(enterprise_id)
+    if status:
+        query += " AND p.status = ?"
+        params.append(status)
+    if published_only:
+        query += " AND p.review_status = 'approved'"
+    query += " ORDER BY p.created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def update_procurement(proc_id, **kwargs):
+    """更新求购"""
+    conn = get_connection()
+    allowed = {'product_name', 'specification', 'quantity', 'price_range',
+               'delivery_location', 'deadline', 'contact_info', 'description', 'status'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [proc_id]
+        conn.execute(f"UPDATE procurements SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_procurement(proc_id):
+    """删除求购"""
+    conn = get_connection()
+    conn.execute("DELETE FROM procurements WHERE id = ?", (proc_id,))
+    conn.execute("DELETE FROM content_reviews WHERE content_type='procurement' AND content_id=?", (proc_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 新闻资讯 ====================
+
+def create_news(title, content, author_id, category='news'):
+    """发布新闻"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO news_articles (title, content, category, author_id) VALUES (?, ?, ?, ?)",
+        (title, content, category, author_id))
+    conn.commit()
+    news_id = cursor.lastrowid
+    conn.close()
+    return news_id
+
+
+def get_news(category=None, page=1, page_size=20):
+    """获取新闻列表"""
+    conn = get_connection()
+    query = "SELECT n.*, u.name as author_name FROM news_articles n LEFT JOIN users u ON n.author_id = u.username WHERE n.is_published = 1"
+    params = []
+    if category:
+        query += " AND n.category = ?"
+        params.append(category)
+    query += " ORDER BY n.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([page_size, (page - 1) * page_size])
+    rows = conn.execute(query, params).fetchall()
+    total = conn.execute(
+        "SELECT COUNT(*) FROM news_articles WHERE is_published = 1" +
+        (f" AND category = ?" if category else ""),
+        (category,) if category else ()).fetchone()[0]
+    conn.close()
+    return [dict(r) for r in rows], total
+
+
+def get_news_by_id(news_id):
+    """获取新闻详情"""
+    conn = get_connection()
+    conn.execute("UPDATE news_articles SET view_count = view_count + 1 WHERE id = ?", (news_id,))
+    row = conn.execute(
+        "SELECT n.*, u.name as author_name FROM news_articles n LEFT JOIN users u ON n.author_id = u.username WHERE n.id = ?",
+        (news_id,)).fetchone()
+    conn.commit()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_news(news_id, **kwargs):
+    """更新新闻"""
+    conn = get_connection()
+    allowed = {'title', 'content', 'category', 'is_published'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [news_id]
+        conn.execute(f"UPDATE news_articles SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_news(news_id):
+    """删除新闻"""
+    conn = get_connection()
+    conn.execute("DELETE FROM news_articles WHERE id = ?", (news_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 政府政策 ====================
+
+def create_policy(title, content, category, author_id):
+    """发布政策"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO government_policies (title, content, category, author_id) VALUES (?, ?, ?, ?)",
+        (title, content, category, author_id))
+    conn.commit()
+    policy_id = cursor.lastrowid
+    conn.close()
+    return policy_id
+
+
+def get_government_policies(category=None):
+    """获取政府政策列表"""
+    conn = get_connection()
+    query = "SELECT * FROM government_policies WHERE is_published = 1"
+    params = []
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_all_government_policies():
+    """获取所有政府政策（含未发布，政府端使用）"""
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM government_policies ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_policy_by_id(policy_id):
+    """获取政策详情"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM government_policies WHERE id = ?", (policy_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_policy(policy_id, **kwargs):
+    """更新政策"""
+    conn = get_connection()
+    allowed = {'title', 'content', 'category', 'is_published'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        updates['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [policy_id]
+        conn.execute(f"UPDATE government_policies SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_policy(policy_id):
+    """删除政策"""
+    conn = get_connection()
+    conn.execute("DELETE FROM government_policies WHERE id = ?", (policy_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 数据大屏 ====================
+
+def get_dashboard_overview():
+    """政府数据大屏 - 总览统计"""
+    conn = get_connection()
+    # 各类用户数
+    total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    student_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='student'").fetchone()[0]
+    teacher_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='teacher'").fetchone()[0]
+    enterprise_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='enterprise'").fetchone()[0]
+
+    # 培训数据
+    total_students = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+    avg_progress = conn.execute("SELECT AVG(progress) FROM students").fetchone()[0] or 0
+    completed = conn.execute("SELECT COUNT(*) FROM students WHERE progress >= 100").fetchone()[0]
+
+    # 就业数据
+    total_jobs = conn.execute("SELECT COUNT(*) FROM job_listings").fetchone()[0]
+    total_applications = conn.execute("SELECT COUNT(*) FROM job_applications").fetchone()[0]
+    approved_apps = conn.execute("SELECT COUNT(*) FROM job_applications WHERE status='approved'").fetchone()[0]
+
+    # 内容数据
+    total_courses = conn.execute("SELECT COUNT(*) FROM courses WHERE is_published=1").fetchone()[0]
+    total_policies = conn.execute("SELECT COUNT(*) FROM government_policies WHERE is_published=1").fetchone()[0]
+    total_news = conn.execute("SELECT COUNT(*) FROM news_articles WHERE is_published=1").fetchone()[0]
+    total_procurements = conn.execute("SELECT COUNT(*) FROM procurements WHERE status='active' AND review_status='approved'").fetchone()[0]
+
+    # 证书数据
+    total_certs = conn.execute("SELECT COUNT(*) FROM certificates").fetchone()[0]
+    earned_certs = conn.execute("SELECT COUNT(*) FROM certificates WHERE status='earned'").fetchone()[0]
+
+    # 讨论区热度
+    total_discussions = conn.execute("SELECT COUNT(*) FROM discussions WHERE is_deleted=0").fetchone()[0]
+    total_comments = conn.execute("SELECT COUNT(*) FROM comments WHERE is_deleted=0").fetchone()[0]
+
+    conn.close()
+
+    return {
+        "users": {
+            "total": total_users,
+            "students": student_count,
+            "teachers": teacher_count,
+            "enterprises": enterprise_count
+        },
+        "training": {
+            "total_students": total_students,
+            "avg_progress": round(avg_progress, 1),
+            "completed": completed,
+            "completion_rate": round(completed / total_students * 100, 1) if total_students > 0 else 0
+        },
+        "employment": {
+            "total_jobs": total_jobs,
+            "total_applications": total_applications,
+            "match_rate": round(approved_apps / total_applications * 100, 1) if total_applications > 0 else 0
+        },
+        "content": {
+            "courses": total_courses,
+            "policies": total_policies,
+            "news": total_news,
+            "procurements": total_procurements
+        },
+        "certificates": {
+            "total": total_certs,
+            "earned": earned_certs,
+            "earn_rate": round(earned_certs / total_certs * 100, 1) if total_certs > 0 else 0
+        },
+        "community": {
+            "discussions": total_discussions,
+            "comments": total_comments
+        }
+    }
+
+
+def get_dashboard_region_stats():
+    """各地区数据统计"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT region, COUNT(*) as count FROM users WHERE region != '' GROUP BY region ORDER BY count DESC LIMIT 10"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_dashboard_direction_stats():
+    """各培训方向统计"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT direction, COUNT(*) as count, AVG(progress) as avg_progress FROM students GROUP BY direction"
+    ).fetchall()
+    conn.close()
+    return [{"direction": r['direction'] or '未分类', "count": r['count'],
+             "avg_progress": round(r['avg_progress'] or 0, 1)} for r in rows]

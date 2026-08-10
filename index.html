@@ -32,7 +32,6 @@
                 <button class="nav-item" data-tab="simulation" role="tab" aria-selected="false" aria-controls="simulation-tab">虚拟实训</button>
                 <button class="nav-item" data-tab="resources" role="tab" aria-selected="false" aria-controls="resources-tab">本土资源</button>
                 <button class="nav-item" data-tab="employment" role="tab" aria-selected="false" aria-controls="employment-tab">就业对接</button>
-                <button class="nav-item teacher-only is-hidden" data-tab="teacher" role="tab" aria-selected="false" aria-controls="teacher-tab">教师管理</button>
             </div>
             <div class="nav-actions">
                 <div class="teacher-quick-menu is-hidden" id="teacher-quick-menu">
@@ -1281,6 +1280,7 @@
 
             </div>
         </div>
+
     </main>
 
     <!-- 页脚 -->
@@ -1299,14 +1299,18 @@
         </div>
     </footer>
 
-    <!-- 登录模态框 -->
+    <!-- 登录/注册模态框 -->
     <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="login-modal-title">用户登录</h3>
-                <button class="modal-close" id="close-login-modal" aria-label="关闭登录"><i class="fas fa-times"></i></button>
+                <div class="auth-tabs">
+                    <button class="auth-tab active" id="auth-tab-login">登录</button>
+                    <button class="auth-tab" id="auth-tab-register">注册</button>
+                </div>
+                <button class="modal-close" id="close-login-modal" aria-label="关闭"><i class="fas fa-times"></i></button>
             </div>
-            <div class="modal-body">
+            <!-- 登录表单 -->
+            <div class="modal-body" id="auth-login-form">
                 <div class="form-group">
                     <label for="login-username">用户名</label>
                     <input type="text" id="login-username" placeholder="输入用户名">
@@ -1320,7 +1324,7 @@
                     <select id="user-role-select">
                         <option value="student">学员</option>
                         <option value="teacher">教师</option>
-                        <option value="admin">管理员</option>
+                        <option value="enterprise">企业用户</option>
                     </select>
                 </div>
                 <div class="form-actions">
@@ -1330,13 +1334,60 @@
                 <div class="demo-section">
                     <h4>演示账户</h4>
                     <div class="demo-list">
+                        <div class="demo-account" data-username="admin_demo" data-password="admin123" data-role="super_admin">
+                            <strong>超管</strong><span>admin_demo / admin123</span>
+                        </div>
+                        <div class="demo-account" data-username="gov_demo" data-password="123456" data-role="government">
+                            <strong>政府</strong><span>gov_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="enterprise_demo" data-password="123456" data-role="enterprise">
+                            <strong>企业</strong><span>enterprise_demo / 123456</span>
+                        </div>
                         <div class="demo-account" data-username="teacher_demo" data-password="123456" data-role="teacher">
-                            <strong>教师账户</strong><span>teacher_demo / 123456</span>
+                            <strong>教师</strong><span>teacher_demo / 123456</span>
                         </div>
                         <div class="demo-account" data-username="student_demo" data-password="123456" data-role="student">
-                            <strong>学员账户</strong><span>student_demo / 123456</span>
+                            <strong>学员</strong><span>student_demo / 123456</span>
                         </div>
                     </div>
+                </div>
+            </div>
+            <!-- 注册表单 -->
+            <div class="modal-body is-hidden" id="auth-register-form">
+                <div class="form-group">
+                    <label for="reg-username">用户名 <span class="required">*</span></label>
+                    <input type="text" id="reg-username" placeholder="输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">密码 <span class="required">*</span></label>
+                    <input type="password" id="reg-password" placeholder="至少6位密码">
+                </div>
+                <div class="form-group">
+                    <label for="reg-name">姓名 <span class="required">*</span></label>
+                    <input type="text" id="reg-name" placeholder="输入真实姓名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-role">注册身份 <span class="required">*</span></label>
+                    <select id="reg-role">
+                        <option value="student">学员（学习技能）</option>
+                        <option value="teacher">教师（传授技能）</option>
+                        <option value="enterprise">企业用户（招聘收购）</option>
+                    </select>
+                </div>
+                <div class="form-group reg-enterprise-only is-hidden" id="reg-company-group">
+                    <label for="reg-company">公司名称</label>
+                    <input type="text" id="reg-company" placeholder="输入公司/单位名称">
+                </div>
+                <div class="form-group">
+                    <label for="reg-phone">手机号</label>
+                    <input type="text" id="reg-phone" placeholder="输入手机号">
+                </div>
+                <div class="form-group">
+                    <label for="reg-region">所在地区</label>
+                    <input type="text" id="reg-region" placeholder="如：广州、梅州、湛江">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="register-submit"><i class="fas fa-user-plus"></i> 注册</button>
                 </div>
             </div>
         </div>
