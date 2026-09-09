@@ -11,3 +11,27 @@ __pycache__/
 .impeccable/
 frontend/dist/
 frontend/dist-locked-backup/
+
+# Temporary files and caches
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.log
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+data/*.db-journal
+data/*.db-shm
+data/*.db-wal
+
+# OS and editor artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
