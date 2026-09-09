@@ -1,0 +1,27 @@
+{
+  "name": "yuexiang-artisan-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "vue-demi@0.14.10": true
+  },
+  "scripts": {
+    "dev": "node scripts/vite.mjs dev",
+    "build": "vue-tsc --noEmit && node scripts/vite.mjs build",
+    "preview": "node scripts/vite.mjs preview"
+  },
+  "dependencies": {
+    "lucide-vue-next": "^0.468.0",
+    "pinia": "^2.3.0",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.6.3",
+    "vite": "^5.4.11",
+    "vue-tsc": "^2.1.10"
+  }
+}
