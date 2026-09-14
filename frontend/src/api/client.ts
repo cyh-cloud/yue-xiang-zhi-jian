@@ -1,36 +1,39 @@
-export class ApiError extends Error {
-  status?: number
+import type { ApiFieldErrors } from './types'
 
-  constructor(message: string, status?: number) {
+export class ApiError extends Error {
+  readonly status: number
+  readonly errors: ApiFieldErrors
+  readonly redirect?: string
+
+  constructor(
+    message: string,
+    status: number,
+    errors: ApiFieldErrors = {},
+    redirect?: string
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.errors = errors
+    this.redirect = redirect
   }
 }
 
 interface RequestOptions extends Omit<RequestInit, 'headers'> {
-  sessionId?: string
-  headers?: Record<string, string>
+  headers?: HeadersInit
 }
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
-  const headers: Record<string, string> = {
-    ...options.headers
-  }
-
-  if (options.sessionId) {
-    headers['X-Session-Id'] = options.sessionId
-  }
-
-  if (options.body) {
-    headers['Content-Type'] = 'application/json'
+  const headers = new Headers(options.headers)
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
   }
 
   const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers,
-    credentials: 'same-origin'
+    credentials: 'include'
   })
 
   const contentType = response.headers.get('content-type') ?? ''
@@ -38,12 +41,34 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     ? await response.json()
     : await response.text()
 
-  if (!response.ok || typeof payload !== 'object' || payload === null || payload.success !== true) {
+  if (
+    !response.ok ||
+    typeof payload !== 'object' ||
+    payload === null ||
+    payload.success !== true
+  ) {
+    const payloadRecord =
+      typeof payload === 'object' && payload !== null
+        ? (payload as Record<string, unknown>)
+        : null
     const message =
-      typeof payload === 'object' && payload !== null && 'message' in payload
-        ? String(payload.message)
+      typeof payloadRecord?.message === 'string'
+        ? payloadRecord.message
         : `接口请求失败：${response.status}`
-    throw new ApiError(message, response.status)
+    const errors =
+      typeof payloadRecord?.errors === 'object' &&
+      payloadRecord.errors !== null &&
+      !Array.isArray(payloadRecord.errors)
+        ? Object.fromEntries(
+            Object.entries(payloadRecord.errors as Record<string, unknown>).map(
+              ([field, value]) => [field, String(value)]
+            )
+          )
+        : {}
+    const redirect =
+      typeof payloadRecord?.redirect === 'string' ? payloadRecord.redirect : undefined
+
+    throw new ApiError(message, response.status, errors, redirect)
   }
 
   return payload as T

@@ -9,6 +9,67 @@ export type ModuleId =
 export type DataSource = 'live' | 'mock'
 export type SnapshotSource = DataSource | 'mixed'
 
+export type UserRole =
+  | 'student'
+  | 'teacher'
+  | 'enterprise'
+  | 'government'
+  | 'super_admin'
+  | 'admin'
+
+export interface AuthUser {
+  id: number
+  username: string
+  name: string
+  role: UserRole
+}
+
+export interface AuthSessionResponse {
+  success: true
+  state: 'pending' | 'active'
+  user: AuthUser
+  default_path: string
+  next_step?: 'interest-tags'
+}
+
+export interface RegisterResponse {
+  success: true
+  next_step: 'interest-tags' | 'portal'
+  user: AuthUser
+  default_path: string
+}
+
+export type LearningDirection =
+  | 'agriculture'
+  | 'ecommerce'
+  | 'handcraft'
+  | 'comprehensive'
+
+export interface StudentProfile {
+  name: string
+  contact: string
+  learning_direction: LearningDirection
+  tag_ids: number[]
+}
+
+export interface InterestTag {
+  id: number
+  group_key: 'crop' | 'skill' | 'job'
+  name: string
+}
+
+export interface CourseSummary {
+  id: number
+  title: string
+  direction: Exclude<LearningDirection, 'comprehensive'>
+  summary: string
+  teacher_name: string
+  published_at: string
+  interest_match: boolean
+}
+
+export type ApiFieldErrors = Record<string, string>
+
 export interface HomeMetric {
   label: string
   value: string
