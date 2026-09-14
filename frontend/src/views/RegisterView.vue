@@ -235,8 +235,8 @@ async function submitRegister() {
 .auth-page {
   min-height: 100svh;
   background:
-    linear-gradient(rgb(244 246 246 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(244 246 246 / 0.028) 1px, transparent 1px),
+    linear-gradient(rgb(16 23 25 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(16 23 25 / 0.038) 1px, transparent 1px),
     var(--ark-ink);
   background-size: 72px 72px;
 }
@@ -262,7 +262,7 @@ async function submitRegister() {
 .auth-intro > p {
   max-width: 48ch;
   margin: 22px 0 0;
-  color: #c4cdcf;
+  color: var(--ark-muted);
   line-height: 1.8;
 }
 
@@ -275,7 +275,7 @@ async function submitRegister() {
   margin-top: 34px;
   padding: 16px;
   border: 1px solid var(--ark-line);
-  background: rgb(5 6 7 / 0.72);
+  background: rgb(255 255 255 / 0.72);
 }
 
 .path-preview > div {
@@ -307,7 +307,7 @@ async function submitRegister() {
 .auth-panel {
   position: relative;
   border: 1px solid var(--ark-line-strong);
-  background: rgb(5 6 7 / 0.92);
+  background: rgb(255 255 255 / 0.92);
   box-shadow: 14px 18px 44px rgb(0 0 0 / 0.42);
 }
 
@@ -432,7 +432,7 @@ form {
 
 .role-field > p {
   margin: 7px 0 0;
-  color: #ff9c9c;
+  color: #b42318;
   font-size: 0.76rem;
 }
 
@@ -445,9 +445,9 @@ form {
 .auth-error {
   margin: 0;
   padding: 10px 11px;
-  border: 1px solid rgb(255 138 138 / 0.44);
-  background: rgb(255 138 138 / 0.08);
-  color: #ff9c9c;
+  border: 1px solid rgb(180 35 24 / 0.44);
+  background: rgb(180 35 24 / 0.08);
+  color: #b42318;
   font-size: 0.8rem;
 }
 

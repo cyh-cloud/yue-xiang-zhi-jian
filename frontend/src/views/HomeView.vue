@@ -220,7 +220,7 @@ onMounted(() => {
 .prototype-note p {
   max-width: 72ch;
   margin: 14px 0 0;
-  color: #c4cdcf;
+  color: var(--ark-muted);
   font-size: 0.94rem;
   line-height: 1.75;
 }

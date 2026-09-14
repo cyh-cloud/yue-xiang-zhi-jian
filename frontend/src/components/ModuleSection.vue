@@ -86,7 +86,7 @@ const emit = defineEmits<{
 }
 
 .module:nth-of-type(odd) {
-  background: linear-gradient(rgb(244 246 246 / 0.018), transparent 38%), var(--ark-ink);
+  background: linear-gradient(rgb(16 23 25 / 0.025), transparent 38%), var(--ark-ink);
 }
 
 .module[data-active="true"]::before {
@@ -150,7 +150,7 @@ h2 {
 .module-intro p {
   max-width: 62ch;
   margin: 18px 0 0;
-  color: #c9d2d4;
+  color: var(--ark-muted);
   font-size: 1rem;
   line-height: 1.75;
 }
@@ -192,7 +192,7 @@ h2 {
   position: relative;
   min-width: 0;
   border: 1px solid var(--ark-line-strong);
-  background: rgb(5 6 7 / 0.88);
+  background: rgb(255 255 255 / 0.88);
 }
 
 .module-stage::after {
@@ -256,7 +256,7 @@ h2 {
   grid-template-columns: 76px minmax(0, 1fr);
   gap: 8px 16px;
   padding: 15px 0;
-  border-bottom: 1px solid rgb(244 246 246 / 0.09);
+  border-bottom: 1px solid rgb(16 23 25 / 0.12);
 }
 
 .item-tag {
@@ -284,7 +284,7 @@ h2 {
 
 .item-copy p {
   margin: 7px 0 0;
-  color: #bac3c6;
+  color: var(--ark-muted);
   font-size: 0.88rem;
   line-height: 1.65;
 }

@@ -84,7 +84,7 @@ input {
 }
 
 input:hover {
-  border-color: rgb(24 209 255 / 0.62);
+  border-color: rgb(0 117 143 / 0.7);
 }
 
 input:focus-visible {
@@ -92,12 +92,12 @@ input:focus-visible {
 }
 
 .invalid input {
-  border-color: rgb(255 138 138 / 0.62);
+  border-color: rgb(180 35 24 / 0.62);
 }
 
 .field-error {
   margin: 0;
-  color: #ff9c9c;
+  color: #b42318;
   font-size: 0.76rem;
   line-height: 1.5;
 }

@@ -178,8 +178,8 @@ onMounted(() => {
 .catalog-page {
   min-height: 100svh;
   background:
-    linear-gradient(rgb(244 246 246 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(244 246 246 / 0.028) 1px, transparent 1px),
+    linear-gradient(rgb(16 23 25 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(16 23 25 / 0.038) 1px, transparent 1px),
     var(--ark-ink);
   background-size: 72px 72px;
 }
@@ -224,7 +224,7 @@ onMounted(() => {
 .catalog-heading p {
   max-width: 66ch;
   margin: 14px 0 0;
-  color: #c4cdcf;
+  color: var(--ark-muted);
 }
 
 .catalog-state {
@@ -235,7 +235,7 @@ onMounted(() => {
   min-width: 112px;
   padding: 12px 14px;
   border: 1px solid var(--ark-line);
-  background: rgb(5 6 7 / 0.78);
+  background: rgb(255 255 255 / 0.78);
   color: var(--ark-signal);
 }
 
@@ -263,7 +263,7 @@ onMounted(() => {
 .direction-tabs button {
   min-height: 48px;
   border: 0;
-  background: rgb(5 6 7 / 0.88);
+  background: rgb(255 255 255 / 0.88);
   color: var(--ark-muted);
   font-size: 0.9rem;
 }
@@ -282,7 +282,7 @@ onMounted(() => {
   min-height: 360px;
   margin-top: 12px;
   border: 1px solid var(--ark-line-strong);
-  background: rgb(5 6 7 / 0.84);
+  background: rgb(255 255 255 / 0.84);
 }
 
 .course-list {
@@ -393,7 +393,7 @@ onMounted(() => {
 
 .catalog-error p {
   margin: 0;
-  color: #ff9c9c;
+  color: #b42318;
 }
 
 .catalog-error button {
@@ -434,9 +434,9 @@ onMounted(() => {
   height: 14px;
   background: linear-gradient(
     90deg,
-    rgb(244 246 246 / 0.08),
-    rgb(244 246 246 / 0.16),
-    rgb(244 246 246 / 0.08)
+    rgb(16 23 25 / 0.08),
+    rgb(16 23 25 / 0.14),
+    rgb(16 23 25 / 0.08)
   );
   background-size: 200% 100%;
   animation: skeleton-shift 1.4s linear infinite;

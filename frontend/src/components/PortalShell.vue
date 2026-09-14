@@ -169,8 +169,8 @@ onMounted(() => {
 .portal-page {
   min-height: 100svh;
   background:
-    linear-gradient(rgb(244 246 246 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(244 246 246 / 0.028) 1px, transparent 1px),
+    linear-gradient(rgb(16 23 25 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(16 23 25 / 0.038) 1px, transparent 1px),
     var(--ark-ink);
   background-size: 72px 72px;
 }
@@ -199,7 +199,7 @@ onMounted(() => {
 .portal-heading p {
   max-width: 62ch;
   margin: 16px 0 0;
-  color: #c4cdcf;
+  color: var(--ark-muted);
 }
 
 .identity-state {
@@ -210,7 +210,7 @@ onMounted(() => {
   min-width: 176px;
   padding: 12px 14px;
   border: 1px solid var(--ark-line);
-  background: rgb(5 6 7 / 0.78);
+  background: rgb(255 255 255 / 0.78);
   color: var(--ark-signal);
 }
 
@@ -266,7 +266,7 @@ onMounted(() => {
   align-items: center;
   min-height: 104px;
   padding: 20px 22px;
-  background: rgb(5 6 7 / 0.88);
+  background: rgb(255 255 255 / 0.88);
 }
 
 .entry-copy h3 {
@@ -318,13 +318,13 @@ onMounted(() => {
   gap: 16px;
   margin-top: 18px;
   padding: 11px 12px;
-  border: 1px solid rgb(255 138 138 / 0.44);
-  background: rgb(255 138 138 / 0.08);
+  border: 1px solid rgb(180 35 24 / 0.44);
+  background: rgb(180 35 24 / 0.08);
 }
 
 .load-error p {
   margin: 0;
-  color: #ff9c9c;
+  color: #b42318;
   font-size: 0.82rem;
 }
 

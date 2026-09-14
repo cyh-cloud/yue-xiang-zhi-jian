@@ -171,8 +171,8 @@ const sourceLabel = computed(() => {
   min-height: calc(100svh - 72px);
   padding: 48px 24px 26px;
   background:
-    linear-gradient(rgb(244 246 246 / 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(244 246 246 / 0.035) 1px, transparent 1px);
+    linear-gradient(rgb(16 23 25 / 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(16 23 25 / 0.045) 1px, transparent 1px);
   background-size: 72px 72px;
   background-color: var(--ark-ink);
 }
@@ -214,7 +214,7 @@ h1 {
 .hero-copy p {
   max-width: 52ch;
   margin: 28px 0 0;
-  color: #c9d2d4;
+  color: var(--ark-muted);
   font-size: 1.06rem;
   line-height: 1.8;
 }
@@ -274,7 +274,7 @@ h1 {
 .hero-path li {
   min-height: 88px;
   padding: 13px;
-  background: rgb(5 6 7 / 0.72);
+  background: rgb(255 255 255 / 0.72);
 }
 
 .hero-path strong {
@@ -293,7 +293,7 @@ h1 {
 .hero-metrics div {
   min-height: 78px;
   padding: 12px;
-  background: rgb(5 6 7 / 0.82);
+  background: rgb(255 255 255 / 0.82);
 }
 
 .hero-metrics dt {
@@ -310,7 +310,7 @@ h1 {
   position: relative;
   min-width: 0;
   border: 1px solid var(--ark-line-strong);
-  background: rgb(5 6 7 / 0.88);
+  background: rgb(255 255 255 / 0.88);
   box-shadow: 12px 14px 40px rgb(0 0 0 / 0.42);
 }
 
@@ -357,7 +357,7 @@ h1 {
 .module-summary {
   margin: 0;
   padding: 15px 18px 0;
-  color: #c9d2d4;
+  color: var(--ark-muted);
   font-size: 0.94rem;
   line-height: 1.72;
 }
@@ -409,7 +409,7 @@ h1 {
   gap: 4px 12px;
   align-items: baseline;
   padding: 11px 0;
-  border-bottom: 1px solid rgb(244 246 246 / 0.08);
+  border-bottom: 1px solid rgb(16 23 25 / 0.12);
 }
 
 .module-items li:last-child {
@@ -435,7 +435,7 @@ h1 {
 .module-items p {
   grid-column: 2 / 4;
   margin: 0;
-  color: #b8c1c4;
+  color: var(--ark-muted);
   font-size: 0.84rem;
   line-height: 1.6;
 }
@@ -446,7 +446,7 @@ h1 {
   justify-content: space-between;
   gap: 12px;
   padding: 13px 18px;
-  background: rgb(244 246 246 / 0.025);
+  background: rgb(16 23 25 / 0.035);
 }
 
 .dossier-foot span {
@@ -495,7 +495,7 @@ h1 {
 }
 
 .direction-rail button small {
-  color: #69767a;
+  color: var(--ark-muted);
   font-size: 0.66rem;
 }
 

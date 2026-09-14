@@ -69,35 +69,35 @@ defineProps<{
 }
 
 .grid path {
-  stroke: rgb(244 246 246 / 0.08);
+  stroke: rgb(16 23 25 / 0.12);
   stroke-width: 1;
 }
 
 .source rect,
 .learner rect,
 .destination path {
-  fill: rgb(244 246 246 / 0.06);
-  stroke: rgb(244 246 246 / 0.42);
+  fill: rgb(16 23 25 / 0.05);
+  stroke: rgb(16 23 25 / 0.42);
   stroke-width: 1;
 }
 
 .learner rect {
-  stroke: rgb(244 246 246 / 0.62);
+  stroke: rgb(16 23 25 / 0.62);
 }
 
 .learner path {
-  stroke: rgb(244 246 246 / 0.4);
+  stroke: rgb(16 23 25 / 0.4);
   stroke-width: 1;
 }
 
 .routes path {
   fill: none;
-  stroke: rgb(244 246 246 / 0.24);
+  stroke: rgb(16 23 25 / 0.24);
   stroke-width: 1;
 }
 
 .markers circle {
-  fill: rgb(244 246 246 / 0.4);
+  fill: rgb(16 23 25 / 0.4);
 }
 
 .stage-art[data-visual="field"] .route-field,

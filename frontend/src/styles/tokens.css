@@ -1,16 +1,16 @@
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
-  --ark-ink: #080a0b;
-  --ark-paper: #f4f6f6;
-  --ark-signal: #18d1ff;
-  --ark-state: #c8eb21;
-  --ark-surface-0: #050607;
-  --ark-surface-1: #0b0f11;
-  --ark-surface-2: #101518;
-  --ark-line: rgb(244 246 246 / 0.18);
-  --ark-line-strong: rgb(244 246 246 / 0.42);
-  --ark-muted: #a7b1b4;
+  --ark-ink: #f4f7f8;
+  --ark-paper: #101719;
+  --ark-signal: #00758f;
+  --ark-state: #526c00;
+  --ark-surface-0: #ffffff;
+  --ark-surface-1: #edf2f3;
+  --ark-surface-2: #e2e9eb;
+  --ark-line: rgb(16 23 25 / 0.16);
+  --ark-line-strong: rgb(16 23 25 / 0.38);
+  --ark-muted: #536267;
   --ark-focus: var(--ark-signal);
   --ark-radius: 2px;
   --ark-shell-max: 1520px;
@@ -64,7 +64,7 @@ button:disabled {
 
 a {
   color: inherit;
-  text-decoration-color: rgb(24 209 255 / 0.6);
+  text-decoration-color: rgb(0 117 143 / 0.72);
   text-underline-offset: 0.25em;
 }
 
@@ -88,12 +88,12 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #293438;
+  background: #aab6b9;
   border: 2px solid var(--ark-surface-0);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a484d;
+  background: #7d8b90;
 }
 
 .ark-shell {

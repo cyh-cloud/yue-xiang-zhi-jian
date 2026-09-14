@@ -118,7 +118,7 @@ function closeMobileNav() {
   top: 0;
   z-index: 30;
   border-bottom: 1px solid var(--ark-line);
-  background: rgb(5 6 7 / 0.96);
+  background: rgb(255 255 255 / 0.96);
   backdrop-filter: blur(12px);
 }
 

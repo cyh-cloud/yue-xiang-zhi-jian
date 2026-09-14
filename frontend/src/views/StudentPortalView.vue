@@ -50,7 +50,7 @@ import PortalShell from '@/components/PortalShell.vue'
   align-items: center;
   min-height: 82px;
   padding: 16px 18px;
-  background: rgb(5 6 7 / 0.94);
+  background: rgb(255 255 255 / 0.94);
   text-decoration: none;
   transition:
     background var(--ark-transition),

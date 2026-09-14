@@ -69,7 +69,7 @@ defineProps<{
   display: block;
   width: 100%;
   height: auto;
-  color: rgb(244 246 246 / 0.66);
+  color: rgb(16 23 25 / 0.62);
 }
 
 .module-visual g * {
@@ -80,7 +80,7 @@ defineProps<{
 
 .module-visual circle,
 .module-visual rect {
-  fill: rgb(244 246 246 / 0.045);
+  fill: rgb(16 23 25 / 0.04);
 }
 
 .module-visual g > :last-child,

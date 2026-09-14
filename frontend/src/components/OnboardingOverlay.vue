@@ -349,7 +349,7 @@ onBeforeUnmount(() => {
   width: min(410px, calc(100vw - 28px));
   border: 1px solid var(--ark-line-strong);
   border-radius: var(--ark-radius);
-  background: rgb(5 6 7 / 0.98);
+  background: rgb(255 255 255 / 0.98);
   box-shadow: 14px 18px 44px rgb(0 0 0 / 0.48);
 }
 
@@ -413,7 +413,7 @@ onBeforeUnmount(() => {
 
 .step-copy p {
   margin: 10px 0 0;
-  color: #c4cdcf;
+  color: var(--ark-muted);
   font-size: 0.9rem;
   line-height: 1.7;
 }
@@ -440,9 +440,9 @@ onBeforeUnmount(() => {
 .guide-error {
   margin: 0 20px 16px;
   padding: 9px 10px;
-  border: 1px solid rgb(255 138 138 / 0.44);
-  background: rgb(255 138 138 / 0.08);
-  color: #ff9c9c;
+  border: 1px solid rgb(180 35 24 / 0.44);
+  background: rgb(180 35 24 / 0.08);
+  color: #b42318;
   font-size: 0.8rem;
 }
 

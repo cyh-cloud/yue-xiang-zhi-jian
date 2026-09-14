@@ -324,8 +324,8 @@ onMounted(() => {
 .profile-page {
   min-height: 100svh;
   background:
-    linear-gradient(rgb(244 246 246 / 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(244 246 246 / 0.028) 1px, transparent 1px),
+    linear-gradient(rgb(16 23 25 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(16 23 25 / 0.038) 1px, transparent 1px),
     var(--ark-ink);
   background-size: 72px 72px;
 }
@@ -370,7 +370,7 @@ onMounted(() => {
 .profile-heading p {
   max-width: 66ch;
   margin: 14px 0 0;
-  color: #c4cdcf;
+  color: var(--ark-muted);
 }
 
 .selected-count {
@@ -385,7 +385,7 @@ onMounted(() => {
   display: grid;
   margin-top: 22px;
   border: 1px solid var(--ark-line-strong);
-  background: rgb(5 6 7 / 0.86);
+  background: rgb(255 255 255 / 0.86);
 }
 
 .form-section {
@@ -503,7 +503,7 @@ onMounted(() => {
 .tag-error {
   align-content: center;
   gap: 12px;
-  color: #ff9c9c;
+  color: #b42318;
 }
 
 .tag-error p {
@@ -601,7 +601,7 @@ onMounted(() => {
 
 .field-error {
   margin: 8px 0 0;
-  color: #ff9c9c;
+  color: #b42318;
   font-size: 0.76rem;
 }
 
@@ -610,7 +610,7 @@ onMounted(() => {
 }
 
 .invalid .direction-options {
-  border-color: rgb(255 138 138 / 0.62);
+  border-color: rgb(180 35 24 / 0.62);
 }
 
 .save-error,
@@ -624,13 +624,13 @@ onMounted(() => {
 }
 
 .save-error {
-  border: 1px solid rgb(255 138 138 / 0.44);
-  background: rgb(255 138 138 / 0.08);
-  color: #ff9c9c;
+  border: 1px solid rgb(180 35 24 / 0.44);
+  background: rgb(180 35 24 / 0.08);
+  color: #b42318;
 }
 
 .save-notice {
-  border: 1px solid rgb(200 235 33 / 0.42);
+  border: 1px solid rgb(82 108 0 / 0.42);
   color: var(--ark-state);
 }
 
@@ -671,7 +671,7 @@ onMounted(() => {
   min-height: 360px;
   margin-top: 22px;
   border: 1px solid var(--ark-line-strong);
-  background: rgb(5 6 7 / 0.84);
+  background: rgb(255 255 255 / 0.84);
 }
 
 .profile-loading {
@@ -685,7 +685,7 @@ onMounted(() => {
   display: block;
   height: 46px;
   border: 1px solid var(--ark-line);
-  background: rgb(244 246 246 / 0.06);
+  background: rgb(16 23 25 / 0.06);
 }
 
 .profile-loading span:nth-child(2) {
@@ -705,7 +705,7 @@ onMounted(() => {
 
 .load-error p {
   margin: 0;
-  color: #ff9c9c;
+  color: #b42318;
 }
 
 .load-error button {
