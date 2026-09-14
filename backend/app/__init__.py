@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 
 from app.auth.routes import auth_bp
 from app.config import build_config
+from app.courses.routes import student_courses_bp
 from app.db import close_db, init_db
 from app.onboarding.routes import onboarding_bp
 from app.profiles.routes import student_profile_bp
@@ -43,6 +44,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             load_session(required=True, allowed_states={"active"})
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(student_courses_bp)
     app.register_blueprint(interest_tags_bp)
     app.register_blueprint(onboarding_bp)
     app.register_blueprint(student_profile_bp)

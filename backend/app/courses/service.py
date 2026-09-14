@@ -1,0 +1,42 @@
+from __future__ import annotations
+
+from app.db import get_db
+
+
+def list_published_courses(user_id: int, direction: str) -> list[dict]:
+    rows = get_db().execute(
+        """
+        SELECT
+            c.id,
+            c.title,
+            c.direction,
+            c.summary,
+            c.teacher_name,
+            c.published_at,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM course_interest_tags cit
+                JOIN student_interest_tags sit
+                  ON sit.tag_id = cit.tag_id
+                WHERE cit.course_id = c.id
+                  AND sit.user_id = ?
+            ) THEN 1 ELSE 0 END AS interest_match
+        FROM courses c
+        WHERE c.status = 'published'
+          AND c.direction = ?
+        ORDER BY interest_match DESC, c.published_at DESC, c.id DESC
+        """,
+        (user_id, direction),
+    ).fetchall()
+    return [
+        {
+            "id": int(row["id"]),
+            "title": str(row["title"]),
+            "direction": str(row["direction"]),
+            "summary": str(row["summary"]),
+            "teacher_name": str(row["teacher_name"]),
+            "published_at": row["published_at"],
+            "interest_match": bool(row["interest_match"]),
+        }
+        for row in rows
+    ]
