@@ -9,6 +9,7 @@ from app.auth.service import (
     register_account,
 )
 from app.auth.validators import validate_registration
+from app.db import get_db
 from app.session_manager import (
     abort_session_required,
     apply_session_cookie,
@@ -16,6 +17,10 @@ from app.session_manager import (
     load_session,
     revoke_current_session,
     role_default_path,
+)
+from app.tags.service import (
+    InvalidInterestTagError,
+    replace_student_tags,
 )
 
 
@@ -128,3 +133,45 @@ def get_session():
         )
 
     abort_session_required()
+
+
+@auth_bp.post("/interest-tags")
+def complete_interest_tags():
+    session = load_session(required=True, allowed_states={"pending"})
+    if session["role"] != "student":
+        abort_session_required()
+
+    payload = request.get_json(silent=True)
+    tag_ids = payload.get("tag_ids") if isinstance(payload, dict) else None
+    if not isinstance(tag_ids, list) or any(
+        not isinstance(tag_id, int) or isinstance(tag_id, bool)
+        for tag_id in tag_ids
+    ):
+        return jsonify(
+            success=False,
+            errors={"tag_ids": "兴趣标签格式不正确"},
+        ), 400
+
+    try:
+        replace_student_tags(session["id"], tag_ids)
+    except InvalidInterestTagError as error:
+        return jsonify(success=False, errors=error.errors), 400
+
+    db = get_db()
+    db.execute(
+        "UPDATE sessions SET state = 'active' WHERE token_hash = ?",
+        (session["token_hash"],),
+    )
+    db.commit()
+
+    user = {
+        "id": session["id"],
+        "username": session["username"],
+        "name": session["name"],
+        "role": session["role"],
+    }
+    return jsonify(
+        success=True,
+        user=user,
+        default_path="/student",
+    )

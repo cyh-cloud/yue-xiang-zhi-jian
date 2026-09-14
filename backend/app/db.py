@@ -5,6 +5,8 @@ from pathlib import Path
 
 from flask import current_app, g
 
+from app.seed import seed_interest_tags
+
 
 SCHEMA_SQL = """
 PRAGMA foreign_keys = ON;
@@ -111,6 +113,7 @@ def get_db() -> sqlite3.Connection:
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
+    seed_interest_tags(db)
     db.commit()
 
 

@@ -6,6 +6,7 @@ from app.auth.routes import auth_bp
 from app.config import build_config
 from app.db import close_db, init_db
 from app.session_manager import load_session
+from app.tags.routes import interest_tags_bp
 
 
 PROTECTED_API_PREFIXES = (
@@ -39,6 +40,7 @@ def create_app(test_config: dict | None = None) -> Flask:
             load_session(required=True, allowed_states={"active"})
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(interest_tags_bp)
 
     with app.app_context():
         init_db()
