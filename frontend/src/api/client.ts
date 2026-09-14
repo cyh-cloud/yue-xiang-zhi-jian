@@ -19,6 +19,22 @@ export class ApiError extends Error {
   }
 }
 
+type SessionExpiredHandler = (error: ApiError) => Promise<void> | void
+
+let sessionExpiredHandler: SessionExpiredHandler | null = null
+
+export function setSessionExpiredHandler(
+  handler: SessionExpiredHandler | null
+): () => void {
+  const previousHandler = sessionExpiredHandler
+  sessionExpiredHandler = handler
+  return () => {
+    if (sessionExpiredHandler === handler) {
+      sessionExpiredHandler = previousHandler
+    }
+  }
+}
+
 interface RequestOptions extends Omit<RequestInit, 'headers'> {
   headers?: HeadersInit
 }
@@ -68,7 +84,12 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     const redirect =
       typeof payloadRecord?.redirect === 'string' ? payloadRecord.redirect : undefined
 
-    throw new ApiError(message, response.status, errors, redirect)
+    const error = new ApiError(message, response.status, errors, redirect)
+    if (response.status === 401 && error.redirect && sessionExpiredHandler) {
+      await sessionExpiredHandler(error)
+    }
+
+    throw error
   }
 
   return payload as T

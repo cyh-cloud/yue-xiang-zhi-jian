@@ -83,6 +83,9 @@ function clearFieldError(field: string) {
   if (student.fieldErrors[field]) {
     delete student.fieldErrors[field]
   }
+  if (Object.keys(student.fieldErrors).length === 0) {
+    student.error = ''
+  }
 }
 
 async function loadTags() {

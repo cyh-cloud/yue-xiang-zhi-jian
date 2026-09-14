@@ -17,6 +17,7 @@ export interface PortalEntry {
   id: string
   title: string
   description: string
+  href?: string
 }
 
 export interface PortalDefinition {
@@ -43,12 +44,14 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
       {
         id: 'student-courses',
         title: '课程聚合',
-        description: '浏览农业、电商与手工方向的已上架课程。'
+        description: '浏览农业、电商与手工方向的已上架课程。',
+        href: '/student/courses'
       },
       {
         id: 'student-profile',
         title: '个人资料',
-        description: '维护联系方式、学习方向与兴趣标签。'
+        description: '维护联系方式、学习方向与兴趣标签。',
+        href: '/student/profile'
       },
       {
         id: 'student-learning-direction',

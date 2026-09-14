@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-vue-next'
+import { ArrowRight, LockKeyhole, RefreshCw, ShieldCheck } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 
 import { apiFetch } from '@/api/client'
 import type { SnapshotSource } from '@/api/types'
@@ -131,7 +131,11 @@ onMounted(() => {
               <h3>{{ entry.title }}</h3>
               <p>{{ entry.description }}</p>
             </div>
-            <span class="future-state">
+            <RouterLink v-if="entry.href" class="entry-action" :to="entry.href">
+              <span>进入</span>
+              <ArrowRight :size="15" aria-hidden="true" />
+            </RouterLink>
+            <span v-else class="future-state">
               <LockKeyhole :size="15" aria-hidden="true" />
               后续开放
             </span>
@@ -286,6 +290,25 @@ onMounted(() => {
   color: var(--ark-muted);
   font-size: 0.76rem;
   white-space: nowrap;
+}
+
+.entry-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--ark-signal);
+  color: var(--ark-signal);
+  font-size: 0.76rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.entry-action:hover,
+.entry-action:focus-visible {
+  background: rgb(24 209 255 / 0.1);
 }
 
 .load-error {

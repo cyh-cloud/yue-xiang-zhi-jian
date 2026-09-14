@@ -6,7 +6,6 @@ import type {
   AuthSessionResponse,
   AuthUser,
   RegisterResponse,
-  UserRole
 } from '@/api/types'
 import { roleDefaultPath } from '@/router/roleRoutes'
 
@@ -49,29 +48,6 @@ interface AuthState {
   fieldErrors: ApiFieldErrors
   notice: string
 }
-
-export const demoAccounts: Array<{
-  label: string
-  username: string
-  password: string
-  role: UserRole
-}> = [
-  { label: '学员', username: 'student_demo', password: '123456', role: 'student' },
-  { label: '教师', username: 'teacher_demo', password: '123456', role: 'teacher' },
-  {
-    label: '企业',
-    username: 'enterprise_demo',
-    password: '123456',
-    role: 'enterprise'
-  },
-  { label: '政府', username: 'gov_demo', password: '123456', role: 'government' },
-  {
-    label: '超管',
-    username: 'admin_demo',
-    password: 'admin123',
-    role: 'super_admin'
-  }
-]
 
 export const useAuthStore = defineStore('auth', {
   state: (): AuthState => ({
