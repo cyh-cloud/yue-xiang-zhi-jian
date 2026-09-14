@@ -71,7 +71,8 @@ def get_student_profile(user_id: int) -> dict:
 
 def update_student_profile(user_id: int, payload: dict) -> dict:
     name = str(payload.get("name", "")).strip()
-    contact = str(payload.get("contact", "")).strip()
+    contact_value = payload.get("contact", "")
+    contact = "" if contact_value is None else str(contact_value).strip()
     learning_direction = str(
         payload.get("learning_direction", "comprehensive")
     ).strip()

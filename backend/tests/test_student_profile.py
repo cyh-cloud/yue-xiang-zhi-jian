@@ -85,6 +85,34 @@ class TestStudentProfile(unittest.TestCase):
             expected,
         )
 
+    def test_profile_null_contact_is_cleared(self):
+        self.login_student("student01")
+        populated = self.client.put(
+            "/api/student/profile",
+            json={
+                "name": "陈晓",
+                "contact": "13800000000",
+                "learning_direction": "comprehensive",
+                "tag_ids": [],
+            },
+        )
+        self.assertEqual(populated.status_code, 200)
+
+        response = self.client.put(
+            "/api/student/profile",
+            json={
+                "name": "陈晓",
+                "contact": None,
+                "learning_direction": "comprehensive",
+                "tag_ids": [],
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["profile"]["contact"], "")
+        persisted = self.client.get("/api/student/profile").get_json()["profile"]
+        self.assertEqual(persisted["contact"], "")
+
     def test_downstream_contract_reads_latest_preferences(self):
         self.login_student("student01")
 
