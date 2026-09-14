@@ -2,7 +2,6 @@
 import { computed, onMounted } from 'vue'
 
 import AppHeader from '@/components/AppHeader.vue'
-import AuthDialog from '@/components/AuthDialog.vue'
 import HomeHero from '@/components/HomeHero.vue'
 import ModuleSection from '@/components/ModuleSection.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -72,7 +71,6 @@ onMounted(() => {
       :loading="home.loading"
       :user-name="auth.user?.name"
       @refresh="home.load(true)"
-      @open-auth="auth.openDialog"
       @logout="auth.logout"
     />
 
@@ -137,8 +135,6 @@ onMounted(() => {
       </div>
       <span>示例数据仅用于原型 · 不代表生产承诺</span>
     </footer>
-
-    <AuthDialog />
   </div>
 </template>
 

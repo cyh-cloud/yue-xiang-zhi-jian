@@ -1,19 +1,23 @@
 <script setup lang="ts">
 import { LogIn, LogOut, Menu, RefreshCw, Sprout, UserPlus, X } from 'lucide-vue-next'
 
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 
 import type { SnapshotSource } from '@/api/types'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   source: SnapshotSource
   loading: boolean
   userName?: string
-}>()
+  variant?: 'home' | 'auth'
+  showAuthControls?: boolean
+}>(), {
+  variant: 'home',
+  showAuthControls: true
+})
 
 const emit = defineEmits<{
   refresh: []
-  openAuth: [mode: 'login' | 'register']
   logout: []
 }>()
 
@@ -24,6 +28,7 @@ const sourceLabel: Record<SnapshotSource, string> = {
 }
 
 const mobileNavOpen = ref(false)
+const isAuthVariant = computed(() => props.variant === 'auth')
 
 function closeMobileNav() {
   mobileNavOpen.value = false
@@ -44,6 +49,7 @@ function closeMobileNav() {
       </RouterLink>
 
       <nav
+        v-if="!isAuthVariant"
         id="module-navigation"
         class="header-nav"
         :class="{ 'mobile-open': mobileNavOpen }"
@@ -58,15 +64,22 @@ function closeMobileNav() {
       </nav>
 
       <div class="header-actions">
-        <span class="source-pill" :data-source="source">
+        <span v-if="!isAuthVariant" class="source-pill" :data-source="source">
           <span aria-hidden="true"></span>
           {{ sourceLabel[source] }}
         </span>
-        <button class="icon-button" type="button" :disabled="loading" @click="emit('refresh')">
+        <button
+          v-if="!isAuthVariant"
+          class="icon-button"
+          type="button"
+          :disabled="loading"
+          @click="emit('refresh')"
+        >
           <RefreshCw :size="16" :class="{ spinning: loading }" aria-hidden="true" />
           <span class="ark-sr-only">刷新数据</span>
         </button>
         <button
+          v-if="!isAuthVariant"
           class="icon-button nav-toggle"
           type="button"
           :aria-expanded="mobileNavOpen"
@@ -77,22 +90,22 @@ function closeMobileNav() {
           <Menu v-else :size="16" aria-hidden="true" />
           <span class="ark-sr-only">学习方向菜单</span>
         </button>
-        <template v-if="userName">
+        <template v-if="showAuthControls && userName">
           <span class="user-chip">{{ userName }}</span>
           <button class="icon-button" type="button" @click="emit('logout')">
             <LogOut :size="16" aria-hidden="true" />
             <span class="ark-sr-only">退出登录</span>
           </button>
         </template>
-        <template v-else>
-          <button class="ghost-button" type="button" @click="emit('openAuth', 'login')">
+        <template v-else-if="showAuthControls">
+          <RouterLink class="ghost-button" to="/login">
             <LogIn :size="15" aria-hidden="true" />
             登录
-          </button>
-          <button class="primary-button" type="button" @click="emit('openAuth', 'register')">
+          </RouterLink>
+          <RouterLink class="primary-button" to="/register">
             <UserPlus :size="15" aria-hidden="true" />
             注册
-          </button>
+          </RouterLink>
         </template>
       </div>
     </div>
@@ -118,6 +131,14 @@ function closeMobileNav() {
   min-height: 72px;
   margin-inline: auto;
   padding: 10px 24px;
+}
+
+.app-header.auth-variant .header-inner {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.app-header.auth-variant .header-actions {
+  justify-content: flex-end;
 }
 
 .brand {
@@ -257,6 +278,7 @@ function closeMobileNav() {
   background: transparent;
   color: var(--ark-paper);
   font-size: 0.82rem;
+  text-decoration: none;
 }
 
 .primary-button {

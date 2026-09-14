@@ -2,6 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import HomeView from '@/views/HomeView.vue'
+import InterestTagsView from '@/views/InterestTagsView.vue'
+import LoginView from '@/views/LoginView.vue'
+import RegisterView from '@/views/RegisterView.vue'
 
 import { authGuard } from './roleRoutes'
 
@@ -18,17 +21,17 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: RoutePlaceholder
+      component: LoginView
     },
     {
       path: '/register',
       name: 'register',
-      component: RoutePlaceholder
+      component: RegisterView
     },
     {
       path: '/register/interest-tags',
       name: 'interest-tags',
-      component: RoutePlaceholder
+      component: InterestTagsView
     },
     {
       path: '/student',
