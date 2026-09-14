@@ -3,11 +3,15 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timezone
 
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.auth.validators import validate_registration
 from app.db import get_db
-from app.session_manager import issue_session
+from app.session_manager import (
+    issue_session,
+    revoke_current_session,
+    role_default_path,
+)
 
 
 class DuplicateUsernameError(Exception):
@@ -18,6 +22,39 @@ class InvalidRegistrationError(ValueError):
     def __init__(self, errors: dict[str, str]) -> None:
         super().__init__("Invalid registration payload")
         self.errors = errors
+
+
+class DisabledAccountError(Exception):
+    pass
+
+
+def _user_payload(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "username": row["username"],
+        "name": row["name"],
+        "role": row["role"],
+    }
+
+
+def authenticate(username: str, password: str, session_hours: int) -> dict | None:
+    normalized_username = str(username).strip()
+    row = get_db().execute(
+        "SELECT * FROM users WHERE username = ?",
+        (normalized_username,),
+    ).fetchone()
+    if row is None or not check_password_hash(row["password_hash"], str(password)):
+        return None
+    if not row["is_enabled"]:
+        raise DisabledAccountError
+
+    revoke_current_session()
+    session_token = issue_session(int(row["id"]), "active", session_hours)
+    return {
+        "session_token": session_token,
+        "user": _user_payload(row),
+        "default_path": role_default_path(row["role"]),
+    }
 
 
 def register_account(payload: dict, session_hours: int) -> dict:
