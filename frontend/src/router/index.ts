@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import AdminPortalView from '@/views/AdminPortalView.vue'
+import CourseCatalogView from '@/views/CourseCatalogView.vue'
 import EnterprisePortalView from '@/views/EnterprisePortalView.vue'
 import GovernmentPortalView from '@/views/GovernmentPortalView.vue'
 import HomeView from '@/views/HomeView.vue'
@@ -9,6 +10,7 @@ import InterestTagsView from '@/views/InterestTagsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import StudentPortalView from '@/views/StudentPortalView.vue'
+import StudentProfileView from '@/views/StudentProfileView.vue'
 import TeacherPortalView from '@/views/TeacherPortalView.vue'
 
 import { authGuard } from './roleRoutes'
@@ -40,6 +42,18 @@ const router = createRouter({
       path: '/student',
       name: 'student-portal',
       component: StudentPortalView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/profile',
+      name: 'student-profile',
+      component: StudentProfileView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/courses',
+      name: 'student-courses',
+      component: CourseCatalogView,
       meta: { requiresAuth: true, roles: ['student'] }
     },
     {
