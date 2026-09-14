@@ -77,17 +77,7 @@ def _seed_accounts(connection, password: str) -> None:
                 f"{username_env} conflicts with another existing role"
             )
 
-        existing = connection.execute(
-            """
-            SELECT id
-            FROM users
-            WHERE role = ?
-            ORDER BY id
-            LIMIT 1
-            """,
-            (role,),
-        ).fetchone()
-        if username_owner is None and existing is None:
+        if username_owner is None:
             cursor = connection.execute(
                 """
                 INSERT INTO users (
@@ -107,8 +97,7 @@ def _seed_accounts(connection, password: str) -> None:
             )
             user_id = int(cursor.lastrowid)
         else:
-            owner = username_owner if username_owner is not None else existing
-            user_id = int(owner["id"])
+            user_id = int(username_owner["id"])
             connection.execute(
                 """
                 UPDATE users

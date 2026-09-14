@@ -24,8 +24,8 @@
 ```powershell
 uv sync --frozen --directory backend
 Copy-Item backend\.env.example backend\.env
-uv run --directory backend python -m app.seed_dev
-uv run --directory backend python run.py
+uv run --directory backend --env-file .env python -m app.seed_dev
+uv run --directory backend --env-file .env python run.py
 ```
 
 macOS 和 Linux 使用：
@@ -33,8 +33,8 @@ macOS 和 Linux 使用：
 ```bash
 uv sync --frozen --directory backend
 cp backend/.env.example backend/.env
-uv run --directory backend python -m app.seed_dev
-uv run --directory backend python run.py
+uv run --directory backend --env-file .env python -m app.seed_dev
+uv run --directory backend --env-file .env python run.py
 ```
 
 复制环境模板后，至少填写 `DEV_SEED_PASSWORD` 和 `SECRET_KEY`。本地种子会拒绝在 `FLASK_ENV=production` 时运行，不会输出密码，并会更新六个本地角色账号、默认兴趣标签和已上架课程。账号用户名可通过 `DEV_SEED_<ROLE>_USERNAME` 覆盖；未设置时使用 `student_demo`、`teacher_demo`、`enterprise_demo`、`government_demo`、`super_admin_demo` 和 `admin_demo`。本地凭据不得提交到版本库或用于生产环境。

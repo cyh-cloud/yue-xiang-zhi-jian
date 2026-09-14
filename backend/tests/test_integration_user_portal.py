@@ -173,6 +173,13 @@ class TestUserPortalIntegration(unittest.TestCase):
             published_at="2026-09-01T00:00:00+00:00",
             tag_ids=[tag_id],
         )
+        self.seed_course(
+            title="水稻新课程",
+            direction="agriculture",
+            status="published",
+            published_at="2026-09-10T00:00:00+00:00",
+            tag_ids=[],
+        )
         profile_payload["tag_ids"] = [tag_id]
         profile = self.client.put(
             "/api/student/profile",
@@ -183,7 +190,14 @@ class TestUserPortalIntegration(unittest.TestCase):
         courses = self.client.get(
             "/api/student/courses?direction=agriculture"
         ).get_json()["courses"]
-        self.assertTrue(courses[0]["interest_match"])
+        self.assertEqual(
+            [course["title"] for course in courses],
+            ["荔枝保果", "水稻新课程"],
+        )
+        self.assertEqual(
+            [course["interest_match"] for course in courses],
+            [True, False],
+        )
 
         for role, expected in ROLE_PATHS.items():
             with self.subTest(role=role):
@@ -202,6 +216,14 @@ class TestUserPortalIntegration(unittest.TestCase):
 
         with patch.dict(
             os.environ,
+            {"DEV_SEED_PASSWORD": "local-password"},
+            clear=True,
+        ):
+            with self.assertRaisesRegex(ValueError, "SECRET_KEY"):
+                seed_local_data(self.database_path)
+
+        with patch.dict(
+            os.environ,
             {
                 "DEV_SEED_PASSWORD": "local-password",
                 "SECRET_KEY": "local-secret",
@@ -211,6 +233,63 @@ class TestUserPortalIntegration(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ValueError, "production"):
                 seed_local_data(self.database_path)
+
+    def test_seed_dev_does_not_take_over_existing_same_role_user(self):
+        now = "2026-09-01T00:00:00+00:00"
+        original_password_hash = "original-password-hash"
+        with self.app.app_context():
+            get_db().execute(
+                """
+                INSERT INTO users (
+                    username, password_hash, name, role, is_enabled,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, 'student', 0, ?, ?)
+                """,
+                (
+                    "existing_student",
+                    original_password_hash,
+                    "既有学员",
+                    now,
+                    now,
+                ),
+            )
+            get_db().commit()
+
+        environment = {
+            "DEV_SEED_PASSWORD": "local-password",
+            "SECRET_KEY": "local-secret",
+            "DEV_SEED_STUDENT_USERNAME": "seed_student_override",
+        }
+        with patch.dict(os.environ, environment, clear=True):
+            seed_local_data(self.database_path)
+
+        with self.app.app_context():
+            db = get_db()
+            existing = db.execute(
+                """
+                SELECT username, password_hash, name, role, is_enabled
+                FROM users
+                WHERE username = 'existing_student'
+                """
+            ).fetchone()
+            seeded = db.execute(
+                """
+                SELECT username, name, role, is_enabled
+                FROM users
+                WHERE username = 'seed_student_override'
+                """
+            ).fetchone()
+
+        self.assertIsNotNone(existing)
+        self.assertEqual(existing["password_hash"], original_password_hash)
+        self.assertEqual(existing["name"], "既有学员")
+        self.assertEqual(existing["role"], "student")
+        self.assertEqual(existing["is_enabled"], 0)
+        self.assertIsNotNone(seeded)
+        self.assertEqual(seeded["name"], "本地学员")
+        self.assertEqual(seeded["role"], "student")
+        self.assertEqual(seeded["is_enabled"], 1)
 
     def test_seed_dev_is_repeatable_and_seeds_all_roles(self):
         environment = {
