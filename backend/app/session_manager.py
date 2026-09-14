@@ -112,12 +112,16 @@ def load_session(
         if required:
             abort_session_required()
         return None
-    if row["expires_at"] <= utc_now_iso():
-        get_db().execute(
-            "DELETE FROM sessions WHERE token_hash = ?",
-            (token_hash,),
-        )
+
+    now_iso = utc_now_iso()
+    cleanup = get_db().execute(
+        "DELETE FROM sessions WHERE expires_at <= ?",
+        (now_iso,),
+    )
+    if cleanup.rowcount:
         get_db().commit()
+
+    if row["expires_at"] <= now_iso:
         if required:
             abort_session_required()
         return None

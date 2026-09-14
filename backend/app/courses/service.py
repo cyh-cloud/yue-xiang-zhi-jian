@@ -3,6 +3,9 @@ from __future__ import annotations
 from app.db import get_db
 
 
+COURSE_DIRECTIONS = {"agriculture", "ecommerce", "handcraft"}
+
+
 def list_published_courses(user_id: int, direction: str) -> list[dict]:
     rows = get_db().execute(
         """

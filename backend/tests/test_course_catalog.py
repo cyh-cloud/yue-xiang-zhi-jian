@@ -161,6 +161,24 @@ class TestCourseCatalog(unittest.TestCase):
         )
         self.assertEqual(response.get_json()["courses"], [])
 
+    def test_invalid_or_missing_direction_returns_clear_400(self):
+        self.login_student("student01")
+
+        for direction in ("invalid", None):
+            with self.subTest(direction=direction):
+                path = (
+                    "/api/student/courses?direction=invalid"
+                    if direction is not None
+                    else "/api/student/courses"
+                )
+                response = self.client.get(path)
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.get_json()["errors"],
+                    {"direction": "学习方向不正确"},
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

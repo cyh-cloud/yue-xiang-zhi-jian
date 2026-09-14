@@ -271,6 +271,51 @@ class TestLoginSession(unittest.TestCase):
         self.assertEqual(response.status_code, 401)
         self.assertIn("redirect", response.get_json())
 
+    def test_session_validation_removes_all_expired_rows(self):
+        self.create_user(username="expired01")
+        self.create_user(username="expired02")
+        active_user_id = self.create_user(username="active01")
+        for username in ("expired01", "expired02"):
+            separate_client = self.app.test_client()
+            separate_client.post(
+                "/api/auth/login",
+                json={"username": username, "password": "password8"},
+            )
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "active01", "password": "password8"},
+        )
+
+        with self.app.app_context():
+            get_db().execute(
+                """
+                UPDATE sessions
+                SET expires_at = '2000-01-01T00:00:00+00:00'
+                WHERE user_id IN (
+                    SELECT id FROM users WHERE username IN ('expired01', 'expired02')
+                )
+                """,
+            )
+            get_db().commit()
+
+        response = self.client.get("/api/auth/session")
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            expired_count = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM sessions
+                WHERE expires_at <= '2000-01-01T00:00:00+00:00'
+                """
+            ).fetchone()["count"]
+            active_count = get_db().execute(
+                "SELECT COUNT(*) AS count FROM sessions WHERE user_id = ?",
+                (active_user_id,),
+            ).fetchone()["count"]
+        self.assertEqual(expired_count, 0)
+        self.assertEqual(active_count, 1)
+
     def test_disabled_account_invalidates_existing_session(self):
         self.create_user(username="student01")
         self.client.post(
