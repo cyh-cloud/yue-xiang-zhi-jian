@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request
 from app.auth.routes import auth_bp
 from app.config import build_config
 from app.db import close_db, init_db
+from app.profiles.routes import student_profile_bp
 from app.session_manager import load_session
 from app.tags.routes import interest_tags_bp
 
@@ -41,6 +42,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(interest_tags_bp)
+    app.register_blueprint(student_profile_bp)
 
     with app.app_context():
         init_db()
