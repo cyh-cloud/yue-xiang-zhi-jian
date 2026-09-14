@@ -7,9 +7,13 @@ import { useAuthStore } from '@/stores/auth'
 
 import { authGuard, roleDefaultPath } from './roleRoutes'
 
-vi.mock('@/api/client', () => ({
-  apiFetch: vi.fn()
-}))
+vi.mock('@/api/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn()
+  }
+})
 
 const mockedApiFetch = vi.mocked(apiFetch)
 
@@ -99,6 +103,23 @@ describe('authGuard', () => {
     await expect(authGuard(route('/register'), auth)).resolves.toBe('/teacher')
   })
 
+  it('redirects authenticated users away from auth routes with trailing slashes', async () => {
+    const auth = useAuthStore()
+    auth.sessionState = 'active'
+    auth.user = {
+      id: 2,
+      username: 'teacher01',
+      name: '陈老师',
+      role: 'teacher'
+    }
+
+    await expect(authGuard(route('/login/'), auth)).resolves.toBe('/teacher')
+    await expect(authGuard(route('/register/'), auth)).resolves.toBe('/teacher')
+    await expect(
+      authGuard(route('/register/interest-tags/'), auth)
+    ).resolves.toBe('/teacher')
+  })
+
   it('redirects users away from routes for another role', async () => {
     const auth = useAuthStore()
     auth.sessionState = 'active'
@@ -131,5 +152,14 @@ describe('authGuard', () => {
     await expect(
       authGuard(route('/register/interest-tags'), auth)
     ).resolves.toBe('/login?redirect=%2Fregister%2Finterest-tags')
+  })
+
+  it('does not expose the interest-tag route with a trailing slash', async () => {
+    const auth = useAuthStore()
+    auth.sessionState = 'anonymous'
+
+    await expect(
+      authGuard(route('/register/interest-tags/'), auth)
+    ).resolves.toBe('/login?redirect=%2Fregister%2Finterest-tags%2F')
   })
 })

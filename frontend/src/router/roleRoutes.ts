@@ -31,6 +31,11 @@ function loginRedirect(fullPath: string): string {
   return `/login?redirect=${encodeURIComponent(fullPath)}`
 }
 
+function normalizeRoutePath(path: string): string {
+  const normalized = path.replace(/\/+$/, '')
+  return normalized || '/'
+}
+
 export async function authGuard(
   to: RouteLocationNormalized,
   auth: AuthRouteStore
@@ -39,17 +44,19 @@ export async function authGuard(
     await auth.restoreSession()
   }
 
+  const path = normalizeRoutePath(to.path)
+
   if (auth.isPendingRegistration) {
-    return to.path === interestTagsPath ? true : interestTagsPath
+    return path === interestTagsPath ? true : interestTagsPath
   }
 
-  if (to.path === interestTagsPath) {
+  if (path === interestTagsPath) {
     return auth.isAuthenticated && auth.user
       ? roleDefaultPath(auth.user.role)
       : loginRedirect(to.fullPath)
   }
 
-  if (authPagePaths.has(to.path)) {
+  if (authPagePaths.has(path)) {
     return auth.isAuthenticated && auth.user
       ? roleDefaultPath(auth.user.role)
       : true

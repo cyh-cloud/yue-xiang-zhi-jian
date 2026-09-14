@@ -5,9 +5,13 @@ import { apiFetch } from '@/api/client'
 
 import { useAuthStore } from './auth'
 
-vi.mock('@/api/client', () => ({
-  apiFetch: vi.fn()
-}))
+vi.mock('@/api/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn()
+  }
+})
 
 const mockedApiFetch = vi.mocked(apiFetch)
 
@@ -82,6 +86,26 @@ describe('useAuthStore', () => {
     expect(auth.sessionState).toBe('active')
     expect(auth.user).toEqual(student)
     expect(auth.defaultPath).toBe('/student')
+  })
+
+  it('preserves structured API errors on login failure', async () => {
+    const { ApiError: ActualApiError } = await vi.importActual<
+      typeof import('@/api/client')
+    >('@/api/client')
+    mockedApiFetch.mockRejectedValue(
+      new ActualApiError(
+        '用户名或密码错误',
+        401,
+        { username: '用户名或密码错误' },
+        '/login?redirect=%2Fstudent'
+      )
+    )
+    const auth = useAuthStore()
+
+    await expect(auth.login('student01', 'wrongpass')).resolves.toBeNull()
+
+    expect(auth.error).toBe('用户名或密码错误')
+    expect(auth.fieldErrors).toEqual({ username: '用户名或密码错误' })
   })
 
   it('keeps a newly registered student pending until interest tags complete', async () => {
