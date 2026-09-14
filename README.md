@@ -2,9 +2,9 @@
 
 粤乡智匠是一个面向农村本土人才培训的原型系统。项目由 Flask 后端和 Vue 3 前端组成：
 
-- 后端：`app.py`、`database.py`、`run.py`，提供 REST API 和 SQLite 数据层。
+- 后端：`backend/`，提供 Flask REST API 和 SQLite 数据层。
 - 新前端：`frontend/`，使用 Vue 3、Vite、Pinia 和 Vue Router。
-- 旧版静态页面：保留在仓库根目录，由 Flask 服务继续访问。
+- 旧版静态页面保留在仓库根目录，不属于 v2 开发范围。
 
 ## 环境要求
 
@@ -22,20 +22,22 @@
 后端使用 `uv` 管理虚拟环境和依赖。在项目根目录执行：
 
 ```powershell
-uv sync --frozen
-Copy-Item .env.example .env
-uv run --frozen python run.py
+uv sync --frozen --directory backend
+Copy-Item backend\.env.example backend\.env
+uv run --directory backend python -m app.seed_dev
+uv run --directory backend python run.py
 ```
 
 macOS 和 Linux 使用：
 
 ```bash
-uv sync --frozen
-cp .env.example .env
-uv run --frozen python run.py
+uv sync --frozen --directory backend
+cp backend/.env.example backend/.env
+uv run --directory backend python -m app.seed_dev
+uv run --directory backend python run.py
 ```
 
-`uv sync --frozen` 会自动创建 `.venv`，并按 `uv.lock` 安装依赖，不需要手动激活虚拟环境。如果还没有 `.env`，先复制 `.env.example` 并填写必要配置。AI 相关功能需要 `AI_API_URL`、`AI_API_KEY` 和 `AI_MODEL`。生产环境必须替换 `SECRET_KEY`。没有 AI 配置时，基础页面和大部分 API 仍可运行，AI 功能会不可用或降级。
+复制环境模板后，至少填写 `DEV_SEED_PASSWORD` 和 `SECRET_KEY`。本地种子会拒绝在 `FLASK_ENV=production` 时运行，不会输出密码，并会更新六个本地角色账号、默认兴趣标签和已上架课程。账号用户名可通过 `DEV_SEED_<ROLE>_USERNAME` 覆盖；未设置时使用 `student_demo`、`teacher_demo`、`enterprise_demo`、`government_demo`、`super_admin_demo` 和 `admin_demo`。本地凭据不得提交到版本库或用于生产环境。
 
 后端启动后会自动初始化 SQLite 数据库，默认地址是：
 
@@ -67,19 +69,15 @@ http://127.0.0.1:5173
 
 Vite 开发服务器会把 `/api` 请求代理到 `http://127.0.0.1:5000`，所以启动前端前应先启动 Flask 后端。
 
-## 演示账号
+## 本地种子
 
-数据库首次初始化后会创建以下演示账号：
+```powershell
+$env:DEV_SEED_PASSWORD = "<本地密码>"
+$env:SECRET_KEY = "<本地密钥>"
+uv run --directory backend python -m app.seed_dev
+```
 
-| 角色 | 用户名 | 密码 |
-| --- | --- | --- |
-| 学员 | `student_demo` | `123456` |
-| 教师 | `teacher_demo` | `123456` |
-| 企业 | `enterprise_demo` | `123456` |
-| 政府人员 | `gov_demo` | `123456` |
-| 管理员 | `admin_demo` | `admin123` |
-
-这些账号只用于本地演示，不要用于生产环境。
+重复运行会更新同一批本地角色账号和课程种子，不会打印密码。命令只用于本地开发数据库。
 
 ## 构建和预览
 
@@ -108,26 +106,24 @@ http://127.0.0.1:4173
 在项目根目录运行后端测试：
 
 ```bash
-uv run --frozen python -m unittest test_app.py
+uv run --directory backend python -m unittest discover -s tests -v
 ```
 
-在 `frontend/` 目录运行前端类型检查：
+在 `frontend/` 目录运行前端测试、类型检查和构建：
 
 ```bash
+npm test
 npx tsc -b --noEmit
+npm run build
 ```
 
 ## 目录说明
 
 | 路径 | 说明 |
 | --- | --- |
-| `app.py` | Flask 应用和 REST API |
-| `database.py` | SQLite 数据层和初始化逻辑 |
-| `run.py` | 本地后端启动脚本 |
-| `pyproject.toml` | 后端依赖和 Python 版本声明 |
-| `uv.lock` | 后端依赖锁文件 |
-| `requirements.txt` | 从 `uv.lock` 导出的 Vercel 兼容依赖清单 |
+| `backend/` | v2 Flask 应用、SQLite 数据层、测试和本地种子 |
 | `frontend/` | Vue 3 + Vite 前端源码 |
+| `specs/` | spec-kit 功能需求契约 |
 | `docs/` | 产品、设计和项目上下文文档 |
 | `data/` | 本地 SQLite 数据库和运行时数据 |
 | `uploads/` | 本地上传文件 |
