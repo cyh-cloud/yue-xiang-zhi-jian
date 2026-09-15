@@ -21,6 +21,10 @@ class ConversationNotFoundError(LookupError):
     pass
 
 
+class MessageNotFoundError(LookupError):
+    pass
+
+
 def validate_message_body(body: object) -> str:
     normalized = str(body or "").strip()
     if not normalized:
@@ -359,4 +363,145 @@ def get_conversation_messages(
     return {
         "conversation": _conversation_payload(conversation_id, user_id),
         "messages": [_message_payload(row) for row in rows],
+    }
+
+
+def get_message_summary(user_id: int) -> dict:
+    db = get_db()
+    unread_private = db.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM private_message_views
+        WHERE user_id = ? AND read_at IS NULL AND cleared_at IS NULL
+        """,
+        (user_id,),
+    ).fetchone()["count"]
+    unread_notifications = db.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM system_notifications
+        WHERE recipient_id = ? AND read_at IS NULL AND cleared_at IS NULL
+        """,
+        (user_id,),
+    ).fetchone()["count"]
+    return {
+        "unread_private": int(unread_private),
+        "unread_notifications": int(unread_notifications),
+        "unread_total": int(unread_private) + int(unread_notifications),
+    }
+
+
+def mark_private_message_read(user_id: int, message_id: int) -> dict:
+    db = get_db()
+    view = db.execute(
+        """
+        SELECT read_at, cleared_at
+        FROM private_message_views
+        WHERE message_id = ? AND user_id = ?
+        """,
+        (message_id, user_id),
+    ).fetchone()
+    if view is None or view["cleared_at"] is not None:
+        raise MessageNotFoundError("Message not found")
+
+    if view["read_at"] is None:
+        with db:
+            db.execute(
+                """
+                UPDATE private_message_views
+                SET read_at = ?
+                WHERE message_id = ?
+                  AND user_id = ?
+                  AND read_at IS NULL
+                  AND cleared_at IS NULL
+                """,
+                (_utc_now_iso(), message_id, user_id),
+            )
+    return get_message_summary(user_id)
+
+
+def mark_notification_read(user_id: int, notification_id: int) -> dict:
+    db = get_db()
+    notification = db.execute(
+        """
+        SELECT read_at, cleared_at
+        FROM system_notifications
+        WHERE id = ? AND recipient_id = ?
+        """,
+        (notification_id, user_id),
+    ).fetchone()
+    if notification is None or notification["cleared_at"] is not None:
+        raise MessageNotFoundError("Notification not found")
+
+    if notification["read_at"] is None:
+        with db:
+            db.execute(
+                """
+                UPDATE system_notifications
+                SET read_at = ?
+                WHERE id = ?
+                  AND recipient_id = ?
+                  AND read_at IS NULL
+                  AND cleared_at IS NULL
+                """,
+                (_utc_now_iso(), notification_id, user_id),
+            )
+    return get_message_summary(user_id)
+
+
+def mark_all_read(user_id: int) -> dict:
+    db = get_db()
+    read_at = _utc_now_iso()
+    with db:
+        db.execute(
+            """
+            UPDATE private_message_views
+            SET read_at = ?
+            WHERE user_id = ?
+              AND read_at IS NULL
+              AND cleared_at IS NULL
+            """,
+            (read_at, user_id),
+        )
+        db.execute(
+            """
+            UPDATE system_notifications
+            SET read_at = ?
+            WHERE recipient_id = ?
+              AND read_at IS NULL
+              AND cleared_at IS NULL
+            """,
+            (read_at, user_id),
+        )
+    return get_message_summary(user_id)
+
+
+def clear_read_items(user_id: int) -> dict:
+    db = get_db()
+    cleared_at = _utc_now_iso()
+    with db:
+        private_result = db.execute(
+            """
+            UPDATE private_message_views
+            SET cleared_at = ?
+            WHERE user_id = ?
+              AND read_at IS NOT NULL
+              AND cleared_at IS NULL
+            """,
+            (cleared_at, user_id),
+        )
+        notification_result = db.execute(
+            """
+            UPDATE system_notifications
+            SET cleared_at = ?
+            WHERE recipient_id = ?
+              AND read_at IS NOT NULL
+              AND cleared_at IS NULL
+            """,
+            (cleared_at, user_id),
+        )
+    return {
+        "cleared_private": int(private_result.rowcount),
+        "cleared_notifications": int(notification_result.rowcount),
+        "unread_total": get_message_summary(user_id)["unread_total"],
     }
