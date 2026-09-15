@@ -52,6 +52,7 @@ interface MessagingState {
   contacts: MessageContact[]
   conversations: ConversationSummary[]
   activeThreadId: number | null
+  threadRequestId: number
   messages: PrivateMessage[]
   notifications: SystemNotification[]
   loading: boolean
@@ -106,6 +107,7 @@ export const useMessageStore = defineStore('messages', {
     contacts: [],
     conversations: [],
     activeThreadId: null,
+    threadRequestId: 0,
     messages: [],
     notifications: [],
     loading: false,
@@ -165,6 +167,7 @@ export const useMessageStore = defineStore('messages', {
       }
     },
     async loadThread(conversationId: number): Promise<PrivateMessage[]> {
+      const requestId = ++this.threadRequestId
       this.loading = true
       this.error = ''
 
@@ -172,6 +175,9 @@ export const useMessageStore = defineStore('messages', {
         const response = await apiFetch<ThreadResponse>(
           `/api/messages/conversations/${conversationId}`
         )
+        if (this.threadRequestId !== requestId) {
+          return []
+        }
         this.activeThreadId = conversationId
         this.messages = response.messages
         this.conversations = upsertConversation(
@@ -180,10 +186,15 @@ export const useMessageStore = defineStore('messages', {
         )
         return this.messages
       } catch (error) {
+        if (this.threadRequestId !== requestId) {
+          return []
+        }
         this.captureError(error, '消息加载失败')
         throw error
       } finally {
-        this.loading = false
+        if (this.threadRequestId === requestId) {
+          this.loading = false
+        }
       }
     },
     async sendMessage(recipientId: number, body: string): Promise<void> {

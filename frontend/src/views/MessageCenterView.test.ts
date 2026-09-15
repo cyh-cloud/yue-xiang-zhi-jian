@@ -165,6 +165,34 @@ describe('MessageCenterView', () => {
     expect(sendMessage).toHaveBeenCalledWith(9, '您好，陈老师')
   })
 
+  it('blocks mutation actions while page data is still loading', async () => {
+    const privateMessage = message()
+    const { wrapper, store } = await mountView('student', currentStore => {
+      currentStore.contacts = [teacherContact]
+      currentStore.conversations = [conversation(privateMessage)]
+      currentStore.activeThreadId = 3
+      currentStore.messages = [privateMessage]
+    })
+    await wrapper.get('[data-test="contact-select"]').setValue('9')
+    vi.spyOn(store, 'loadContacts').mockReturnValue(
+      new Promise(() => {}) as never
+    )
+
+    await wrapper.get('.refresh-button').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="reply-input"]').setValue('新回复')
+
+    expect(
+      wrapper.get('[data-test="reply-submit"]').attributes('disabled')
+    ).toBeDefined()
+    expect(
+      wrapper.get('[data-test="mark-all-read"]').attributes('disabled')
+    ).toBeDefined()
+    expect(
+      wrapper.get('[data-test="clear-read"]').attributes('disabled')
+    ).toBeDefined()
+  })
+
   it('does not invent prohibited contacts', async () => {
     const { wrapper } = await mountView('student', currentStore => {
       currentStore.contacts = [teacherContact]

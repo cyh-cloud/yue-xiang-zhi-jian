@@ -27,6 +27,7 @@ const selectedContactId = ref<number | null>(null)
 const firstMessageBody = ref('')
 const replyBody = ref('')
 const actionError = ref('')
+const pageLoading = ref(false)
 
 const canUsePrivateMessages = computed(() => {
   const role = auth.user?.role
@@ -56,6 +57,7 @@ const hasVisibleContent = computed(() => {
 
   return store.conversations.length > 0 || store.messages.length > 0
 })
+const actionsDisabled = computed(() => pageLoading.value || store.loading)
 
 function formatTimestamp(value: string): string {
   const normalized = value.replace('T', ' ').replace(/(?:Z|\+00:00)$/, '')
@@ -93,7 +95,7 @@ async function openConversation(conversationId: number) {
 }
 
 async function openPrivateMessage(message: PrivateMessage) {
-  if (message.read) {
+  if (pageLoading.value || message.read) {
     return
   }
 
@@ -106,7 +108,7 @@ async function openPrivateMessage(message: PrivateMessage) {
 }
 
 async function openNotification(notification: SystemNotification) {
-  if (notification.read) {
+  if (pageLoading.value || notification.read) {
     return
   }
 
@@ -119,7 +121,11 @@ async function openNotification(notification: SystemNotification) {
 }
 
 async function submitFirstMessage() {
-  if (!selectedContact.value || !firstMessageBody.value.trim()) {
+  if (
+    pageLoading.value ||
+    !selectedContact.value ||
+    !firstMessageBody.value.trim()
+  ) {
     return
   }
 
@@ -136,7 +142,11 @@ async function submitFirstMessage() {
 }
 
 async function submitReply() {
-  if (!selectedConversation.value || !replyBody.value.trim()) {
+  if (
+    pageLoading.value ||
+    !selectedConversation.value ||
+    !replyBody.value.trim()
+  ) {
     return
   }
 
@@ -153,6 +163,10 @@ async function submitReply() {
 }
 
 async function markAllRead() {
+  if (pageLoading.value) {
+    return
+  }
+
   actionError.value = ''
   try {
     await store.markAllRead()
@@ -162,6 +176,10 @@ async function markAllRead() {
 }
 
 async function clearRead() {
+  if (pageLoading.value) {
+    return
+  }
+
   actionError.value = ''
   try {
     await store.clearRead()
@@ -172,18 +190,23 @@ async function clearRead() {
 
 async function loadPage() {
   actionError.value = ''
+  pageLoading.value = true
   const tasks: Promise<unknown>[] = [
     store.loadSummary(),
     store.loadNotifications()
   ]
 
-  if (canUsePrivateMessages.value) {
-    tasks.push(store.loadContacts(), store.loadConversations())
-  }
+  try {
+    if (canUsePrivateMessages.value) {
+      tasks.push(store.loadContacts(), store.loadConversations())
+    }
 
-  const results = await Promise.allSettled(tasks)
-  if (results.some(result => result.status === 'rejected')) {
-    actionError.value = store.error || '消息数据加载失败'
+    const results = await Promise.allSettled(tasks)
+    if (results.some(result => result.status === 'rejected')) {
+      actionError.value = store.error || '消息数据加载失败'
+    }
+  } finally {
+    pageLoading.value = false
   }
 }
 
@@ -220,7 +243,7 @@ onMounted(() => {
         <button
           class="refresh-button"
           type="button"
-          :disabled="store.loading"
+          :disabled="actionsDisabled"
           @click="loadPage"
         >
           <RefreshCw :size="16" :class="{ spinning: store.loading }" aria-hidden="true" />
@@ -275,7 +298,7 @@ onMounted(() => {
             <button
               data-test="mark-all-read"
               type="button"
-              :disabled="store.loading"
+              :disabled="actionsDisabled"
               @click="markAllRead"
             >
               <CheckCheck :size="15" aria-hidden="true" />
@@ -284,7 +307,7 @@ onMounted(() => {
             <button
               data-test="clear-read"
               type="button"
-              :disabled="store.loading"
+              :disabled="actionsDisabled"
               @click="clearRead"
             >
               <Eraser :size="15" aria-hidden="true" />
@@ -411,7 +434,7 @@ onMounted(() => {
                   <button
                     data-test="reply-submit"
                     type="button"
-                    :disabled="store.loading || !replyBody.trim()"
+                    :disabled="actionsDisabled || !replyBody.trim()"
                     @click="submitReply"
                   >
                     <Send :size="16" aria-hidden="true" />
@@ -440,7 +463,7 @@ onMounted(() => {
                   <button
                     data-test="send-message"
                     type="button"
-                    :disabled="store.loading || !firstMessageBody.trim()"
+                    :disabled="actionsDisabled || !firstMessageBody.trim()"
                     @click="submitFirstMessage"
                   >
                     <Send :size="16" aria-hidden="true" />

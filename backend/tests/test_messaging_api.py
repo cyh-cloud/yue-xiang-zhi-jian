@@ -183,9 +183,27 @@ class TestMessagingApi(unittest.TestCase):
                 self.assertEqual(response.status_code, 400)
                 self.assertEqual(
                     response.get_json(),
+                {
+                    "success": False,
+                    "errors": {"body": "消息内容不能为空"},
+                },
+            )
+
+    def test_invalid_recipient_id_returns_validation_errors(self):
+        cases = [[], True, False, 1.5, 0, -1]
+
+        for recipient_id in cases:
+            with self.subTest(recipient_id=recipient_id):
+                response = self.teacher_client.post(
+                    "/api/messages/conversations",
+                    json={"recipient_id": recipient_id, "body": "消息"},
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.get_json(),
                     {
                         "success": False,
-                        "errors": {"body": "消息内容不能为空"},
+                        "errors": {"recipient_id": "接收人必须是正整数"},
                     },
                 )
 

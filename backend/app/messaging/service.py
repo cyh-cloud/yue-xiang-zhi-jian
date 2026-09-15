@@ -32,6 +32,12 @@ def validate_message_body(body: object) -> str:
     return normalized
 
 
+def validate_recipient_id(recipient_id: object) -> int:
+    if type(recipient_id) is not int or recipient_id <= 0:
+        raise MessageValidationError({"recipient_id": "接收人必须是正整数"})
+    return recipient_id
+
+
 def _ordered_pair(user_a_id: int, user_b_id: int) -> tuple[int, int]:
     low, high = sorted((user_a_id, user_b_id))
     return low, high
@@ -233,6 +239,7 @@ def send_private_message(
     body: object,
 ) -> dict:
     normalized_body = validate_message_body(body)
+    recipient_id = validate_recipient_id(recipient_id)
     if messaging_relationship(sender_id, recipient_id) is None:
         raise MessagingAccessDeniedError(
             "Current relationship does not allow private messaging"
@@ -243,6 +250,16 @@ def send_private_message(
     db = get_db()
 
     with db:
+        db.execute(
+            """
+            INSERT INTO message_conversations (
+                participant_low_id, participant_high_id, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (participant_low_id, participant_high_id) DO NOTHING
+            """,
+            (low_id, high_id, created_at, created_at),
+        )
         conversation = db.execute(
             """
             SELECT id
@@ -253,21 +270,8 @@ def send_private_message(
             (low_id, high_id),
         ).fetchone()
         if conversation is None:
-            cursor = db.execute(
-                """
-                INSERT INTO message_conversations (
-                    participant_low_id,
-                    participant_high_id,
-                    created_at,
-                    updated_at
-                )
-                VALUES (?, ?, ?, ?)
-                """,
-                (low_id, high_id, created_at, created_at),
-            )
-            conversation_id = int(cursor.lastrowid)
-        else:
-            conversation_id = int(conversation["id"])
+            raise RuntimeError("Failed to create or select conversation")
+        conversation_id = int(conversation["id"])
 
         message = _insert_message(
             conversation_id,

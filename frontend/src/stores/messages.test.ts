@@ -96,6 +96,49 @@ describe('useMessageStore', () => {
     expect(store.conversations[0].last_message).toBeNull()
   })
 
+  it('ignores a stale thread response when a newer thread has loaded', async () => {
+    let releaseFirst = () => {}
+    const firstResponse = new Promise(resolve => {
+      releaseFirst = () =>
+        resolve({
+          success: true,
+          conversation: conversation(message(), 1),
+          messages: [message()]
+        })
+    })
+    const secondMessage = message({
+      id: 8,
+      conversation_id: 4,
+      body: '最新会话消息'
+    })
+
+    mockedApiFetch
+      .mockImplementationOnce(() => firstResponse)
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          success: true,
+          conversation: {
+            ...conversation(secondMessage, 1),
+            id: 4,
+            unread_count: 1
+          },
+          messages: [secondMessage]
+        })
+      )
+
+    const store = useMessageStore()
+    const firstLoad = store.loadThread(3)
+    const secondLoad = store.loadThread(4)
+
+    await secondLoad
+    releaseFirst()
+    await firstLoad
+
+    expect(store.activeThreadId).toBe(4)
+    expect(store.messages).toEqual([secondMessage])
+    expect(store.conversations.map(item => item.id)).toEqual([4])
+  })
+
   it('refreshes conversation state after reading an unloaded message', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({

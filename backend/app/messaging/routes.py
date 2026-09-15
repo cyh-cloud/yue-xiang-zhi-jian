@@ -18,6 +18,7 @@ from app.messaging.service import (
     mark_private_message_read,
     reply_to_conversation,
     send_private_message,
+    validate_recipient_id,
 )
 from app.session_manager import load_session
 
@@ -66,9 +67,12 @@ def create_conversation():
     session = _active_session()
     payload = _json_payload()
     try:
+        recipient_id = payload.get("recipient_id")
+        if "recipient_id" in payload:
+            recipient_id = validate_recipient_id(recipient_id)
         record = send_private_message(
             int(session["id"]),
-            payload.get("recipient_id"),
+            recipient_id,
             payload.get("body"),
         )
     except MessageValidationError as error:

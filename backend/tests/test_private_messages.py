@@ -1,7 +1,10 @@
 import tempfile
 import unittest
 from datetime import datetime, timezone
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
+from unittest.mock import patch
 
 from app import create_app
 from app.db import get_db
@@ -29,6 +32,41 @@ class FakeMessagingSourceProvider(NullMessagingSourceProvider):
         self, student_id: int, enterprise_id: int
     ) -> bool:
         return (student_id, enterprise_id) in self.applications
+
+
+class ConversationLookupBarrier:
+    def __init__(
+        self,
+        connection,
+        barrier: Barrier,
+    ) -> None:
+        self.connection = connection
+        self.barrier = barrier
+        self.lookup_released = False
+        self.insert_seen = False
+
+    def execute(self, sql: str, parameters=()):
+        if sql.lstrip().upper().startswith("INSERT"):
+            self.insert_seen = True
+        if (
+            "FROM message_conversations" in sql
+            and "participant_low_id = ?" in sql
+            and not self.lookup_released
+            and not self.insert_seen
+        ):
+            self.lookup_released = True
+            self.barrier.wait()
+        return self.connection.execute(sql, parameters)
+
+    def __enter__(self):
+        self.connection.__enter__()
+        return self
+
+    def __exit__(self, *args):
+        return self.connection.__exit__(*args)
+
+    def __getattr__(self, name):
+        return getattr(self.connection, name)
 
 
 class TestPrivateMessages(unittest.TestCase):
@@ -136,6 +174,65 @@ class TestPrivateMessages(unittest.TestCase):
         self.assertEqual(
             [item["body"] for item in thread["messages"]],
             ["第一条", "第二条"],
+        )
+
+    def test_concurrent_first_messages_reuse_one_conversation(self):
+        lookup_barrier = Barrier(2, timeout=5)
+
+        def send(sender_id: int, recipient_id: int, body: str) -> dict:
+            with self.app.app_context():
+                return send_private_message(
+                    sender_id,
+                    recipient_id,
+                    body,
+                )
+
+        with patch(
+            "app.messaging.service.get_db",
+            side_effect=lambda: ConversationLookupBarrier(
+                get_db(),
+                lookup_barrier,
+            ),
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                teacher_send = executor.submit(
+                    send,
+                    self.teacher_id,
+                    self.student_id,
+                    "老师同时发起",
+                )
+                student_send = executor.submit(
+                    send,
+                    self.student_id,
+                    self.teacher_id,
+                    "学员同时发起",
+                )
+                results = [teacher_send.result(), student_send.result()]
+
+        conversation_ids = {
+            result["conversation"]["id"] for result in results
+        }
+        self.assertEqual(len(conversation_ids), 1)
+        conversation_id = next(iter(conversation_ids))
+
+        with self.app.app_context():
+            counts = get_db().execute(
+                """
+                SELECT
+                    (SELECT COUNT(*) FROM message_conversations) AS conversations,
+                    (SELECT COUNT(*) FROM private_messages) AS messages
+                """
+            ).fetchone()
+            thread = get_conversation_messages(
+                self.teacher_id,
+                conversation_id,
+            )
+
+        self.assertEqual(int(counts["conversations"]), 1)
+        self.assertEqual(int(counts["messages"]), 2)
+        self.assertEqual(
+            {item["body"] for item in thread["messages"]},
+            {"老师同时发起", "学员同时发起"},
         )
 
     def test_thread_order_and_read_state_are_per_user(self):
