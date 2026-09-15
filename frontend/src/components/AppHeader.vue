@@ -5,6 +5,8 @@ import { computed, ref } from 'vue'
 
 import type { SnapshotSource } from '@/api/types'
 
+import MessageBadge from './MessageBadge.vue'
+
 const props = withDefaults(defineProps<{
   source: SnapshotSource
   loading: boolean
@@ -91,6 +93,7 @@ function closeMobileNav() {
           <span class="ark-sr-only">学习方向菜单</span>
         </button>
         <template v-if="showAuthControls && userName">
+          <MessageBadge />
           <span class="user-chip">{{ userName }}</span>
           <button class="icon-button" type="button" @click="emit('logout')">
             <LogOut :size="16" aria-hidden="true" />

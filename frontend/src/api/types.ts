@@ -68,6 +68,48 @@ export interface CourseSummary {
   interest_match: boolean
 }
 
+export interface MessagingSummary {
+  unread_private: number
+  unread_notifications: number
+  unread_total: number
+}
+
+export interface MessageContact {
+  id: number
+  name: string
+  role: UserRole
+  relationship: 'teacher_student' | 'application'
+}
+
+export interface PrivateMessage {
+  id: number
+  conversation_id: number
+  sender_id: number
+  body: string
+  created_at: string
+  read: boolean
+}
+
+export interface ConversationSummary {
+  id: number
+  participant: MessageContact
+  last_message: PrivateMessage
+  unread_count: number
+  updated_at: string
+}
+
+export interface SystemNotification {
+  id: number
+  event_type: string
+  title: string
+  body: string
+  source_type: string | null
+  source_id: string | null
+  source_available: boolean
+  created_at: string
+  read: boolean
+}
+
 export type ApiFieldErrors = Record<string, string>
 
 export interface HomeMetric {
