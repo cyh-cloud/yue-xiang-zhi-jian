@@ -93,6 +93,13 @@ async function fetchOverview() {
   return { summaryResponse, conversationsResponse }
 }
 
+async function fetchConversations(): Promise<ConversationSummary[]> {
+  const response = await apiFetch<ConversationsResponse>(
+    '/api/messages/conversations'
+  )
+  return response.conversations
+}
+
 export const useMessageStore = defineStore('messages', {
   state: (): MessagingState => ({
     summary: emptySummary(),
@@ -148,10 +155,7 @@ export const useMessageStore = defineStore('messages', {
       this.error = ''
 
       try {
-        const response = await apiFetch<ConversationsResponse>(
-          '/api/messages/conversations'
-        )
-        this.conversations = response.conversations
+        this.conversations = await fetchConversations()
         return this.conversations
       } catch (error) {
         this.captureError(error, '会话列表加载失败')
@@ -272,19 +276,8 @@ export const useMessageStore = defineStore('messages', {
         const message = this.messages.find(item => item.id === messageId)
         if (message) {
           message.read = true
-          this.conversations = this.conversations.map(conversation => {
-            if (
-              conversation.id !== message.conversation_id ||
-              conversation.unread_count === 0
-            ) {
-              return conversation
-            }
-            return {
-              ...conversation,
-              unread_count: conversation.unread_count - 1
-            }
-          })
         }
+        this.conversations = await fetchConversations()
       } catch (error) {
         this.captureError(error, '消息状态更新失败')
         throw error
@@ -332,10 +325,7 @@ export const useMessageStore = defineStore('messages', {
           ...notification,
           read: true
         }))
-        this.conversations = this.conversations.map(conversation => ({
-          ...conversation,
-          unread_count: 0
-        }))
+        this.conversations = await fetchConversations()
       } catch (error) {
         this.captureError(error, '全部已读操作失败')
         throw error

@@ -93,7 +93,7 @@ export interface PrivateMessage {
 export interface ConversationSummary {
   id: number
   participant: MessageContact
-  last_message: PrivateMessage
+  last_message: PrivateMessage | null
   unread_count: number
   updated_at: string
 }
