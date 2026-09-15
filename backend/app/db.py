@@ -96,6 +96,58 @@ CREATE TABLE IF NOT EXISTS course_interest_tags (
     tag_id INTEGER NOT NULL REFERENCES interest_tags(id) ON DELETE CASCADE,
     PRIMARY KEY (course_id, tag_id)
 );
+
+CREATE TABLE IF NOT EXISTS message_conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    participant_low_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    participant_high_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    CHECK (participant_low_id < participant_high_id),
+    UNIQUE (participant_low_id, participant_high_id)
+);
+
+CREATE TABLE IF NOT EXISTS private_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL
+        REFERENCES message_conversations(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_private_messages_conversation
+    ON private_messages(conversation_id, created_at, id);
+
+CREATE TABLE IF NOT EXISTS private_message_views (
+    message_id INTEGER NOT NULL REFERENCES private_messages(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    read_at TEXT,
+    cleared_at TEXT,
+    PRIMARY KEY (message_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_private_views_unread
+    ON private_message_views(user_id, read_at, cleared_at);
+
+CREATE TABLE IF NOT EXISTS system_notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_key TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    source_type TEXT,
+    source_id TEXT,
+    source_available INTEGER NOT NULL DEFAULT 1 CHECK (source_available IN (0, 1)),
+    created_at TEXT NOT NULL,
+    read_at TEXT,
+    cleared_at TEXT,
+    UNIQUE (recipient_id, event_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_unread
+    ON system_notifications(recipient_id, read_at, cleared_at, created_at DESC);
 """
 
 
