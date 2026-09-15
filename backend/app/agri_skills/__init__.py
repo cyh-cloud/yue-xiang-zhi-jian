@@ -2,7 +2,18 @@ from __future__ import annotations
 
 from flask import Flask
 
-from app.agri_skills.ai_client import NullAiClient, set_ai_client
+from app.agri_skills.ai_client import (
+    NullAiClient,
+    OpenAiCompatibleAiClient,
+    get_ai_client,
+    set_ai_client,
+)
+from app.agri_skills.ai_context import (
+    AI_FIELD_ALLOWLISTS,
+    allowed_context,
+    build_ai_messages,
+    redact_ai_log,
+)
 from app.agri_skills.calendar import (
     list_product_subscriber_ids,
     list_product_subscriptions,
@@ -18,6 +29,17 @@ from app.agri_skills.presets import (
 
 def install_default_agri_services(app: Flask) -> None:
     if "agri_ai_client" not in app.extensions:
-        set_ai_client(app, NullAiClient())
+        if app.config.get("AI_API_URL") and app.config.get("AI_API_KEY"):
+            set_ai_client(
+                app,
+                OpenAiCompatibleAiClient(
+                    api_url=str(app.config["AI_API_URL"]),
+                    api_key=str(app.config["AI_API_KEY"]),
+                    model=str(app.config["AI_MODEL"]),
+                    timeout=float(app.config["AI_TIMEOUT_SECONDS"]),
+                ),
+            )
+        else:
+            set_ai_client(app, NullAiClient())
     if "agri_preset_provider" not in app.extensions:
         set_preset_provider(app, PlaceholderPresetProvider())
