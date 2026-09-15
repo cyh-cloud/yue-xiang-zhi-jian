@@ -196,6 +196,21 @@ describe('MessageCenterView', () => {
     expect(reply).toHaveBeenCalledWith(3, '收到')
   })
 
+  it('marks an unread item within three interactions', async () => {
+    const unread = message({ body: '未读消息' })
+    const { wrapper, store } = await mountView('student', currentStore => {
+      currentStore.conversations = [conversation(unread)]
+      currentStore.activeThreadId = 3
+      currentStore.messages = [unread]
+    })
+    const markRead = vi.spyOn(store, 'markPrivateRead').mockResolvedValue()
+
+    await wrapper.get('[data-test="tab-private"]').trigger('click')
+    await wrapper.get('[data-test="message-7"]').trigger('click')
+
+    expect(markRead).toHaveBeenCalledWith(7)
+  })
+
   it.each(['admin', 'government'] as const)(
     'shows the private-message restriction for %s without a composer',
     async role => {
