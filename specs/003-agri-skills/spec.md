@@ -34,9 +34,10 @@
 2. **Given** 回答已提供追问建议，**When** 学员点击任一建议，**Then** 系统以该建议开启新一问答轮次，并再次提供三个后续建议。
 3. **Given** 学员使用语音提问且识别成功，**When** 识别完成，**Then** 系统展示识别文字，学员可确认或修改后提交，并得到与文字提问一致的问答结果。
 4. **Given** 语音因噪音或不可识别而失败，**When** 识别结束，**Then** 系统提示“未能识别，请重试或改用文字输入”，文字输入仍可使用。
-5. **Given** AI 服务不可用且本地知识库存在匹配条目，**When** 学员提交问题，**Then** 系统返回最匹配的知识库内容并标注“离线知识库回答”，且不生成追问建议。
-6. **Given** AI 服务不可用且本地知识库无匹配条目，**When** 学员提交问题，**Then** 系统提示“暂无法回答，建议稍后再试”。
-7. **Given** 学员已完成多轮问答，**When** 打开问答历史，**Then** 问答记录按最后更新时间倒序展示，并可查看完整问答轮次。
+5. **Given** AI 服务不可用且本地知识库存在多个候选条目，**When** 学员提交问题，**Then** 系统只返回命中字段最多的一条，标注“离线知识库回答”，且不生成追问建议。
+6. **Given** 多个本地知识条目的命中字段数量和匹配关键词长度相同，**When** 系统选择结果，**Then** 按 11 提供的目录顺序和稳定标识返回唯一结果。
+7. **Given** AI 服务不可用且本地知识库无有效关键词匹配，**When** 学员提交问题，**Then** 系统提示“暂无法回答，建议稍后再试”。
+8. **Given** 学员已完成多轮问答，**When** 打开问答历史，**Then** 问答记录按最后更新时间倒序展示，并可查看完整问答轮次。
 
 ---
 
@@ -52,12 +53,13 @@
 
 1. **Given** 学员开始新诊断，**When** 依次选择农产品、发病部位和一个或多个症状，**Then** 系统保存点选信息并进入 AI 引导追问。
 2. **Given** 诊断进行中，**When** AI 要求补充细节，**Then** 学员可用文字或语音转文字回答，系统据此生成下一轮追问。
-3. **Given** AI 在五轮内判断信息充分，**When** 本轮回答完成，**Then** 系统输出病因分析、防治方案和本轮所依据的症状信息。
-4. **Given** 达到五轮上限但 AI 仍无法确认充分性，**When** 第五轮回答完成，**Then** 系统基于已有信息给出明确标注为“信息有限”的结论，并停止继续追问。
-5. **Given** 学员中途关闭或离开诊断，**When** 再次进入历史，**Then** 会话保持“进行中”，学员可以继续追问或明确放弃后重新开始。
-6. **Given** AI 服务不可用，**When** 学员进入诊断或继续回答，**Then** 系统提示“AI 服务暂时不可用”，不提供离线诊断结果，并保留已填写的点选信息和回答供恢复后继续。
-7. **Given** 诊断已有历史，**When** 学员查看记录，**Then** 可查看点选信息、全部追问回答、结论和会话状态。
-8. **Given** 进行中的诊断连续 365 天没有任何新回答或状态更新，**When** 系统执行会话生命周期检查，**Then** 会话自动变为“已放弃”且历史仍可查看，不自动删除。
+3. **Given** 诊断 AI 在本轮返回 `follow_up_required`，**When** 结果有效，**Then** 系统只展示下一轮追问。
+4. **Given** 诊断 AI 在五轮内返回 `conclusion_ready`，**When** 本轮回答完成，**Then** 系统结束追问并输出病因分析、防治方案和本轮所依据的症状信息。
+5. **Given** 达到五轮上限，**When** 第五轮回答完成，**Then** 无论 AI 返回何种状态，系统都基于已有信息给出标注“信息有限”的结论并停止继续追问。
+6. **Given** 学员中途关闭或离开诊断，**When** 再次进入历史，**Then** 会话保持“进行中”，学员可以继续追问或明确放弃后重新开始。
+7. **Given** AI 服务不可用或返回缺失、未知、结构不完整的状态，**When** 学员进入诊断或继续回答，**Then** 系统提示“AI 服务暂时不可用”，不提供离线诊断结果，并保留已填写的点选信息和回答供恢复后继续。
+8. **Given** 诊断已有历史，**When** 学员查看记录，**Then** 可查看点选信息、全部追问回答、结论和会话状态。
+9. **Given** 进行中的诊断连续 365 天没有任何新回答或状态更新，**When** 系统执行会话生命周期检查，**Then** 会话自动变为“已放弃”且历史仍可查看，不自动删除。
 
 ---
 
@@ -92,11 +94,13 @@
 **Acceptance Scenarios**:
 
 1. **Given** 诊断已有结论，**When** 学员选择“AI 自测”，**Then** 系统依据诊断文本生成 3 至 5 道选择题或判断题。
-2. **Given** 自测已生成，**When** 学员提交答案且 AI 可用，**Then** 系统给出总分、逐题正误和讲解，并把成绩保存为可供技能档案和学习统计读取的学习成果。
-3. **Given** AI 服务不可用，**When** 学员尝试生成、提交或判分自测，**Then** 系统提示“AI 服务暂时不可用”，不提供离线出题或离线判分，已有诊断记录不受影响。
-4. **Given** 诊断已有结论，**When** 学员提交复诊状态“好转”“无变化”或“恶化”及可选备注，**Then** 系统生成一条复诊记录并挂接到原诊断会话。
-5. **Given** 原诊断已有复诊记录，**When** 学员查看历史，**Then** 可查看全部复诊状态、备注和时间，并可基于选定复诊记录再次发起诊断。
-6. **Given** 学员基于复诊再次诊断，**When** 新会话创建，**Then** 系统预填上轮产品、部位、症状和适用上下文，学员仍可在提交前调整。
+2. **Given** 首次生成结果无效，**When** 系统自动重新生成且第二次结果有效，**Then** 只向学员发布第二次完整测试。
+3. **Given** 连续两次生成结果均无效，**When** 校验结束，**Then** 系统不创建自测记录、不展示残缺题目、保留原诊断并提示“AI 服务暂时不可用”。
+4. **Given** 自测已生成，**When** 学员提交答案且 AI 可用，**Then** 系统给出总分、逐题正误和讲解，并把成绩保存为可供技能档案和学习统计读取的学习成果。
+5. **Given** AI 服务不可用，**When** 学员尝试生成、提交或判分自测，**Then** 系统提示“AI 服务暂时不可用”，不提供离线出题或离线判分，已有诊断记录不受影响。
+6. **Given** 诊断已有结论，**When** 学员提交复诊状态“好转”“无变化”或“恶化”及可选备注，**Then** 系统生成一条复诊记录并挂接到原诊断会话。
+7. **Given** 原诊断已有复诊记录，**When** 学员查看历史，**Then** 可查看全部复诊状态、备注和时间，并可基于选定复诊记录再次发起诊断。
+8. **Given** 学员基于选定复诊记录再次诊断，**When** 新会话创建，**Then** 系统记录来源诊断和来源复诊记录，预填可编辑的产品、部位和症状，并只读带入原结论、复诊状态和备注作为首次追问上下文，不复制原问答轮次。
 
 ---
 
@@ -111,9 +115,9 @@
 **Acceptance Scenarios**:
 
 1. **Given** 平台存在多个方向的课程，**When** 学员进入农业课程区块，**Then** 只展示农业方向的已上架课程，并使用 08 的同一课程数据。
-2. **Given** 学员兴趣标签或农业课程学习行为发生变化，**When** “为你推荐”刷新，**Then** 系统排除已完成课程，先按三个兴趣标签组的精确匹配数量、再按未完成观看行为、最后按上架时间倒序生成结果；无可用推荐时显示“暂无推荐”。
-3. **Given** 学员播放课程后离开，**When** 再次打开同一课程，**Then** 播放器从上次有效进度继续。
-4. **Given** 学员课程观看进度达到或超过 80%，**When** 进度完成，**Then** 该课程标记为已完成，重复上报不产生重复完成记录。
+2. **Given** 学员兴趣标签或农业课程学习行为发生变化，**When** “为你推荐”刷新，**Then** 系统排除已完成课程，按稳定标识去重并计算标签精确交集数，再依次按交集数、有观看但未完成、最近观看时间、有效观看进度、上架时间、课程稳定标识排序；无可用推荐时显示“暂无推荐”。
+3. **Given** 学员播放课程后离开，**When** 再次打开同一课程，**Then** 播放器从最近一次有效播放位置继续，最远进度和完成状态不因当前位置较低而回退。
+4. **Given** 课程时长有效，**When** 学员最远有效播放位置达到视频总时长的 79%、80% 或 90%，**Then** 0 至 100 的整数进度分别按向下取整计算，且仅在达到或超过 80% 时标记完成。
 5. **Given** 已完成课程由教师开启 AI 课后测验，**When** 学员进入课程，**Then** 测验入口点亮；未开启测验的课程不显示可用测验入口。
 6. **Given** 学员提交 AI 课后测验且 AI 可用，**When** 判分完成，**Then** 显示得分、逐题结果和讲解，保留本次提交历史，并把最近一次有效得分作为可覆盖旧正式成绩的成绩供技能档案和学习统计读取。
 7. **Given** AI 服务不可用，**When** 学员提交需 AI 判分的课后测验，**Then** 系统提示“AI 服务暂时不可用”，课程浏览、进度和已完成状态不受影响。
@@ -129,14 +133,19 @@
 - AI 问答流式输出中途失败时，不把不完整内容当作完整答案；系统按农技问答降级策略返回本地知识库结果或明确提示。
 - 语音识别成功但结果为空、仅含空白或属于误识别时，不得提交空问题；识别失败与取消录音均不得创建问答记录。
 - 诊断达到五轮上限时不得出现第六轮 AI 追问；存在未提交回答时，退出前必须保留草稿状态。
+- 诊断 AI 返回缺失、未知或结构不完整的 `follow_up_required` / `conclusion_ready` 状态时，不得推断 AI 意图或生成部分结论，系统按 AI 服务失败保留会话。
 - 进行中的诊断连续 365 天无活动后必须转为“已放弃”；自动放弃不得删除点选信息、问答或结论属性，也不得允许继续向 AI 追问。
 - 已放弃的诊断不得继续使用 AI，但历史记录仍可查看；重新诊断必须创建独立会话，不覆盖原记录。
+- 基于复诊记录再诊断时，来源诊断或复诊记录后来不可用时，新会话的来源引用保留并标记不可用，不得删除或覆盖已创建的新会话。
 - 自测题目少于 3 道、超过 5 道、题干无效或缺少数值时，不得向学员发布不完整测试，并提示稍后重试。
 - 课程进入待审核、下架或删除状态后，不得继续出现在农业课程区块；已有学习进度和测验成绩保留，并按来源对象当前可用性展示。
 - 重复、乱序或跨设备上报观看进度时，完成状态只可前进不可回退；已达标课程不得因后续较短进度而变成未完成。
+- 观看位置为负数、超过视频总时长、视频总时长无效或必要字段缺失时，不改变最远位置、累计观看时长、完成状态或推荐学习行为。
 - 学员修改兴趣标签后，后续推荐必须使用最新标签，不得继续使用旧缓存结果。
-- 本地知识库存在多条同等匹配时使用稳定排序返回唯一结果，不向学员同时展示互不相关的答案。
+- 08 提供的课程标签标识不存在于 01 标签目录或无法唯一解析时，该标签不参与推荐匹配，课程仍可通过其他有效标签和学习行为排序。
+- 本地知识库存在多条候选时，只返回命中字段最多的一条；命中字段数量和匹配关键词长度相同时，按 11 目录顺序和稳定标识返回唯一结果。
 - 非学员角色或会话无效时不得访问农业技能数据，也不得通过直接输入记录标识读取他人问答、诊断或学习进度。
+- 构造外部 AI 请求或写入失败日志时发现字段不在当前调用白名单、包含凭证或可能暴露其他学员数据，系统必须剔除该字段并继续可安全执行的部分，不得为完成调用而放宽白名单。
 
 ## Requirements *(mandatory)*
 
@@ -174,7 +183,7 @@
 | 语音识别 | 将农技问答、诊断补充回答的语音转为文字 | 识别失败提示“未能识别，请重试或改用文字输入”；AI 服务不可用时提示“AI 服务暂时不可用”；文字输入始终保留 |
 | 农技问答回答 | 生成流式回答 | 仅在 AI 服务不可用时降级到本地病虫害知识库；有匹配时标注“离线知识库回答”，无匹配时提示“暂无法回答，建议稍后再试” |
 | 农技问答追问建议 | 根据本轮回答生成三个建议 | 不单独降级；AI 服务不可用时沿用农技问答的本地知识库降级，且不生成追问建议 |
-| 诊断追问与结论 | 生成下一轮追问、病因分析和防治方案 | 不降级；提示“AI 服务暂时不可用”，保留点选和回答数据，恢复后继续 |
+| 诊断追问与结论 | 生成下一轮追问、病因分析和防治方案，并返回 `follow_up_required` 或 `conclusion_ready` 状态 | 不降级；非法状态或服务失败提示“AI 服务暂时不可用”，保留点选和回答数据，恢复后继续 |
 | 诊断自测生成 | 依据诊断文本生成 3 至 5 道题 | 不降级；提示“AI 服务暂时不可用” |
 | 诊断自测判分与讲解 | 判分、逐题讲解 | 不降级；提示“AI 服务暂时不可用” |
 
@@ -183,6 +192,8 @@
 - **FR-022**: System MUST show exactly “未能识别，请重试或改用文字输入” when voice recognition fails because of noise, cancellation or an unusable result.
 - **FR-023**: System MUST use exactly “AI 服务暂时不可用” for every non-问答 AI failure in this feature, including diagnosis, diagnostic self-test and AI-graded course quiz.
 - **FR-024**: System MUST preserve user-entered text, point selections and completed records when an AI call fails; an AI failure MUST NOT delete or corrupt manual data.
+- **FR-075**: Every external AI request MUST use a call-specific field allowlist containing only the current student’s task input and the agricultural context required for that call, including question text, selected product/part/symptoms, diagnosis conclusion, follow-up status/note, course summary or quiz questions where applicable. Requests MUST NOT contain usernames, user identifiers, contact information, passwords, session credentials, role metadata, other students’ records or unrelated history.
+- **FR-076**: AI failure logs and diagnosis records MUST retain only content necessary for troubleshooting, the student’s history and acceptance evidence. Logs MUST NOT contain passwords, session tokens, contact details or other credentials; if request content is retained for troubleshooting, its scope and retention period MUST be explicitly bounded and sensitive fields MUST be redacted.
 
 **农技问答**
 
@@ -192,7 +203,7 @@
 - **FR-028**: System MUST treat a selected follow-up suggestion as a new question in the same conversation and continue the same streamed-answer and three-suggestion behavior.
 - **FR-029**: System MUST support multiple Q&A rounds without truncating prior turns.
 - **FR-030**: System MUST list the student’s Q&A conversations in reverse chronological order by latest activity and allow every retained turn to be reviewed.
-- **FR-031**: System MUST automatically use the local pest knowledge base when the AI answer call is unavailable, and MUST select the most relevant available entry using the submitted question.
+- **FR-031**: System MUST automatically use the local pest knowledge base when the AI answer call is unavailable. It MUST normalize the submitted question and rank candidates by the number of exact matches against pest/disease names, agricultural-product names, symptom names and keyword aliases; ties MUST be resolved by matched-keyword length, then by the 11 catalog order, then by stable identifier, and exactly one entry MUST be returned.
 - **FR-032**: System MUST label every local knowledge-base answer as “离线知识库回答” and MUST NOT return follow-up suggestions for that answer.
 - **FR-033**: System MUST show “暂无法回答，建议稍后再试” when the local knowledge base has no usable match.
 
@@ -204,7 +215,7 @@
 - **FR-037**: System MUST send the selected product, part and symptoms to AI as the initial diagnosis context.
 - **FR-038**: System MUST show one AI-guided question at a time and accept the student’s answer as text or confirmed speech-recognition text.
 - **FR-039**: System MUST limit AI-guided diagnosis questioning to five answered rounds.
-- **FR-040**: System MUST end diagnosis when AI determines the available information is sufficient or when the five-round limit is reached.
+- **FR-040**: Each diagnosis AI turn MUST return an observable `follow_up_required` or `conclusion_ready` status. System MUST show the next follow-up only for `follow_up_required`, MUST end questioning and show the conclusion for `conclusion_ready`, and MUST treat a missing, unknown or structurally invalid status as an AI failure. When five rounds have been answered, System MUST force a conclusion marked “信息有限” even if AI requests another follow-up.
 - **FR-041**: System MUST output both an etiological analysis and a prevention-and-treatment plan in every completed diagnosis.
 - **FR-042**: A conclusion reached solely because the five-round limit was reached MUST be visibly marked “信息有限”.
 - **FR-043**: System MUST persist an interrupted diagnosis as “进行中” and allow the same student to resume it or explicitly abandon it; a session with no new answer or status update for 365 consecutive days MUST automatically transition to “已放弃”.
@@ -217,26 +228,26 @@
 
 - **FR-048**: System MUST offer an optional AI self-test after a diagnosis has a conclusion.
 - **FR-049**: System MUST instruct the self-test generation call to produce 3 to 5 multiple-choice or true/false questions based only on the diagnosis text.
-- **FR-050**: System MUST reject and regenerate or defer an invalid self-test that has fewer than 3 questions, more than 5 questions, missing prompts, invalid options or missing answers.
+- **FR-050**: System MUST validate a generated self-test before publishing it. If the result has fewer than 3 questions, more than 5 questions, missing prompts, invalid options or missing answers, System MUST discard it and generate once more. If the second result is also invalid, System MUST discard all invalid content, MUST NOT create or display a self-test, MUST preserve the originating diagnosis, and MUST show “AI 服务暂时不可用”; a later manual attempt MUST restart the same maximum-two-generation flow.
 - **FR-051**: System MUST allow the student to answer the generated self-test and, when AI is available, return a score, per-question correctness and an explanation.
 - **FR-052**: System MUST persist every submitted self-test result as a learning outcome associated with the originating diagnosis.
 - **FR-053**: System MUST NOT generate, grade or explain a self-test through a local knowledge-base fallback; AI unavailability uses the fixed message from FR-023.
 - **FR-054**: System MUST allow the student to add one or more follow-up records to a completed diagnosis, each with status “好转”, “无变化” or “恶化” and an optional note; every submission MUST create a new independent record rather than overwrite an earlier one.
 - **FR-055**: System MUST attach every follow-up record to its originating diagnosis and retain all records in chronological history.
 - **FR-056**: System MUST allow the student to start a new diagnosis from a selected follow-up record.
-- **FR-057**: A diagnosis started from a follow-up record MUST prefill the previous product, affected part, symptoms and applicable context while remaining editable before submission.
+- **FR-057**: A diagnosis started from a follow-up record MUST create an independent session that records the source diagnosis and source follow-up record, prefills the previous product, affected part and symptom set as editable fields, and associates the previous diagnosis conclusion plus the selected follow-up status and note as read-only context for the first AI question. It MUST NOT copy the previous session’s Q&A rounds, and it MUST NOT alter either source record.
 - **FR-058**: System MUST retain self-test and follow-up records even if a later diagnosis session is abandoned or AI becomes unavailable.
 
 **农业课程区块与 AI 课后测验**
 
 - **FR-059**: System MUST display only published courses whose learning direction is agriculture and whose authoritative status is supplied by 08.
-- **FR-060**: System MUST provide a deterministic “为你推荐” area from eligible uncompleted published agricultural courses: courses MUST be ranked first by the count of exact matches across the student’s current crop-category, skill-interest and job-category tags, then by recent or existing viewing behavior for courses not yet completed, and finally by publication time descending; completed courses MUST be excluded.
+- **FR-060**: System MUST provide a deterministic “为你推荐” area from eligible uncompleted published agricultural courses. 08 MUST supply course-tag references using stable identifiers from 01’s tag catalog. System MUST deduplicate course and student tags by stable identifier, calculate the exact tag-intersection count, and rank courses by: intersection count descending; courses with an existing but incomplete viewing record before courses without one; latest viewing time descending; effective viewing progress descending; publication time descending; course stable identifier ascending. Completed courses MUST be excluded. If 08 supplies only tag names, the placeholder adapter MUST resolve them by normalized exact name against 01’s catalog, and unmatched or ambiguous names MUST be ignored for matching.
 - **FR-061**: System MUST show “暂无推荐” when no recommendation signal produces eligible courses, independently from the general course empty state.
 - **FR-062**: System MUST show “暂无课程” when there are no eligible published agricultural courses.
-- **FR-063**: System MUST record course viewing progress and total viewing duration for the current student and course.
-- **FR-064**: System MUST resume playback from the last valid recorded position when the same course is reopened.
-- **FR-065**: System MUST mark a course complete when effective viewing progress reaches at least 80%, and MUST treat later duplicate or lower progress updates as idempotent.
-- **FR-066**: System MUST prevent viewing progress and completion state from moving backwards after a higher valid progress has been recorded.
+- **FR-063**: System MUST record, for the current student and course, the furthest valid playback position, the most recent valid playback position, effective viewing progress, active cumulative viewing duration, completion state and timestamps. Effective progress MUST equal the furthest valid position divided by the video duration, rounded down to an integer percentage between 0 and 100.
+- **FR-064**: System MUST reject progress updates with a negative position, a position beyond the video duration, a non-positive or missing video duration, or other missing required fields, and rejected updates MUST NOT alter any learning record.
+- **FR-065**: System MUST resume playback from the most recent valid playback position when the same course is reopened; a lower resume position MUST NOT reduce the furthest position or completed state.
+- **FR-066**: System MUST mark a course complete when effective progress reaches at least 80%. Duplicate, out-of-order or cross-device lower progress updates MUST NOT move the furthest position, cumulative viewing duration or completion state backwards or double count them.
 - **FR-067**: System MUST expose the completed state and course quiz availability required by 08’s learning statistics without making course browsing depend on statistics availability.
 - **FR-068**: System MUST activate the AI quiz entry only when the completed course has an enabled and valid quiz configured by 08.
 - **FR-069**: System MUST consume the 08-owned question bank and MUST NOT allow the student to edit questions, options, answers or scoring rules.
@@ -250,16 +261,16 @@
 
 - **Agricultural Product**: 11 维护的农产品目录项；具有稳定标识、名称、顺序和可用状态，是日历与产品订阅的表达对象。
 - **Farming Calendar Entry**: 11 维护的产品与月份农事内容，包含农事任务、管理要点、节气和月度提示；03 只读。
-- **Pest Knowledge Entry**: 11 维护的本地病虫害知识条目，用于农技问答的 AI 不可用降级；包含问题特征、匹配信息和回答内容。
+- **Pest Knowledge Entry**: 11 维护的本地病虫害知识条目，用于农技问答的 AI 不可用降级；至少包含稳定标识、目录顺序、病虫害名称、农产品名称、症状名称、关键词别名和回答内容。
 - **Q&A Conversation**: 学员的一组连续农技问答，具有创建时间、最后更新时间和多个有序轮次。
 - **Q&A Turn**: 一次问题、输入来源、回答内容、回答模式、是否离线降级、时间及可选三个追问建议。
-- **Diagnosis Session**: 一次病虫害诊断，包含产品、部位、症状集合、状态、最多五轮问答、结论、结论充分性和时间信息。
+- **Diagnosis Session**: 一次病虫害诊断，包含产品、部位、症状集合、状态、最多五轮问答、每轮可观察的 AI 状态、结论、结论充分性和时间信息；基于复诊开始的新会话还包含来源诊断和来源复诊记录引用。
 - **Diagnosis Answer**: 对某轮诊断追问的文字回答及其语音转文字来源。
 - **Diagnostic Self-Test**: 由诊断文本生成的 3 至 5 道题、答案、评分规则和生成状态。
 - **Diagnostic Self-Test Attempt**: 学员对诊断自测的提交、得分、逐题结果、讲解和时间。
-- **Follow-Up Record**: 诊断后的防治效果记录，包含状态、备注、记录时间和原诊断关联。
+- **Follow-Up Record**: 诊断后的防治效果记录，包含状态、备注、记录时间、原诊断关联，并可作为独立新诊断会话的来源。
 - **Product Subscription**: 学员与农产品之间的有效订阅关系及订阅历史，用于 02 触发月度农事提醒。
-- **Course Learning Progress**: 学员在农业课程上的观看位置、有效进度、累计观看时长、完成状态和最后更新时间。
+- **Course Learning Progress**: 学员在农业课程上的最远有效播放位置、最近有效播放位置、有效进度、累计观看时长、完成状态、最后观看时间和最后更新时间，用于断点续播及确定性推荐排序。
 - **Course Quiz Attempt**: 学员对 08 所配置课程测验的一次作答、得分、逐题结果、讲解和时间；每次提交都保留，最近一次有效评分提交为正式成绩。
 
 ## Scope Boundaries
@@ -281,7 +292,7 @@
 
 - **01-账户与门户（已实现，复用）**: 提供学员身份、有效会话、角色路由、最新兴趣标签、学习方向和课程聚合基础能力。
 - **02-消息与通知（已实现，复用）**: 提供系统通知、订阅推送、未读管理与触发时受众接口；农事提醒不得绕过该通道。
-- **08-教师工作台（尚未实现，前向依赖）**: 生产环境应提供农业课程、发布状态、课程简介、学习统计所需接口和可选 AI 课后测验配置；在 08 尚未实现时，03 只消费 01 现有的已上架课程读取契约，并把测验能力视为“未配置/不可用”，不得在 03 内建立课程或题库编辑器。
+- **08-教师工作台（尚未实现，前向依赖）**: 生产环境应提供农业课程、稳定课程标识、可验证的视频总时长、与 01 标签目录对齐的稳定标签标识、发布状态、课程简介、学习统计所需接口和可选 AI 课后测验配置；在 08 尚未实现时，03 只消费 01 现有的已上架课程读取契约，占位课程必须提供稳定时长，无有效时长的课程不得计算完成，并把测验能力视为“未配置/不可用”。
 - **11-系统管理后台（尚未实现，前向依赖）**: 生产环境应提供农产品目录、农时日历和病虫害知识库读取契约；在 11 尚未实现时，03 使用只读、明确标记为演示用途的最小占位数据，覆盖代表性产品和月份，并能返回“知识库无匹配”。占位数据不得被描述为正式业务数据，不得在 03 内提供增删改维护功能，并必须在 11 接入后由权威来源透明替换。
 - **共享语音识别能力（尚未实现，前向依赖）**: 03 消费统一的语音转文字结果，不定义方言分类或语音业务规则；在底层能力尚未接入时，使用可替换的占位适配器覆盖识别成功、失败和 AI 不可用路径。
 - **外部 AI 服务**: 提供流式问答、追问建议、诊断追问、诊断结论、诊断自测生成与判分、课程测验判分和语音识别等调用；服务可用性不得阻塞日历、订阅、诊断数据编辑、课程浏览、学习进度或历史查看。
@@ -292,24 +303,25 @@
 
 - **SC-001**: 在有历史和无历史两种初始状态下，100% 的日历会话正确选择默认产品与当前月份；产品切换、前后翻月、产品级无数据和月份级无数据空态全部符合规格。
 - **SC-002**: 对有效、重复、取消和再次订阅路径，100% 的月度提醒只发送给触发时有效订阅的学员，同一学员同一产品同一月份至多收到一条提醒。
-- **SC-003**: 在文字、语音成功、语音失败、AI 可用、本地知识库命中、本地知识库未命中和流式中断测试中，100% 的问答结果、三个追问建议规则及固定提示符合规格。
-- **SC-004**: 在诊断充分、恰好五轮上限、中途恢复、连续 365 天无活动自动放弃、主动放弃重开、自测和 AI 不可用测试中，100% 的会话不超过五轮、状态转换正确、历史可查、结论含病因分析与防治方案。
-- **SC-005**: 100% 的有效诊断自测包含 3 至 5 道题；每次提交均返回得分、逐题结果和讲解，并可在历史中重新读取。
-- **SC-006**: 每条复诊记录均可从原诊断查看；100% 的基于复诊再诊断会话正确预填上轮信息，同时保持字段可编辑。
-- **SC-007**: 在课程筛选、推荐、播放中断、重复进度、达到或超过 80% 完成、测验未开启、测验已开启、多次测验提交和 AI 不可用测试中，100% 的正式成绩均等于最近一次有效提交得分，且历史提交不丢失。
-- **SC-008**: 100% 的农业课程区块课程均为农业方向已上架课程，且与 08/01 使用的权威课程记录一致；100% 的推荐结果排除已完成课程，并严格按标签匹配数、未完成观看行为、上架时间倒序排序；无课程和推荐为空时显示对应空态。
+- **SC-003**: 在文字、语音成功、语音失败、AI 可用、本地知识库多候选、知识库同分、知识库未命中和流式中断测试中，100% 的问答结果、唯一知识条目选择、三个追问建议规则及固定提示符合规格。
+- **SC-004**: 使用固定 `follow_up_required`、`conclusion_ready` 和非法状态响应测试时，100% 的会话按状态正确追问或结案；在“信息有限”、恰好五轮上限、中途恢复、连续 365 天无活动自动放弃、主动放弃重开、自测和 AI 不可用测试中，状态转换正确、历史可查、结论含病因分析与防治方案。
+- **SC-005**: 100% 发布的诊断自测包含 3 至 5 道有效题目；首次无效时最多自动重生成一次，连续两次无效时零残缺测试发布且原诊断不受影响；每次有效提交均返回得分、逐题结果和讲解，并可在历史中重新读取。
+- **SC-006**: 每条复诊记录均可从原诊断查看；100% 的基于复诊再诊断会话正确记录来源、预填可编辑字段、带入规定的只读上下文且不复制原问答轮次，原诊断和复诊记录均保持不变。
+- **SC-007**: 在课程筛选、推荐、播放中断、79%/80%/90% 完成边界、无效进度、乱序或重复进度、测验未开启、测验已开启、多次测验提交和 AI 不可用测试中，100% 的进度计算、断点恢复、完成状态和正式成绩符合规格，且历史提交不丢失。
+- **SC-008**: 100% 的农业课程区块课程均为农业方向已上架课程，且与 08/01 使用的权威课程记录一致；100% 的推荐结果排除已完成课程，并按标签交集数、有无未完成观看、最近观看时间、有效观看进度、上架时间、课程稳定标识的固定顺序排序；无课程和推荐为空时显示对应空态。
 - **SC-009**: 账户、标签、消息、课程发布和非课程评论能力复用测试中，03 产生的重复实现数量为 0；跨学员读取或修改尝试的拒绝率达到 100%。
 - **SC-010**: 对依赖尚未实现的场景，100% 的系统响应可区分正式数据与演示占位，且占位能力不会阻塞问答、诊断、日历、订阅、课程浏览或进度记录的手动路径。
+- **SC-011**: 对全部外部 AI 调用点执行请求捕获和日志检查时，100% 的请求字段来自对应白名单，0 条请求或失败日志包含密码、会话令牌、联系方式、账户标识或其他学员数据。
 
 ## Assumptions
 
 - 农业技能模块的交互角色限定为已登录学员；管理员、教师、企业、政府和超管通过各自模块管理来源数据，不直接操作本模块的学员记录。
 - 当前月份、月初提醒和所有时间顺序均按平台配置时区计算；默认时区为中国标准时间 `Asia/Shanghai`。
-- “达到五轮上限但信息仍不足”按合理的强制作结口径处理：输出基于现有信息的最佳可用病因分析与防治方案，并标注“信息有限”，不再追问第六轮。
-- 本地病虫害知识库降级只用于农技问答；匹配结果以单条最相关知识条目返回，不生成追问建议，也不用于诊断结论。
+- “达到五轮上限但信息仍不足”按强制作结口径处理：输出基于现有信息的最佳可用病因分析与防治方案，并标注“信息有限”，不再追问第六轮。
+- 本地病虫害知识库降级只用于农技问答；匹配结果按病虫害名称、农产品名称、症状名称和关键词别名的精确命中数量、匹配关键词长度、目录顺序和稳定标识确定唯一单条结果，不生成追问建议，也不用于诊断结论。
 - AI 流式回答只有形成完整内容后才触发三个追问建议；中途失败不得把不完整文本标记为完整回答。
-- 课程观看进度以学员账号跨会话保存；有效进度单调不回退，达到 80% 后完成状态永久保留。
-- “学习行为”用于推荐时使用本模块已记录的农业课程观看、观看进度和完成状态；已完成课程不进入推荐池，未完成观看行为作为标签匹配之后的次级排序信号。
+- 课程观看进度以学员账号跨会话保存；最远有效位置和完成状态单调不回退，断点位置使用最近有效位置，达到 80% 后完成状态永久保留。
+- “学习行为”用于推荐时使用本模块已记录的农业课程最近观看时间、观看进度和完成状态；已完成课程不进入推荐池，未完成观看行为及时间、进度按已确认的固定顺序参与排序。
 - 诊断自测、复用课程测验和复诊记录属于学习成果来源；具体技能档案汇总、可见范围和简历附带规则由 07 决定。
 - 预置数据占位仅服务于 11 尚未实现时的可开发、可验收状态，生产口径始终以 11 台账为准；一旦 11 接入，03 不保留第二份正式数据维护入口。
 - 课程评论沿用既有课程视频评论区；如果评论能力尚未实现，03 只保留入口或不可用状态，不自行建立评论系统。
