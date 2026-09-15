@@ -57,6 +57,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         id: 'student-learning-direction',
         title: '学习方向入口',
         description: '进入农业、电商与手工方向的专属内容。'
+      },
+      {
+        id: 'student-messages',
+        title: '消息中心',
+        description: '查看私信、系统通知与未读消息。',
+        href: '/messages'
       }
     ],
     steps: [
@@ -95,6 +101,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         id: 'teacher-dashboard',
         title: '数据看板',
         description: '查看课程与教学活动的数据概览。'
+      },
+      {
+        id: 'teacher-messages',
+        title: '消息中心',
+        description: '查看私信、系统通知与未读消息。',
+        href: '/messages'
       }
     ],
     steps: [
@@ -133,6 +145,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         id: 'enterprise-dashboard',
         title: '企业看板',
         description: '查看岗位与申请数据的经营概览。'
+      },
+      {
+        id: 'enterprise-messages',
+        title: '消息中心',
+        description: '查看私信、系统通知与未读消息。',
+        href: '/messages'
       }
     ],
     steps: [
@@ -171,6 +189,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         id: 'government-dashboard',
         title: '政务看板',
         description: '查看政策、新闻与区域服务数据概览。'
+      },
+      {
+        id: 'government-messages',
+        title: '消息中心',
+        description: '查看私信、系统通知与未读消息。',
+        href: '/messages'
       }
     ],
     steps: [
@@ -209,6 +233,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         id: 'admin-system-config',
         title: '系统配置',
         description: '维护平台运行参数与基础配置。'
+      },
+      {
+        id: 'admin-messages',
+        title: '消息中心',
+        description: '查看私信、系统通知与未读消息。',
+        href: '/messages'
       }
     ],
     steps: [

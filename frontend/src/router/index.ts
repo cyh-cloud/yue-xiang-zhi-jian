@@ -8,6 +8,7 @@ import GovernmentPortalView from '@/views/GovernmentPortalView.vue'
 import HomeView from '@/views/HomeView.vue'
 import InterestTagsView from '@/views/InterestTagsView.vue'
 import LoginView from '@/views/LoginView.vue'
+import MessageCenterView from '@/views/MessageCenterView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import StudentPortalView from '@/views/StudentPortalView.vue'
 import StudentProfileView from '@/views/StudentProfileView.vue'
@@ -37,6 +38,12 @@ const router = createRouter({
       path: '/register/interest-tags',
       name: 'interest-tags',
       component: InterestTagsView
+    },
+    {
+      path: '/messages',
+      name: 'messages',
+      component: MessageCenterView,
+      meta: { requiresAuth: true }
     },
     {
       path: '/student',
