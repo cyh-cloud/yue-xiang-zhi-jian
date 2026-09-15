@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 
 from app.agri_skills import install_default_agri_services
 from app.agri_skills.messaging_provider import AgriMessagingProvider
+from app.agri_skills.routes import agri_skills_bp
 from app.auth.routes import auth_bp
 from app.config import build_config
 from app.courses.routes import student_courses_bp
@@ -24,6 +25,7 @@ PROTECTED_API_PREFIXES = (
     "/api/admin",
     "/api/onboarding",
     "/api/messages",
+    "/api/agri-skills",
 )
 
 
@@ -60,6 +62,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(onboarding_bp)
     app.register_blueprint(student_profile_bp)
     app.register_blueprint(messages_bp)
+    app.register_blueprint(agri_skills_bp)
 
     with app.app_context():
         init_db()
