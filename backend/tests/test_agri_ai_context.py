@@ -86,14 +86,48 @@ class TestAgriAiContext(unittest.TestCase):
             ],
         )
 
+    def test_allowlist_recursively_drops_nested_sensitive_fields(self):
+        messages = build_ai_messages(
+            "qa_answer",
+            {
+                "question": "荔枝落果怎么办",
+                "conversation_summary": {
+                    "prior_topic": "落果",
+                    "username": "student01",
+                    "profile": {
+                        "user_id": 7,
+                        "contact": "13800000000",
+                        "note": "保留",
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(
+            json.loads(messages[1]["content"]),
+            {
+                "question": "荔枝落果怎么办",
+                "conversation_summary": {
+                    "prior_topic": "落果",
+                    "profile": {"note": "保留"},
+                },
+            },
+        )
+
     def test_redaction_removes_credentials_and_contacts_recursively(self):
         value = redact_ai_log(
             {
                 "PASSWORD": "secret",
                 "Contact": "13800000000",
+                "api_key": "api-key-value",
                 "question": "荔枝",
                 "nested": [
-                    {"session": "session-id", "answer": "保持"},
+                    {
+                        "authorization": "Bearer token",
+                        "secret": "shared-secret",
+                        "session": "session-id",
+                        "answer": "保持",
+                    },
                     {"token": "token-value"},
                 ],
             }
@@ -104,9 +138,15 @@ class TestAgriAiContext(unittest.TestCase):
             {
                 "PASSWORD": "[REDACTED]",
                 "Contact": "[REDACTED]",
+                "api_key": "[REDACTED]",
                 "question": "荔枝",
                 "nested": [
-                    {"session": "[REDACTED]", "answer": "保持"},
+                    {
+                        "authorization": "[REDACTED]",
+                        "secret": "[REDACTED]",
+                        "session": "[REDACTED]",
+                        "answer": "保持",
+                    },
                     {"token": "[REDACTED]"},
                 ],
             },
@@ -187,7 +227,7 @@ class TestOpenAiCompatibleAiClient(unittest.TestCase):
         ):
             client.complete_json([], call_point="qa_answer")
 
-    def test_upstream_http_failure_is_wrapped_and_logged_redacted(self):
+    def test_upstream_failure_logs_only_bounded_non_content_metadata(self):
         transport = httpx.MockTransport(
             lambda request: httpx.Response(
                 502,
@@ -205,14 +245,7 @@ class TestOpenAiCompatibleAiClient(unittest.TestCase):
         messages = [
             {
                 "role": "user",
-                "content": json.dumps(
-                    {
-                        "question": "荔枝",
-                        "password": "top-secret",
-                        "contact": "13800000000",
-                    },
-                    ensure_ascii=False,
-                ),
+                "content": "PROMPT-CONTENT-MUST-NOT-BE-LOGGED",
             }
         ]
 
@@ -226,9 +259,9 @@ class TestOpenAiCompatibleAiClient(unittest.TestCase):
 
         output = "\n".join(logs.output)
         self.assertIn("AI call failed for selftest_grade", output)
-        self.assertIn("[REDACTED]", output)
-        self.assertNotIn("top-secret", output)
-        self.assertNotIn("13800000000", output)
+        self.assertIn("'operation': 'complete_json'", output)
+        self.assertIn("'message_count': 1", output)
+        self.assertNotIn("PROMPT-CONTENT-MUST-NOT-BE-LOGGED", output)
 
     def test_malformed_stream_response_is_wrapped(self):
         client = OpenAiCompatibleAiClient(

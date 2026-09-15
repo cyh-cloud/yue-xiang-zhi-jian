@@ -33,12 +33,33 @@ SENSITIVE_KEYS = {
     "token",
     "session",
     "credential",
+    "api_key",
+    "secret",
+    "authorization",
 }
+
+
+def _sanitize_allowed_value(value):
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_allowed_value(item)
+            for key, item in value.items()
+            if not isinstance(key, str) or key.lower() not in SENSITIVE_KEYS
+        }
+    if isinstance(value, list):
+        return [_sanitize_allowed_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_allowed_value(item) for item in value)
+    return value
 
 
 def allowed_context(call_point: str, context: dict) -> dict:
     allowed = AI_FIELD_ALLOWLISTS[call_point]
-    return {key: value for key, value in context.items() if key in allowed}
+    return {
+        key: _sanitize_allowed_value(value)
+        for key, value in context.items()
+        if key in allowed
+    }
 
 
 def build_ai_messages(call_point: str, context: dict) -> list[dict]:

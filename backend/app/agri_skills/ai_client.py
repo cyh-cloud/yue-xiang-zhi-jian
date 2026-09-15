@@ -8,7 +8,6 @@ import httpx
 from flask import Flask, current_app
 from flask import has_app_context
 
-from app.agri_skills.ai_context import redact_ai_log
 from app.agri_skills.errors import AiUnavailableError
 
 
@@ -34,27 +33,6 @@ def extract_json_object(content: str) -> str:
     if not isinstance(value, dict):
         raise ValueError("AI response JSON must be an object")
     return text[start : start + end]
-
-
-def _redact_embedded_json(value):
-    if isinstance(value, dict):
-        return {
-            key: _redact_embedded_json(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, list):
-        return [_redact_embedded_json(item) for item in value]
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-        except (json.JSONDecodeError, TypeError):
-            return value
-        if isinstance(parsed, (dict, list)):
-            return json.dumps(
-                redact_ai_log(parsed),
-                ensure_ascii=False,
-            )
-    return value
 
 
 class NullAiClient:
@@ -93,7 +71,12 @@ class OpenAiCompatibleAiClient:
         return httpx.Client(timeout=self.timeout)
 
     @staticmethod
-    def _log_failure(call_point: str, messages: list[dict]) -> None:
+    def _log_failure(
+        call_point: str,
+        *,
+        operation: str,
+        message_count: int,
+    ) -> None:
         logger = (
             current_app.logger
             if has_app_context()
@@ -102,7 +85,10 @@ class OpenAiCompatibleAiClient:
         logger.warning(
             "AI call failed for %s: %s",
             call_point,
-            _redact_embedded_json(redact_ai_log(messages)),
+            {
+                "operation": operation,
+                "message_count": message_count,
+            },
         )
 
     def stream_chat(
@@ -140,7 +126,11 @@ class OpenAiCompatibleAiClient:
                         if content:
                             yield content
         except Exception as exc:
-            self._log_failure(call_point, messages)
+            self._log_failure(
+                call_point,
+                operation="stream_chat",
+                message_count=len(messages),
+            )
             raise AiUnavailableError("AI service request failed") from exc
 
     def complete_json(
@@ -167,7 +157,11 @@ class OpenAiCompatibleAiClient:
                 content = response.json()["choices"][0]["message"]["content"]
                 return json.loads(extract_json_object(content))
         except Exception as exc:
-            self._log_failure(call_point, messages)
+            self._log_failure(
+                call_point,
+                operation="complete_json",
+                message_count=len(messages),
+            )
             raise AiUnavailableError("AI service request failed") from exc
 
     def transcribe(
