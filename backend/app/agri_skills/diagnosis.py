@@ -17,6 +17,7 @@ from app.session_manager import utc_now_iso
 
 INPUT_MODES = {"text", "voice"}
 ALLOWED_AI_STATUSES = {"follow_up_required", "conclusion_ready"}
+FOLLOWUP_OUTCOMES = {"improved", "unchanged", "worsened"}
 MAX_DIAGNOSIS_ROUNDS = 5
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 
@@ -94,6 +95,49 @@ def _load_diagnosis(user_id: int, session_id: int) -> dict:
     if pending_question:
         questions.append(pending_question)
 
+    source_session_id = (
+        int(row["source_session_id"])
+        if row["source_session_id"] is not None
+        else None
+    )
+    source_followup_id = (
+        int(row["source_followup_id"])
+        if row["source_followup_id"] is not None
+        else None
+    )
+    source_available = True
+    source_context = None
+    if source_session_id is not None:
+        source_available = False
+        source_row = get_db().execute(
+            """
+            SELECT
+                source.conclusion_json,
+                followup.outcome,
+                followup.note
+            FROM agri_diagnosis_sessions AS source
+            JOIN agri_diagnosis_followups AS followup
+              ON followup.id = ?
+             AND followup.session_id = source.id
+            WHERE source.id = ? AND source.user_id = ?
+            """,
+            (source_followup_id, source_session_id, user_id),
+        ).fetchone()
+        if source_row is not None:
+            source_available = True
+            source_context = {
+                "source_conclusion": (
+                    _deserialize_json(
+                        str(source_row["conclusion_json"]),
+                        dict,
+                    )
+                    if source_row["conclusion_json"] is not None
+                    else None
+                ),
+                "followup_status": str(source_row["outcome"]),
+                "followup_note": str(source_row["note"]),
+            }
+
     return {
         "id": int(row["id"]),
         "user_id": int(row["user_id"]),
@@ -114,16 +158,10 @@ def _load_diagnosis(user_id: int, session_id: int) -> dict:
         "questions": questions,
         "answers": [answer["answer"] for answer in answer_records],
         "answer_records": answer_records,
-        "source_session_id": (
-            int(row["source_session_id"])
-            if row["source_session_id"] is not None
-            else None
-        ),
-        "source_followup_id": (
-            int(row["source_followup_id"])
-            if row["source_followup_id"] is not None
-            else None
-        ),
+        "source_session_id": source_session_id,
+        "source_followup_id": source_followup_id,
+        "source_available": source_available,
+        "source_context": source_context,
         "created_at": str(row["created_at"]),
         "updated_at": str(row["updated_at"]),
         "abandoned_at": (
@@ -282,19 +320,22 @@ def start_diagnosis(user_id: int, session_id: int) -> dict:
         return current
 
     round_no = current["round_count"] + 1
+    ai_context = {
+        "product_name": current["product"]["name"],
+        "affected_part": current["affected_part"],
+        "symptoms": current["symptoms"],
+        "round_no": round_no,
+        "prior_questions": current["questions"],
+        "prior_answers": current["answers"],
+    }
+    if current["source_context"] is not None:
+        ai_context.update(current["source_context"])
     try:
         result = _validate_ai_turn(
             get_ai_client().complete_json(
                 build_ai_messages(
                     "diagnosis_turn",
-                    {
-                        "product_name": current["product"]["name"],
-                        "affected_part": current["affected_part"],
-                        "symptoms": current["symptoms"],
-                        "round_no": round_no,
-                        "prior_questions": current["questions"],
-                        "prior_answers": current["answers"],
-                    },
+                    ai_context,
                 ),
                 call_point="diagnosis_turn",
             ),
@@ -497,6 +538,102 @@ def create_diagnosis(
                 product_key,
                 normalized_part,
                 json.dumps(normalized_symptoms, ensure_ascii=False),
+                now,
+                now,
+            ),
+        )
+    return start_diagnosis(user_id, int(cursor.lastrowid))
+
+
+def add_followup(
+    user_id: int,
+    session_id: int,
+    outcome: str,
+    note: object,
+) -> dict:
+    session = get_diagnosis(user_id, session_id)
+    if session["status"] != "completed":
+        raise AgriValidationError("仅已完成诊断可记录复诊")
+    if outcome not in FOLLOWUP_OUTCOMES:
+        raise AgriValidationError(
+            "复诊状态不正确",
+            details={"outcome": "状态不正确"},
+        )
+    normalized_note = str(note or "").strip()
+    now = utc_now_iso()
+    with get_db():
+        cursor = get_db().execute(
+            """
+            INSERT INTO agri_diagnosis_followups (
+                session_id, outcome, note, created_at
+            ) VALUES (?, ?, ?, ?)
+            """,
+            (session_id, outcome, normalized_note, now),
+        )
+    return {
+        "id": int(cursor.lastrowid),
+        "outcome": outcome,
+        "note": normalized_note,
+        "created_at": now,
+    }
+
+
+def list_followups(user_id: int, session_id: int) -> list[dict]:
+    get_diagnosis(user_id, session_id)
+    rows = get_db().execute(
+        """
+        SELECT id, outcome, note, created_at
+        FROM agri_diagnosis_followups
+        WHERE session_id = ?
+        ORDER BY created_at, id
+        """,
+        (session_id,),
+    ).fetchall()
+    return [
+        {
+            "id": int(row["id"]),
+            "outcome": str(row["outcome"]),
+            "note": str(row["note"]),
+            "created_at": str(row["created_at"]),
+        }
+        for row in rows
+    ]
+
+
+def create_diagnosis_from_followup(
+    user_id: int,
+    diagnosis_session_id: int,
+    followup_id: int,
+) -> dict:
+    source = get_diagnosis(user_id, diagnosis_session_id)
+    followup = get_db().execute(
+        """
+        SELECT id
+        FROM agri_diagnosis_followups
+        WHERE id = ? AND session_id = ?
+        """,
+        (followup_id, diagnosis_session_id),
+    ).fetchone()
+    if followup is None:
+        raise AgriNotFoundError("复诊记录不存在")
+
+    now = utc_now_iso()
+    with get_db():
+        cursor = get_db().execute(
+            """
+            INSERT INTO agri_diagnosis_sessions (
+                user_id, product_key, affected_part, symptoms_json,
+                status, round_count, source_session_id, source_followup_id,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, 'in_progress', 0, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                source["product_key"],
+                source["affected_part"],
+                json.dumps(source["symptoms"], ensure_ascii=False),
+                diagnosis_session_id,
+                followup_id,
                 now,
                 now,
             ),
