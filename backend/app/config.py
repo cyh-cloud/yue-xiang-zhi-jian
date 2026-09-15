@@ -36,4 +36,12 @@ def build_config() -> dict[str, object]:
         "SESSION_HOURS": int(os.environ.get("SESSION_HOURS", "24")),
         "SESSION_COOKIE_SECURE": session_cookie_secure,
         "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
+        "AI_API_URL": os.environ.get("AI_API_URL", "").strip(),
+        "AI_API_KEY": os.environ.get("AI_API_KEY", "").strip(),
+        "AI_MODEL": os.environ.get("AI_MODEL", "Qwen/Qwen3-32B").strip(),
+        "AI_ASR_URL": os.environ.get("AI_ASR_URL", "").strip(),
+        "AI_ASR_MODEL": os.environ.get(
+            "AI_ASR_MODEL", "FunAudioLLM/SenseVoiceSmall"
+        ).strip(),
+        "AI_TIMEOUT_SECONDS": float(os.environ.get("AI_TIMEOUT_SECONDS", "60")),
     }

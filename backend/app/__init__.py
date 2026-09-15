@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
+from app.agri_skills import install_default_agri_services
 from app.auth.routes import auth_bp
 from app.config import build_config
 from app.courses.routes import student_courses_bp
@@ -30,6 +31,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
+    install_default_agri_services(app)
     app.teardown_appcontext(close_db)
 
     @app.get("/api/health")
