@@ -8,6 +8,16 @@
 
 **Input**: User description: "agri-skills: 农业技能子系统。基于 `docs/粤乡智匠——需求输入.md` 的 03-农业技能章节及相关 v1/v2/v3 细化口径，实现农时智能日历、语音/文字 AI 农技问答、点选式病虫害多轮诊断、诊断自测与复诊记录、农业课程区块和 AI 课后测验作答；严格复用 01 的账户、会话、角色路由、兴趣标签与课程聚合能力，复用 02 的消息通知与农事提醒通道，课程和预置内容分别消费 08、11 的权威数据。"
 
+## Clarifications
+
+### Session 2026-09-15
+
+- Q: 一个已完成的诊断会话可以关联多条复诊记录吗？ → A: 可以；每次复诊提交都新增一条独立记录，任一条记录均可用于再次发起诊断。
+- Q: 农时日历的空态是否要区分“该产品有产品数据但当前月无数据”和“该产品完全没有预置日历数据”？ → A: 区分；产品无数据时显示“暂无该产品农时数据”，产品有数据但当月无记录时显示“当月无该产品农时”。
+- Q: “进行中”的诊断会话是否有自动超时或保留期限？ → A: 连续 365 天无活动后自动标记为“已放弃”，历史继续可查。
+- Q: AI 课后测验的多次提交应如何计入正式成绩和学习统计？ → A: 保留每次提交历史；最近一次有效得分作为正式成绩、覆盖旧正式成绩并计入学习统计与技能档案。
+- Q: “为你推荐”的最小规则应采用哪些兴趣标签和学习行为，并按什么优先级排序？ → A: 排除已完成课程；先按作物类目、技能兴趣、岗位类别三个标签组的精确匹配数量排序，再按已有观看但未完成的学习行为排序，最后按上架时间倒序。
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 完成语音或文字农技问答 (Priority: P1)
@@ -47,6 +57,7 @@
 5. **Given** 学员中途关闭或离开诊断，**When** 再次进入历史，**Then** 会话保持“进行中”，学员可以继续追问或明确放弃后重新开始。
 6. **Given** AI 服务不可用，**When** 学员进入诊断或继续回答，**Then** 系统提示“AI 服务暂时不可用”，不提供离线诊断结果，并保留已填写的点选信息和回答供恢复后继续。
 7. **Given** 诊断已有历史，**When** 学员查看记录，**Then** 可查看点选信息、全部追问回答、结论和会话状态。
+8. **Given** 进行中的诊断连续 365 天没有任何新回答或状态更新，**When** 系统执行会话生命周期检查，**Then** 会话自动变为“已放弃”且历史仍可查看，不自动删除。
 
 ---
 
@@ -63,9 +74,10 @@
 1. **Given** 学员曾选择过农产品，**When** 再次进入农时日历，**Then** 默认显示该产品及当前月份；无历史时显示农产品目录首项。
 2. **Given** 当前产品存在当月预置数据，**When** 页面加载，**Then** 展示农事任务、管理要点、节气标注和当月农事提示。
 3. **Given** 学员切换产品或前后翻月，**When** 选择完成，**Then** 日历内容按所选产品和月份重新加载。
-4. **Given** 所选产品和月份超出预置数据范围，**When** 页面加载，**Then** 显示“暂无数据”空态。
-5. **Given** 学员未订阅某农产品，**When** 点击订阅，**Then** 该产品和当前学员之间建立有效订阅关系。
-6. **Given** 学员已订阅某农产品且订阅仍有效，**When** 每月初触发农事提醒，**Then** 系统通过 02 的消息中心发送该产品当月农事要点；取消订阅后不再收到后续提醒。
+4. **Given** 所选农产品没有任何月份的预置日历数据，**When** 页面加载，**Then** 显示“暂无该产品农时数据”。
+5. **Given** 所选农产品存在其他月份的日历数据但当前月没有记录，**When** 页面加载，**Then** 保留产品和月份选择并显示“当月无该产品农时”。
+6. **Given** 学员未订阅某农产品，**When** 点击订阅，**Then** 该产品和当前学员之间建立有效订阅关系。
+7. **Given** 学员已订阅某农产品且订阅仍有效，**When** 每月初触发农事提醒，**Then** 系统通过 02 的消息中心发送该产品当月农事要点；取消订阅后不再收到后续提醒。
 
 ---
 
@@ -99,11 +111,11 @@
 **Acceptance Scenarios**:
 
 1. **Given** 平台存在多个方向的课程，**When** 学员进入农业课程区块，**Then** 只展示农业方向的已上架课程，并使用 08 的同一课程数据。
-2. **Given** 学员兴趣标签或农业课程学习行为发生变化，**When** “为你推荐”刷新，**Then** 推荐结果按最新有效信号更新；无可用推荐时显示“暂无推荐”。
+2. **Given** 学员兴趣标签或农业课程学习行为发生变化，**When** “为你推荐”刷新，**Then** 系统排除已完成课程，先按三个兴趣标签组的精确匹配数量、再按未完成观看行为、最后按上架时间倒序生成结果；无可用推荐时显示“暂无推荐”。
 3. **Given** 学员播放课程后离开，**When** 再次打开同一课程，**Then** 播放器从上次有效进度继续。
 4. **Given** 学员课程观看进度达到或超过 80%，**When** 进度完成，**Then** 该课程标记为已完成，重复上报不产生重复完成记录。
 5. **Given** 已完成课程由教师开启 AI 课后测验，**When** 学员进入课程，**Then** 测验入口点亮；未开启测验的课程不显示可用测验入口。
-6. **Given** 学员提交 AI 课后测验且 AI 可用，**When** 判分完成，**Then** 显示得分、逐题结果和讲解，并保存可供技能档案和学习统计读取的成绩。
+6. **Given** 学员提交 AI 课后测验且 AI 可用，**When** 判分完成，**Then** 显示得分、逐题结果和讲解，保留本次提交历史，并把最近一次有效得分作为可覆盖旧正式成绩的成绩供技能档案和学习统计读取。
 7. **Given** AI 服务不可用，**When** 学员提交需 AI 判分的课后测验，**Then** 系统提示“AI 服务暂时不可用”，课程浏览、进度和已完成状态不受影响。
 8. **Given** 农业方向没有已上架课程或当前没有推荐，**When** 打开课程区块，**Then** 对应区域分别显示“暂无课程”或“暂无推荐”。
 
@@ -111,12 +123,13 @@
 
 ### Edge Cases
 
-- 11 尚未提供预置内容、预置目录为空或指定产品/月份没有数据时，日历和本地知识库必须按空态或明确占位响应，不得伪造为正式业务数据。
+- 11 尚未提供预置内容、预置目录为空、产品没有任一日历数据或产品有数据但指定月份无记录时，日历必须分别显示“暂无该产品农时数据”或“当月无该产品农时”；本地知识库必须按空态或明确占位响应，不得伪造为正式业务数据。
 - 学员上次选择的农产品后被 11 下架或删除时，日历回退到当前目录首项，并提示原选择已不可用。
 - 同一学员重复订阅同一产品时只保留一个有效订阅；重复触发的同月农事提醒不得向同一学员重复送达。
 - AI 问答流式输出中途失败时，不把不完整内容当作完整答案；系统按农技问答降级策略返回本地知识库结果或明确提示。
 - 语音识别成功但结果为空、仅含空白或属于误识别时，不得提交空问题；识别失败与取消录音均不得创建问答记录。
 - 诊断达到五轮上限时不得出现第六轮 AI 追问；存在未提交回答时，退出前必须保留草稿状态。
+- 进行中的诊断连续 365 天无活动后必须转为“已放弃”；自动放弃不得删除点选信息、问答或结论属性，也不得允许继续向 AI 追问。
 - 已放弃的诊断不得继续使用 AI，但历史记录仍可查看；重新诊断必须创建独立会话，不覆盖原记录。
 - 自测题目少于 3 道、超过 5 道、题干无效或缺少数值时，不得向学员发布不完整测试，并提示稍后重试。
 - 课程进入待审核、下架或删除状态后，不得继续出现在农业课程区块；已有学习进度和测验成绩保留，并按来源对象当前可用性展示。
@@ -146,7 +159,7 @@
 - **FR-010**: System MUST default the calendar month to the current month in the platform’s configured time zone.
 - **FR-011**: System MUST display the selected product and month’s agricultural tasks, management guidance, solar-term annotations and monthly agricultural reminder when preset data exists.
 - **FR-012**: System MUST refresh calendar content when the student changes product or moves to a previous or later month.
-- **FR-013**: System MUST show “暂无数据” when the selected product and month have no preset calendar entry.
+- **FR-013**: System MUST show “暂无该产品农时数据” when the selected agricultural product has no preset calendar entry in any month, and MUST show “当月无该产品农时” while retaining the selected product and month controls when the product has entries in other months but none for the selected month.
 - **FR-014**: System MUST persist the student’s last selected product independently from product subscription state.
 - **FR-015**: System MUST allow a student to subscribe to or unsubscribe from any currently available agricultural product.
 - **FR-016**: System MUST maintain at most one effective subscription per student and product; repeated subscribe or unsubscribe requests MUST be idempotent.
@@ -194,7 +207,7 @@
 - **FR-040**: System MUST end diagnosis when AI determines the available information is sufficient or when the five-round limit is reached.
 - **FR-041**: System MUST output both an etiological analysis and a prevention-and-treatment plan in every completed diagnosis.
 - **FR-042**: A conclusion reached solely because the five-round limit was reached MUST be visibly marked “信息有限”.
-- **FR-043**: System MUST persist an interrupted diagnosis as “进行中” and allow the same student to resume it or explicitly abandon it.
+- **FR-043**: System MUST persist an interrupted diagnosis as “进行中” and allow the same student to resume it or explicitly abandon it; a session with no new answer or status update for 365 consecutive days MUST automatically transition to “已放弃”.
 - **FR-044**: System MUST NOT send an abandoned diagnosis to AI again, and MUST keep its prior information readable in history.
 - **FR-045**: System MUST retain every diagnosis session’s point selections, ordered questions and answers, conclusion, status and timestamps for history review.
 - **FR-046**: System MUST create a new diagnosis session when the student restarts after abandonment; it MUST NOT overwrite the abandoned session.
@@ -208,7 +221,7 @@
 - **FR-051**: System MUST allow the student to answer the generated self-test and, when AI is available, return a score, per-question correctness and an explanation.
 - **FR-052**: System MUST persist every submitted self-test result as a learning outcome associated with the originating diagnosis.
 - **FR-053**: System MUST NOT generate, grade or explain a self-test through a local knowledge-base fallback; AI unavailability uses the fixed message from FR-023.
-- **FR-054**: System MUST allow the student to add one follow-up record to a completed diagnosis with status “好转”, “无变化” or “恶化” and an optional note.
+- **FR-054**: System MUST allow the student to add one or more follow-up records to a completed diagnosis, each with status “好转”, “无变化” or “恶化” and an optional note; every submission MUST create a new independent record rather than overwrite an earlier one.
 - **FR-055**: System MUST attach every follow-up record to its originating diagnosis and retain all records in chronological history.
 - **FR-056**: System MUST allow the student to start a new diagnosis from a selected follow-up record.
 - **FR-057**: A diagnosis started from a follow-up record MUST prefill the previous product, affected part, symptoms and applicable context while remaining editable before submission.
@@ -217,7 +230,7 @@
 **农业课程区块与 AI 课后测验**
 
 - **FR-059**: System MUST display only published courses whose learning direction is agriculture and whose authoritative status is supplied by 08.
-- **FR-060**: System MUST provide a “为你推荐” area based on the student’s latest interest tags and recorded agricultural learning behavior, without changing or duplicating 08’s course records.
+- **FR-060**: System MUST provide a deterministic “为你推荐” area from eligible uncompleted published agricultural courses: courses MUST be ranked first by the count of exact matches across the student’s current crop-category, skill-interest and job-category tags, then by recent or existing viewing behavior for courses not yet completed, and finally by publication time descending; completed courses MUST be excluded.
 - **FR-061**: System MUST show “暂无推荐” when no recommendation signal produces eligible courses, independently from the general course empty state.
 - **FR-062**: System MUST show “暂无课程” when there are no eligible published agricultural courses.
 - **FR-063**: System MUST record course viewing progress and total viewing duration for the current student and course.
@@ -228,7 +241,7 @@
 - **FR-068**: System MUST activate the AI quiz entry only when the completed course has an enabled and valid quiz configured by 08.
 - **FR-069**: System MUST consume the 08-owned question bank and MUST NOT allow the student to edit questions, options, answers or scoring rules.
 - **FR-070**: System MUST submit quiz answers for AI grading and return a score, per-question correctness and explanations when AI is available.
-- **FR-071**: System MUST persist each submitted course-quiz attempt and its learning outcome for later skill-archive and learning-statistics consumption.
+- **FR-071**: System MUST persist every submitted course-quiz attempt and its learning outcome; the most recent valid scored attempt MUST become the formal course-quiz result, replace the prior formal result for learning statistics and skill-archive consumption, and all earlier attempts MUST remain available as history.
 - **FR-072**: System MUST preserve course browsing, progress, completion and earlier results when the AI quiz-grading call is unavailable, while showing the fixed FR-023 message for the failed quiz operation.
 - **FR-073**: System MUST use the existing course-video comment area for course questions and teacher replies and MUST NOT create a forum, discussion module or separate comment store.
 - **FR-074**: System MUST show course and recommendation empty states independently and MUST NOT count unavailable, unpublished or out-of-direction courses as either.
@@ -247,7 +260,7 @@
 - **Follow-Up Record**: 诊断后的防治效果记录，包含状态、备注、记录时间和原诊断关联。
 - **Product Subscription**: 学员与农产品之间的有效订阅关系及订阅历史，用于 02 触发月度农事提醒。
 - **Course Learning Progress**: 学员在农业课程上的观看位置、有效进度、累计观看时长、完成状态和最后更新时间。
-- **Course Quiz Attempt**: 学员对 08 所配置课程测验的一次作答、得分、逐题结果、讲解和时间。
+- **Course Quiz Attempt**: 学员对 08 所配置课程测验的一次作答、得分、逐题结果、讲解和时间；每次提交都保留，最近一次有效评分提交为正式成绩。
 
 ## Scope Boundaries
 
@@ -277,14 +290,14 @@
 
 ### Measurable Outcomes
 
-- **SC-001**: 在有历史和无历史两种初始状态下，100% 的日历会话正确选择默认产品与当前月份；产品切换、前后翻月和超范围空态全部符合规格。
+- **SC-001**: 在有历史和无历史两种初始状态下，100% 的日历会话正确选择默认产品与当前月份；产品切换、前后翻月、产品级无数据和月份级无数据空态全部符合规格。
 - **SC-002**: 对有效、重复、取消和再次订阅路径，100% 的月度提醒只发送给触发时有效订阅的学员，同一学员同一产品同一月份至多收到一条提醒。
 - **SC-003**: 在文字、语音成功、语音失败、AI 可用、本地知识库命中、本地知识库未命中和流式中断测试中，100% 的问答结果、三个追问建议规则及固定提示符合规格。
-- **SC-004**: 在诊断充分、恰好五轮上限、中途恢复、放弃重开、自测和 AI 不可用测试中，100% 的会话不超过五轮、状态可恢复、结论含病因分析与防治方案。
+- **SC-004**: 在诊断充分、恰好五轮上限、中途恢复、连续 365 天无活动自动放弃、主动放弃重开、自测和 AI 不可用测试中，100% 的会话不超过五轮、状态转换正确、历史可查、结论含病因分析与防治方案。
 - **SC-005**: 100% 的有效诊断自测包含 3 至 5 道题；每次提交均返回得分、逐题结果和讲解，并可在历史中重新读取。
 - **SC-006**: 每条复诊记录均可从原诊断查看；100% 的基于复诊再诊断会话正确预填上轮信息，同时保持字段可编辑。
-- **SC-007**: 在课程筛选、推荐、播放中断、重复进度、达到或超过 80% 完成、测验未开启、测验已开启和 AI 不可用测试中，100% 的结果符合规格。
-- **SC-008**: 100% 的农业课程区块课程均为农业方向已上架课程，且与 08/01 使用的权威课程记录一致；无课程和推荐为空时显示对应空态。
+- **SC-007**: 在课程筛选、推荐、播放中断、重复进度、达到或超过 80% 完成、测验未开启、测验已开启、多次测验提交和 AI 不可用测试中，100% 的正式成绩均等于最近一次有效提交得分，且历史提交不丢失。
+- **SC-008**: 100% 的农业课程区块课程均为农业方向已上架课程，且与 08/01 使用的权威课程记录一致；100% 的推荐结果排除已完成课程，并严格按标签匹配数、未完成观看行为、上架时间倒序排序；无课程和推荐为空时显示对应空态。
 - **SC-009**: 账户、标签、消息、课程发布和非课程评论能力复用测试中，03 产生的重复实现数量为 0；跨学员读取或修改尝试的拒绝率达到 100%。
 - **SC-010**: 对依赖尚未实现的场景，100% 的系统响应可区分正式数据与演示占位，且占位能力不会阻塞问答、诊断、日历、订阅、课程浏览或进度记录的手动路径。
 
@@ -296,7 +309,7 @@
 - 本地病虫害知识库降级只用于农技问答；匹配结果以单条最相关知识条目返回，不生成追问建议，也不用于诊断结论。
 - AI 流式回答只有形成完整内容后才触发三个追问建议；中途失败不得把不完整文本标记为完整回答。
 - 课程观看进度以学员账号跨会话保存；有效进度单调不回退，达到 80% 后完成状态永久保留。
-- “学习行为”用于推荐时至少包括本模块已记录的农业课程浏览、观看进度和完成状态；标签匹配仍是最直接的推荐信号。
+- “学习行为”用于推荐时使用本模块已记录的农业课程观看、观看进度和完成状态；已完成课程不进入推荐池，未完成观看行为作为标签匹配之后的次级排序信号。
 - 诊断自测、复用课程测验和复诊记录属于学习成果来源；具体技能档案汇总、可见范围和简历附带规则由 07 决定。
 - 预置数据占位仅服务于 11 尚未实现时的可开发、可验收状态，生产口径始终以 11 台账为准；一旦 11 接入，03 不保留第二份正式数据维护入口。
 - 课程评论沿用既有课程视频评论区；如果评论能力尚未实现，03 只保留入口或不可用状态，不自行建立评论系统。
