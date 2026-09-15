@@ -3,6 +3,13 @@ from __future__ import annotations
 from flask import Flask
 
 from app.agri_skills.ai_client import NullAiClient, set_ai_client
+from app.agri_skills.calendar import (
+    list_product_subscriber_ids,
+    list_product_subscriptions,
+    subscribe_product,
+    unsubscribe_product,
+)
+from app.agri_skills.messaging_provider import AgriMessagingProvider
 from app.agri_skills.presets import (
     PlaceholderPresetProvider,
     set_preset_provider,
