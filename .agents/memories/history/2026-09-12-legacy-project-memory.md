@@ -1,3 +1,5 @@
+> Archived legacy project memory moved during the 2026-09-12 migration.
+
 # Project Memory Operating Rules
 
 1. 本文件维护粤乡智匠项目内的持久记忆。只保存跨会话有价值的项目定位、边界、验收口径、复用经验与路由规则；不保存完整聊天记录或一次性调试过程。

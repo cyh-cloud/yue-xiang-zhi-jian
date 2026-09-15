@@ -9,6 +9,8 @@ __pycache__/
 .agents/*
 !.agents/memories/
 .impeccable/
+.superpowers/
+.worktrees/
 frontend/dist/
 frontend/dist-locked-backup/
 
