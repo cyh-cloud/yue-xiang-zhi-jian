@@ -303,6 +303,60 @@ class TestAgriCourseApi(unittest.TestCase):
             [0, 1],
         )
 
+    def test_quiz_attempt_history_route_is_owner_scoped(self):
+        self._complete_course(1)
+        self.ai.complete_json.return_value = {
+            "score": 100,
+            "questions": [
+                {
+                    "id": "q1",
+                    "correct": True,
+                    "explanation": "正确。",
+                }
+            ],
+        }
+        submitted = self.client.post(
+            "/api/agri-skills/courses/1/quiz",
+            json={"answers": {"q1": "A"}},
+        )
+
+        history = self.client.get(
+            "/api/agri-skills/courses/1/quiz/attempts"
+        )
+        foreign = self.other_client.get(
+            "/api/agri-skills/courses/1/quiz/attempts"
+        )
+
+        self.assertEqual(submitted.status_code, 201)
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(
+            history.get_json()["attempts"],
+            [
+                {
+                    "id": submitted.get_json()["attempt"]["id"],
+                    "course_id": 1,
+                    "answers": {"q1": "A"},
+                    "score": 100,
+                    "questions": [
+                        {
+                            "id": "q1",
+                            "type": "single_choice",
+                            "prompt": "达到多少进度视为完成？",
+                            "options": ["A", "B"],
+                            "correct": True,
+                            "explanation": "正确。",
+                        }
+                    ],
+                    "is_formal": True,
+                    "is_current": True,
+                    "is_latest": True,
+                    "created_at": submitted.get_json()["attempt"]["created_at"],
+                }
+            ],
+        )
+        self.assertEqual(foreign.status_code, 200)
+        self.assertEqual(foreign.get_json()["attempts"], [])
+
     def test_recommendations_exclude_completed_and_unavailable_courses(self):
         recommendations = self.client.get("/api/agri-skills/recommendations")
 
@@ -492,6 +546,11 @@ class TestAgriCourseApi(unittest.TestCase):
                 {"position_seconds": 10, "watched_delta_seconds": 10},
             ),
             ("GET", "/api/agri-skills/courses/1/quiz", None),
+            (
+                "GET",
+                "/api/agri-skills/courses/1/quiz/attempts",
+                None,
+            ),
             (
                 "POST",
                 "/api/agri-skills/courses/1/quiz",

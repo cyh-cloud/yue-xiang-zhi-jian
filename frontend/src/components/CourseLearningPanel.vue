@@ -31,6 +31,16 @@ const coursesStore = useCourseLearningStore()
 const auth = useAuthStore()
 const router = useRouter()
 const quizAnswers = reactive<Record<string, string>>({})
+const attemptTimestampFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'Asia/Shanghai',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23'
+})
 
 const orderedCourses = computed(() => coursesStore.courses)
 const orderedRecommendations = computed(() => coursesStore.recommendations)
@@ -90,6 +100,18 @@ function latestAttempt(courseId: number): CourseQuizAttempt | undefined {
   )
 }
 
+function justSubmitted(courseId: number): boolean {
+  return coursesStore.justSubmittedCourseId === courseId
+}
+
+function resultLabel(courseId: number): string {
+  return justSubmitted(courseId) ? '本次成绩' : '最近成绩'
+}
+
+function feedbackLabel(courseId: number): string {
+  return justSubmitted(courseId) ? '本次解析' : '上次解析'
+}
+
 function attemptsFor(courseId: number): CourseQuizAttempt[] {
   return coursesStore.attempts.filter(
     attempt => attempt.course_id === courseId
@@ -128,6 +150,24 @@ function formatPublishedAt(value: string): string {
     month: '2-digit',
     day: '2-digit'
   }).format(date)
+}
+
+function formatAttemptTimestamp(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  const values = Object.fromEntries(
+    attemptTimestampFormatter
+      .formatToParts(date)
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  )
+  return [
+    values.year,
+    values.month,
+    values.day
+  ].join('-') + ` ${values.hour}:${values.minute}:${values.second}`
 }
 
 async function openQuiz(courseId: number) {
@@ -435,7 +475,7 @@ onMounted(() => {
                       class="ark-data"
                       :datetime="attempt.created_at"
                     >
-                      {{ attempt.created_at }}
+                      {{ formatAttemptTimestamp(attempt.created_at) }}
                     </time>
                     <span>
                       {{
@@ -493,13 +533,21 @@ onMounted(() => {
                 :data-test="`quiz-result-${course.id}`"
               >
                 <div class="quiz-result__score">
-                  <span>本次得分</span>
+                  <span data-test="quiz-result-label">
+                    {{ resultLabel(course.id) }}
+                  </span>
                   <strong
                     class="ark-data"
                     :data-test="`quiz-score-${course.id}`"
                   >
                     {{ latestAttempt(course.id)?.score }} 分
                   </strong>
+                </div>
+                <div
+                  class="quiz-result__feedback-heading"
+                  data-test="quiz-feedback-label"
+                >
+                  {{ feedbackLabel(course.id) }}
                 </div>
                 <article
                   v-for="(question, index) in latestAttempt(course.id)?.questions"
@@ -1065,6 +1113,13 @@ onMounted(() => {
 .quiz-result__score strong {
   color: var(--ark-signal);
   font-size: 1.55rem;
+}
+
+.quiz-result__feedback-heading {
+  padding: 10px 16px;
+  border-top: 1px solid var(--ark-line);
+  color: var(--ark-muted);
+  font-size: 0.72rem;
 }
 
 .quiz-result article {

@@ -23,6 +23,7 @@ interface CourseLearningState {
   progressErrorsByCourse: Record<number, string>
   activeQuiz: CourseQuiz | null
   attempts: CourseQuizAttempt[]
+  justSubmittedCourseId: number | null
   loading: boolean
   error: string
   recommendationError: string
@@ -134,6 +135,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
     progressErrorsByCourse: {},
     activeQuiz: null,
     attempts: [],
+    justSubmittedCourseId: null,
     loading: false,
     error: '',
     recommendationError: ''
@@ -149,6 +151,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
       this.progressErrorsByCourse = {}
       this.activeQuiz = null
       this.attempts = []
+      this.justSubmittedCourseId = null
       this.loading = false
       this.error = ''
       this.recommendationError = ''
@@ -286,6 +289,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
     async loadQuiz(courseId: number): Promise<boolean> {
       this.loading = true
       this.error = ''
+      this.justSubmittedCourseId = null
 
       try {
         const response = await apiFetch<{
@@ -318,6 +322,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
     ): Promise<boolean> {
       this.loading = true
       this.error = ''
+      this.justSubmittedCourseId = null
 
       try {
         const response = await apiFetch<{
@@ -346,6 +351,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
               : item
           )
         ]
+        this.justSubmittedCourseId = courseId
         return true
       } catch (error) {
         this.captureError(error, '课后测验提交失败')

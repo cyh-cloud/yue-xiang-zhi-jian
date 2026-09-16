@@ -108,6 +108,26 @@ const attempts = [
   }
 ]
 
+const submittedAttempt = {
+  id: 23,
+  course_id: 1,
+  score: 100,
+  is_formal: true,
+  is_current: true,
+  is_latest: true,
+  questions: [
+    {
+      id: 'q1',
+      type: 'single_choice',
+      prompt: '达到多少进度视为完成？',
+      options: ['60%', '80%'],
+      correct: true,
+      explanation: '达到 80% 即完成。'
+    }
+  ],
+  created_at: '2026-09-16T04:00:00+00:00'
+}
+
 function mockApi() {
   mockedApiFetch.mockImplementation(async (path, options) => {
     if (path === '/api/ecommerce-training/courses') {
@@ -147,6 +167,12 @@ function mockApi() {
     }
     if (path === '/api/ecommerce-training/courses/1/quiz/attempts') {
       return { success: true, attempts } as never
+    }
+    if (
+      path === '/api/ecommerce-training/courses/1/quiz' &&
+      options?.method === 'POST'
+    ) {
+      return { success: true, attempt: submittedAttempt } as never
     }
     throw new Error(`Unexpected request: ${path}`)
   })
@@ -214,6 +240,44 @@ describe('EcommerceCoursesView quiz availability and history', () => {
     expect(
       refreshed.get('[data-test="quiz-history-21"]').text()
     ).toContain('历史成绩')
+    expect(
+      refreshed.get('[data-test="quiz-history-22"]').text()
+    ).toContain('2026-09-16 11:00:00')
+    expect(
+      refreshed.get('[data-test="quiz-history-22"]').text()
+    ).not.toContain('2026-09-16T03:00:00+00:00')
+  })
+
+  it('labels only the just-submitted result as current and refreshed results as latest history', async () => {
+    mockApi()
+    const submitted = mountView()
+    await flushPromises()
+    await submitted.get('[data-test="quiz-entry-1"]').trigger('click')
+    await flushPromises()
+    await submitted.get('[data-test="quiz-option-0-1"]').setValue()
+    await submitted.get('[data-test="quiz-form-1"]').trigger('submit')
+    await flushPromises()
+
+    expect(
+      submitted.get('[data-test="quiz-result-label"]').text()
+    ).toContain('本次成绩')
+    expect(
+      submitted.get('[data-test="quiz-feedback-label"]').text()
+    ).toContain('本次解析')
+    submitted.unmount()
+
+    const refreshed = mountView()
+    await flushPromises()
+    await refreshed.get('[data-test="quiz-entry-1"]').trigger('click')
+    await flushPromises()
+
+    expect(
+      refreshed.get('[data-test="quiz-result-label"]').text()
+    ).toContain('最近成绩')
+    expect(
+      refreshed.get('[data-test="quiz-feedback-label"]').text()
+    ).toContain('上次解析')
+    expect(refreshed.get('.quiz-result').text()).not.toContain('本次')
   })
 })
 

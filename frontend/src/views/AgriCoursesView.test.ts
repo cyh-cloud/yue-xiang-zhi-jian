@@ -241,6 +241,10 @@ describe('AgriCoursesView', () => {
     await wrapper.get('[data-test="quiz-entry-1"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.get('[data-test="quiz-1"]').element).toBeTruthy()
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/agri-skills/courses/1/quiz/attempts'
+    )
     expect(wrapper.get('[data-test="quiz-1"]').text()).toContain(
       '达到多少进度视为完成？'
     )
