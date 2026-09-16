@@ -369,7 +369,7 @@ describe('EcommerceCustomerServiceView', () => {
     expect(wrapper.text()).not.toMatch(/本地兜底|SSE|003|降级/)
   })
 
-  it('safely renders string, list and dictionary analysis and summary values', async () => {
+  it('safely renders analysis strings and summary string, list and dictionary values', async () => {
     const mixed = customerSession({
       status: 'completed',
       end_suggested: true,
@@ -377,12 +377,12 @@ describe('EcommerceCustomerServiceView', () => {
         customerTurn(1, {
           student_reply: '请提供订单号',
           analysis: {
-            problem: ['未先确认订单状态'],
-            evidence: { quote: '请提供订单号', reason: '未确认订单' },
+            problem: '未先确认订单状态',
+            evidence: '学员直接要求提供订单号，未确认订单',
             suggestion: '先共情，再确认订单和商品状态',
             criteria: {
-              确认订单情况: { reached: true, note: '已询问' },
-              说明退换流程: ['拆封后可申请', '需提供凭证']
+              确认订单情况: true,
+              说明退换流程: false
             },
             goal_status: 'not_reached'
           }
@@ -409,8 +409,9 @@ describe('EcommerceCustomerServiceView', () => {
 
     expect(wrapper.text()).toContain('未先确认订单状态')
     expect(wrapper.text()).toContain('未确认订单')
-    expect(wrapper.text()).toContain('拆封后可申请')
-    expect(wrapper.text()).toContain('需提供凭证')
+    expect(wrapper.text()).toContain('确认订单情况')
+    expect(wrapper.text()).toContain('已达成')
+    expect(wrapper.text()).toContain('未达成')
     expect(wrapper.text()).toContain('整场回应清楚')
     expect(wrapper.text()).toContain('可直接回应顾虑')
     expect(wrapper.text()).not.toContain('[object Object]')

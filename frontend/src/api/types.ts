@@ -480,10 +480,10 @@ export interface CustomerSession {
     customer_message: string
     student_reply: string | null
     analysis: {
-      problem: CustomerServiceJsonValue
-      evidence: CustomerServiceJsonValue
-      suggestion: CustomerServiceJsonValue
-      criteria: Record<string, CustomerServiceJsonValue>
+      problem: string
+      evidence: string
+      suggestion: string
+      criteria: Record<string, boolean>
       goal_status: 'reached' | 'not_reached'
     } | null
     created_at: string

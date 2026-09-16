@@ -1,8 +1,12 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 
 import { ApiError, apiFetch } from '@/api/client'
-import type { CustomerScenario, CustomerSession } from '@/api/types'
+import type {
+  CustomerScenario,
+  CustomerServiceJsonValue,
+  CustomerSession
+} from '@/api/types'
 
 import { useEcommerceCustomerServiceStore } from './ecommerceCustomerService'
 
@@ -64,6 +68,32 @@ describe('ecommerceCustomerService store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     mockedApiFetch.mockReset()
+  })
+
+  it('keeps analysis strict while allowing JSON-safe summary values', () => {
+    type Analysis = NonNullable<
+      CustomerSession['turns'][number]['analysis']
+    >
+    type Summary = NonNullable<CustomerSession['summary']>
+
+    expectTypeOf<Analysis['problem']>().toEqualTypeOf<string>()
+    expectTypeOf<Analysis['evidence']>().toEqualTypeOf<string>()
+    expectTypeOf<Analysis['suggestion']>().toEqualTypeOf<string>()
+    expectTypeOf<Analysis['criteria']>().toEqualTypeOf<
+      Record<string, boolean>
+    >()
+    expectTypeOf<Summary['overall_performance']>().toEqualTypeOf<
+      CustomerServiceJsonValue
+    >()
+    expectTypeOf<Summary['main_problems']>().toEqualTypeOf<
+      CustomerServiceJsonValue
+    >()
+    expectTypeOf<Summary['prioritized_improvements']>().toEqualTypeOf<
+      CustomerServiceJsonValue
+    >()
+    expectTypeOf<Summary['goal_completion']>().toEqualTypeOf<
+      CustomerServiceJsonValue
+    >()
   })
 
   it('loads exactly five scenarios and starts the selected scenario', async () => {
