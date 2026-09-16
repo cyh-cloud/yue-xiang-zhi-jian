@@ -68,12 +68,14 @@ export const useAgriCalendarStore = defineStore('agriCalendar', {
       try {
         const response = await apiFetch<{
           success: true
-          calendar: FarmingCalendar
+          calendar: FarmingCalendar & { product_key?: string }
         }>(
           `/api/agri-skills/calendar?product_key=${encodeURIComponent(targetProductKey)}&month=${targetMonth}`
         )
         this.selectedProductKey =
-          response.calendar.product?.key || targetProductKey
+          response.calendar.product?.key ||
+          response.calendar.product_key ||
+          targetProductKey
         this.month = targetMonth
         this.calendar = response.calendar
       } catch (error) {

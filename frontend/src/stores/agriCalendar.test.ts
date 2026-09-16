@@ -94,6 +94,28 @@ describe('useAgriCalendarStore', () => {
     expect(store.month).toBe(2)
   })
 
+  it('keeps the product key when an empty calendar omits product details', async () => {
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      calendar: {
+        product_key: 'longan',
+        month: 9,
+        tasks: [],
+        management: [],
+        solar_terms: [],
+        reminder: '',
+        empty_state: '暂无该产品农时数据'
+      }
+    } as never)
+    const store = useAgriCalendarStore()
+
+    await store.loadCalendar(undefined, 9)
+
+    expect(store.selectedProductKey).toBe('longan')
+    expect(store.calendar?.empty_state).toBe('暂无该产品农时数据')
+    expect(store.month).toBe(9)
+  })
+
   it('persists a product selection before loading its calendar', async () => {
     mockedApiFetch.mockImplementation(async (path, options) => {
       if (
