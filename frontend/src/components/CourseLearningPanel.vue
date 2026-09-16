@@ -616,7 +616,9 @@ onMounted(() => {
 
 .recommendation-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 10px;
+  padding: 12px;
 }
 
 .recommendation-item {
@@ -625,12 +627,7 @@ onMounted(() => {
   gap: 12px;
   min-width: 0;
   padding: 17px 18px;
-  border-right: 1px solid var(--ark-line);
-  border-bottom: 1px solid var(--ark-line);
-}
-
-.recommendation-item:nth-child(3n) {
-  border-right: 0;
+  border: 1px solid var(--ark-line);
 }
 
 .recommendation-item > span {
@@ -696,6 +693,7 @@ onMounted(() => {
   margin: 5px 0 0;
   font-size: 1.28rem;
   line-height: 1.3;
+  text-wrap: balance;
 }
 
 .course-card__head time {
@@ -705,10 +703,12 @@ onMounted(() => {
 }
 
 .course-card__summary {
+  min-width: 0;
   max-width: 78ch;
   margin: 13px 0 0;
   color: var(--ark-muted);
   overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 .course-card__meta {
@@ -1024,10 +1024,6 @@ onMounted(() => {
 
   .recommendation-list {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .recommendation-item {
-    border-right: 0;
   }
 
   .course-card {

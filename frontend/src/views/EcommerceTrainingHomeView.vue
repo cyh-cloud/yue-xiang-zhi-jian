@@ -187,7 +187,7 @@ async function logout() {
 .ecommerce-training-home__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1px;
+  gap: 10px;
 }
 
 .ecommerce-training-card {

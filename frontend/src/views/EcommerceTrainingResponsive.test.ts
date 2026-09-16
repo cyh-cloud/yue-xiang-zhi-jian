@@ -327,6 +327,9 @@ describe('ecommerce responsive CSS contracts', () => {
     ).toContain('repeat(auto-fit, minmax(250px, 1fr))')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__grid')
+    ).toContain('gap: 10px')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__grid')
     ).not.toContain('background: var(--ark-line)')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card')
@@ -380,7 +383,7 @@ describe('ecommerce responsive CSS contracts', () => {
       'grid-template-columns: minmax(0, 1fr)'
     )
     expect(cssRule(ecommerceLiveScriptSource, '.output-panel')).toContain(
-      'min-height: clamp(260px, 38svh, 360px)'
+      'min-height: clamp(180px, 24svh, 300px)'
     )
 
     const simulationMobile = mediaBlock(ecommerceSimulationSource, 900)
@@ -404,7 +407,7 @@ describe('ecommerce responsive CSS contracts', () => {
       'grid-template-columns: minmax(0, 1fr) auto'
     )
     expect(cssRule(ecommerceSimulationSource, '.training-panel')).toContain(
-      'min-height: clamp(280px, 42svh, 460px)'
+      'min-height: clamp(200px, 28svh, 340px)'
     )
     expect(
       cssRule(ecommerceSimulationSource, '.scene-panel button span')
@@ -504,11 +507,20 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(coursesMobile, '.recommendation-list')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
+    expect(cssRule(courseLearningPanelSource, '.recommendation-list')).toContain(
+      'repeat(auto-fit, minmax(min(100%, 240px), 1fr))'
+    )
+    expect(courseLearningPanelSource).not.toContain(
+      '.recommendation-item:nth-child(3n)'
+    )
     expect(cssRule(courseLearningPanelSource, '.course-card')).toContain(
       'min-width: 0'
     )
     expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
       'overflow-wrap: anywhere'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
+      'text-wrap: pretty'
     )
     expect(cssRule(courseLearningPanelSource, '.course-card__meta')).toContain(
       'flex-wrap: wrap'

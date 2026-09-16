@@ -467,7 +467,7 @@ onMounted(() => {
 }
 
 .output-panel {
-  min-height: clamp(260px, 38svh, 360px);
+  min-height: clamp(180px, 24svh, 300px);
 }
 
 .current-version {

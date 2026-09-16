@@ -8,7 +8,9 @@ import {
   Radio,
   Store
 } from 'lucide-vue-next'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 const links = [
   { to: '/student/ecommerce-training', label: '模块首页', icon: Home },
@@ -43,11 +45,27 @@ const links = [
     icon: BookOpen
   }
 ] as const
+
+const route = useRoute()
+const navRef = ref<HTMLElement | null>(null)
+
+function revealActiveLink() {
+  void nextTick(() => {
+    const activeLink = navRef.value?.querySelector<HTMLElement>('a.is-active')
+    activeLink?.scrollIntoView?.({
+      block: 'nearest',
+      inline: 'center'
+    })
+  })
+}
+
+onMounted(revealActiveLink)
+watch(() => route.fullPath, revealActiveLink, { flush: 'post' })
 </script>
 
 <template>
   <nav class="ecommerce-training-nav" aria-label="电商运营实训导航">
-    <div class="ecommerce-training-nav__inner">
+    <div ref="navRef" class="ecommerce-training-nav__inner">
       <RouterLink
         v-for="link in links"
         :key="link.to"
