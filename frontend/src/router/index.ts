@@ -1,6 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
+import AgriCalendarView from '@/views/AgriCalendarView.vue'
+import AgriCoursesView from '@/views/AgriCoursesView.vue'
+import AgriDiagnosisView from '@/views/AgriDiagnosisView.vue'
+import AgriQaView from '@/views/AgriQaView.vue'
+import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
 import CourseCatalogView from '@/views/CourseCatalogView.vue'
 import EnterprisePortalView from '@/views/EnterprisePortalView.vue'
@@ -61,6 +66,36 @@ const router = createRouter({
       path: '/student/courses',
       name: 'student-courses',
       component: CourseCatalogView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/agri-skills',
+      name: 'student-agri-skills',
+      component: AgriSkillsHomeView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/agri-skills/calendar',
+      name: 'student-agri-calendar',
+      component: AgriCalendarView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/agri-skills/qa',
+      name: 'student-agri-qa',
+      component: AgriQaView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/agri-skills/diagnosis',
+      name: 'student-agri-diagnosis',
+      component: AgriDiagnosisView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/agri-skills/courses',
+      name: 'student-agri-courses',
+      component: AgriCoursesView,
       meta: { requiresAuth: true, roles: ['student'] }
     },
     {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, UserRound } from 'lucide-vue-next'
+import { BookOpen, Sprout, UserRound } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 
 import PortalShell from '@/components/PortalShell.vue'
@@ -22,6 +22,13 @@ import PortalShell from '@/components/PortalShell.vue'
         <span>
           <strong>编辑个人资料</strong>
           <small>学习方向与兴趣标签</small>
+        </span>
+      </RouterLink>
+      <RouterLink to="/student/agri-skills">
+        <Sprout :size="18" aria-hidden="true" />
+        <span>
+          <strong>进入农业技能</strong>
+          <small>农时、问答、诊断与课程</small>
         </span>
       </RouterLink>
     </nav>

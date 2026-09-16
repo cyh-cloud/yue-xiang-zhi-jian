@@ -63,6 +63,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         title: '消息中心',
         description: '查看私信、系统通知与未读消息。',
         href: '/messages'
+      },
+      {
+        id: 'student-agri-skills',
+        title: '农业技能',
+        description: '农时日历、农技问答、病虫害诊断与农业课程。',
+        href: '/student/agri-skills'
       }
     ],
     steps: [
