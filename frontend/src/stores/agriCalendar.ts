@@ -83,7 +83,26 @@ export const useAgriCalendarStore = defineStore('agriCalendar', {
       }
     },
     async selectProduct(key: string) {
-      await this.loadCalendar(key, this.month)
+      this.saving = true
+      this.error = ''
+
+      try {
+        const response = await apiFetch<{
+          success: true
+          product_key: string
+        }>('/api/agri-skills/calendar/selection', {
+          method: 'PUT',
+          body: JSON.stringify({ product_key: key })
+        })
+        this.selectedProductKey = response.product_key || key
+      } catch (error) {
+        this.captureError(error, '产品选择保存失败')
+        return
+      } finally {
+        this.saving = false
+      }
+
+      await this.loadCalendar(this.selectedProductKey, this.month)
     },
     async changeMonth(delta: number) {
       const month = ((((this.month - 1 + delta) % 12) + 12) % 12) + 1
