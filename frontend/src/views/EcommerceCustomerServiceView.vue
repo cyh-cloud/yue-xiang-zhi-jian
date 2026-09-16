@@ -10,26 +10,24 @@ import { useRouter } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
 import EcommerceTrainingNav from '@/components/EcommerceTrainingNav.vue'
+import type { CustomerSession } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
-import {
-  type EcommerceCustomerServiceSession,
-  useEcommerceCustomerServiceStore
-} from '@/stores/ecommerceCustomerService'
+import { useEcommerceCustomerServiceStore } from '@/stores/ecommerceCustomerService'
 
 const store = useEcommerceCustomerServiceStore()
 const auth = useAuthStore()
 const router = useRouter()
 
 const lastTurn = computed(() => {
-  const turns = store.current?.turns
+  const turns = store.currentSession?.turns
   return turns?.length ? turns[turns.length - 1] : null
 })
 const canCompose = computed(
   () =>
     Boolean(
-      store.current &&
-        store.current.status !== 'completed' &&
-        !store.current.end_suggested &&
+      store.currentSession &&
+        store.currentSession.status !== 'completed' &&
+        !store.currentSession.end_suggested &&
         lastTurn.value &&
         !lastTurn.value.student_reply
   )
@@ -53,7 +51,7 @@ const operationStatus = computed(() => {
   if (store.ending) {
     return '正在生成训练总结'
   }
-  return store.current?.status === 'completed' ? '客服训练已完成' : ''
+  return store.currentSession?.status === 'completed' ? '客服训练已完成' : ''
 })
 
 function formatValue(value: unknown, depth = 0): string {
@@ -99,9 +97,7 @@ function goalStatusLabel(value: 'reached' | 'not_reached'): string {
   return value === 'reached' ? '目标已达成' : '目标未达成'
 }
 
-function historyStatusLabel(
-  status: EcommerceCustomerServiceSession['status']
-): string {
+function historyStatusLabel(status: CustomerSession['status']): string {
   if (status === 'completed') {
     return '已完成'
   }
@@ -124,7 +120,10 @@ function formatTime(value: string): string {
       })
 }
 
-function historySummary(session: EcommerceCustomerServiceSession): string {
+function historySummary(session: {
+  status: CustomerSession['status']
+  summary: { goal_completion: unknown } | null
+}): string {
   if (session.summary) {
     return formatValue(session.summary.goal_completion)
   }
@@ -134,7 +133,7 @@ function historySummary(session: EcommerceCustomerServiceSession): string {
 }
 
 function scenarioIsActive(key: string): boolean {
-  return store.current?.scenario_key === key
+  return store.currentSession?.scenario_key === key
 }
 
 async function logout() {
@@ -231,16 +230,16 @@ onMounted(() => {
             <span>训练记录</span>
             <h2 id="history-title">客服历史</h2>
           </div>
-          <small>{{ store.history.length }} 条记录</small>
+          <small>{{ store.historyItems.length }} 条记录</small>
         </div>
 
         <div
-          v-if="store.history.length"
+          v-if="store.historyItems.length"
           class="history-list"
           data-test="customer-service-history"
         >
           <button
-            v-for="session in store.history"
+            v-for="session in store.historyItems"
             :key="session.id"
             type="button"
             :data-test="`customer-service-history-item-${session.id}`"
@@ -272,7 +271,7 @@ onMounted(() => {
       </p>
 
       <section
-        v-if="store.current"
+        v-if="store.currentSession"
         data-test="customer-service-conversation"
         class="conversation panel"
         :aria-busy="store.submitting || store.advancing || store.ending"
@@ -281,12 +280,14 @@ onMounted(() => {
         <div class="panel-heading">
           <MessagesSquare :size="19" aria-hidden="true" />
           <div>
-            <h2 id="conversation-title">{{ store.current.scenario_label }}</h2>
+            <h2 id="conversation-title">
+              {{ store.currentSession.scenario_label }}
+            </h2>
             <span>
               {{
-                store.current.status === 'completed'
+                store.currentSession.status === 'completed'
                   ? '训练已完成'
-                  : store.current.end_suggested
+                  : store.currentSession.end_suggested
                     ? 'AI 建议结束，等待你确认'
                     : '训练进行中'
               }}
@@ -300,7 +301,7 @@ onMounted(() => {
 
         <div class="goal-criteria">
           <span
-            v-for="criterion in store.current.goal_criteria"
+            v-for="criterion in store.currentSession.goal_criteria"
             :key="criterion"
           >
             {{ criterion }}
@@ -312,7 +313,7 @@ onMounted(() => {
           class="transcript"
         >
           <li
-            v-for="turn in store.current.turns"
+            v-for="turn in store.currentSession.turns"
             :key="turn.id"
             data-test="customer-service-turn"
             class="turn"
@@ -420,7 +421,7 @@ onMounted(() => {
       </section>
 
       <section
-        v-if="store.current?.summary"
+        v-if="store.currentSession?.summary"
         class="summary panel"
         :aria-busy="store.ending"
         aria-labelledby="summary-title"
@@ -433,21 +434,31 @@ onMounted(() => {
         <div class="summary-grid">
           <article>
             <h3>整场表现</h3>
-            <p>{{ formatValue(store.current.summary.overall_performance) }}</p>
+            <p>
+              {{ formatValue(store.currentSession.summary.overall_performance) }}
+            </p>
           </article>
           <article>
             <h3>主要问题</h3>
-            <p>{{ formatValue(store.current.summary.main_problems) }}</p>
+            <p>
+              {{ formatValue(store.currentSession.summary.main_problems) }}
+            </p>
           </article>
           <article>
             <h3>优先改进项</h3>
             <p>
-              {{ formatValue(store.current.summary.prioritized_improvements) }}
+              {{
+                formatValue(
+                  store.currentSession.summary.prioritized_improvements
+                )
+              }}
             </p>
           </article>
           <article>
             <h3>目标完成情况</h3>
-            <p>{{ formatValue(store.current.summary.goal_completion) }}</p>
+            <p>
+              {{ formatValue(store.currentSession.summary.goal_completion) }}
+            </p>
           </article>
         </div>
       </section>

@@ -7,33 +7,10 @@ const API_PREFIX = '/api/ecommerce-training/customer-service'
 const AI_UNAVAILABLE_MESSAGE = 'AI 服务暂时不可用'
 const GENERIC_ACTION_ERROR = '操作失败，请稍后重试'
 
-export type EcommerceCustomerServiceSession = Omit<
-  CustomerSession,
-  'turns' | 'summary'
-> & {
-  turns: Array<
-    Omit<CustomerSession['turns'][number], 'analysis'> & {
-      analysis: {
-        problem: unknown
-        evidence: unknown
-        suggestion: unknown
-        criteria: Record<string, unknown>
-        goal_status: 'reached' | 'not_reached'
-      } | null
-    }
-  >
-  summary: {
-    overall_performance: unknown
-    main_problems: unknown
-    prioritized_improvements: unknown
-    goal_completion: unknown
-  } | null
-}
-
 interface EcommerceCustomerServiceState {
   scenarios: CustomerScenario[]
-  current: EcommerceCustomerServiceSession | null
-  history: EcommerceCustomerServiceSession[]
+  current: CustomerSession | null
+  history: CustomerSession[]
   pendingReply: string
   loadingScenarios: boolean
   loadingHistory: boolean
@@ -45,17 +22,15 @@ interface EcommerceCustomerServiceState {
   error: string
 }
 
-function lastTurn(session: EcommerceCustomerServiceSession | null) {
+function lastTurn(session: CustomerSession | null) {
   if (!session?.turns.length) {
     return null
   }
   return session.turns[session.turns.length - 1]
 }
 
-function sortSessions(
-  sessions: EcommerceCustomerServiceSession[]
-): EcommerceCustomerServiceSession[] {
-  const timestamp = (session: EcommerceCustomerServiceSession): number => {
+function sortSessions(sessions: CustomerSession[]): CustomerSession[] {
+  const timestamp = (session: CustomerSession): number => {
     const updatedAt = Date.parse(session.updated_at)
     if (!Number.isNaN(updatedAt)) {
       return updatedAt
@@ -68,12 +43,6 @@ function sortSessions(
     (left, right) =>
       timestamp(right) - timestamp(left) || right.id - left.id
   )
-}
-
-function toStoreSession(
-  session: CustomerSession
-): EcommerceCustomerServiceSession {
-  return session
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -118,8 +87,11 @@ export const useEcommerceCustomerServiceStore = defineStore(
           state.opening
         )
       },
+      currentSession(state): CustomerSession | null {
+        return state.current as CustomerSession | null
+      },
       canContinue(state): boolean {
-        const turn = lastTurn(state.current)
+        const turn = lastTurn(state.current as CustomerSession | null)
         return Boolean(
           state.current &&
             state.current.status !== 'completed' &&
@@ -137,17 +109,22 @@ export const useEcommerceCustomerServiceStore = defineStore(
             !state.pendingReply
         )
       },
-      completedSessions(state): EcommerceCustomerServiceSession[] {
-        return state.history.filter(session => session.status === 'completed')
+      historyItems(state): CustomerSession[] {
+        return state.history as CustomerSession[]
+      },
+      completedSessions(state): CustomerSession[] {
+        return (state.history as CustomerSession[]).filter(
+          session => session.status === 'completed'
+        )
       }
     },
     actions: {
       replaceSession(session: CustomerSession) {
-        const storedSession = toStoreSession(session)
-        this.current = storedSession
-        this.history = sortSessions([
-          storedSession,
-          ...this.history.filter(item => item.id !== storedSession.id)
+        const state = this as EcommerceCustomerServiceState
+        state.current = session
+        state.history = sortSessions([
+          session,
+          ...state.history.filter(item => item.id !== session.id)
         ])
       },
       async loadScenarios(): Promise<boolean> {
@@ -183,10 +160,9 @@ export const useEcommerceCustomerServiceStore = defineStore(
             success: true
             sessions: CustomerSession[]
           }>(`${API_PREFIX}/sessions`)
-          this.history = sortSessions(
-            Array.isArray(response.sessions)
-              ? response.sessions.map(toStoreSession)
-              : []
+          const state = this as EcommerceCustomerServiceState
+          state.history = sortSessions(
+            Array.isArray(response.sessions) ? response.sessions : []
           )
           return true
         } catch (error) {

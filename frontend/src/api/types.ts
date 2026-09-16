@@ -449,17 +449,10 @@ export interface StorePlan {
   created_at: string
 }
 
-export interface CustomerServiceJsonObject {
-  [key: string]: CustomerServiceJsonValue
-}
-
-export type CustomerServiceJsonValue =
+export type CustomerServiceSummaryPart =
   | string
-  | number
-  | boolean
-  | null
-  | CustomerServiceJsonValue[]
-  | CustomerServiceJsonObject
+  | CustomerServiceSummaryPart[]
+  | { [key: string]: CustomerServiceSummaryPart }
 
 export interface CustomerScenario {
   key: string
@@ -489,10 +482,10 @@ export interface CustomerSession {
     created_at: string
   }>
   summary: {
-    overall_performance: CustomerServiceJsonValue
-    main_problems: CustomerServiceJsonValue
-    prioritized_improvements: CustomerServiceJsonValue
-    goal_completion: CustomerServiceJsonValue
+    overall_performance: CustomerServiceSummaryPart
+    main_problems: CustomerServiceSummaryPart
+    prioritized_improvements: CustomerServiceSummaryPart
+    goal_completion: CustomerServiceSummaryPart
   } | null
   confirmed_at: string | null
   created_at: string

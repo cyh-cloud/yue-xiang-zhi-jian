@@ -389,10 +389,38 @@ describe('EcommerceCustomerServiceView', () => {
         })
       ],
       summary: {
-        overall_performance: '整场回应清楚',
-        main_problems: [{ title: '首轮缺少共情', detail: '可直接回应顾虑' }],
-        prioritized_improvements: ['先确认订单情况'],
-        goal_completion: { reached: 1, total: 2 }
+        overall_performance: {
+          summary: '整场回应清楚',
+          highlights: [
+            {
+              label: '先确认顾客顾虑',
+              examples: ['先回应顾客顾虑']
+            }
+          ]
+        },
+        main_problems: [
+          {
+            title: '首轮缺少共情',
+            detail: ['可直接回应顾虑']
+          }
+        ],
+        prioritized_improvements: [
+          '先确认订单情况',
+          {
+            action: '补充凭证说明',
+            examples: ['说明订单和商品状态凭证']
+          }
+        ],
+        goal_completion: {
+          outcome: '两项目标均已达成',
+          criteria: [
+            '确认订单情况',
+            {
+              name: '说明退换流程',
+              result: '已说明'
+            }
+          ]
+        }
       }
     })
     mockedApiFetch
@@ -413,7 +441,13 @@ describe('EcommerceCustomerServiceView', () => {
     expect(wrapper.text()).toContain('已达成')
     expect(wrapper.text()).toContain('未达成')
     expect(wrapper.text()).toContain('整场回应清楚')
+    expect(wrapper.text()).toContain('先确认顾客顾虑')
     expect(wrapper.text()).toContain('可直接回应顾虑')
+    expect(wrapper.text()).toContain('补充凭证说明')
+    expect(wrapper.text()).toContain('说明订单和商品状态凭证')
+    expect(wrapper.text()).toContain('两项目标均已达成')
+    expect(wrapper.text()).toContain('说明退换流程')
+    expect(wrapper.text()).toContain('已说明')
     expect(wrapper.text()).not.toContain('[object Object]')
   })
 })

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { ApiError, apiFetch } from '@/api/client'
 import type {
   CustomerScenario,
-  CustomerServiceJsonValue,
+  CustomerServiceSummaryPart,
   CustomerSession
 } from '@/api/types'
 
@@ -83,17 +83,26 @@ describe('ecommerceCustomerService store', () => {
       Record<string, boolean>
     >()
     expectTypeOf<Summary['overall_performance']>().toEqualTypeOf<
-      CustomerServiceJsonValue
+      CustomerServiceSummaryPart
     >()
     expectTypeOf<Summary['main_problems']>().toEqualTypeOf<
-      CustomerServiceJsonValue
+      CustomerServiceSummaryPart
     >()
     expectTypeOf<Summary['prioritized_improvements']>().toEqualTypeOf<
-      CustomerServiceJsonValue
+      CustomerServiceSummaryPart
     >()
     expectTypeOf<Summary['goal_completion']>().toEqualTypeOf<
-      CustomerServiceJsonValue
+      CustomerServiceSummaryPart
     >()
+    expectTypeOf<
+      Extract<CustomerServiceSummaryPart, number>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<CustomerServiceSummaryPart, boolean>
+    >().toEqualTypeOf<never>()
+    expectTypeOf<
+      Extract<CustomerServiceSummaryPart, null>
+    >().toEqualTypeOf<never>()
   })
 
   it('loads exactly five scenarios and starts the selected scenario', async () => {
@@ -126,21 +135,25 @@ describe('ecommerceCustomerService store', () => {
     })
     expect(store.current?.turns[0].customer_message).toContain('退')
     expect(store.pendingReply).toBe('')
-    expect(store.history.map(item => item.id)).toEqual([7])
+    expect((store.history as CustomerSession[]).map(item => item.id)).toEqual([
+      7
+    ])
   })
 
   it('upserts current sessions without duplicate ids and sorts by latest update', () => {
     const store = useEcommerceCustomerServiceStore()
-    store.history = [
+    store.replaceSession(
       customerSession({
         id: 2,
         updated_at: '2026-09-17T09:00:00+08:00'
-      }),
+      })
+    )
+    store.replaceSession(
       customerSession({
         id: 1,
         updated_at: '2026-09-17T08:00:00+08:00'
       })
-    ]
+    )
 
     store.replaceSession(
       customerSession({
@@ -149,7 +162,10 @@ describe('ecommerceCustomerService store', () => {
       })
     )
 
-    expect(store.history.map(item => item.id)).toEqual([1, 2])
+    expect((store.history as CustomerSession[]).map(item => item.id)).toEqual([
+      1,
+      2
+    ])
 
     store.replaceSession(
       customerSession({
@@ -158,7 +174,11 @@ describe('ecommerceCustomerService store', () => {
       })
     )
 
-    expect(store.history.map(item => item.id)).toEqual([1, 2, 3])
+    expect((store.history as CustomerSession[]).map(item => item.id)).toEqual([
+      1,
+      2,
+      3
+    ])
     expect(store.current?.id).toBe(3)
   })
 
@@ -263,7 +283,9 @@ describe('ecommerceCustomerService store', () => {
       { method: 'POST' }
     )
     expect(store.current?.status).toBe('completed')
-    expect(store.current?.summary?.goal_completion).toBe('两项目标均已达成')
+    expect(
+      (store.current as CustomerSession | null)?.summary?.goal_completion
+    ).toBe('两项目标均已达成')
   })
 
   it('does not fabricate the first customer message when generation fails', async () => {
@@ -279,7 +301,7 @@ describe('ecommerceCustomerService store', () => {
 
   it('maps only 503 or the exact AI message and leaves 401 to session handling', async () => {
     const store = useEcommerceCustomerServiceStore()
-    store.current = customerSession()
+    store.replaceSession(customerSession())
 
     mockedApiFetch.mockRejectedValueOnce(
       new ApiError('provider credentials leaked', 500)
@@ -484,7 +506,11 @@ describe('ecommerceCustomerService store', () => {
 
     expect(await store.loadHistory()).toBe(true)
     expect(mockedApiFetch).toHaveBeenLastCalledWith(`${API_PREFIX}/sessions`)
-    expect(store.history.map(item => item.id)).toEqual([10, 9, 4])
+    expect((store.history as CustomerSession[]).map(item => item.id)).toEqual([
+      10,
+      9,
+      4
+    ])
 
     expect(await store.openSession(9)).toBe(true)
     expect(mockedApiFetch).toHaveBeenLastCalledWith(
@@ -492,6 +518,10 @@ describe('ecommerceCustomerService store', () => {
     )
     expect(store.current?.id).toBe(9)
     expect(store.current?.status).toBe('completed')
-    expect(store.history.map(item => item.id)).toEqual([10, 9, 4])
+    expect((store.history as CustomerSession[]).map(item => item.id)).toEqual([
+      10,
+      9,
+      4
+    ])
   })
 })
