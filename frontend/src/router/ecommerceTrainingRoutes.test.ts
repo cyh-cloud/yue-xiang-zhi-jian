@@ -31,10 +31,12 @@ describe('ecommerce training routes', () => {
       title: '电商运营实训',
       href: '/student/ecommerce-training'
     })
-    expect(portalDefinitions.student.steps).toContainEqual(
-      expect.objectContaining({
-        selector: '#student-ecommerce-training'
-      })
-    )
+    expect(
+      portalDefinitions.student.steps.find(
+        step => step.selector === '#student-ecommerce-training'
+      )
+    ).toMatchObject({
+      title: '电商运营实训'
+    })
   })
 })

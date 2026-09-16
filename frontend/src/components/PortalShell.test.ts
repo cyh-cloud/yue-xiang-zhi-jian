@@ -38,7 +38,11 @@ describe('PortalShell', () => {
         { path: '/register', component: { template: '<div />' } },
         { path: '/student', component: { template: '<div />' } },
         { path: '/student/courses', component: { template: '<div />' } },
-        { path: '/student/profile', component: { template: '<div />' } }
+        { path: '/student/profile', component: { template: '<div />' } },
+        {
+          path: '/student/ecommerce-training',
+          component: { template: '<div />' }
+        }
       ]
     })
 
@@ -53,6 +57,9 @@ describe('PortalShell', () => {
     )
     expect(wrapper.get('#student-profile a').attributes('href')).toBe(
       '/student/profile'
+    )
+    expect(wrapper.get('#student-ecommerce-training a').attributes('href')).toBe(
+      '/student/ecommerce-training'
     )
     expect(wrapper.find('#student-learning-direction a').exists()).toBe(false)
     expect(wrapper.get('#student-learning-direction').text()).toContain(

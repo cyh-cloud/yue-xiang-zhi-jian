@@ -5,6 +5,8 @@ import { nextTick, type Component } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { installSessionExpiredHandler } from '@/api/session-expiry'
+import courseLearningPanelSource from '@/components/CourseLearningPanel.vue?raw'
+import ecommerceTrainingNavSource from '@/components/EcommerceTrainingNav.vue?raw'
 import { useAuthStore } from '@/stores/auth'
 import { useCourseLearningStore } from '@/stores/courseLearning'
 import { useEcommerceCopyTrainingStore } from '@/stores/ecommerceCopyTraining'
@@ -19,6 +21,12 @@ import EcommerceCustomerServiceView from './EcommerceCustomerServiceView.vue'
 import EcommerceLiveScriptView from './EcommerceLiveScriptView.vue'
 import EcommerceSimulationView from './EcommerceSimulationView.vue'
 import EcommerceStoreGuidanceView from './EcommerceStoreGuidanceView.vue'
+import ecommerceCopyTrainingSource from './EcommerceCopyTrainingView.vue?raw'
+import ecommerceCustomerServiceSource from './EcommerceCustomerServiceView.vue?raw'
+import ecommerceLiveScriptSource from './EcommerceLiveScriptView.vue?raw'
+import ecommerceSimulationSource from './EcommerceSimulationView.vue?raw'
+import ecommerceStoreGuidanceSource from './EcommerceStoreGuidanceView.vue?raw'
+import ecommerceTrainingHomeSource from './EcommerceTrainingHomeView.vue?raw'
 
 const paths = [
   '/student/ecommerce-training',
@@ -95,6 +103,24 @@ function successResponse(payload: Record<string, unknown>) {
     headers: new Headers({ 'Content-Type': 'application/json' }),
     json: async () => payload
   }
+}
+
+function mediaBlock(source: string, maxWidth: number): string {
+  const marker = `@media (max-width: ${maxWidth}px)`
+  const start = source.indexOf(marker)
+  expect(start).toBeGreaterThanOrEqual(0)
+  return source.slice(start)
+}
+
+function cssRule(css: string, selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = css.match(
+    new RegExp(
+      `(?:^|[{}])\\s*[^{}]*?${escaped}[^{}]*?\\s*\\{([\\s\\S]*?)\\}`
+    )
+  )
+  expect(match).not.toBeNull()
+  return (match?.[1] ?? '').replace(/\s+/g, ' ').trim()
 }
 
 const responsiveCases: Array<{
@@ -287,6 +313,196 @@ const responsiveCases: Array<{
   }
 ]
 
+describe('ecommerce responsive CSS contracts', () => {
+  // jsdom does not calculate layout; real overflow and overlap remain browser acceptance checks.
+  it('declares explicit containment, collapse and wrapping contracts', () => {
+    expect(cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home')).toContain(
+      'overflow-x: clip'
+    )
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__grid')
+    ).toContain('repeat(auto-fit, minmax(250px, 1fr))')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card')
+    ).toContain('grid-template-columns: auto minmax(0, 1fr) auto')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body')
+    ).toContain('min-width: 0')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body strong')
+    ).toContain('overflow-wrap: anywhere')
+    expect(
+      cssRule(
+        mediaBlock(ecommerceTrainingHomeSource, 640),
+        '.ecommerce-training-home__main'
+      )
+    ).toContain('padding: 32px 14px 48px')
+
+    const liveScriptMobile = mediaBlock(ecommerceLiveScriptSource, 900)
+    const liveScriptTight = mediaBlock(ecommerceLiveScriptSource, 540)
+    expect(cssRule(ecommerceLiveScriptSource, '.live-script-page')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceLiveScriptSource, '.live-script-page')).toContain(
+      'overflow-x: clip'
+    )
+    expect(cssRule(liveScriptMobile, '.workspace')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(ecommerceLiveScriptSource, '.version-meta')).toContain(
+      'flex-wrap: wrap'
+    )
+    expect(cssRule(ecommerceLiveScriptSource, '.version-meta > *')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceLiveScriptSource, '.version-meta > *')).toContain(
+      'overflow-wrap: anywhere'
+    )
+    expect(cssRule(liveScriptTight, '.style-options')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(liveScriptTight, '.history-panel button')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+
+    const simulationMobile = mediaBlock(ecommerceSimulationSource, 900)
+    const simulationTight = mediaBlock(ecommerceSimulationSource, 560)
+    expect(cssRule(ecommerceSimulationSource, '.simulation-page')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceSimulationSource, '.simulation-page')).toContain(
+      'overflow-x: clip'
+    )
+    expect(cssRule(simulationMobile, '.workspace')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(simulationTight, '.scene-panel ul')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(simulationTight, '.scene-heading')).toContain(
+      'flex-direction: column'
+    )
+    expect(cssRule(simulationTight, '.score-row')).toContain(
+      'grid-template-columns: minmax(0, 1fr) auto'
+    )
+    expect(
+      cssRule(ecommerceSimulationSource, '.scene-panel button span')
+    ).toContain('overflow-wrap: anywhere')
+
+    const copyTrainingMobile = mediaBlock(ecommerceCopyTrainingSource, 760)
+    const copyTrainingTight = mediaBlock(ecommerceCopyTrainingSource, 540)
+    expect(cssRule(ecommerceCopyTrainingSource, '.copy-training-page')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceCopyTrainingSource, '.copy-training-page')).toContain(
+      'overflow-x: clip'
+    )
+    expect(cssRule(copyTrainingMobile, '.selection-form')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(copyTrainingMobile, '.comparison-grid')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(copyTrainingMobile, '.score-strip')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(copyTrainingTight, '.panel-heading')).toContain(
+      'flex-wrap: wrap'
+    )
+    expect(cssRule(ecommerceCopyTrainingSource, '.case-copy')).toContain(
+      'overflow-wrap: anywhere'
+    )
+
+    const storeGuidanceMobile = mediaBlock(ecommerceStoreGuidanceSource, 900)
+    const storeGuidanceTight = mediaBlock(ecommerceStoreGuidanceSource, 640)
+    expect(cssRule(ecommerceStoreGuidanceSource, '.store-guidance-page')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceStoreGuidanceSource, '.store-guidance-page')).toContain(
+      'overflow-x: clip'
+    )
+    expect(cssRule(storeGuidanceMobile, '.workspace')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(ecommerceStoreGuidanceSource, '.current-inputs')).toContain(
+      'flex-wrap: wrap'
+    )
+    expect(cssRule(ecommerceStoreGuidanceSource, '.plan-sections p')).toContain(
+      'overflow-wrap: anywhere'
+    )
+    expect(cssRule(storeGuidanceTight, '.history-panel button')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+
+    const customerServiceTablet = mediaBlock(ecommerceCustomerServiceSource, 1120)
+    const customerServiceMobile = mediaBlock(ecommerceCustomerServiceSource, 760)
+    expect(cssRule(ecommerceCustomerServiceSource, '.customer-service-page')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(ecommerceCustomerServiceSource, '.customer-service-page')).toContain(
+      'overflow-x: clip'
+    )
+    expect(cssRule(customerServiceTablet, '.scenario-grid')).toContain(
+      'grid-template-columns: repeat(3, minmax(0, 1fr))'
+    )
+    expect(cssRule(customerServiceMobile, '.scenario-grid')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(customerServiceMobile, '.turn-analysis dl')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(customerServiceMobile, '.summary-grid')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(ecommerceCustomerServiceSource, '.message p')).toContain(
+      'overflow-wrap: anywhere'
+    )
+    expect(cssRule(ecommerceCustomerServiceSource, '.goal-criteria')).toContain(
+      'flex-wrap: wrap'
+    )
+
+    const coursesMobile = mediaBlock(courseLearningPanelSource, 760)
+    expect(cssRule(courseLearningPanelSource, '.agri-courses-page')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(courseLearningPanelSource, '.agri-courses-page')).toContain(
+      'overflow-x: clip'
+    )
+    expect(cssRule(coursesMobile, '.recommendation-list')).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card')).toContain(
+      'min-width: 0'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
+      'overflow-wrap: anywhere'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card__meta')).toContain(
+      'flex-wrap: wrap'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card__actions')).toContain(
+      'flex-wrap: wrap'
+    )
+    expect(cssRule(coursesMobile, '.course-card__head')).toContain(
+      'flex-direction: column'
+    )
+    expect(cssRule(coursesMobile, '.quiz-submit')).toContain('width: 100%')
+
+    expect(
+      cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav__inner')
+    ).toContain('overflow-x: auto')
+    expect(cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav a')).toContain(
+      'flex: 0 0 auto'
+    )
+    expect(cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav a')).toContain(
+      'white-space: nowrap'
+    )
+  })
+})
+
 describe.each(sessionCases)('$name session expiry', ({ path, component }) => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -352,19 +568,19 @@ describe.each(widths)('ecommerce acceptance at %dpx', width => {
       'fetch',
       vi.fn().mockImplementation(async input => {
         const path = String(input)
-      if (path.endsWith('/courses')) {
+        if (path.endsWith('/courses')) {
           return successResponse({ success: true, courses: [] })
-      }
-      if (path.endsWith('/recommendations')) {
+        }
+        if (path.endsWith('/recommendations')) {
           return successResponse({ success: true, courses: [] })
-      }
-      if (path.includes('/simulations/scenes')) {
+        }
+        if (path.includes('/simulations/scenes')) {
           return successResponse({ success: true, scenes: [] })
-      }
-      if (path.includes('/simulations')) {
+        }
+        if (path.includes('/simulations')) {
           return successResponse({ success: true, trainings: [] })
-      }
-      if (path.includes('/copy-training/catalog')) {
+        }
+        if (path.includes('/copy-training/catalog')) {
           return successResponse({
             success: true,
             catalog: {
@@ -373,23 +589,23 @@ describe.each(widths)('ecommerce acceptance at %dpx', width => {
               defect_categories: ['missing_action']
             }
           })
-      }
-      if (path.includes('/copy-training')) {
+        }
+        if (path.includes('/copy-training')) {
           return successResponse({ success: true, sessions: [] })
-      }
-      if (path.includes('/customer-service/scenarios')) {
+        }
+        if (path.includes('/customer-service/scenarios')) {
           return successResponse({ success: true, scenarios: [] })
-      }
-      if (path.includes('/customer-service/sessions')) {
+        }
+        if (path.includes('/customer-service/sessions')) {
           return successResponse({ success: true, sessions: [] })
-      }
-      if (path.includes('/store-plans')) {
+        }
+        if (path.includes('/store-plans')) {
           return successResponse({ success: true, plans: [] })
-      }
-      if (path.includes('/live-scripts')) {
+        }
+        if (path.includes('/live-scripts')) {
           return successResponse({ success: true, versions: [] })
-      }
-      throw new Error(`Unexpected API request: ${path}`)
+        }
+        throw new Error(`Unexpected API request: ${path}`)
       })
     )
   })
@@ -399,7 +615,7 @@ describe.each(widths)('ecommerce acceptance at %dpx', width => {
   })
 
   it.each(responsiveCases)(
-    'keeps $name free of horizontal overflow and English AI errors',
+    'renders long Chinese content for $name without English AI errors',
     async ({ component, prepare }) => {
       vi.stubGlobal('innerWidth', width)
       const pinia = createPinia()
@@ -414,9 +630,6 @@ describe.each(widths)('ecommerce acceptance at %dpx', width => {
       await nextTick()
 
       expect(wrapper.text()).toContain(longChinese)
-      expect(wrapper.find('[data-test="horizontal-overflow"]').exists()).toBe(
-        false
-      )
       expect(wrapper.text()).not.toContain('AI service unavailable')
     }
   )
