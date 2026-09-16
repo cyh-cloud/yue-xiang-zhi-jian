@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, Sprout, UserRound } from 'lucide-vue-next'
+import { BookOpen, Radio, Sprout, UserRound } from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 
 import PortalShell from '@/components/PortalShell.vue'
@@ -29,6 +29,13 @@ import PortalShell from '@/components/PortalShell.vue'
         <span>
           <strong>进入农业技能</strong>
           <small>农时、问答、诊断与课程</small>
+        </span>
+      </RouterLink>
+      <RouterLink to="/student/ecommerce-training">
+        <Radio :size="18" aria-hidden="true" />
+        <span>
+          <strong>进入电商运营实训</strong>
+          <small>直播、文案、装修、客服与课程</small>
         </span>
       </RouterLink>
     </nav>

@@ -69,6 +69,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         title: '农业技能',
         description: '农时日历、农技问答、病虫害诊断与农业课程。',
         href: '/student/agri-skills'
+      },
+      {
+        id: 'student-ecommerce-training',
+        title: '电商运营实训',
+        description: '直播、模拟、文案、店铺装修、客服与电商课程。',
+        href: '/student/ecommerce-training'
       }
     ],
     steps: [
@@ -86,6 +92,11 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         selector: '#student-learning-direction',
         title: '学习方向入口',
         description: '从学习方向入口进入对应的专属内容。'
+      },
+      {
+        selector: '#student-ecommerce-training',
+        title: '电商运营实训',
+        description: '从电商运营实训入口进入直播、文案、客服和课程训练。'
       }
     ]
   },

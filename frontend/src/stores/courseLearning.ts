@@ -89,6 +89,9 @@ function directionMetadata(
 }
 
 function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.status === 401 && error.redirect) {
+    return fallback
+  }
   return error instanceof ApiError
     ? error.message
     : error instanceof Error
