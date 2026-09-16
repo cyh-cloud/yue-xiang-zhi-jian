@@ -23,7 +23,7 @@
 - Feature 需求定义只走 spec-kit（`$speckit-specify` 起）；同一 feature 禁止再产出 superpowers 设计文档（双规格源禁止）。
 - 实现与执行走 superpowers：writing-plans → subagent-driven-development。
 - superpowers worktree 挂当前 `v2/lixKRT/NNN-<slug>` feature 分支（spec-kit 生成 `NNN-<slug>` 后立即改名），不另开分支；`.superpowers/`、`.worktrees/` 不入 git，`.specify/`、`specs/` 入 git，`.agents/` 按仓库现有策略（memories 进，skills 不进）。
-- 模型阶梯（spawn 必须显式传 model+effort）：实现者=`基元律动/deepseek-flash`（max）；任务级审查=`基元律动/glm-5.3`（high）；修复 4-5 轮升档=`基元律动/glm-5.3`（high）；最终全分支审查=`基元律动/glm-5.3`（high）。
+- 模型阶梯（spawn 必须显式传 model+effort）：实现者=`基元律动/deepseek-flash`（max）；任务级审查=`基元律动/glm-5.3-flash`（high）；修复 4-5 轮升档=`基元律动/glm-5.3`（high）；最终全分支审查=`基元律动/glm-5.3`（high）。
 - 模块合并后跑 `$speckit-converge`（弱化版：只对照 `specs/<NNN>/spec.md`）；发现缺口回填 superpowers 计划或记 `NOW.md`，不新建 tasks.md 权威。
 - SDD 门禁与修复循环按全局豁免执行（Agent Memory `AGENTS.md` 规则 5/7/13）。
 
