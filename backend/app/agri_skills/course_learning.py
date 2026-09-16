@@ -110,20 +110,18 @@ def list_agriculture_courses(student_id: int) -> list[dict]:
     return list_courses(student_id, "agriculture")
 
 
+def _is_legacy_course_provider(provider: object) -> bool:
+    return not callable(getattr(provider, "list_published_courses", None))
+
+
 def _require_course(course_id: int, direction: str) -> dict:
     provider = get_course_provider()
     course = provider.get_course(course_id)
-    if course is None:
+    if not isinstance(course, dict):
         raise AgriNotFoundError("课程不存在")
-    course_direction = course.get("direction")
-    if course_direction is None:
-        # Legacy 03 providers imply agriculture from their method name.
-        is_legacy_provider = not callable(
-            getattr(provider, "list_published_courses", None)
-        )
-        if is_legacy_provider and direction == "agriculture":
-            return course
-    if course_direction != direction:
+    if _is_legacy_course_provider(provider) and "direction" not in course:
+        course = {**course, "direction": "agriculture"}
+    if not is_eligible_course(course, direction):
         raise AgriNotFoundError("课程不存在")
     return course
 
@@ -200,31 +198,11 @@ def list_recommendations(
         }
         for row in rows
     ]
-    provider = get_course_provider()
-    is_legacy_provider = not callable(
-        getattr(provider, "list_published_courses", None)
-    )
-    eligible_courses = []
-    for course in courses:
-        if is_eligible_course(course, direction):
-            eligible_courses.append(course)
-            continue
-        if not is_legacy_provider:
-            continue
-        # Legacy recommendation fixtures predate provider-required text fields.
-        course_id = course.get("id")
-        duration = course.get("duration_seconds")
-        if (
-            course.get("direction") == direction
-            and isinstance(course_id, int)
-            and not isinstance(course_id, bool)
-            and course_id > 0
-            and isinstance(duration, int)
-            and not isinstance(duration, bool)
-            and duration > 0
-        ):
-            eligible_courses.append(course)
-    return eligible_courses
+    return [
+        course
+        for course in courses
+        if is_eligible_course(course, direction)
+    ]
 
 
 def get_course_progress(

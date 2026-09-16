@@ -9,8 +9,10 @@ from app import create_app
 from app.agri_skills.course_learning import (
     DatabaseAgriCourseProvider,
     get_course_progress,
+    get_course_quiz,
     list_courses,
     list_recommendations,
+    submit_course_quiz,
     update_course_progress,
 )
 from app.agri_skills.errors import AgriNotFoundError, AgriValidationError
@@ -301,17 +303,22 @@ class TestAgriCourseProgress(unittest.TestCase):
                 0,
             )
 
-    def test_missing_duration_rejects_progress_without_mutation(self):
+    def test_invalid_course_rejects_progress_without_mutation(self):
         with self.app.app_context():
             self.course_provider.courses[0]["duration_seconds"] = None
 
-            with self.assertRaisesRegex(AgriValidationError, "课程时长不可用"):
+            with self.assertRaises(AgriNotFoundError):
                 update_course_progress(self.student_id, 1, 10, 10)
 
-            self.assertEqual(
-                get_course_progress(self.student_id, 1)["progress_percent"],
-                0,
-            )
+            row = get_db().execute(
+                """
+                SELECT *
+                FROM agri_course_progress
+                WHERE user_id = ? AND course_id = ?
+                """,
+                (self.student_id, 1),
+            ).fetchone()
+            self.assertIsNone(row)
 
     def test_recommendations_sort_by_intersection_viewing_and_time(self):
         with self.app.app_context():
@@ -397,6 +404,24 @@ class TestAgriCourseProgress(unittest.TestCase):
         with self.app.app_context():
             with self.assertRaises(AgriNotFoundError):
                 get_course_progress(self.student_id, 1, "ecommerce")
+            with self.assertRaises(AgriNotFoundError):
+                update_course_progress(
+                    self.student_id,
+                    1,
+                    10,
+                    10,
+                    "ecommerce",
+                )
+            self.assertIsNone(
+                get_course_quiz(self.student_id, 1, "ecommerce")
+            )
+            with self.assertRaises(AgriNotFoundError):
+                submit_course_quiz(
+                    self.student_id,
+                    1,
+                    {},
+                    "ecommerce",
+                )
 
     def test_default_course_provider_supports_stable_progress_loop(self):
         with self.app.app_context():

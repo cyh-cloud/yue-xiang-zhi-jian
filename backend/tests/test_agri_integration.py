@@ -208,6 +208,7 @@ class TestAgriIntegration(unittest.TestCase):
         self.course = {
             "id": 1,
             "title": "荔枝保果",
+            "direction": "agriculture",
             "summary": "保果与病虫害管理",
             "teacher_name": "林老师",
             "published_at": "2026-09-01T00:00:00+00:00",
@@ -731,13 +732,14 @@ class TestAgriIntegration(unittest.TestCase):
                     id, title, direction, status, published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, 'agriculture', 'published', ?, '', '林老师', ?, ?)
+                VALUES (?, ?, 'agriculture', 'published', ?, ?, '林老师', ?, ?)
                 """,
                 (
                     (
                         course_id,
                         f"课程 {course_id}",
                         "2026-09-01T00:00:00+00:00",
+                        f"课程 {course_id} 简介",
                         now,
                         now,
                     )
