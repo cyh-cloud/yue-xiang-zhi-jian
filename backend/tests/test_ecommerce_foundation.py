@@ -5,6 +5,7 @@ from pathlib import Path
 from app import create_app
 from app.agri_skills.ai_context import AI_FIELD_ALLOWLISTS
 from app.db import get_db
+from app.seed import seed_courses
 
 
 class TestEcommerceFoundation(unittest.TestCase):
@@ -76,6 +77,27 @@ class TestEcommerceFoundation(unittest.TestCase):
             "customer_summary",
         }
         self.assertTrue(expected.issubset(AI_FIELD_ALLOWLISTS))
+
+    def test_default_seed_courses_have_valid_duration(self):
+        with self.app.app_context():
+            seed_courses(get_db())
+            rows = get_db().execute(
+                """
+                SELECT duration_seconds
+                FROM courses
+                WHERE title IN (
+                    '荔枝保果与采收管理',
+                    '水稻绿色种植基础',
+                    '农产品直播运营入门',
+                    '竹编基础与产品设计'
+                )
+                """
+            ).fetchall()
+
+        self.assertEqual(len(rows), 4)
+        self.assertTrue(
+            all(row["duration_seconds"] == 300 for row in rows)
+        )
 
 
 if __name__ == "__main__":
