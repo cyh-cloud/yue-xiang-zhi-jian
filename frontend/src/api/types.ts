@@ -198,3 +198,145 @@ export interface JobDto {
   category?: string
   requirements?: string[] | string
 }
+
+export interface AgriProduct {
+  key: string
+  name: string
+  sort_order: number
+}
+
+export interface FarmingCalendar {
+  product: AgriProduct
+  month: number
+  tasks: string[]
+  management: string[]
+  solar_terms: string[]
+  reminder: string
+  empty_state: '暂无该产品农时数据' | '当月无该产品农时' | null
+}
+
+export interface QaTurn {
+  id: number
+  question: string
+  answer: string
+  input_mode: 'text' | 'voice'
+  answer_mode: 'ai' | 'local_kb'
+  suggestions: string[]
+  created_at: string
+}
+
+export interface QaConversation {
+  id: number
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface DiagnosisAnswer {
+  round_no: number
+  question: string
+  answer: string
+  input_mode: 'text' | 'voice'
+  ai_status: 'follow_up_required' | 'conclusion_ready'
+}
+
+export interface DiagnosisFollowup {
+  id: number
+  outcome: 'improved' | 'unchanged' | 'worsened'
+  note: string
+  created_at: string
+}
+
+export interface DiagnosisConclusion {
+  cause: string
+  treatment: string
+}
+
+export interface DiagnosisSession {
+  id: number
+  product: AgriProduct
+  product_key: string
+  affected_part: string
+  symptoms: string[]
+  status: 'in_progress' | 'completed' | 'abandoned'
+  round_count: number
+  conclusion: DiagnosisConclusion | null
+  limited: boolean
+  answers: DiagnosisAnswer[]
+  followups: DiagnosisFollowup[]
+  source_session_id: number | null
+  source_followup_id: number | null
+  source_available: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface DiagnosticSelfTestQuestion {
+  id: string
+  type: 'single_choice' | 'true_false'
+  prompt: string
+  options: string[]
+}
+
+export interface DiagnosticSelfTest {
+  id: number
+  diagnosis_session_id: number
+  generation_attempts: number
+  questions: DiagnosticSelfTestQuestion[]
+}
+
+export interface SelfTestResultQuestion extends DiagnosticSelfTestQuestion {
+  correct: boolean
+  explanation: string
+}
+
+export interface SelfTestResult {
+  attempt_id: number
+  score: number
+  questions: SelfTestResultQuestion[]
+}
+
+export interface AgriculturalCourse {
+  id: number
+  title: string
+  summary: string
+  teacher_name: string
+  published_at: string
+  tag_ids: number[]
+  duration_seconds: number | null
+}
+
+export interface CourseProgress {
+  course_id: number
+  duration_seconds: number
+  furthest_position_seconds: number
+  resume_position_seconds: number
+  progress_percent: number
+  watched_seconds: number
+  completed_at: string | null
+  last_viewed_at: string | null
+}
+
+export interface CourseQuizQuestion {
+  id: string
+  type: 'single_choice' | 'true_false'
+  prompt: string
+  options: string[]
+}
+
+export interface CourseQuiz {
+  course_id: number
+  questions: CourseQuizQuestion[]
+}
+
+export interface CourseQuizAttempt {
+  id: number
+  course_id: number
+  score: number
+  is_formal: boolean
+  questions: Array<CourseQuizQuestion & {
+    correct: boolean
+    explanation: string
+  }>
+  created_at: string
+}
