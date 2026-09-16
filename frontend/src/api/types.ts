@@ -449,6 +449,18 @@ export interface StorePlan {
   created_at: string
 }
 
+export interface CustomerServiceJsonObject {
+  [key: string]: CustomerServiceJsonValue
+}
+
+export type CustomerServiceJsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | CustomerServiceJsonValue[]
+  | CustomerServiceJsonObject
+
 export interface CustomerScenario {
   key: string
   label: string
@@ -468,19 +480,19 @@ export interface CustomerSession {
     customer_message: string
     student_reply: string | null
     analysis: {
-      problem: string
-      evidence: string
-      suggestion: string
-      criteria: Record<string, boolean>
+      problem: CustomerServiceJsonValue
+      evidence: CustomerServiceJsonValue
+      suggestion: CustomerServiceJsonValue
+      criteria: Record<string, CustomerServiceJsonValue>
       goal_status: 'reached' | 'not_reached'
     } | null
     created_at: string
   }>
   summary: {
-    overall_performance: string
-    main_problems: string[]
-    prioritized_improvements: string[]
-    goal_completion: string
+    overall_performance: CustomerServiceJsonValue
+    main_problems: CustomerServiceJsonValue
+    prioritized_improvements: CustomerServiceJsonValue
+    goal_completion: CustomerServiceJsonValue
   } | null
   confirmed_at: string | null
   created_at: string

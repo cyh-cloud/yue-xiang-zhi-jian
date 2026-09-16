@@ -96,6 +96,40 @@ describe('ecommerceCustomerService store', () => {
     })
     expect(store.current?.turns[0].customer_message).toContain('退')
     expect(store.pendingReply).toBe('')
+    expect(store.history.map(item => item.id)).toEqual([7])
+  })
+
+  it('upserts current sessions without duplicate ids and sorts by latest update', () => {
+    const store = useEcommerceCustomerServiceStore()
+    store.history = [
+      customerSession({
+        id: 2,
+        updated_at: '2026-09-17T09:00:00+08:00'
+      }),
+      customerSession({
+        id: 1,
+        updated_at: '2026-09-17T08:00:00+08:00'
+      })
+    ]
+
+    store.replaceSession(
+      customerSession({
+        id: 1,
+        updated_at: '2026-09-17T10:00:00+08:00'
+      })
+    )
+
+    expect(store.history.map(item => item.id)).toEqual([1, 2])
+
+    store.replaceSession(
+      customerSession({
+        id: 3,
+        updated_at: '2026-09-17T07:00:00+08:00'
+      })
+    )
+
+    expect(store.history.map(item => item.id)).toEqual([1, 2, 3])
+    expect(store.current?.id).toBe(3)
   })
 
   it('runs the complete ordered multi-turn flow without ending automatically', async () => {
@@ -213,6 +247,30 @@ describe('ecommerceCustomerService store', () => {
     expect(store.error).toBe('AI 服务暂时不可用')
   })
 
+  it('maps only 503 or the exact AI message and leaves 401 to session handling', async () => {
+    const store = useEcommerceCustomerServiceStore()
+    store.current = customerSession()
+
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError('provider credentials leaked', 500)
+    )
+    expect(await store.submitReply('第一条回复')).toBe(false)
+    expect(store.error).toBe('操作失败，请稍后重试')
+    expect(store.error).not.toContain('credentials')
+
+    store.pendingReply = ''
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError('AI 服务暂时不可用', 500)
+    )
+    expect(await store.submitReply('第二条回复')).toBe(false)
+    expect(store.error).toBe('AI 服务暂时不可用')
+
+    store.pendingReply = ''
+    mockedApiFetch.mockRejectedValueOnce(new ApiError('登录已过期', 401))
+    expect(await store.submitReply('第三条回复')).toBe(false)
+    expect(store.error).toBe('')
+  })
+
   it('keeps the submitted reply pending when per-turn analysis fails', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({ success: true, session: customerSession() } as never)
@@ -231,6 +289,54 @@ describe('ecommerceCustomerService store', () => {
     expect(store.pendingReply).toBe('请提供订单号')
     expect(store.current?.status).toBe('active')
     expect(store.error).toBe('AI 服务暂时不可用')
+  })
+
+  it('does not send a second reply while the first reply is pending', async () => {
+    let resolveReply!: (value: unknown) => void
+    const analyzed = customerSession({
+      turns: [
+        customerTurn(1, {
+          student_reply: '第一条回复',
+          analysis: {
+            problem: '尚未确认订单',
+            evidence: '学员回复未包含订单信息',
+            suggestion: '先确认订单情况',
+            criteria: {
+              确认订单情况: false,
+              说明退换流程: false
+            },
+            goal_status: 'not_reached'
+          }
+        })
+      ]
+    })
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        session: customerSession()
+      } as never)
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveReply = resolve
+          })
+      )
+    const store = useEcommerceCustomerServiceStore()
+    await store.start('after_sales')
+
+    const pending = store.submitReply('第一条回复')
+    expect(store.submitting).toBe(true)
+    expect(await store.submitReply('第二条回复')).toBe(false)
+    expect(
+      mockedApiFetch.mock.calls.filter(
+        ([url]) => url === `${API_PREFIX}/sessions/7/replies`
+      )
+    ).toHaveLength(1)
+    expect(store.pendingReply).toBe('第一条回复')
+
+    resolveReply({ success: true, session: analyzed } as never)
+    expect(await pending).toBe(true)
+    expect(store.pendingReply).toBe('')
   })
 
   it('keeps the complete transcript and retry action when customer-message generation fails', async () => {
@@ -324,12 +430,21 @@ describe('ecommerceCustomerService store', () => {
         prioritized_improvements: ['补充政策依据'],
         goal_completion: '目标达成'
       },
+      updated_at: '2026-09-17T09:00:00+08:00',
       completed_at: '2026-09-17T09:00:00+08:00'
+    })
+    const older = customerSession({
+      id: 4,
+      updated_at: '2026-09-17T08:00:00+08:00'
+    })
+    const newer = customerSession({
+      id: 10,
+      updated_at: '2026-09-17T10:00:00+08:00'
     })
     mockedApiFetch
       .mockResolvedValueOnce({
         success: true,
-        sessions: [historical]
+        sessions: [older, historical, newer]
       } as never)
       .mockResolvedValueOnce({
         success: true,
@@ -339,7 +454,7 @@ describe('ecommerceCustomerService store', () => {
 
     expect(await store.loadHistory()).toBe(true)
     expect(mockedApiFetch).toHaveBeenLastCalledWith(`${API_PREFIX}/sessions`)
-    expect(store.history.map(item => item.id)).toEqual([9])
+    expect(store.history.map(item => item.id)).toEqual([10, 9, 4])
 
     expect(await store.openSession(9)).toBe(true)
     expect(mockedApiFetch).toHaveBeenLastCalledWith(
@@ -347,5 +462,6 @@ describe('ecommerceCustomerService store', () => {
     )
     expect(store.current?.id).toBe(9)
     expect(store.current?.status).toBe('completed')
+    expect(store.history.map(item => item.id)).toEqual([10, 9, 4])
   })
 })

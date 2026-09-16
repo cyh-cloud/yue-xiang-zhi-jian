@@ -11,7 +11,10 @@ import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import EcommerceTrainingNav from '@/components/EcommerceTrainingNav.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useEcommerceCustomerServiceStore } from '@/stores/ecommerceCustomerService'
+import {
+  type EcommerceCustomerServiceSession,
+  useEcommerceCustomerServiceStore
+} from '@/stores/ecommerceCustomerService'
 
 const store = useEcommerceCustomerServiceStore()
 const auth = useAuthStore()
@@ -29,8 +32,29 @@ const canCompose = computed(
         !store.current.end_suggested &&
         lastTurn.value &&
         !lastTurn.value.student_reply
-    )
+  )
 )
+const operationStatus = computed(() => {
+  if (store.loadingScenarios && !store.scenarios.length) {
+    return '正在加载客服训练场景'
+  }
+  if (store.loadingHistory && !store.history.length) {
+    return '正在加载客服训练历史'
+  }
+  if (store.starting) {
+    return '正在生成客户消息'
+  }
+  if (store.submitting) {
+    return '正在分析学员回复'
+  }
+  if (store.advancing) {
+    return '正在生成下一条客户消息'
+  }
+  if (store.ending) {
+    return '正在生成训练总结'
+  }
+  return store.current?.status === 'completed' ? '客服训练已完成' : ''
+})
 
 function formatValue(value: unknown, depth = 0): string {
   if (value === null || value === undefined) {
@@ -75,6 +99,40 @@ function goalStatusLabel(value: 'reached' | 'not_reached'): string {
   return value === 'reached' ? '目标已达成' : '目标未达成'
 }
 
+function historyStatusLabel(
+  status: EcommerceCustomerServiceSession['status']
+): string {
+  if (status === 'completed') {
+    return '已完成'
+  }
+  if (status === 'goal_reached') {
+    return '待确认结束'
+  }
+  return '进行中'
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value)
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+}
+
+function historySummary(session: EcommerceCustomerServiceSession): string {
+  if (session.summary) {
+    return formatValue(session.summary.goal_completion)
+  }
+  return session.status === 'completed'
+    ? '训练已完成'
+    : '尚未生成训练总结'
+}
+
 function scenarioIsActive(key: string): boolean {
   return store.current?.scenario_key === key
 }
@@ -85,7 +143,7 @@ async function logout() {
 }
 
 onMounted(() => {
-  void store.loadScenarios()
+  void Promise.all([store.loadScenarios(), store.loadHistory()])
 })
 </script>
 
@@ -99,7 +157,16 @@ onMounted(() => {
     />
     <EcommerceTrainingNav />
 
-    <main class="customer-service-shell">
+    <main class="customer-service-shell" :aria-busy="store.isBusy">
+      <p
+        data-test="customer-service-operation-status"
+        class="ark-sr-only"
+        role="status"
+        aria-live="polite"
+      >
+        {{ operationStatus }}
+      </p>
+
       <header class="page-heading">
         <p class="eyebrow">客服模拟训练</p>
         <h1>在真实咨询节奏中逐轮练习</h1>
@@ -108,7 +175,11 @@ onMounted(() => {
         </p>
       </header>
 
-      <section aria-labelledby="scenario-title">
+      <section
+        data-test="customer-service-scenario-region"
+        :aria-busy="store.loadingScenarios"
+        aria-labelledby="scenario-title"
+      >
         <div class="section-heading">
           <div>
             <span>训练场景</span>
@@ -149,6 +220,48 @@ onMounted(() => {
         </p>
       </section>
 
+      <section
+        class="history-panel"
+        data-test="customer-service-history-region"
+        :aria-busy="store.loadingHistory"
+        aria-labelledby="history-title"
+      >
+        <div class="section-heading">
+          <div>
+            <span>训练记录</span>
+            <h2 id="history-title">客服历史</h2>
+          </div>
+          <small>{{ store.history.length }} 条记录</small>
+        </div>
+
+        <div
+          v-if="store.history.length"
+          class="history-list"
+          data-test="customer-service-history"
+        >
+          <button
+            v-for="session in store.history"
+            :key="session.id"
+            type="button"
+            :data-test="`customer-service-history-item-${session.id}`"
+            :disabled="store.isBusy"
+            @click="store.openSession(session.id)"
+          >
+            <span class="history-main">
+              <strong>{{ session.scenario_label }}</strong>
+              <small>{{ historyStatusLabel(session.status) }}</small>
+            </span>
+            <time :datetime="session.updated_at">
+              {{ formatTime(session.updated_at) }}
+            </time>
+            <span class="history-result">{{ historySummary(session) }}</span>
+          </button>
+        </div>
+        <p v-else-if="!store.loadingHistory" class="empty-state">
+          暂无客服训练记录。
+        </p>
+      </section>
+
       <p
         v-if="store.error"
         class="error-message"
@@ -160,7 +273,9 @@ onMounted(() => {
 
       <section
         v-if="store.current"
+        data-test="customer-service-conversation"
         class="conversation panel"
+        :aria-busy="store.submitting || store.advancing || store.ending"
         aria-labelledby="conversation-title"
       >
         <div class="panel-heading">
@@ -307,6 +422,7 @@ onMounted(() => {
       <section
         v-if="store.current?.summary"
         class="summary panel"
+        :aria-busy="store.ending"
         aria-labelledby="summary-title"
       >
         <div class="panel-heading">
@@ -455,6 +571,62 @@ onMounted(() => {
   color: var(--ark-signal);
   font-size: 0.8rem;
   font-weight: 800;
+}
+
+.history-panel {
+  margin-top: 28px;
+}
+
+.history-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 9px;
+}
+
+.history-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 12px;
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--ark-line);
+  border-radius: var(--ark-radius);
+  background: var(--ark-surface-0);
+  color: var(--ark-paper);
+  text-align: left;
+}
+
+.history-list button:hover,
+.history-list button:focus-visible {
+  border-color: var(--ark-signal);
+  background: var(--ark-surface-1);
+}
+
+.history-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.history-main strong {
+  overflow-wrap: anywhere;
+}
+
+.history-main small,
+.history-result {
+  color: var(--ark-muted);
+  font-size: 0.78rem;
+}
+
+.history-list time {
+  color: var(--ark-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-result {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
 }
 
 .error-message {

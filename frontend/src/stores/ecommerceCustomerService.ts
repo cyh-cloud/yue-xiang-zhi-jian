@@ -1,15 +1,39 @@
 import { defineStore } from 'pinia'
 
-import { apiFetch } from '@/api/client'
+import { ApiError, apiFetch } from '@/api/client'
 import type { CustomerScenario, CustomerSession } from '@/api/types'
 
 const API_PREFIX = '/api/ecommerce-training/customer-service'
 const AI_UNAVAILABLE_MESSAGE = 'AI 服务暂时不可用'
+const GENERIC_ACTION_ERROR = '操作失败，请稍后重试'
+
+export type EcommerceCustomerServiceSession = Omit<
+  CustomerSession,
+  'turns' | 'summary'
+> & {
+  turns: Array<
+    Omit<CustomerSession['turns'][number], 'analysis'> & {
+      analysis: {
+        problem: unknown
+        evidence: unknown
+        suggestion: unknown
+        criteria: Record<string, unknown>
+        goal_status: 'reached' | 'not_reached'
+      } | null
+    }
+  >
+  summary: {
+    overall_performance: unknown
+    main_problems: unknown
+    prioritized_improvements: unknown
+    goal_completion: unknown
+  } | null
+}
 
 interface EcommerceCustomerServiceState {
   scenarios: CustomerScenario[]
-  current: CustomerSession | null
-  history: CustomerSession[]
+  current: EcommerceCustomerServiceSession | null
+  history: EcommerceCustomerServiceSession[]
   pendingReply: string
   loadingScenarios: boolean
   loadingHistory: boolean
@@ -21,15 +45,48 @@ interface EcommerceCustomerServiceState {
   error: string
 }
 
-function lastTurn(session: CustomerSession | null) {
+function lastTurn(session: EcommerceCustomerServiceSession | null) {
   if (!session?.turns.length) {
     return null
   }
   return session.turns[session.turns.length - 1]
 }
 
-function sortSessions(sessions: CustomerSession[]): CustomerSession[] {
-  return [...sessions].sort((left, right) => right.id - left.id)
+function sortSessions(
+  sessions: EcommerceCustomerServiceSession[]
+): EcommerceCustomerServiceSession[] {
+  const timestamp = (session: EcommerceCustomerServiceSession): number => {
+    const updatedAt = Date.parse(session.updated_at)
+    if (!Number.isNaN(updatedAt)) {
+      return updatedAt
+    }
+    const createdAt = Date.parse(session.created_at)
+    return Number.isNaN(createdAt) ? 0 : createdAt
+  }
+
+  return [...sessions].sort(
+    (left, right) =>
+      timestamp(right) - timestamp(left) || right.id - left.id
+  )
+}
+
+function toStoreSession(
+  session: CustomerSession
+): EcommerceCustomerServiceSession {
+  return session
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.status === 401) {
+    return ''
+  }
+  if (
+    error instanceof ApiError &&
+    (error.status === 503 || error.message === AI_UNAVAILABLE_MESSAGE)
+  ) {
+    return AI_UNAVAILABLE_MESSAGE
+  }
+  return fallback
 }
 
 export const useEcommerceCustomerServiceStore = defineStore(
@@ -80,22 +137,18 @@ export const useEcommerceCustomerServiceStore = defineStore(
             !state.pendingReply
         )
       },
-      completedSessions(state): CustomerSession[] {
+      completedSessions(state): EcommerceCustomerServiceSession[] {
         return state.history.filter(session => session.status === 'completed')
       }
     },
     actions: {
       replaceSession(session: CustomerSession) {
-        this.current = session
-        if (
-          session.status === 'completed' ||
-          this.history.some(item => item.id === session.id)
-        ) {
-          this.history = sortSessions([
-            session,
-            ...this.history.filter(item => item.id !== session.id)
-          ])
-        }
+        const storedSession = toStoreSession(session)
+        this.current = storedSession
+        this.history = sortSessions([
+          storedSession,
+          ...this.history.filter(item => item.id !== storedSession.id)
+        ])
       },
       async loadScenarios(): Promise<boolean> {
         if (this.loadingScenarios) {
@@ -111,8 +164,8 @@ export const useEcommerceCustomerServiceStore = defineStore(
           }>(`${API_PREFIX}/scenarios`)
           this.scenarios = response.scenarios
           return true
-        } catch {
-          this.error = '客服场景加载失败'
+        } catch (error) {
+          this.error = errorMessage(error, '客服场景加载失败')
           return false
         } finally {
           this.loadingScenarios = false
@@ -131,11 +184,13 @@ export const useEcommerceCustomerServiceStore = defineStore(
             sessions: CustomerSession[]
           }>(`${API_PREFIX}/sessions`)
           this.history = sortSessions(
-            Array.isArray(response.sessions) ? response.sessions : []
+            Array.isArray(response.sessions)
+              ? response.sessions.map(toStoreSession)
+              : []
           )
           return true
-        } catch {
-          this.error = '客服训练记录加载失败'
+        } catch (error) {
+          this.error = errorMessage(error, '客服训练记录加载失败')
           return false
         } finally {
           this.loadingHistory = false
@@ -156,8 +211,8 @@ export const useEcommerceCustomerServiceStore = defineStore(
           this.replaceSession(response.session)
           this.pendingReply = ''
           return true
-        } catch {
-          this.error = '客服训练记录加载失败'
+        } catch (error) {
+          this.error = errorMessage(error, '客服训练记录加载失败')
           return false
         } finally {
           this.opening = false
@@ -181,8 +236,8 @@ export const useEcommerceCustomerServiceStore = defineStore(
           })
           this.replaceSession(response.session)
           return true
-        } catch {
-          this.error = AI_UNAVAILABLE_MESSAGE
+        } catch (error) {
+          this.error = errorMessage(error, GENERIC_ACTION_ERROR)
           return false
         } finally {
           this.starting = false
@@ -208,8 +263,8 @@ export const useEcommerceCustomerServiceStore = defineStore(
           this.replaceSession(response.session)
           this.pendingReply = ''
           return true
-        } catch {
-          this.error = AI_UNAVAILABLE_MESSAGE
+        } catch (error) {
+          this.error = errorMessage(error, GENERIC_ACTION_ERROR)
           return false
         } finally {
           this.submitting = false
@@ -232,8 +287,8 @@ export const useEcommerceCustomerServiceStore = defineStore(
           this.replaceSession(response.session)
           this.pendingReply = ''
           return true
-        } catch {
-          this.error = AI_UNAVAILABLE_MESSAGE
+        } catch (error) {
+          this.error = errorMessage(error, GENERIC_ACTION_ERROR)
           return false
         } finally {
           this.advancing = false
@@ -256,8 +311,8 @@ export const useEcommerceCustomerServiceStore = defineStore(
           this.replaceSession(response.session)
           this.pendingReply = ''
           return true
-        } catch {
-          this.error = AI_UNAVAILABLE_MESSAGE
+        } catch (error) {
+          this.error = errorMessage(error, GENERIC_ACTION_ERROR)
           return false
         } finally {
           this.ending = false

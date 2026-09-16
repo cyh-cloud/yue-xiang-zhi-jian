@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { apiFetch } from '@/api/client'
+import { ApiError, apiFetch } from '@/api/client'
 import type { CustomerScenario, CustomerSession } from '@/api/types'
 import AppHeader from '@/components/AppHeader.vue'
 import EcommerceTrainingNav from '@/components/EcommerceTrainingNav.vue'
@@ -113,6 +113,70 @@ describe('EcommerceCustomerServiceView', () => {
       '投诉处理'
     ])
     expect(cards.every(card => card.findAll('li').length >= 2)).toBe(true)
+    expect(
+      wrapper
+        .get('[data-test="customer-service-scenario-region"]')
+        .attributes('aria-busy')
+    ).toBe('false')
+    expect(
+      wrapper
+        .get('[data-test="customer-service-operation-status"]')
+        .attributes('aria-live')
+    ).toBe('polite')
+  })
+
+  it('loads history and opens a historical session without duplicating it', async () => {
+    const historical = customerSession({
+      id: 9,
+      status: 'completed',
+      end_suggested: true,
+      updated_at: '2026-09-17T09:00:00+08:00',
+      summary: {
+        overall_performance: '整体回应清楚',
+        main_problems: ['首轮缺少共情'],
+        prioritized_improvements: ['先确认顾客顾虑'],
+        goal_completion: '两项目标均已达成'
+      },
+      completed_at: '2026-09-17T09:00:00+08:00'
+    })
+    mockedApiFetch
+      .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        sessions: [historical]
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        session: historical
+      } as never)
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(mockedApiFetch.mock.calls.slice(0, 2).map(([url]) => url)).toEqual([
+      '/api/ecommerce-training/customer-service/scenarios',
+      '/api/ecommerce-training/customer-service/sessions'
+    ])
+    const history = wrapper.get('[data-test="customer-service-history"]')
+    const item = history.get(
+      '[data-test="customer-service-history-item-9"]'
+    )
+    expect(item.text()).toContain('售后处理')
+    expect(item.text()).toContain('已完成')
+    expect(item.text()).toContain('两项目标均已达成')
+    expect(item.get('time').attributes('datetime')).toBe(
+      '2026-09-17T09:00:00+08:00'
+    )
+
+    await item.trigger('click')
+    await flushPromises()
+
+    expect(mockedApiFetch).toHaveBeenLastCalledWith(
+      '/api/ecommerce-training/customer-service/sessions/9'
+    )
+    expect(wrapper.text()).toContain('整体回应清楚')
+    expect(
+      wrapper.findAll('[data-test="customer-service-history-item-9"]')
+    ).toHaveLength(1)
   })
 
   it('renders ordered turns and only exposes continue or end for the allowed states', async () => {
@@ -167,6 +231,7 @@ describe('EcommerceCustomerServiceView', () => {
     })
     mockedApiFetch
       .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({ success: true, sessions: [] } as never)
       .mockResolvedValueOnce({ success: true, session: customerSession() } as never)
       .mockResolvedValueOnce({ success: true, session: analyzed } as never)
       .mockResolvedValueOnce({
@@ -189,6 +254,11 @@ describe('EcommerceCustomerServiceView', () => {
       .get('[data-test="customer-service-scenario-after_sales"]')
       .trigger('click')
     await flushPromises()
+    expect(
+      wrapper
+        .get('[data-test="customer-service-conversation"]')
+        .attributes('aria-busy')
+    ).toBe('false')
     await wrapper
       .get('[data-test="customer-service-reply"]')
       .setValue('请提供订单号')
@@ -260,8 +330,9 @@ describe('EcommerceCustomerServiceView', () => {
   it('preserves transcript and pending reply after analysis failure without fabricating feedback', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({ success: true, sessions: [] } as never)
       .mockResolvedValueOnce({ success: true, session: customerSession() } as never)
-      .mockRejectedValueOnce(new Error('provider timeout'))
+      .mockRejectedValueOnce(new ApiError('provider timeout', 503))
     const { wrapper } = mountView()
     await flushPromises()
 
@@ -314,7 +385,7 @@ describe('EcommerceCustomerServiceView', () => {
               说明退换流程: ['拆封后可申请', '需提供凭证']
             },
             goal_status: 'not_reached'
-          } as unknown as CustomerSession['turns'][number]['analysis']
+          }
         })
       ],
       summary: {
@@ -323,9 +394,10 @@ describe('EcommerceCustomerServiceView', () => {
         prioritized_improvements: ['先确认订单情况'],
         goal_completion: { reached: 1, total: 2 }
       }
-    } as unknown as Partial<CustomerSession>)
+    })
     mockedApiFetch
       .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({ success: true, sessions: [] } as never)
       .mockResolvedValueOnce({ success: true, session: mixed } as never)
     const { wrapper } = mountView()
     await flushPromises()
