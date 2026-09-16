@@ -30,6 +30,9 @@ def build_config() -> dict[str, object]:
 
     return {
         "SECRET_KEY": secret_key,
+        "APP_TIMEZONE": os.environ.get(
+            "APP_TIMEZONE", "Asia/Shanghai"
+        ).strip(),
         "DATABASE_PATH": os.environ.get(
             "DATABASE_PATH", str(BACKEND_ROOT.parent / "data" / "yuexiang.db")
         ),

@@ -1,8 +1,17 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
-from flask import Blueprint, Response, jsonify, request, stream_with_context
+from flask import (
+    Blueprint,
+    Response,
+    current_app,
+    jsonify,
+    request,
+    stream_with_context,
+)
 
 from app.agri_skills.calendar import (
     get_calendar,
@@ -57,6 +66,11 @@ def _sse(event: str, payload: dict) -> str:
     return f"event: {event}\ndata: {data}\n\n"
 
 
+def _current_calendar_month() -> int:
+    timezone_name = str(current_app.config["APP_TIMEZONE"])
+    return datetime.now(ZoneInfo(timezone_name)).month
+
+
 @agri_skills_bp.get("/products")
 def get_products():
     _student_session()
@@ -69,14 +83,17 @@ def get_calendar_route():
     product_key = request.args.get("product_key", "").strip()
     if not product_key:
         product_key = get_selected_product(int(session["id"]))
-    raw_month = request.args.get("month", "")
-    try:
-        month = int(raw_month)
-    except ValueError:
-        return jsonify(
-            success=False,
-            errors={"month": "月份必须是 1 至 12 的整数"},
-        ), 400
+    raw_month = request.args.get("month")
+    if raw_month is None:
+        month = _current_calendar_month()
+    else:
+        try:
+            month = int(raw_month)
+        except ValueError:
+            return jsonify(
+                success=False,
+                errors={"month": "月份必须是 1 至 12 的整数"},
+            ), 400
     if not 1 <= month <= 12:
         return jsonify(
             success=False,

@@ -1,6 +1,8 @@
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from werkzeug.security import generate_password_hash
 
@@ -142,7 +144,6 @@ class TestAgriCalendarApi(unittest.TestCase):
 
     def test_calendar_rejects_missing_or_out_of_range_month(self):
         cases = [
-            "/api/agri-skills/calendar?product_key=litchi",
             "/api/agri-skills/calendar?product_key=litchi&month=spring",
             "/api/agri-skills/calendar?product_key=litchi&month=0",
             "/api/agri-skills/calendar?product_key=litchi&month=13",
@@ -157,6 +158,98 @@ class TestAgriCalendarApi(unittest.TestCase):
                     response.get_json()["errors"],
                     {"month": "月份必须是 1 至 12 的整数"},
                 )
+
+    def test_missing_month_uses_configured_timezone_with_existing_selection(self):
+        selected = self.student_client.put(
+            "/api/agri-skills/calendar/selection",
+            json={"product_key": "litchi"},
+        )
+        self.assertEqual(selected.status_code, 200)
+        fixed_utc = datetime(
+            2026,
+            3,
+            31,
+            16,
+            30,
+            tzinfo=timezone.utc,
+        )
+
+        with patch(
+            "app.agri_skills.routes.datetime",
+            create=True,
+        ) as route_datetime:
+            route_datetime.now.side_effect = (
+                lambda tz: fixed_utc.astimezone(tz)
+            )
+            response = self.student_client.get(
+                "/api/agri-skills/calendar"
+            )
+            used_timezone = route_datetime.now.call_args.args[0]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(str(used_timezone), "Asia/Shanghai")
+        self.assertEqual(used_timezone.utcoffset(fixed_utc).total_seconds(), 28800)
+        calendar = response.get_json()["calendar"]
+        self.assertEqual(calendar["product"]["key"], "litchi")
+        self.assertEqual(calendar["month"], 4)
+        self.assertIn("清明", calendar["solar_terms"])
+
+    def test_missing_month_without_selection_uses_default_product(self):
+        fixed_utc = datetime(
+            2026,
+            3,
+            31,
+            16,
+            30,
+            tzinfo=timezone.utc,
+        )
+
+        with patch(
+            "app.agri_skills.routes.datetime",
+            create=True,
+        ) as route_datetime:
+            route_datetime.now.side_effect = (
+                lambda tz: fixed_utc.astimezone(tz)
+            )
+            response = self.student_client.get(
+                "/api/agri-skills/calendar"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        calendar = response.get_json()["calendar"]
+        self.assertEqual(calendar["product"]["key"], "litchi")
+        self.assertEqual(calendar["month"], 4)
+        self.assertIsNone(calendar["empty_state"])
+
+    def test_missing_month_uses_current_month_with_month_empty_state(self):
+        fixed_utc = datetime(
+            2026,
+            5,
+            31,
+            16,
+            30,
+            tzinfo=timezone.utc,
+        )
+
+        with patch(
+            "app.agri_skills.routes.datetime",
+            create=True,
+        ) as route_datetime:
+            route_datetime.now.side_effect = (
+                lambda tz: fixed_utc.astimezone(tz)
+            )
+            response = self.student_client.get(
+                "/api/agri-skills/calendar"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        calendar = response.get_json()["calendar"]
+        self.assertEqual(calendar["product"]["key"], "litchi")
+        self.assertEqual(calendar["month"], 6)
+        self.assertEqual(
+            calendar["empty_state"],
+            "当月无该产品农时",
+        )
 
     def test_invalid_product_is_rejected_for_selection_and_subscription(self):
         selection = self.student_client.put(
