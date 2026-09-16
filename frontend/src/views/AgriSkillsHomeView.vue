@@ -96,7 +96,9 @@ const entries = [
 
 <style scoped>
 .agri-skills-home {
+  min-width: 0;
   min-height: 100svh;
+  overflow-x: clip;
   background: var(--ark-ink);
 }
 
