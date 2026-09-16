@@ -8,7 +8,7 @@ import httpx
 from flask import Flask, current_app
 from flask import has_app_context
 
-from app.agri_skills.errors import AiUnavailableError
+from app.agri_skills.errors import AgriValidationError, AiUnavailableError
 
 
 def extract_json_object(content: str) -> str:
@@ -171,7 +171,33 @@ class OpenAiCompatibleAiClient:
         *,
         call_point: str,
     ) -> str:
-        raise AiUnavailableError("ASR endpoint is not configured")
+        api_url = current_app.config.get("AI_ASR_URL")
+        if not api_url or not self.api_key:
+            raise AiUnavailableError("AI service is not configured")
+
+        try:
+            with self._client() as client:
+                response = client.post(
+                    str(api_url),
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    files={"file": (filename, audio)},
+                    data={"model": current_app.config["AI_ASR_MODEL"]},
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except Exception as exc:
+            self._log_failure(
+                call_point,
+                operation="transcribe",
+                message_count=1,
+            )
+            raise AiUnavailableError("AI service request failed") from exc
+
+        raw_text = payload.get("text", "") if isinstance(payload, dict) else ""
+        text = raw_text.strip() if isinstance(raw_text, str) else ""
+        if not text:
+            raise AgriValidationError("未能识别，请重试或改用文字输入")
+        return text
 
 
 def set_ai_client(app: Flask, client) -> None:

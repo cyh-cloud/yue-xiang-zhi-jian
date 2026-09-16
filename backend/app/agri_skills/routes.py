@@ -13,6 +13,7 @@ from flask import (
     stream_with_context,
 )
 
+from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.calendar import (
     get_calendar,
     get_selected_product,
@@ -152,6 +153,35 @@ def handle_ai_unavailable(error):
 def get_products():
     _student_session()
     return jsonify(success=True, products=list_products())
+
+
+@agri_skills_bp.post("/speech/transcriptions")
+def transcribe_speech():
+    _student_session()
+    audio_file = request.files.get("audio")
+    if audio_file is None or not audio_file.filename:
+        return jsonify(
+            success=False,
+            message="未能识别，请重试或改用文字输入",
+        ), 422
+    audio = audio_file.read()
+    if not audio:
+        return jsonify(
+            success=False,
+            message="未能识别，请重试或改用文字输入",
+        ), 422
+    try:
+        text = get_ai_client().transcribe(
+            audio,
+            audio_file.filename,
+            call_point="speech_to_text",
+        )
+    except AgriValidationError:
+        return jsonify(
+            success=False,
+            message="未能识别，请重试或改用文字输入",
+        ), 422
+    return jsonify(success=True, text=text)
 
 
 @agri_skills_bp.get("/calendar")
