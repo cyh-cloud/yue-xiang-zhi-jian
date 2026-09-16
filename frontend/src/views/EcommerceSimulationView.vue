@@ -108,7 +108,7 @@ onMounted(() => {
                 type="button"
                 :data-test="`simulation-scene-${scene.key}`"
                 :class="{ 'is-active': store.current?.scene_key === scene.key }"
-                :disabled="store.starting"
+                :disabled="store.isBusy"
                 @click="store.start(scene.key)"
               >
                 <span>{{ scene.label }}</span>
@@ -174,10 +174,11 @@ onMounted(() => {
                       type="button"
                       :data-test="`simulation-save-${segment.key}`"
                       :disabled="
-                        isSegmentSaved(segment.key) ||
-                        !store.drafts[segment.key]?.trim() ||
-                        store.current.status === 'completed'
-                      "
+                      isSegmentSaved(segment.key) ||
+                      !store.drafts[segment.key]?.trim() ||
+                      store.current.status === 'completed' ||
+                      store.isBusy
+                    "
                       @click="store.saveSegment(segment.key, store.drafts[segment.key] ?? '')"
                     >
                       {{ isSegmentSaved(segment.key) ? '已保存' : '保存环节' }}
@@ -204,7 +205,7 @@ onMounted(() => {
               <button
                 type="button"
                 data-test="simulation-score"
-                :disabled="!store.canScore || store.scoring"
+                :disabled="!store.canScore || store.isBusy"
                 @click="store.score()"
               >
                 <LoaderCircle
@@ -266,6 +267,7 @@ onMounted(() => {
               <button
                 type="button"
                 :data-test="`simulation-history-item-${item.id}`"
+                :disabled="store.isBusy"
                 @click="store.openTraining(item.id)"
               >
                 <strong>{{ item.scene_label }}</strong>
@@ -541,7 +543,7 @@ onMounted(() => {
 }
 
 .segment-actions button {
-  min-height: 38px;
+  min-height: 44px;
   padding: 8px 14px;
   border: 1px solid var(--ark-line-strong);
   border-radius: var(--ark-radius);

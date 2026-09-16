@@ -242,6 +242,77 @@ describe('EcommerceSimulationView', () => {
     ).not.toHaveProperty('disabled')
   })
 
+  it('disables context-changing controls while a segment save is pending', async () => {
+    const { pinia, wrapper } = mountView()
+    await flushPromises()
+    const store = useEcommerceSimulationStore(pinia)
+    store.history = [completedTraining()]
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-test="simulation-scene-opening"]').trigger('click')
+    await flushPromises()
+
+    let resolveSave:
+      | ((value: {
+          success: true
+          training: SimulationTraining
+        }) => void)
+      | undefined
+    mockedApiFetch.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveSave = resolve
+        }) as never
+    )
+    await wrapper
+      .get('[data-test="simulation-segment-greeting"] textarea')
+      .setValue('欢迎来到直播间')
+    await wrapper
+      .get('[data-test="simulation-save-greeting"]')
+      .trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(
+      wrapper
+        .get('[data-test="simulation-scene-product_intro"]')
+        .attributes()
+    ).toHaveProperty('disabled')
+    expect(
+      wrapper
+        .get('[data-test="simulation-history-item-1"]')
+        .attributes()
+    ).toHaveProperty('disabled')
+    expect(
+      wrapper
+        .get('[data-test="simulation-save-hook"]')
+        .attributes()
+    ).toHaveProperty('disabled')
+
+    resolveSave?.({
+      success: true,
+      training: {
+        ...draftTraining(),
+        segments: draftTraining().segments.map(segment =>
+          segment.key === 'greeting'
+            ? { ...segment, text: '欢迎来到直播间' }
+            : segment
+        )
+      }
+    })
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[data-test="simulation-scene-product_intro"]')
+        .attributes()
+    ).not.toHaveProperty('disabled')
+    expect(
+      wrapper
+        .get('[data-test="simulation-history-item-1"]')
+        .attributes()
+    ).not.toHaveProperty('disabled')
+  })
+
   it('renders four labeled dimensions and the backend total score', async () => {
     const { pinia, wrapper } = mountView()
     await flushPromises()

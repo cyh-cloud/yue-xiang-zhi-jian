@@ -281,6 +281,130 @@ describe('ecommerceSimulation store', () => {
     expect(store.current?.total_score).toBe(64)
   })
 
+  it('ignores a stale save response after another training starts', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = training()
+    store.drafts = {
+      greeting: '欢迎来到直播间',
+      hook: '',
+      audience_call: ''
+    }
+    let resolveSave:
+      | ((value: {
+          success: true
+          training: SimulationTraining
+        }) => void)
+      | undefined
+    const nextTraining = training({
+      id: 2,
+      scene_key: 'product_intro',
+      scene_label: '产品介绍',
+      segments: [
+        { key: 'feature', label: '核心卖点', text: '' },
+        { key: 'proof', label: '信任证明', text: '' }
+      ]
+    })
+    mockedApiFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSave = resolve
+          }) as never
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        training: nextTraining
+      } as never)
+
+    const saveRequest = store.saveSegment(
+      'greeting',
+      '欢迎来到直播间'
+    )
+    const startRequest = store.start('product_intro')
+    await startRequest
+
+    expect(store.current?.id).toBe(2)
+    resolveSave?.({
+      success: true,
+      training: training({
+        id: 1,
+        segments: [
+          {
+            key: 'greeting',
+            label: '欢迎问候',
+            text: '欢迎来到直播间'
+          },
+          { key: 'hook', label: '利益吸引', text: '' },
+          { key: 'audience_call', label: '观众召集', text: '' }
+        ]
+      })
+    })
+    await saveRequest
+
+    expect(store.current?.id).toBe(2)
+    expect(store.current?.scene_key).toBe('product_intro')
+    expect(store.drafts).toEqual({
+      feature: '',
+      proof: ''
+    })
+    expect(store.savedSegments).toEqual({
+      feature: false,
+      proof: false
+    })
+  })
+
+  it('maps 400 and 500 score failures without claiming AI is unavailable', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = training({ segments: completedTraining().segments })
+    store.drafts = Object.fromEntries(
+      store.current.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    mockedApiFetch
+      .mockRejectedValueOnce(new ApiError('训练尚未完成', 400))
+      .mockRejectedValueOnce(new ApiError('评分服务异常', 500))
+
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('训练尚未完成')
+    expect(store.error).not.toBe('AI 服务暂时不可用')
+
+    store.current = training({ segments: completedTraining().segments })
+    store.drafts = Object.fromEntries(
+      store.current.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('评分服务异常')
+    expect(store.error).not.toBe('AI 服务暂时不可用')
+  })
+
+  it('leaves 401 handling to the existing session flow', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = completedTraining()
+    store.drafts = Object.fromEntries(
+      store.current.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError('登录已过期', 401)
+    )
+
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('')
+  })
+
   it('loads history and opens a historical training record', async () => {
     const scored = completedTraining()
     const store = useEcommerceSimulationStore()

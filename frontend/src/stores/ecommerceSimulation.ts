@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-import { apiFetch } from '@/api/client'
+import { ApiError, apiFetch } from '@/api/client'
 import type { SimulationScene, SimulationTraining } from '@/api/types'
 
 interface EcommerceSimulationState {
@@ -12,11 +12,31 @@ interface EcommerceSimulationState {
   savingSegments: Record<string, boolean>
   loading: boolean
   starting: boolean
+  openingTraining: boolean
   scoring: boolean
+  contextRequestId: number
   error: string
 }
 
 const AI_UNAVAILABLE_MESSAGE = 'AI 服务暂时不可用'
+
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 401
+}
+
+function isAiUnavailable(error: unknown): boolean {
+  return (
+    error instanceof ApiError &&
+    (error.status === 503 || error.message === AI_UNAVAILABLE_MESSAGE)
+  )
+}
+
+function actionErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.message) {
+    return error.message
+  }
+  return fallback
+}
 
 function segmentState(training: SimulationTraining) {
   return {
@@ -59,7 +79,9 @@ export const useEcommerceSimulationStore = defineStore(
       savingSegments: {},
       loading: false,
       starting: false,
+      openingTraining: false,
       scoring: false,
+      contextRequestId: 0,
       error: ''
     }),
     getters: {
@@ -81,6 +103,7 @@ export const useEcommerceSimulationStore = defineStore(
         return (
           state.loading ||
           state.starting ||
+          state.openingTraining ||
           state.scoring ||
           Object.values(state.savingSegments).some(Boolean)
         )
@@ -113,10 +136,11 @@ export const useEcommerceSimulationStore = defineStore(
         }
       },
       async start(sceneKey: string): Promise<boolean> {
-        if (this.starting) {
+        if (this.starting || this.openingTraining) {
           return false
         }
 
+        const requestId = ++this.contextRequestId
         this.starting = true
         this.error = ''
 
@@ -128,14 +152,21 @@ export const useEcommerceSimulationStore = defineStore(
             method: 'POST',
             body: JSON.stringify({ scene_key: sceneKey })
           })
+          if (requestId !== this.contextRequestId) {
+            return false
+          }
           this.applyTraining(response.training)
           this.history = replaceHistoryItem(this.history, response.training)
           return true
-        } catch {
-          this.error = '模拟训练创建失败'
+        } catch (error) {
+          if (requestId === this.contextRequestId && !isUnauthorized(error)) {
+            this.error = actionErrorMessage(error, '模拟训练创建失败')
+          }
           return false
         } finally {
-          this.starting = false
+          if (requestId === this.contextRequestId) {
+            this.starting = false
+          }
         }
       },
       async saveSegment(
@@ -147,7 +178,10 @@ export const useEcommerceSimulationStore = defineStore(
           !training ||
           training.status !== 'draft' ||
           this.savedSegments[segmentKey] ||
-          this.savingSegments[segmentKey]
+          this.savingSegments[segmentKey] ||
+          this.starting ||
+          this.openingTraining ||
+          Object.values(this.savingSegments).some(Boolean)
         ) {
           return false
         }
@@ -163,6 +197,7 @@ export const useEcommerceSimulationStore = defineStore(
           return false
         }
 
+        const requestId = this.contextRequestId
         this.savingSegments = {
           ...this.savingSegments,
           [segmentKey]: true
@@ -180,6 +215,12 @@ export const useEcommerceSimulationStore = defineStore(
               body: JSON.stringify({ text: normalized })
             }
           )
+          if (
+            requestId !== this.contextRequestId ||
+            this.current?.id !== training.id
+          ) {
+            return false
+          }
           const savedSegment = response.training.segments.find(
             segment => segment.key === segmentKey
           )
@@ -193,13 +234,24 @@ export const useEcommerceSimulationStore = defineStore(
             [segmentKey]: Boolean(savedSegment?.text.trim())
           }
           return true
-        } catch {
-          this.error = '环节话术保存失败'
+        } catch (error) {
+          if (
+            requestId === this.contextRequestId &&
+            this.current?.id === training.id &&
+            !isUnauthorized(error)
+          ) {
+            this.error = actionErrorMessage(error, '环节话术保存失败')
+          }
           return false
         } finally {
-          this.savingSegments = {
-            ...this.savingSegments,
-            [segmentKey]: false
+          if (
+            requestId === this.contextRequestId &&
+            this.current?.id === training.id
+          ) {
+            this.savingSegments = {
+              ...this.savingSegments,
+              [segmentKey]: false
+            }
           }
         }
       },
@@ -209,6 +261,7 @@ export const useEcommerceSimulationStore = defineStore(
           return false
         }
 
+        const requestId = this.contextRequestId
         this.scoring = true
         this.error = ''
 
@@ -218,16 +271,35 @@ export const useEcommerceSimulationStore = defineStore(
             training: SimulationTraining
           }>(
             `/api/ecommerce-training/simulations/${training.id}/score`,
-            { method: 'POST' }
+          { method: 'POST' }
           )
+          if (
+            requestId !== this.contextRequestId ||
+            this.current?.id !== training.id
+          ) {
+            return false
+          }
           this.current = response.training
           this.history = replaceHistoryItem(this.history, response.training)
           return true
-        } catch {
-          this.error = AI_UNAVAILABLE_MESSAGE
+        } catch (error) {
+          if (
+            requestId === this.contextRequestId &&
+            this.current?.id === training.id &&
+            !isUnauthorized(error)
+          ) {
+            this.error = isAiUnavailable(error)
+              ? AI_UNAVAILABLE_MESSAGE
+              : actionErrorMessage(error, '评分请求失败')
+          }
           return false
         } finally {
-          this.scoring = false
+          if (
+            requestId === this.contextRequestId &&
+            this.current?.id === training.id
+          ) {
+            this.scoring = false
+          }
         }
       },
       async loadHistory(): Promise<boolean> {
@@ -241,15 +313,25 @@ export const useEcommerceSimulationStore = defineStore(
           }>('/api/ecommerce-training/simulations')
           this.history = response.trainings
           return true
-        } catch {
-          this.error = '模拟训练记录加载失败'
+        } catch (error) {
+          if (!isUnauthorized(error)) {
+            this.error = actionErrorMessage(
+              error,
+              '模拟训练记录加载失败'
+            )
+          }
           return false
         } finally {
           this.loading = false
         }
       },
       async openTraining(id: number): Promise<boolean> {
-        this.loading = true
+        if (this.openingTraining || this.starting) {
+          return false
+        }
+
+        const requestId = ++this.contextRequestId
+        this.openingTraining = true
         this.error = ''
 
         try {
@@ -257,14 +339,24 @@ export const useEcommerceSimulationStore = defineStore(
             success: true
             training: SimulationTraining
           }>(`/api/ecommerce-training/simulations/${id}`)
+          if (requestId !== this.contextRequestId) {
+            return false
+          }
           this.applyTraining(response.training)
           this.history = replaceHistoryItem(this.history, response.training)
           return true
-        } catch {
-          this.error = '模拟训练记录加载失败'
+        } catch (error) {
+          if (requestId === this.contextRequestId && !isUnauthorized(error)) {
+            this.error = actionErrorMessage(
+              error,
+              '模拟训练记录加载失败'
+            )
+          }
           return false
         } finally {
-          this.loading = false
+          if (requestId === this.contextRequestId) {
+            this.openingTraining = false
+          }
         }
       },
       clearError() {
