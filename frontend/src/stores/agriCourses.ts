@@ -23,43 +23,74 @@ interface AgriCoursesState {
   courses: AgriCourse[]
   recommendations: AgriCourse[]
   progressByCourse: Record<number, CourseProgress>
+  progressErrorsByCourse: Record<number, string>
   activeQuiz: CourseQuiz | null
   attempts: CourseQuizAttempt[]
   loading: boolean
   error: string
+  recommendationError: string
 }
 
-function normalizedStatus(course: AgriCourse): string | undefined {
-  if (typeof course.status === 'string') {
-    return course.status
-  }
-  if (typeof course.publication_status === 'string') {
-    return course.publication_status
-  }
-  if (course.is_published === true) {
-    return 'published'
-  }
-  if (course.is_published === false) {
-    return 'offline'
-  }
-  return undefined
+function hasOwn(course: AgriCourse, key: keyof AgriCourse): boolean {
+  return Object.prototype.hasOwnProperty.call(course, key)
 }
 
-function normalizedDirection(course: AgriCourse): string | undefined {
-  return course.direction ?? course.learning_direction
+function normalizedStatus(course: AgriCourse): string | null {
+  if (hasOwn(course, 'status')) {
+    return typeof course.status === 'string' ? course.status : null
+  }
+  if (hasOwn(course, 'publication_status')) {
+    return typeof course.publication_status === 'string'
+      ? course.publication_status
+      : null
+  }
+  if (hasOwn(course, 'is_published')) {
+    if (course.is_published === true) {
+      return 'published'
+    }
+    if (course.is_published === false) {
+      return 'offline'
+    }
+    return null
+  }
+  return null
+}
+
+function normalizedDirection(course: AgriCourse): string | null {
+  if (typeof course.direction === 'string') {
+    return course.direction
+  }
+  if (typeof course.learning_direction === 'string') {
+    return course.learning_direction
+  }
+  return null
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError
+    ? error.message
+    : error instanceof Error
+      ? error.message
+      : fallback
 }
 
 function isEligibleCourse(course: AgriCourse): boolean {
   const status = normalizedStatus(course)
   const direction = normalizedDirection(course)
-  return (
-    (status === undefined || status === 'published') &&
-    (direction === undefined || direction === 'agriculture')
-  )
+  return status === 'published' && direction === 'agriculture'
 }
 
 function isEligibleRecommendation(course: AgriCourse): boolean {
-  return isEligibleCourse(course)
+  const status = normalizedStatus(course)
+  const direction = normalizedDirection(course)
+  return (
+    Number.isInteger(course.id) &&
+    course.id > 0 &&
+    typeof course.title === 'string' &&
+    course.title.trim() !== '' &&
+    (status === null || status === 'published') &&
+    (direction === null || direction === 'agriculture')
+  )
 }
 
 export const useAgriCoursesStore = defineStore('agriCourses', {
@@ -67,19 +98,16 @@ export const useAgriCoursesStore = defineStore('agriCourses', {
     courses: [],
     recommendations: [],
     progressByCourse: {},
+    progressErrorsByCourse: {},
     activeQuiz: null,
     attempts: [],
     loading: false,
-    error: ''
+    error: '',
+    recommendationError: ''
   }),
   actions: {
     captureError(error: unknown, fallback: string) {
-      this.error =
-        error instanceof ApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : fallback
+      this.error = errorMessage(error, fallback)
     },
     async loadCourses() {
       this.loading = true
@@ -93,6 +121,8 @@ export const useAgriCoursesStore = defineStore('agriCourses', {
         const courses = response.courses.filter(isEligibleCourse)
         this.courses = courses
 
+        this.progressErrorsByCourse = {}
+        const progressErrors: Record<number, string> = {}
         const progressEntries = await Promise.all(
           courses.map(async course => {
             try {
@@ -101,7 +131,11 @@ export const useAgriCoursesStore = defineStore('agriCourses', {
                 progress: CourseProgress
               }>(`/api/agri-skills/courses/${course.id}/progress`)
               return [course.id, progressResponse.progress] as const
-            } catch {
+            } catch (error) {
+              progressErrors[course.id] = errorMessage(
+                error,
+                '学习进度加载失败'
+              )
               return null
             }
           })
@@ -113,15 +147,37 @@ export const useAgriCoursesStore = defineStore('agriCourses', {
             ): entry is readonly [number, CourseProgress] => entry !== null
           )
         )
+        this.progressErrorsByCourse = progressErrors
       } catch (error) {
         this.captureError(error, '课程加载失败')
       } finally {
         this.loading = false
       }
     },
-    async loadRecommendations() {
+    async loadProgress(courseId: number): Promise<boolean> {
       this.loading = true
-      this.error = ''
+
+      try {
+        const response = await apiFetch<{
+          success: true
+          progress: CourseProgress
+        }>(`/api/agri-skills/courses/${courseId}/progress`)
+        this.progressByCourse[courseId] = response.progress
+        delete this.progressErrorsByCourse[courseId]
+        return true
+      } catch (error) {
+        this.progressErrorsByCourse[courseId] = errorMessage(
+          error,
+          '学习进度加载失败'
+        )
+        return false
+      } finally {
+        this.loading = false
+      }
+    },
+    async loadRecommendations(): Promise<boolean> {
+      this.loading = true
+      this.recommendationError = ''
 
       try {
         const response = await apiFetch<{
@@ -129,8 +185,10 @@ export const useAgriCoursesStore = defineStore('agriCourses', {
           courses: AgriCourse[]
         }>('/api/agri-skills/recommendations')
         this.recommendations = response.courses.filter(isEligibleRecommendation)
+        return true
       } catch (error) {
-        this.captureError(error, '推荐课程加载失败')
+        this.recommendationError = errorMessage(error, '推荐课程加载失败')
+        return false
       } finally {
         this.loading = false
       }
@@ -155,12 +213,16 @@ export const useAgriCoursesStore = defineStore('agriCourses', {
           })
         })
         this.progressByCourse[courseId] = response.progress
+        delete this.progressErrorsByCourse[courseId]
 
         if (
           response.progress.completed_at !== null ||
           response.progress.progress_percent >= 80
         ) {
-          await this.loadRecommendations()
+          this.recommendations = this.recommendations.filter(
+            course => course.id !== courseId
+          )
+          return await this.loadRecommendations()
         }
         return true
       } catch (error) {

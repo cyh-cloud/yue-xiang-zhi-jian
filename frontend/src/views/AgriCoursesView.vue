@@ -25,33 +25,24 @@ const auth = useAuthStore()
 const router = useRouter()
 const quizAnswers = reactive<Record<string, string>>({})
 
-const orderedCourses = computed(() =>
-  [...coursesStore.courses].sort(
-    (left, right) =>
-      left.id - right.id ||
-      left.title.localeCompare(right.title, 'zh-CN')
-  )
-)
-
-const orderedRecommendations = computed(() =>
-  [...coursesStore.recommendations].sort(
-    (left, right) =>
-      left.id - right.id ||
-      left.title.localeCompare(right.title, 'zh-CN')
-  )
-)
+const orderedCourses = computed(() => coursesStore.courses)
+const orderedRecommendations = computed(() => coursesStore.recommendations)
 
 function progressFor(courseId: number): CourseProgress | undefined {
   return coursesStore.progressByCourse[courseId]
 }
 
-function progressPercent(courseId: number): number {
-  const value = progressFor(courseId)?.progress_percent ?? 0
+function progressPercent(courseId: number): number | undefined {
+  const value = progressFor(courseId)?.progress_percent
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
   return Math.min(100, Math.max(0, value))
 }
 
 function canOpenQuiz(courseId: number): boolean {
-  return progressPercent(courseId) >= 80
+  const progress = progressPercent(courseId)
+  return progress !== undefined && progress >= 80
 }
 
 function commentReturnTo(course: AgriCourse): string {
@@ -117,6 +108,17 @@ async function submitQuiz(courseId: number) {
   await coursesStore.submitQuiz(courseId, { ...quizAnswers })
 }
 
+async function retryAll() {
+  await Promise.all([
+    coursesStore.loadCourses(),
+    coursesStore.loadRecommendations()
+  ])
+}
+
+async function retryProgress(courseId: number) {
+  await coursesStore.loadProgress(courseId)
+}
+
 async function logout() {
   await auth.logout()
   await router.push('/login')
@@ -155,7 +157,7 @@ onMounted(() => {
         role="alert"
       >
         <span>{{ coursesStore.error }}</span>
-        <button type="button" @click="coursesStore.loadCourses">
+        <button type="button" @click="retryAll">
           <RefreshCw :size="16" aria-hidden="true" />
           重新加载
         </button>
@@ -173,14 +175,34 @@ onMounted(() => {
           <Sparkles :size="21" aria-hidden="true" />
         </header>
 
+        <div
+          v-if="coursesStore.recommendationError"
+          class="section-error"
+          role="alert"
+        >
+          <p data-test="recommendation-error">
+            {{ coursesStore.recommendationError }}
+          </p>
+          <button
+            type="button"
+            data-test="recommendation-retry"
+            @click="coursesStore.loadRecommendations"
+          >
+            <RefreshCw :size="15" aria-hidden="true" />
+            重试推荐
+          </button>
+        </div>
         <p
-          v-if="orderedRecommendations.length === 0"
+          v-else-if="orderedRecommendations.length === 0"
           class="section-empty"
           data-test="recommendation-empty"
         >
           暂无推荐
         </p>
-        <div v-else class="recommendation-list">
+        <div
+          v-if="orderedRecommendations.length"
+          class="recommendation-list"
+        >
           <article
             v-for="course in orderedRecommendations"
             :key="course.id"
@@ -264,19 +286,19 @@ onMounted(() => {
               </div>
             </dl>
 
-            <div class="course-progress">
+            <div v-if="progressFor(course.id)" class="course-progress">
               <div class="course-progress__head">
                 <span>学习进度</span>
                 <strong class="ark-data">
-                  {{ progressPercent(course.id) }}%
+                  {{ progressPercent(course.id) ?? 0 }}%
                 </strong>
               </div>
               <progress
                 :data-test="`course-progress-${course.id}`"
-                :value="progressPercent(course.id)"
+                :value="progressPercent(course.id) ?? 0"
                 max="100"
               >
-                {{ progressPercent(course.id) }}%
+                {{ progressPercent(course.id) ?? 0 }}%
               </progress>
               <div class="course-progress__facts">
                 <span :data-test="`course-resume-${course.id}`">
@@ -288,6 +310,28 @@ onMounted(() => {
                   {{ formatTime(progressFor(course.id)?.watched_seconds ?? 0) }}
                 </span>
               </div>
+            </div>
+            <div
+              v-else-if="coursesStore.progressErrorsByCourse[course.id]"
+              class="course-progress course-progress--error"
+              :data-test="`course-progress-error-${course.id}`"
+              role="alert"
+            >
+              <div>
+                <strong>学习进度加载失败</strong>
+                <p>{{ coursesStore.progressErrorsByCourse[course.id] }}</p>
+              </div>
+              <button
+                type="button"
+                :data-test="`course-progress-retry-${course.id}`"
+                @click="retryProgress(course.id)"
+              >
+                <RefreshCw :size="15" aria-hidden="true" />
+                重试
+              </button>
+            </div>
+            <div v-else class="course-progress course-progress--pending">
+              正在读取学习进度
             </div>
 
             <div class="course-card__actions">
@@ -311,7 +355,13 @@ onMounted(() => {
                 课后测验
               </button>
               <small v-if="!canOpenQuiz(course.id)">
-                达到 80% 后开放
+                {{
+                  coursesStore.progressErrorsByCourse[course.id]
+                    ? '进度加载失败，重试后再参加测验'
+                    : progressFor(course.id)
+                      ? '达到 80% 后开放'
+                      : '学习进度加载中'
+                }}
               </small>
             </div>
 
@@ -519,6 +569,41 @@ onMounted(() => {
   text-align: center;
 }
 
+.section-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--ark-line);
+  background: var(--ark-surface-1);
+}
+
+.section-error p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.section-error button,
+.course-progress--error button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--ark-line-strong);
+  background: transparent;
+  color: var(--ark-paper);
+}
+
+.section-error button:hover,
+.course-progress--error button:hover {
+  border-color: var(--ark-signal);
+  color: var(--ark-signal);
+}
+
 .recommendation-list {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -683,6 +768,33 @@ onMounted(() => {
 
 .course-progress progress::-moz-progress-bar {
   background: var(--ark-signal);
+}
+
+.course-progress--error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.course-progress--error > div {
+  min-width: 0;
+}
+
+.course-progress--error strong {
+  font-size: 0.84rem;
+}
+
+.course-progress--error p {
+  margin: 4px 0 0;
+  color: var(--ark-muted);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.course-progress--pending {
+  color: var(--ark-muted);
+  font-size: 0.78rem;
 }
 
 .course-card__actions {
@@ -895,6 +1007,12 @@ onMounted(() => {
 
   .course-card__head,
   .agri-courses-error {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .section-error,
+  .course-progress--error {
     align-items: flex-start;
     flex-direction: column;
   }

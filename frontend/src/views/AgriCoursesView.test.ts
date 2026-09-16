@@ -1,14 +1,16 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { apiFetch } from '@/api/client'
+import { ApiError, apiFetch } from '@/api/client'
 import type {
   AgriculturalCourse,
   CourseProgress,
   CourseQuizAttempt
 } from '@/api/types'
+import { useAgriCoursesStore } from '@/stores/agriCourses'
 
 import AgriCoursesView from './AgriCoursesView.vue'
 
@@ -24,7 +26,7 @@ const mockedApiFetch = vi.mocked(apiFetch)
 
 type CourseRow = AgriculturalCourse & {
   direction: string
-  status?: string
+  status?: string | null
   return_to?: string
 }
 
@@ -37,6 +39,7 @@ const publishedCourse: CourseRow = {
   tag_ids: [1],
   duration_seconds: 100,
   direction: 'agriculture',
+  status: 'published',
   return_to: '/student/courses/1?comment=1#comments'
 }
 
@@ -123,6 +126,7 @@ function mockApi(
 }
 
 function mountView() {
+  const pinia = createPinia()
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -139,11 +143,12 @@ function mountView() {
     ].map(path => ({ path, component: { template: '<div />' } }))
   })
 
-  return mount(AgriCoursesView, {
+  const wrapper = mount(AgriCoursesView, {
     global: {
-      plugins: [createPinia(), router]
+      plugins: [pinia, router]
     }
   })
+  return { pinia, wrapper }
 }
 
 describe('AgriCoursesView', () => {
@@ -153,7 +158,7 @@ describe('AgriCoursesView', () => {
 
   it('shows independent course and recommendation empty states', async () => {
     mockApi([], [], {})
-    const wrapper = mountView()
+    const { wrapper } = mountView()
     await flushPromises()
 
     expect(wrapper.get('[data-test="course-empty"]').text()).toBe('暂无课程')
@@ -181,7 +186,7 @@ describe('AgriCoursesView', () => {
       { 1: progress(1, 80) }
     )
 
-    const wrapper = mountView()
+    const { wrapper } = mountView()
     await flushPromises()
 
     expect(wrapper.find('[data-test="course-1"]').exists()).toBe(true)
@@ -206,7 +211,7 @@ describe('AgriCoursesView', () => {
       { 1: progress(1, 79), 4: progress(4, 80) }
     )
 
-    const wrapper = mountView()
+    const { wrapper } = mountView()
     await flushPromises()
 
     expect(wrapper.get('[data-test="course-progress-1"]').attributes('value')).toBe(
@@ -225,7 +230,7 @@ describe('AgriCoursesView', () => {
 
   it('renders quiz questions, score, correctness and explanations', async () => {
     mockApi()
-    const wrapper = mountView()
+    const { wrapper } = mountView()
     await flushPromises()
 
     await wrapper.get('[data-test="quiz-entry-1"]').trigger('click')
@@ -242,6 +247,98 @@ describe('AgriCoursesView', () => {
     expect(wrapper.get('[data-test="quiz-result-0"]').text()).toContain('正确')
     expect(wrapper.get('[data-test="quiz-explanation-0"]').text()).toBe(
       '达到 80% 即完成。'
+    )
+  })
+
+  it('preserves backend ordering for courses and recommendations', async () => {
+    mockApi(
+      [
+        { ...publishedCourse, id: 7, title: '后置课程' },
+        { ...publishedCourse, id: 2, title: '前置课程' }
+      ],
+      [
+        { id: 9, title: '推荐九', summary: '推荐九摘要' },
+        { id: 3, title: '推荐三', summary: '推荐三摘要' }
+      ],
+      { 7: progress(7, 80), 2: progress(2, 80) }
+    )
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(
+      wrapper
+        .findAll('.course-card')
+        .map(course => course.attributes('data-test'))
+    ).toEqual(['course-7', 'course-2'])
+    expect(
+      wrapper
+        .findAll('.recommendation-item')
+        .map(course => course.attributes('data-test'))
+    ).toEqual(['recommendation-9', 'recommendation-3'])
+  })
+
+  it('shows a course progress failure instead of presenting zero progress', async () => {
+    mockedApiFetch.mockImplementation(async path => {
+      if (path === '/api/agri-skills/courses') {
+        return { success: true, courses: [publishedCourse] } as never
+      }
+      if (path === '/api/agri-skills/recommendations') {
+        return { success: true, courses: [] } as never
+      }
+      if (path === '/api/agri-skills/courses/1/progress') {
+        throw new ApiError('学习进度暂时不可用', 503)
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-test="course-progress-error-1"]').text()
+    ).toContain('学习进度暂时不可用')
+    expect(wrapper.find('[data-test="course-progress-1"]').exists()).toBe(false)
+  })
+
+  it('keeps a recommendation retry path after a completed refresh fails', async () => {
+    let recommendationCalls = 0
+    mockedApiFetch.mockImplementation(async (path, options) => {
+      if (path === '/api/agri-skills/courses') {
+        return { success: true, courses: [publishedCourse] } as never
+      }
+      if (path === '/api/agri-skills/recommendations') {
+        recommendationCalls += 1
+        if (recommendationCalls === 1) {
+          return {
+            success: true,
+            courses: [{ id: 1, title: '荔枝保果技术', summary: '' }]
+          } as never
+        }
+        throw new ApiError('推荐刷新失败', 503)
+      }
+      if (
+        path === '/api/agri-skills/courses/1/progress' &&
+        options?.method === 'PUT'
+      ) {
+        return { success: true, progress: progress(1, 80) } as never
+      }
+      if (path === '/api/agri-skills/courses/1/progress') {
+        return { success: true, progress: progress(1, 79) } as never
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const { pinia, wrapper } = mountView()
+    await flushPromises()
+
+    const store = useAgriCoursesStore(pinia)
+    await store.saveProgress(1, 80, 20)
+    await nextTick()
+
+    expect(store.recommendations).toEqual([])
+    expect(wrapper.get('[data-test="recommendation-error"]').text()).toContain(
+      '推荐刷新失败'
+    )
+    expect(wrapper.find('[data-test="recommendation-retry"]').exists()).toBe(
+      true
     )
   })
 })
