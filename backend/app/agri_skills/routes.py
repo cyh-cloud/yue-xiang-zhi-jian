@@ -22,10 +22,21 @@ from app.agri_skills.calendar import (
     subscribe_product,
     unsubscribe_product,
 )
+from app.agri_skills.diagnosis import (
+    abandon_diagnosis,
+    add_followup,
+    answer_diagnosis,
+    create_diagnosis,
+    create_diagnosis_from_followup,
+    get_diagnosis,
+    list_diagnoses,
+    start_diagnosis,
+)
 from app.agri_skills.errors import (
     AgriNotFoundError,
     AgriSkillError,
     AgriValidationError,
+    AiUnavailableError,
     PresetContentUnavailableError,
 )
 from app.agri_skills.qa import (
@@ -36,6 +47,7 @@ from app.agri_skills.qa import (
     persist_qa_turn,
     stream_qa_answer,
 )
+from app.agri_skills.self_test import generate_self_test, submit_self_test
 from app.session_manager import abort_session_required, load_session
 
 
@@ -69,6 +81,28 @@ def _sse(event: str, payload: dict) -> str:
 def _current_calendar_month() -> int:
     timezone_name = str(current_app.config["APP_TIMEZONE"])
     return datetime.now(ZoneInfo(timezone_name)).month
+
+
+@agri_skills_bp.errorhandler(AgriValidationError)
+def handle_validation(error):
+    return jsonify(
+        success=False,
+        message=error.message,
+        errors=error.details,
+    ), 400
+
+
+@agri_skills_bp.errorhandler(AgriNotFoundError)
+def handle_not_found(error):
+    return jsonify(success=False, message=error.message), 404
+
+
+@agri_skills_bp.errorhandler(AiUnavailableError)
+def handle_ai_unavailable(error):
+    return jsonify(
+        success=False,
+        message="AI 服务暂时不可用",
+    ), 503
 
 
 @agri_skills_bp.get("/products")
@@ -150,6 +184,112 @@ def delete_subscription(product_key: str):
         success=True,
         subscription=unsubscribe_product(int(session["id"]), product_key),
     )
+
+
+@agri_skills_bp.post("/diagnoses")
+def post_diagnosis():
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    diagnosis = create_diagnosis(
+        int(session["id"]),
+        str(payload.get("product_key", "")).strip(),
+        str(payload.get("affected_part", "")).strip(),
+        payload.get("symptoms")
+        if isinstance(payload.get("symptoms"), list)
+        else [],
+    )
+    return jsonify(success=True, session=diagnosis), 201
+
+
+@agri_skills_bp.get("/diagnoses")
+def get_diagnoses():
+    session = _student_session()
+    return jsonify(
+        success=True,
+        diagnoses=list_diagnoses(int(session["id"])),
+    )
+
+
+@agri_skills_bp.get("/diagnoses/<int:session_id>")
+def get_diagnosis_route(session_id: int):
+    session = _student_session()
+    diagnosis = get_diagnosis(int(session["id"]), session_id)
+    return jsonify(success=True, session=diagnosis)
+
+
+@agri_skills_bp.post("/diagnoses/<int:session_id>/start")
+def post_diagnosis_start(session_id: int):
+    session = _student_session()
+    diagnosis = start_diagnosis(int(session["id"]), session_id)
+    return jsonify(success=True, session=diagnosis)
+
+
+@agri_skills_bp.post("/diagnoses/<int:session_id>/answers")
+def post_diagnosis_answer(session_id: int):
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    result = answer_diagnosis(
+        int(session["id"]),
+        session_id,
+        str(payload.get("answer", "")),
+        str(payload.get("input_mode", "text")),
+    )
+    return jsonify(success=True, **result)
+
+
+@agri_skills_bp.post("/diagnoses/<int:session_id>/abandon")
+def post_diagnosis_abandon(session_id: int):
+    session = _student_session()
+    return jsonify(
+        success=True,
+        session=abandon_diagnosis(int(session["id"]), session_id),
+    )
+
+
+@agri_skills_bp.post("/diagnoses/<int:session_id>/followups")
+def post_followup(session_id: int):
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    followup = add_followup(
+        int(session["id"]),
+        session_id,
+        str(payload.get("outcome", "")),
+        payload.get("note", ""),
+    )
+    return jsonify(success=True, followup=followup), 201
+
+
+@agri_skills_bp.post("/diagnoses/<int:session_id>/repeat")
+def post_repeat_diagnosis(session_id: int):
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    diagnosis = create_diagnosis_from_followup(
+        int(session["id"]),
+        session_id,
+        int(payload.get("followup_id", 0)),
+    )
+    return jsonify(success=True, session=diagnosis), 201
+
+
+@agri_skills_bp.post("/diagnoses/<int:session_id>/self-test")
+def post_self_test(session_id: int):
+    session = _student_session()
+    test = generate_self_test(int(session["id"]), session_id)
+    return jsonify(success=True, self_test=test), 201
+
+
+@agri_skills_bp.post("/self-tests/<int:self_test_id>/submit")
+def post_self_test_submit(self_test_id: int):
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    result = submit_self_test(
+        int(session["id"]),
+        self_test_id,
+        payload.get("answers")
+        if isinstance(payload.get("answers"), dict)
+        else {},
+    )
+    return jsonify(success=True, result=result)
 
 
 @agri_skills_bp.post("/qa/conversations")
