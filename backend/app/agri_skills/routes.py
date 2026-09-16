@@ -503,7 +503,15 @@ def stream_qa_message(conversation_id: int):
                         answer_mode="ai",
                         suggestions=event["suggestions"],
                     )
-                    yield _sse("complete", {"turn": thread["turns"][-1]})
+                    yield _sse(
+                        "complete",
+                        {
+                            "turn": thread["turns"][-1],
+                            "suggestion_error": event.get(
+                                "suggestion_error"
+                            ),
+                        },
+                    )
                 elif event["type"] == "replace":
                     thread = persist_qa_turn(
                         user_id=int(session["id"]),

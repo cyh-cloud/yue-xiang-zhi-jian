@@ -344,6 +344,14 @@ export const useAgriDiagnosisStore = defineStore('agriDiagnosis', {
         this.selfTest = null
         this.selfTestResult = null
         this.storeSession(response.session)
+        if (
+          response.session.ai_error ||
+          (this.activeSession?.status === 'in_progress' &&
+            !pendingQuestion(this.activeSession))
+        ) {
+          this.error = AI_UNAVAILABLE_MESSAGE
+          return false
+        }
         return true
       } catch (error) {
         this.captureError(error, '再次诊断创建失败')

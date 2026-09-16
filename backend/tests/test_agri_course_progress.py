@@ -13,7 +13,7 @@ from app.agri_skills.course_learning import (
     update_course_progress,
 )
 from app.agri_skills.errors import AgriValidationError
-from app.agri_skills.providers import set_course_provider
+from app.agri_skills.providers import get_course_provider, set_course_provider
 from app.db import get_db
 
 
@@ -204,7 +204,37 @@ class TestAgriCourseProgress(unittest.TestCase):
             self.assertEqual(result["resume_position_seconds"], 40)
             self.assertEqual(result["progress_percent"], 90)
 
-    def test_concurrent_updates_merge_instead_of_overwriting_stale_progress(self):
+    def test_duplicate_progress_event_does_not_double_count_watch_time(self):
+        with self.app.app_context():
+            first = update_course_progress(self.student_id, 1, 60, 30)
+            duplicate = update_course_progress(self.student_id, 1, 60, 30)
+
+            self.assertEqual(first["watched_seconds"], 30)
+            self.assertEqual(duplicate["watched_seconds"], 30)
+            self.assertEqual(duplicate["furthest_position_seconds"], 60)
+            self.assertEqual(duplicate["progress_percent"], 60)
+
+    def test_out_of_order_progress_does_not_double_count_watch_time(self):
+        with self.app.app_context():
+            update_course_progress(self.student_id, 1, 90, 30)
+            result = update_course_progress(self.student_id, 1, 40, 20)
+
+            self.assertEqual(result["watched_seconds"], 30)
+            self.assertEqual(result["furthest_position_seconds"], 90)
+            self.assertEqual(result["resume_position_seconds"], 40)
+            self.assertEqual(result["progress_percent"], 90)
+
+    def test_same_position_replay_does_not_double_count_watch_time(self):
+        with self.app.app_context():
+            update_course_progress(self.student_id, 1, 60, 30)
+            replay = update_course_progress(self.student_id, 1, 60, 5)
+
+            self.assertEqual(replay["watched_seconds"], 30)
+            self.assertEqual(replay["furthest_position_seconds"], 60)
+            self.assertEqual(replay["resume_position_seconds"], 60)
+            self.assertEqual(replay["progress_percent"], 60)
+
+    def test_concurrent_duplicate_updates_are_counted_once(self):
         barrier = threading.Barrier(2)
 
         def update(position, watched_delta):
@@ -228,17 +258,17 @@ class TestAgriCourseProgress(unittest.TestCase):
                     future.result()
                     for future in (
                         executor.submit(update, 40, 10),
-                        executor.submit(update, 90, 10),
+                        executor.submit(update, 40, 10),
                     )
                 ]
 
         self.assertEqual(len(results), 2)
         with self.app.app_context():
             progress = get_course_progress(self.student_id, 1)
-        self.assertEqual(progress["furthest_position_seconds"], 90)
-        self.assertEqual(progress["watched_seconds"], 20)
-        self.assertEqual(progress["progress_percent"], 90)
-        self.assertIsNotNone(progress["completed_at"])
+        self.assertEqual(progress["furthest_position_seconds"], 40)
+        self.assertEqual(progress["watched_seconds"], 10)
+        self.assertEqual(progress["progress_percent"], 40)
+        self.assertIsNone(progress["completed_at"])
 
     def test_invalid_progress_is_rejected_without_mutation(self):
         with self.app.app_context():
@@ -310,9 +340,40 @@ class TestAgriCourseProgress(unittest.TestCase):
 
             self.assertEqual([course["id"] for course in courses], [2, 3, 1])
             self.assertEqual(courses[0]["tag_ids"], [1])
-            self.assertIsNone(courses[0]["duration_seconds"])
+            duration = courses[0]["duration_seconds"]
+            self.assertIsInstance(duration, int)
+            self.assertGreater(duration, 0)
+            self.assertEqual(
+                provider.get_course(2)["duration_seconds"],
+                duration,
+            )
             self.assertIsNone(provider.get_course(4))
             self.assertIsNone(provider.get_course(5))
+
+    def test_default_course_provider_supports_stable_progress_loop(self):
+        with self.app.app_context():
+            self.app.extensions.pop("agri_course_provider", None)
+
+            provider = get_course_provider()
+            self.assertIsInstance(provider, DatabaseAgriCourseProvider)
+            first = provider.get_course(1)
+            second = provider.get_course(1)
+            duration = first["duration_seconds"]
+            self.assertIsInstance(duration, int)
+            self.assertGreater(duration, 0)
+            self.assertEqual(second["duration_seconds"], duration)
+
+            completion_position = (duration * 80) // 100
+            progress = update_course_progress(
+                self.student_id,
+                1,
+                completion_position,
+                completion_position,
+            )
+
+            self.assertEqual(progress["duration_seconds"], duration)
+            self.assertEqual(progress["progress_percent"], 80)
+            self.assertIsNotNone(progress["completed_at"])
 
 
 if __name__ == "__main__":

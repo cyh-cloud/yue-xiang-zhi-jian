@@ -148,6 +148,32 @@ class TestAgriQaApi(unittest.TestCase):
             ["如何施肥", "如何排水", "如何防虫"],
         )
 
+    def test_stream_complete_event_preserves_followup_failure(self):
+        self.fake_ai.complete_json.side_effect = AiUnavailableError(
+            "AI 服务暂时不可用"
+        )
+
+        response = self.student_client.post(
+            (
+                "/api/agri-skills/qa/conversations/"
+                f"{self.conversation_id}/messages/stream"
+            ),
+            json={"question": "荔枝如何保果"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        events = self._sse_events(response.get_data(as_text=True))
+        self.assertEqual(
+            [event for event, _ in events],
+            ["chunk", "chunk", "complete"],
+        )
+        payload = events[-1][1]
+        self.assertEqual(
+            payload["suggestion_error"],
+            "AI 服务暂时不可用",
+        )
+        self.assertEqual(payload["turn"]["suggestions"], [])
+
     def test_stream_replaces_partial_ai_output_with_local_answer(self):
         def failed_stream(messages, *, call_point):
             yield "不完整"

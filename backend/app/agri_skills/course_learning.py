@@ -17,6 +17,7 @@ from app.session_manager import utc_now_iso
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 COURSE_QUIZ_QUESTION_TYPES = {"single_choice", "true_false"}
+PLACEHOLDER_COURSE_DURATION_SECONDS = 300
 
 
 class DatabaseAgriCourseProvider:
@@ -49,12 +50,20 @@ class DatabaseAgriCourseProvider:
             str(row["name"])
             for row in get_db().execute("PRAGMA table_info(courses)").fetchall()
         }
-        duration_value = course.get("duration_seconds")
-        duration = (
-            int(duration_value)
-            if "duration_seconds" in columns and duration_value is not None
-            else None
-        )
+        if "duration_seconds" not in columns:
+            duration = PLACEHOLDER_COURSE_DURATION_SECONDS
+        else:
+            duration_value = course.get("duration_seconds")
+            try:
+                duration = int(duration_value)
+            except (TypeError, ValueError):
+                duration = None
+            if (
+                isinstance(duration_value, bool)
+                or duration is None
+                or duration <= 0
+            ):
+                duration = None
         tag_ids = [
             int(row["tag_id"])
             for row in get_db().execute(
@@ -218,7 +227,14 @@ def update_course_progress(
                     excluded.progress_percent
                 ),
                 watched_seconds = agri_course_progress.watched_seconds
-                    + excluded.watched_seconds,
+                    + MIN(
+                        excluded.watched_seconds,
+                        MAX(
+                            0,
+                            excluded.furthest_position_seconds
+                            - agri_course_progress.furthest_position_seconds
+                        )
+                    ),
                 completed_at = COALESCE(
                     agri_course_progress.completed_at,
                     excluded.completed_at

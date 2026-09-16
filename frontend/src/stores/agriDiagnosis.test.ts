@@ -314,6 +314,37 @@ describe('agriDiagnosis store', () => {
     expect(store.activeSession?.status).toBe('in_progress')
   })
 
+  it('keeps the repeated diagnosis and reports an AI failure', async () => {
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      session: session({
+        id: 19,
+        source_session_id: 12,
+        source_followup_id: 7,
+        status: 'in_progress',
+        pending_question: null,
+        pending_question_round: null,
+        ai_error: 'AI 服务暂时不可用'
+      })
+    } as never)
+    const store = useAgriDiagnosisStore()
+    store.activeSession = session({ status: 'completed' })
+
+    const succeeded = await store.repeatDiagnosis(7)
+
+    expect(succeeded).toBe(false)
+    expect(store.error).toBe('AI 服务暂时不可用')
+    expect(store.activeSession).toMatchObject({
+      id: 19,
+      source_session_id: 12,
+      source_followup_id: 7,
+      product_key: 'litchi',
+      affected_part: 'fruit',
+      symptoms: ['虫蛀', '落果'],
+      status: 'in_progress'
+    })
+  })
+
   it('generates and grades a self-test without dropping the questions', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({

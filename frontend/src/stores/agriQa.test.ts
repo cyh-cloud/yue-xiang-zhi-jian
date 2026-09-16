@@ -105,6 +105,7 @@ describe('agriQa store', () => {
     expect(store.answerMode).toBe('local_kb')
     expect(store.turns[0].answer).toContain('离线知识库回答')
     expect(store.suggestions).toEqual([])
+    expect(store.suggestionError).toBe('')
   })
 
   it('forces local-KB semantics for a malformed replace event', async () => {
@@ -134,6 +135,7 @@ describe('agriQa store', () => {
       suggestions: []
     })
     expect(store.suggestions).toEqual([])
+    expect(store.suggestionError).toBe('')
   })
 
   it('uses the non-streaming local fallback after a streamed AI response is interrupted', async () => {
