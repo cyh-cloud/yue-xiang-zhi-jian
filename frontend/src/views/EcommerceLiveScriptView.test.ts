@@ -97,6 +97,9 @@ describe('EcommerceLiveScriptView', () => {
     expect(wrapper.get('[data-test="live-script-selling-points"]').attributes()).toHaveProperty(
       'required'
     )
+    expect(wrapper.get('[data-test="live-script-price"]').attributes()).not.toHaveProperty(
+      'required'
+    )
 
     const styles = wrapper.findAll('[data-test="live-script-style"]')
     expect(styles).toHaveLength(3)
@@ -141,6 +144,9 @@ describe('EcommerceLiveScriptView', () => {
     expect(wrapper.get('[data-test="live-script-history"]').text()).toContain(
       '荔枝干'
     )
+    expect(wrapper.get('[data-test="live-script-history"]').text()).toContain(
+      '香甜、耐储存'
+    )
     expect(wrapper.find('[data-test="live-script-regenerate"]').exists()).toBe(
       true
     )
@@ -156,7 +162,8 @@ describe('EcommerceLiveScriptView', () => {
         success: true,
         version: version(1, {
           product_name: '陈皮',
-          style: 'humorous'
+          style: 'humorous',
+          selling_points: ['理气', '陈香']
         })
       } as never)
     const { pinia, wrapper } = mountView()
@@ -172,7 +179,36 @@ describe('EcommerceLiveScriptView', () => {
     expect(wrapper.get('[data-test="live-script-current"]').text()).toContain(
       '陈皮'
     )
+    expect(
+      wrapper.get('[data-test="live-script-current-selling-points"]').text()
+    ).toContain('理气、陈香')
     expect(wrapper.findAll('[data-test="live-script-section"]')).toHaveLength(4)
+  })
+
+  it('submits without price text and displays the missing price state', async () => {
+    const { pinia, wrapper } = mountView()
+    await flushPromises()
+    const store = useEcommerceLiveScriptStore(pinia)
+    mockedApiFetch.mockResolvedValueOnce({
+      success: true,
+      version: version(1, {
+        price_text: '',
+        is_current: true
+      })
+    } as never)
+
+    await wrapper.get('[data-test="live-script-product-name"]').setValue('荔枝干')
+    await wrapper
+      .get('[data-test="live-script-selling-points"]')
+      .setValue('香甜、耐储存')
+    await wrapper.get('[data-test="live-script-form"]').trigger('submit')
+    await flushPromises()
+
+    expect(store.form.price_text).toBe('')
+    expect(store.current?.price_text).toBe('')
+    expect(wrapper.get('[data-test="live-script-current-price"]').text()).toBe(
+      '价格：未填写'
+    )
   })
 
   it('shows the exact AI message and preserves the form after failure', async () => {
@@ -191,7 +227,7 @@ describe('EcommerceLiveScriptView', () => {
     await wrapper.get('[data-test="live-script-form"]').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.get('[aria-live="polite"]').text()).toBe(
+    expect(wrapper.get('[aria-live="assertive"]').text()).toBe(
       'AI 服务暂时不可用'
     )
     expect(store.form.product_name).toBe('荔枝干')

@@ -74,12 +74,8 @@ export const useEcommerceLiveScriptStore = defineStore(
           style: this.form.style
         }
 
-        if (
-          !request.product_name ||
-          !request.selling_points ||
-          !request.price_text
-        ) {
-          this.error = '请填写商品名称、卖点和价格文案'
+        if (!request.product_name || !request.selling_points) {
+          this.error = '请填写商品名称和卖点'
           return false
         }
         if (!LIVE_SCRIPT_STYLES.includes(request.style)) {
@@ -127,12 +123,8 @@ export const useEcommerceLiveScriptStore = defineStore(
             versions: LiveScriptVersion[]
           }>('/api/ecommerce-training/live-scripts')
           this.history = sortHistory(response.versions)
-          const current = response.versions.find(item => item.is_current)
-          if (current) {
-            this.current = current
-          } else if (!this.current) {
-            this.current = this.history[0] ?? null
-          }
+          this.current =
+            this.history.find(item => item.is_current) ?? null
         } catch {
           this.error = '直播话术记录加载失败'
         } finally {

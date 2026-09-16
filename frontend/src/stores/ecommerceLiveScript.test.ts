@@ -82,23 +82,28 @@ describe('ecommerceLiveScript store', () => {
     expect(store.history.map(item => item.is_current)).toEqual([true, false])
   })
 
-  it('loads module history and opens an original version', async () => {
+  it('loads unordered module history and opens an original version', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({
         success: true,
         versions: [
-          version(2, { is_current: true }),
-          version(1, { style: 'humorous' })
+          version(1, { style: 'humorous' }),
+          version(3),
+          version(2, { is_current: true })
         ]
       } as never)
       .mockResolvedValueOnce({
         success: true,
-        version: version(1, { style: 'humorous' })
+        version: version(1, {
+          style: 'humorous',
+          selling_points: ['理气', '陈香']
+        })
       } as never)
     const store = useEcommerceLiveScriptStore()
 
     await store.loadHistory()
     expect(store.current?.id).toBe(2)
+    expect(store.history.map(item => item.id)).toEqual([3, 2, 1])
 
     await store.openVersion(1)
     expect(mockedApiFetch).toHaveBeenLastCalledWith(
@@ -106,6 +111,30 @@ describe('ecommerceLiveScript store', () => {
     )
     expect(store.current?.id).toBe(1)
     expect(store.current?.style).toBe('humorous')
+    expect(store.current?.selling_points).toEqual(['理气', '陈香'])
+  })
+
+  it('recomputes current from server history and clears stale current', async () => {
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        versions: [version(4), version(3)]
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        versions: []
+      } as never)
+    const store = useEcommerceLiveScriptStore()
+    store.current = version(99, { is_current: true })
+
+    await store.loadHistory()
+    expect(store.current).toBeNull()
+    expect(store.history.map(item => item.id)).toEqual([4, 3])
+
+    store.current = version(99, { is_current: true })
+    await store.loadHistory()
+    expect(store.current).toBeNull()
+    expect(store.history).toEqual([])
   })
 
   it('keeps the form and exact AI message when generation fails', async () => {
@@ -127,6 +156,54 @@ describe('ecommerceLiveScript store', () => {
     expect(store.current).toBeNull()
     expect(store.history).toEqual([])
     expect(store.error).toBe('AI 服务暂时不可用')
+  })
+
+  it('keeps an existing current version when regeneration fails', async () => {
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError('provider timeout', 503)
+    )
+    const store = useEcommerceLiveScriptStore()
+    const existing = version(7, { is_current: true })
+    store.current = existing
+    store.history = [existing]
+    store.form = {
+      product_name: '陈皮',
+      selling_points: '陈香',
+      price_text: '',
+      style: 'professional'
+    }
+
+    expect(await store.generate()).toBe(false)
+    expect(store.current).toEqual(existing)
+    expect(store.history).toEqual([existing])
+    expect(store.error).toBe('AI 服务暂时不可用')
+  })
+
+  it('submits without price text and stores the empty input', async () => {
+    mockedApiFetch.mockResolvedValueOnce({
+      success: true,
+      version: version(5, {
+        price_text: '',
+        is_current: true
+      })
+    } as never)
+    const store = useEcommerceLiveScriptStore()
+    store.form = {
+      product_name: '荔枝干',
+      selling_points: '香甜、耐储存',
+      price_text: '',
+      style: 'enthusiastic'
+    }
+
+    expect(await store.generate()).toBe(true)
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/ecommerce-training/live-scripts',
+      {
+        method: 'POST',
+        body: JSON.stringify(store.form)
+      }
+    )
+    expect(store.current?.price_text).toBe('')
   })
 
   it('does not call the AI when required inputs are empty', async () => {

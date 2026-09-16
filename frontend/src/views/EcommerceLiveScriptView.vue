@@ -115,7 +115,6 @@ onMounted(() => {
                 v-model="store.form.price_text"
                 data-test="live-script-price"
                 type="text"
-                required
                 autocomplete="off"
                 placeholder="例如：限时 39.9 元"
               />
@@ -174,7 +173,7 @@ onMounted(() => {
               v-if="store.error"
               class="error-message"
               role="alert"
-              aria-live="polite"
+              aria-live="assertive"
             >
               {{ store.error }}
             </p>
@@ -197,8 +196,15 @@ onMounted(() => {
           >
             <div class="version-meta">
               <strong>{{ store.current.product_name }}</strong>
-              <span>{{ styleLabels[store.current.style] }}</span>
-              <span>{{ store.current.price_text }}</span>
+              <span class="style-label">
+                {{ styleLabels[store.current.style] }}
+              </span>
+              <span data-test="live-script-current-selling-points">
+                卖点：{{ store.current.selling_points.join('、') || '未填写' }}
+              </span>
+              <span data-test="live-script-current-price">
+                价格：{{ store.current.price_text || '未填写' }}
+              </span>
               <time :datetime="store.current.created_at">
                 {{ formatTime(store.current.created_at) }}
               </time>
@@ -240,10 +246,15 @@ onMounted(() => {
                   {{ item.product_name }}
                   <small>{{ styleLabels[item.style] }}</small>
                 </span>
-                <span>{{ item.price_text }}</span>
                 <time :datetime="item.created_at">
                   {{ formatTime(item.created_at) }}
                 </time>
+                <span class="history-selling-points">
+                  卖点：{{ item.selling_points.join('、') || '未填写' }}
+                </span>
+                <span class="history-price">
+                  价格：{{ item.price_text || '未填写' }}
+                </span>
                 <em v-if="item.is_current">当前</em>
               </button>
             </li>
@@ -479,7 +490,14 @@ onMounted(() => {
   font-size: 1.05rem;
 }
 
-.version-meta span:first-of-type {
+.version-meta > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.version-meta .style-label {
   color: var(--ark-signal);
   font-weight: 700;
 }
@@ -547,6 +565,12 @@ onMounted(() => {
   font-weight: 700;
 }
 
+.history-panel button > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .history-title small {
   margin-left: 7px;
   color: var(--ark-signal);
@@ -558,6 +582,8 @@ onMounted(() => {
   grid-row: 1 / span 2;
   align-self: center;
   font-size: 0.75rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .history-panel em {
