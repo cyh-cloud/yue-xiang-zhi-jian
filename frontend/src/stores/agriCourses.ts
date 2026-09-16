@@ -35,35 +35,53 @@ function hasOwn(course: AgriCourse, key: keyof AgriCourse): boolean {
   return Object.prototype.hasOwnProperty.call(course, key)
 }
 
-function normalizedStatus(course: AgriCourse): string | null {
-  if (hasOwn(course, 'status')) {
-    return typeof course.status === 'string' ? course.status : null
-  }
-  if (hasOwn(course, 'publication_status')) {
-    return typeof course.publication_status === 'string'
-      ? course.publication_status
-      : null
-  }
-  if (hasOwn(course, 'is_published')) {
-    if (course.is_published === true) {
-      return 'published'
-    }
-    if (course.is_published === false) {
-      return 'offline'
-    }
-    return null
-  }
-  return null
+interface MetadataState {
+  present: boolean
+  valid: boolean
 }
 
-function normalizedDirection(course: AgriCourse): string | null {
-  if (typeof course.direction === 'string') {
-    return course.direction
+function publicationMetadata(course: AgriCourse): MetadataState {
+  if (hasOwn(course, 'status')) {
+    return {
+      present: true,
+      valid: typeof course.status === 'string' && course.status === 'published'
+    }
   }
-  if (typeof course.learning_direction === 'string') {
-    return course.learning_direction
+  if (hasOwn(course, 'publication_status')) {
+    return {
+      present: true,
+      valid:
+        typeof course.publication_status === 'string' &&
+        course.publication_status === 'published'
+    }
   }
-  return null
+  if (hasOwn(course, 'is_published')) {
+    return {
+      present: true,
+      valid: course.is_published === true
+    }
+  }
+  return { present: false, valid: true }
+}
+
+function directionMetadata(course: AgriCourse): MetadataState {
+  if (hasOwn(course, 'direction')) {
+    return {
+      present: true,
+      valid:
+        typeof course.direction === 'string' &&
+        course.direction === 'agriculture'
+    }
+  }
+  if (hasOwn(course, 'learning_direction')) {
+    return {
+      present: true,
+      valid:
+        typeof course.learning_direction === 'string' &&
+        course.learning_direction === 'agriculture'
+    }
+  }
+  return { present: false, valid: true }
 }
 
 function errorMessage(error: unknown, fallback: string): string {
@@ -75,21 +93,21 @@ function errorMessage(error: unknown, fallback: string): string {
 }
 
 function isEligibleCourse(course: AgriCourse): boolean {
-  const status = normalizedStatus(course)
-  const direction = normalizedDirection(course)
-  return status === 'published' && direction === 'agriculture'
+  const publication = publicationMetadata(course)
+  const direction = directionMetadata(course)
+  return publication.valid && direction.present && direction.valid
 }
 
 function isEligibleRecommendation(course: AgriCourse): boolean {
-  const status = normalizedStatus(course)
-  const direction = normalizedDirection(course)
+  const publication = publicationMetadata(course)
+  const direction = directionMetadata(course)
   return (
     Number.isInteger(course.id) &&
     course.id > 0 &&
     typeof course.title === 'string' &&
     course.title.trim() !== '' &&
-    (status === null || status === 'published') &&
-    (direction === null || direction === 'agriculture')
+    publication.valid &&
+    direction.valid
   )
 }
 

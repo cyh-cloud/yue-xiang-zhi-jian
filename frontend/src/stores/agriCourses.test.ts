@@ -40,7 +40,6 @@ const courseFixture: CourseRow = {
   tag_ids: [1],
   duration_seconds: 100,
   direction: 'agriculture',
-  status: 'published',
   return_to: '/student/courses/1?comment=1#comments'
 }
 
@@ -118,7 +117,7 @@ describe('agriCourses store', () => {
     )
   })
 
-  it('uses separate strict course and recommendation eligibility contracts', async () => {
+  it('accepts the authoritative agriculture payload and rejects malformed metadata', async () => {
     const recommendation = {
       id: 9,
       title: '推荐课程',
@@ -147,7 +146,20 @@ describe('agriCourses store', () => {
               id: 7,
               title: '电商课程',
               direction: 'ecommerce'
-            }
+            },
+            {
+              ...courseFixture,
+              id: 8,
+              title: '空发布状态',
+              publication_status: null
+            },
+            {
+              ...courseFixture,
+              id: 9,
+              title: '空发布布尔值',
+              is_published: null
+            },
+            { ...courseFixture, id: 10, title: '异常发布状态', status: 'unknown' }
           ]
         } as never
       }

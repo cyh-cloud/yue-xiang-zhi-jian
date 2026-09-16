@@ -39,7 +39,6 @@ const publishedCourse: CourseRow = {
   tag_ids: [1],
   duration_seconds: 100,
   direction: 'agriculture',
-  status: 'published',
   return_to: '/student/courses/1?comment=1#comments'
 }
 
