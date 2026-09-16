@@ -281,7 +281,7 @@ describe('ecommerceSimulation store', () => {
     expect(store.current?.total_score).toBe(64)
   })
 
-  it('ignores a stale save response after another training starts', async () => {
+  it('rejects context changes while a save is pending and applies its own response', async () => {
     const store = useEcommerceSimulationStore()
     store.current = training()
     store.drafts = {
@@ -289,41 +289,30 @@ describe('ecommerceSimulation store', () => {
       hook: '',
       audience_call: ''
     }
+    store.savedSegments = {
+      greeting: false,
+      hook: false,
+      audience_call: false
+    }
     let resolveSave:
       | ((value: {
           success: true
           training: SimulationTraining
         }) => void)
       | undefined
-    const nextTraining = training({
-      id: 2,
-      scene_key: 'product_intro',
-      scene_label: '产品介绍',
-      segments: [
-        { key: 'feature', label: '核心卖点', text: '' },
-        { key: 'proof', label: '信任证明', text: '' }
-      ]
-    })
-    mockedApiFetch
-      .mockImplementationOnce(
-        () =>
-          new Promise(resolve => {
-            resolveSave = resolve
-          }) as never
-      )
-      .mockResolvedValueOnce({
-        success: true,
-        training: nextTraining
-      } as never)
+    mockedApiFetch.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveSave = resolve
+        }) as never
+    )
 
     const saveRequest = store.saveSegment(
       'greeting',
       '欢迎来到直播间'
     )
-    const startRequest = store.start('product_intro')
-    await startRequest
-
-    expect(store.current?.id).toBe(2)
+    expect(await store.start('product_intro')).toBe(false)
+    expect(store.current?.id).toBe(1)
     resolveSave?.({
       success: true,
       training: training({
@@ -341,16 +330,105 @@ describe('ecommerceSimulation store', () => {
     })
     await saveRequest
 
-    expect(store.current?.id).toBe(2)
-    expect(store.current?.scene_key).toBe('product_intro')
+    expect(store.current?.id).toBe(1)
+    expect(store.current?.scene_key).toBe('opening')
     expect(store.drafts).toEqual({
-      feature: '',
-      proof: ''
+      greeting: '欢迎来到直播间',
+      hook: '',
+      audience_call: ''
     })
     expect(store.savedSegments).toEqual({
-      feature: false,
-      proof: false
+      greeting: true,
+      hook: false,
+      audience_call: false
     })
+    expect(store.isBusy).toBe(false)
+  })
+
+  it('rejects context mutations while scoring is pending and clears busy state after settle', async () => {
+    const store = useEcommerceSimulationStore()
+    const scored = completedTraining()
+    store.current = training({ segments: scored.segments })
+    store.drafts = Object.fromEntries(
+      scored.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    const nextTraining = training({
+      id: 2,
+      scene_key: 'product_intro',
+      scene_label: '产品介绍',
+      segments: [{ key: 'feature', label: '核心卖点', text: '' }]
+    })
+    let resolveScore:
+      | ((value: {
+          success: true
+          training: SimulationTraining
+        }) => void)
+      | undefined
+    mockedApiFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveScore = resolve
+          }) as never
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        training: nextTraining
+      } as never)
+
+    const scoreRequest = store.score()
+    expect(store.scoring).toBe(true)
+    expect(await store.start('product_intro')).toBe(false)
+    expect(await store.openTraining(2)).toBe(false)
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+
+    resolveScore?.({
+      success: true,
+      training: scored
+    })
+    await scoreRequest
+
+    expect(store.scoring).toBe(false)
+    expect(store.isBusy).toBe(false)
+    expect(await store.start('product_intro')).toBe(true)
+    expect(store.current?.id).toBe(2)
+  })
+
+  it('keeps loading active until every overlapping read has settled', async () => {
+    const store = useEcommerceSimulationStore()
+    let resolveScenes:
+      | ((value: { success: true; scenes: SimulationScene[] }) => void)
+      | undefined
+    mockedApiFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveScenes = resolve
+          }) as never
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        trainings: []
+      } as never)
+
+    const scenesRequest = store.loadScenes()
+    const historyRequest = store.loadHistory()
+    await historyRequest
+
+    expect(store.loading).toBe(true)
+
+    resolveScenes?.({
+      success: true,
+      scenes
+    })
+    await scenesRequest
+
+    expect(store.loading).toBe(false)
   })
 
   it('maps 400 and 500 score failures without claiming AI is unavailable', async () => {

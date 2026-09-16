@@ -11,6 +11,7 @@ interface EcommerceSimulationState {
   savedSegments: Record<string, boolean>
   savingSegments: Record<string, boolean>
   loading: boolean
+  activeReadRequests: number
   starting: boolean
   openingTraining: boolean
   scoring: boolean
@@ -36,6 +37,20 @@ function actionErrorMessage(error: unknown, fallback: string): string {
     return error.message
   }
   return fallback
+}
+
+function hasPendingMutation(state: {
+  starting: boolean
+  openingTraining: boolean
+  scoring: boolean
+  savingSegments: Record<string, boolean>
+}): boolean {
+  return (
+    state.starting ||
+    state.openingTraining ||
+    state.scoring ||
+    Object.values(state.savingSegments).some(Boolean)
+  )
 }
 
 function segmentState(training: SimulationTraining) {
@@ -78,6 +93,7 @@ export const useEcommerceSimulationStore = defineStore(
       savedSegments: {},
       savingSegments: {},
       loading: false,
+      activeReadRequests: 0,
       starting: false,
       openingTraining: false,
       scoring: false,
@@ -99,14 +115,11 @@ export const useEcommerceSimulationStore = defineStore(
           )
         )
       },
+      mutationBusy(state): boolean {
+        return hasPendingMutation(state)
+      },
       isBusy(state): boolean {
-        return (
-          state.loading ||
-          state.starting ||
-          state.openingTraining ||
-          state.scoring ||
-          Object.values(state.savingSegments).some(Boolean)
-        )
+        return state.loading || hasPendingMutation(state)
       }
     },
     actions: {
@@ -118,6 +131,7 @@ export const useEcommerceSimulationStore = defineStore(
         this.savingSegments = nextState.savingSegments
       },
       async loadScenes(): Promise<boolean> {
+        this.activeReadRequests += 1
         this.loading = true
         this.error = ''
 
@@ -132,11 +146,15 @@ export const useEcommerceSimulationStore = defineStore(
           this.error = '模拟训练场景加载失败'
           return false
         } finally {
-          this.loading = false
+          this.activeReadRequests = Math.max(
+            0,
+            this.activeReadRequests - 1
+          )
+          this.loading = this.activeReadRequests > 0
         }
       },
       async start(sceneKey: string): Promise<boolean> {
-        if (this.starting || this.openingTraining) {
+        if (this.mutationBusy) {
           return false
         }
 
@@ -164,9 +182,7 @@ export const useEcommerceSimulationStore = defineStore(
           }
           return false
         } finally {
-          if (requestId === this.contextRequestId) {
-            this.starting = false
-          }
+          this.starting = false
         }
       },
       async saveSegment(
@@ -179,9 +195,7 @@ export const useEcommerceSimulationStore = defineStore(
           training.status !== 'draft' ||
           this.savedSegments[segmentKey] ||
           this.savingSegments[segmentKey] ||
-          this.starting ||
-          this.openingTraining ||
-          Object.values(this.savingSegments).some(Boolean)
+          this.mutationBusy
         ) {
           return false
         }
@@ -244,20 +258,15 @@ export const useEcommerceSimulationStore = defineStore(
           }
           return false
         } finally {
-          if (
-            requestId === this.contextRequestId &&
-            this.current?.id === training.id
-          ) {
-            this.savingSegments = {
-              ...this.savingSegments,
-              [segmentKey]: false
-            }
+          this.savingSegments = {
+            ...this.savingSegments,
+            [segmentKey]: false
           }
         }
       },
       async score(): Promise<boolean> {
         const training = this.current
-        if (!training || !this.canScore || this.scoring) {
+        if (!training || !this.canScore || this.mutationBusy) {
           return false
         }
 
@@ -294,15 +303,11 @@ export const useEcommerceSimulationStore = defineStore(
           }
           return false
         } finally {
-          if (
-            requestId === this.contextRequestId &&
-            this.current?.id === training.id
-          ) {
-            this.scoring = false
-          }
+          this.scoring = false
         }
       },
       async loadHistory(): Promise<boolean> {
+        this.activeReadRequests += 1
         this.loading = true
         this.error = ''
 
@@ -322,11 +327,15 @@ export const useEcommerceSimulationStore = defineStore(
           }
           return false
         } finally {
-          this.loading = false
+          this.activeReadRequests = Math.max(
+            0,
+            this.activeReadRequests - 1
+          )
+          this.loading = this.activeReadRequests > 0
         }
       },
       async openTraining(id: number): Promise<boolean> {
-        if (this.openingTraining || this.starting) {
+        if (this.mutationBusy) {
           return false
         }
 
@@ -354,9 +363,7 @@ export const useEcommerceSimulationStore = defineStore(
           }
           return false
         } finally {
-          if (requestId === this.contextRequestId) {
-            this.openingTraining = false
-          }
+          this.openingTraining = false
         }
       },
       clearError() {
