@@ -340,3 +340,150 @@ export interface CourseQuizAttempt {
   }>
   created_at: string
 }
+
+export type CourseDirection = 'agriculture' | 'ecommerce'
+
+export interface EcommerceCourse extends AgriculturalCourse {
+  direction: CourseDirection
+  status?: string | null
+  publication_status?: string | null
+  is_published?: boolean | null
+  learning_direction?: string | null
+  return_to?: string | null
+  returnTo?: string | null
+  comment_url?: string | null
+}
+
+export interface LiveScriptVersion {
+  id: number
+  product_name: string
+  selling_points: string[]
+  price_text: string
+  style: 'enthusiastic' | 'professional' | 'humorous'
+  script: {
+    opening: string
+    product_intro: string
+    interaction: string
+    closing: string
+  }
+  is_current: boolean
+  created_at: string
+}
+
+export interface SimulationScene {
+  key: string
+  label: string
+  segments: Array<{
+    key: string
+    label: string
+  }>
+}
+
+export interface SimulationTraining {
+  id: number
+  scene_key: string
+  scene_label: string
+  segments: Array<{
+    key: string
+    label: string
+    text: string
+  }>
+  status: 'draft' | 'completed'
+  scores: {
+    pacing: number
+    emotion: number
+    interaction: number
+    selling_point: number
+  } | null
+  suggestions: {
+    pacing: string
+    emotion: string
+    interaction: string
+    selling_point: string
+  } | null
+  total_score: number | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export interface CopyTrainingSession {
+  id: number
+  product_type: string
+  scene: string
+  status: 'case_ready' | 'critique_ready' | 'copy_ready' | 'completed'
+  case: {
+    copy_text: string
+    is_teaching_case: true
+    defect_categories?: string[]
+  }
+  learner_critique: string | null
+  reference: {
+    reference_critique: string
+    consistency_score: number
+    reason: string
+  } | null
+  optimized_prompt: string | null
+  revised_copy: string | null
+  optimization: {
+    differences: string[]
+    optimization_score: number
+    evidence: string
+  } | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
+
+export interface StorePlan {
+  id: number
+  store_type: string
+  platform: string
+  style_preference: string
+  plan: {
+    home_layout: string[]
+    color_scheme: Record<string, string>
+    detail_structure: string[]
+    navigation: string[]
+  }
+  created_at: string
+}
+
+export interface CustomerScenario {
+  key: string
+  label: string
+  criteria: string[]
+}
+
+export interface CustomerSession {
+  id: number
+  scenario_key: string
+  scenario_label: string
+  goal_criteria: string[]
+  status: 'active' | 'goal_reached' | 'completed'
+  end_suggested: boolean
+  turns: Array<{
+    id: number
+    turn_no: number
+    customer_message: string
+    student_reply: string | null
+    analysis: {
+      problem: string
+      evidence: string
+      suggestion: string
+      criteria: Record<string, boolean>
+      goal_status: 'reached' | 'not_reached'
+    } | null
+    created_at: string
+  }>
+  summary: {
+    overall_performance: string
+    main_problems: string[]
+    prioritized_improvements: string[]
+    goal_completion: string
+  } | null
+  confirmed_at: string | null
+  created_at: string
+  updated_at: string
+  completed_at: string | null
+}
