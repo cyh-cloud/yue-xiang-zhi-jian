@@ -1,9 +1,11 @@
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
 from app import create_app
 from app.agri_skills.ai_context import AI_FIELD_ALLOWLISTS
+from app.agri_skills.course_learning import DatabaseAgriCourseProvider
 from app.db import get_db
 from app.seed import seed_courses
 
@@ -47,9 +49,60 @@ class TestEcommerceFoundation(unittest.TestCase):
             }
             self.assertIn("duration_seconds", columns)
 
+    def test_legacy_course_duration_is_backfilled_during_migration(self):
+        legacy_path = Path(self.temp_dir.name) / "legacy.db"
+        connection = sqlite3.connect(legacy_path)
+        connection.execute(
+            """
+            CREATE TABLE courses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                status TEXT NOT NULL,
+                published_at TEXT,
+                summary TEXT NOT NULL DEFAULT '',
+                teacher_name TEXT NOT NULL DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO courses (
+                id, title, direction, status, published_at, summary,
+                teacher_name, created_at, updated_at
+            )
+            VALUES (
+                42, 'Legacy agriculture', 'agriculture', 'published',
+                '2026-09-01T00:00:00+00:00', 'Legacy summary',
+                'Legacy teacher', '2026-09-01T00:00:00+00:00',
+                '2026-09-01T00:00:00+00:00'
+            )
+            """
+        )
+        connection.commit()
+        connection.close()
+
+        legacy_app = create_app(
+            {
+                "TESTING": True,
+                "DATABASE_PATH": str(legacy_path),
+                "SECRET_KEY": "test-only-secret",
+            }
+        )
+
+        with legacy_app.app_context():
+            row = get_db().execute(
+                "SELECT duration_seconds FROM courses WHERE id = 42"
+            ).fetchone()
+
+        self.assertEqual(row["duration_seconds"], 300)
+
     def test_fixed_ecommerce_course_fixture(self):
         with self.app.app_context():
-            rows = get_db().execute(
+            db = get_db()
+            rows = db.execute(
                 """
                 SELECT id, direction, status, duration_seconds
                 FROM courses
@@ -57,7 +110,35 @@ class TestEcommerceFoundation(unittest.TestCase):
                 ORDER BY id
                 """
             ).fetchall()
+            tag_rows = db.execute(
+                """
+                SELECT c.id, t.name, t.is_active
+                FROM courses c
+                JOIN course_interest_tags ct ON ct.course_id = c.id
+                JOIN interest_tags t ON t.id = ct.tag_id
+                WHERE c.id IN (1001, 1002)
+                ORDER BY c.id
+                """
+            ).fetchall()
+            provider = DatabaseAgriCourseProvider()
+            quiz = provider.get_quiz(1001)
+
         self.assertEqual([row["id"] for row in rows], [1001, 1002, 1003, 1004, 1005])
+        self.assertEqual(rows[0]["status"], "published")
+        self.assertEqual(rows[1]["status"], "published")
+        self.assertGreater(rows[0]["duration_seconds"], 0)
+        self.assertGreater(rows[1]["duration_seconds"], 0)
+        self.assertEqual(
+            [
+                (row["id"], row["name"], row["is_active"])
+                for row in tag_rows
+            ],
+            [
+                (1001, "电商直播", 1),
+                (1002, "电商运营", 1),
+            ],
+        )
+        self.assertIsNone(quiz)
         self.assertEqual(rows[0]["direction"], "ecommerce")
         self.assertEqual(rows[2]["status"], "pending")
         self.assertEqual(rows[3]["direction"], "agriculture")

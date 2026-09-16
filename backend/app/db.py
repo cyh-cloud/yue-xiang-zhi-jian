@@ -401,6 +401,13 @@ def _ensure_course_duration_column(db: sqlite3.Connection) -> None:
     columns = {row["name"] for row in db.execute("PRAGMA table_info(courses)")}
     if "duration_seconds" not in columns:
         db.execute("ALTER TABLE courses ADD COLUMN duration_seconds INTEGER")
+        db.execute(
+            """
+            UPDATE courses
+            SET duration_seconds = 300
+            WHERE duration_seconds IS NULL
+            """
+        )
 
 
 def init_db(connection: sqlite3.Connection | None = None) -> None:

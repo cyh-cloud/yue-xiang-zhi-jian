@@ -19,6 +19,7 @@ ROLE_PATHS = {
     "super_admin": "/admin",
     "admin": "/admin",
 }
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
 
 
 class TestUserPortalIntegration(unittest.TestCase):
@@ -34,10 +35,6 @@ class TestUserPortalIntegration(unittest.TestCase):
                 "SESSION_COOKIE_SECURE": False,
             }
         )
-        with self.app.app_context():
-            db = get_db()
-            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
-            db.commit()
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -195,14 +192,20 @@ class TestUserPortalIntegration(unittest.TestCase):
         courses = self.client.get(
             "/api/student/courses?direction=agriculture"
         ).get_json()["courses"]
+        legacy_courses = [
+            course
+            for course in courses
+            if course["id"] not in ECOMMERCE_FIXTURE_IDS
+        ]
         self.assertEqual(
-            [course["title"] for course in courses],
+            [course["title"] for course in legacy_courses],
             ["荔枝保果", "水稻新课程"],
         )
         self.assertEqual(
-            [course["interest_match"] for course in courses],
+            [course["interest_match"] for course in legacy_courses],
             [True, False],
         )
+        self.assertIn(1004, [course["id"] for course in courses])
 
         for role, expected in ROLE_PATHS.items():
             with self.subTest(role=role):

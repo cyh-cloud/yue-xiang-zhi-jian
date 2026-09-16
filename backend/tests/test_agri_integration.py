@@ -22,6 +22,7 @@ from app.messaging.notification_service import list_notifications
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 NO_LOCAL_MATCH_MESSAGE = "暂无法回答，建议稍后再试"
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
 
 
 class FakeCourseProvider:
@@ -183,9 +184,6 @@ class TestAgriIntegration(unittest.TestCase):
         self.student_client = self._login("student01")
         self.other_client = self._login("student02")
         with self.app.app_context():
-            get_db().execute(
-                "DELETE FROM courses WHERE id BETWEEN 1001 AND 1005"
-            )
             now = "2026-09-15T00:00:00+00:00"
             get_db().execute(
                 """
@@ -843,9 +841,14 @@ class TestAgriIntegration(unittest.TestCase):
 
         self.assertNotIn(11, recommendation_ids)
         self.assertEqual(
-            recommendation_ids,
+            [
+                course_id
+                for course_id in recommendation_ids
+                if course_id not in ECOMMERCE_FIXTURE_IDS
+            ],
             [1, 8, 9, 7, 6, 4, 5, 3, 2, 10],
         )
+        self.assertIn(1004, recommendation_ids)
 
     def test_latest_valid_course_quiz_attempt_is_formal(self):
         self._complete_course()

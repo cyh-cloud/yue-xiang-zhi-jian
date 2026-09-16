@@ -6,6 +6,9 @@ from app import create_app
 from app.db import get_db
 
 
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
+
+
 class TestCourseCatalog(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -17,10 +20,6 @@ class TestCourseCatalog(unittest.TestCase):
                 "SESSION_HOURS": 24,
             }
         )
-        with self.app.app_context():
-            db = get_db()
-            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
-            db.commit()
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -107,7 +106,9 @@ class TestCourseCatalog(unittest.TestCase):
             "/api/student/courses?direction=agriculture"
         )
         titles = [
-            item["title"] for item in response.get_json()["courses"]
+            item["title"]
+            for item in response.get_json()["courses"]
+            if item["id"] not in ECOMMERCE_FIXTURE_IDS
         ]
         self.assertEqual(titles, ["agriculture-published"])
 
@@ -152,6 +153,7 @@ class TestCourseCatalog(unittest.TestCase):
             [
                 item["published_at"]
                 for item in response.get_json()["courses"]
+                if item["id"] not in ECOMMERCE_FIXTURE_IDS
             ],
             [
                 "2026-09-12T00:00:00+00:00",

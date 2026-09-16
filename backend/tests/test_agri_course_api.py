@@ -12,6 +12,9 @@ from app.agri_skills.providers import set_course_provider
 from app.db import get_db
 
 
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
+
+
 class FakeCourseProvider:
     def __init__(self, courses: list[dict], quiz: dict | None) -> None:
         self.courses = [dict(course) for course in courses]
@@ -49,10 +52,6 @@ class TestAgriCourseApi(unittest.TestCase):
                 "AI_MODEL": "test-model",
             }
         )
-        with self.app.app_context():
-            db = get_db()
-            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
-            db.commit()
         self.student_id = self._create_user("student01", "student")
         self.other_student_id = self._create_user("student02", "student")
         self._create_user("teacher01", "teacher")
@@ -232,7 +231,15 @@ class TestAgriCourseApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         courses = response.get_json()["courses"]
-        self.assertEqual([course["id"] for course in courses], [1, 2])
+        course_ids = [course["id"] for course in courses]
+        self.assertEqual(
+            [
+                course_id
+                for course_id in course_ids
+                if course_id not in ECOMMERCE_FIXTURE_IDS
+            ],
+            [1, 2],
+        )
         self.assertTrue(
             all(item["direction"] == "agriculture" for item in courses)
         )
@@ -304,6 +311,7 @@ class TestAgriCourseApi(unittest.TestCase):
             [
                 course["id"]
                 for course in recommendations.get_json()["courses"]
+                if course["id"] not in ECOMMERCE_FIXTURE_IDS
             ],
             [2, 1],
         )
@@ -316,6 +324,7 @@ class TestAgriCourseApi(unittest.TestCase):
             [
                 course["id"]
                 for course in recommendations.get_json()["courses"]
+                if course["id"] not in ECOMMERCE_FIXTURE_IDS
             ],
             [1],
         )

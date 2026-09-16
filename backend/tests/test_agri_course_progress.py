@@ -20,6 +20,9 @@ from app.agri_skills.providers import get_course_provider, set_course_provider
 from app.db import get_db
 
 
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
+
+
 class FakeCourseProvider:
     def __init__(self, courses: list[dict]) -> None:
         self.courses = [dict(course) for course in courses]
@@ -81,7 +84,6 @@ class TestAgriCourseProgress(unittest.TestCase):
         )
         with self.app.app_context():
             db = get_db()
-            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
             cursor = db.execute(
                 """
                 INSERT INTO users (
@@ -364,7 +366,15 @@ class TestAgriCourseProgress(unittest.TestCase):
                 item["id"] for item in list_recommendations(self.student_id)
             ]
 
-            self.assertEqual(ids, [3, 2, 1])
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [3, 2, 1],
+            )
+            self.assertIn(1004, ids)
 
     def test_database_provider_filters_and_hydrates_agriculture_courses(self):
         with self.app.app_context():
@@ -375,7 +385,21 @@ class TestAgriCourseProgress(unittest.TestCase):
                 "agriculture",
             )
 
-            self.assertEqual([course["id"] for course in courses], [2, 3, 1])
+            course_ids = [course["id"] for course in courses]
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in course_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [2, 3, 1],
+            )
+            self.assertIn(1004, course_ids)
+            courses = [
+                course
+                for course in courses
+                if course["id"] not in ECOMMERCE_FIXTURE_IDS
+            ]
             self.assertEqual(courses[0]["tag_ids"], [1])
             duration = courses[0]["duration_seconds"]
             self.assertIsInstance(duration, int)
@@ -388,7 +412,18 @@ class TestAgriCourseProgress(unittest.TestCase):
                 self.student_id,
                 "ecommerce",
             )
-            self.assertEqual([course["id"] for course in ecommerce], [4])
+            ecommerce_ids = [course["id"] for course in ecommerce]
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in ecommerce_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [4],
+            )
+            self.assertTrue(
+                {1001, 1002, 1005}.issubset(ecommerce_ids)
+            )
             self.assertEqual(provider.get_course(4)["direction"], "ecommerce")
             self.assertIsNone(provider.get_course(5))
 
@@ -403,12 +438,41 @@ class TestAgriCourseProgress(unittest.TestCase):
                 "ecommerce",
             )
 
+            agriculture_ids = [course["id"] for course in agriculture]
+            ecommerce_ids = [course["id"] for course in ecommerce]
+            recommendation_ids = [
+                course["id"] for course in recommendations
+            ]
+
             self.assertEqual(
-                [course["id"] for course in agriculture],
+                [
+                    course_id
+                    for course_id in agriculture_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
                 [2, 3, 1],
             )
-            self.assertEqual([course["id"] for course in ecommerce], [4])
-            self.assertEqual([course["id"] for course in recommendations], [4])
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in ecommerce_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [4],
+            )
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in recommendation_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [4],
+            )
+            self.assertIn(1004, agriculture_ids)
+            self.assertTrue({1001, 1002}.issubset(ecommerce_ids))
+            self.assertTrue(
+                {1001, 1002}.issubset(recommendation_ids)
+            )
 
     def test_course_actions_reject_courses_from_another_direction(self):
         with self.app.app_context():
