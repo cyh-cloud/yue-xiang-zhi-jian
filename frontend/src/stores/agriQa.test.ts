@@ -107,6 +107,35 @@ describe('agriQa store', () => {
     expect(store.suggestions).toEqual([])
   })
 
+  it('forces local-KB semantics for a malformed replace event', async () => {
+    const malformedTurn = {
+      ...aiTurn,
+      id: 14,
+      question: '荔枝蒂蛀虫',
+      answer: '离线知识库回答\n荔枝蒂蛀虫：及时清理落果',
+      answer_mode: 'ai',
+      suggestions: ['不应显示的建议']
+    } as QaTurn
+    mockedApiStream.mockImplementation(async (_path, _options, onEvent) => {
+      onEvent({ event: 'chunk', data: { content: '部分' } } as never)
+      onEvent({ event: 'replace', data: { turn: malformedTurn } } as never)
+    })
+    const store = useAgriQaStore()
+    store.activeConversationId = conversation.id
+
+    await store.ask('荔枝蒂蛀虫', 'text')
+
+    expect(store.streamingText).toBe('')
+    expect(store.answerMode).toBe('local_kb')
+    expect(store.turns).toHaveLength(1)
+    expect(store.turns[0]).toMatchObject({
+      id: 14,
+      answer_mode: 'local_kb',
+      suggestions: []
+    })
+    expect(store.suggestions).toEqual([])
+  })
+
   it('uses the non-streaming local fallback after a streamed AI response is interrupted', async () => {
     const localTurn: QaTurn = {
       ...aiTurn,
@@ -162,6 +191,69 @@ describe('agriQa store', () => {
     expect(store.turns).toHaveLength(0)
   })
 
+  it('does not expose a raw streamed error message', async () => {
+    mockedApiStream.mockImplementation(async (_path, _options, onEvent) => {
+      onEvent({
+        event: 'error',
+        data: { message: 'upstream socket reset' }
+      } as never)
+    })
+    const store = useAgriQaStore()
+    store.activeConversationId = conversation.id
+
+    await store.ask('荔枝如何保果', 'text')
+
+    expect(store.error).toBe('AI 服务暂时不可用')
+    expect(store.turns).toHaveLength(0)
+  })
+
+  it('does not expose a raw suggestion error from a completed turn', async () => {
+    mockedApiStream.mockImplementation(async (_path, _options, onEvent) => {
+      onEvent({
+        event: 'complete',
+        data: {
+          turn: aiTurn,
+          suggestion_error: 'backend implementation detail'
+        }
+      } as never)
+    })
+    const store = useAgriQaStore()
+    store.activeConversationId = conversation.id
+
+    await store.ask('荔枝如何保果', 'text')
+
+    expect(store.suggestionError).toBe('AI 服务暂时不可用')
+    expect(store.turns).toEqual([aiTurn])
+  })
+
+  it('shows the exact AI-unavailable message when the stream fails', async () => {
+    mockedApiStream.mockRejectedValue(new Error('network connection closed'))
+    const store = useAgriQaStore()
+    store.activeConversationId = conversation.id
+
+    const succeeded = await store.ask('荔枝如何保果', 'text')
+
+    expect(succeeded).toBe(false)
+    expect(store.error).toBe('AI 服务暂时不可用')
+    expect(store.turns).toHaveLength(0)
+  })
+
+  it('shows the exact AI-unavailable message when non-stream fallback fails', async () => {
+    mockedApiStream.mockImplementation(async (_path, _options, onEvent) => {
+      onEvent({ event: 'chunk', data: { content: '不完整' } } as never)
+      throw new Error('stream disconnected')
+    })
+    mockedApiFetch.mockRejectedValue(new Error('database unavailable'))
+    const store = useAgriQaStore()
+    store.activeConversationId = conversation.id
+
+    const succeeded = await store.ask('荔枝蒂蛀虫导致落果', 'text')
+
+    expect(succeeded).toBe(false)
+    expect(store.error).toBe('AI 服务暂时不可用')
+    expect(store.turns).toHaveLength(0)
+  })
+
   it('loads conversations newest-first and opens every retained turn', async () => {
     const olderConversation = {
       ...conversation,
@@ -202,6 +294,20 @@ describe('agriQa store', () => {
     const store = useAgriQaStore()
 
     const text = await store.transcribe(new Blob(['x']), 'question.webm')
+
+    expect(text).toBe('')
+    expect(store.error).toBe('未能识别，请重试或改用文字输入')
+    expect(store.turns).toHaveLength(0)
+  })
+
+  it('maps network-level transcription failures to the recognition message', async () => {
+    mockedApiFetch.mockRejectedValue(new TypeError('Failed to fetch'))
+    const store = useAgriQaStore()
+
+    const text = await store.transcribe(
+      new Blob(['audio'], { type: 'audio/webm' }),
+      'question.webm'
+    )
 
     expect(text).toBe('')
     expect(store.error).toBe('未能识别，请重试或改用文字输入')

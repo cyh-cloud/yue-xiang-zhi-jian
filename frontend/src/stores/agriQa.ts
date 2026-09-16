@@ -1,10 +1,14 @@
 import { defineStore } from 'pinia'
 
-import { ApiError, apiFetch, apiStream } from '@/api/client'
+import { apiFetch, apiStream } from '@/api/client'
 import type { QaConversation, QaTurn } from '@/api/types'
 
 type InputMode = 'text' | 'voice'
 type AnswerMode = 'ai' | 'local_kb'
+
+const AI_UNAVAILABLE_MESSAGE = 'AI 服务暂时不可用'
+const RECOGNITION_FAILURE_MESSAGE = '未能识别，请重试或改用文字输入'
+const NO_ANSWER_MESSAGE = '暂无法回答，建议稍后再试'
 
 interface QaStreamPayload {
   content?: string
@@ -59,13 +63,8 @@ export const useAgriQaStore = defineStore('agriQa', {
     error: ''
   }),
   actions: {
-    captureError(error: unknown, fallback: string) {
-      this.error =
-        error instanceof ApiError
-          ? error.message
-          : error instanceof Error
-            ? error.message
-            : fallback
+    captureError(_error: unknown, fallback: string) {
+      this.error = fallback
     },
     applyTurn(turn: QaTurn, suggestionError = '') {
       this.turns.push(turn)
@@ -199,14 +198,23 @@ export const useAgriQaStore = defineStore('agriQa', {
               settled = true
               this.applyTurn(
                 event.data.turn,
-                event.data.suggestion_error ?? ''
+                event.data.suggestion_error
+                  ? AI_UNAVAILABLE_MESSAGE
+                  : ''
               )
             } else if (event.event === 'replace' && event.data.turn) {
               settled = true
-              this.applyTurn(event.data.turn)
+              this.applyTurn({
+                ...event.data.turn,
+                answer_mode: 'local_kb',
+                suggestions: []
+              })
             } else if (event.event === 'error') {
               streamErrorMessage =
-                event.data.message ?? '暂无法回答，建议稍后再试'
+                event.data.message === NO_ANSWER_MESSAGE ||
+                event.data.message === AI_UNAVAILABLE_MESSAGE
+                  ? event.data.message
+                  : AI_UNAVAILABLE_MESSAGE
             }
           }
         )
@@ -219,7 +227,7 @@ export const useAgriQaStore = defineStore('agriQa', {
 
         if (!settled) {
           this.streamingText = ''
-          this.error = '暂无法回答，建议稍后再试'
+          this.error = NO_ANSWER_MESSAGE
           return false
         }
 
@@ -254,13 +262,13 @@ export const useAgriQaStore = defineStore('agriQa', {
             return true
           } catch (fallbackError) {
             this.streamingText = ''
-            this.captureError(fallbackError, '问答请求失败')
+            this.captureError(fallbackError, AI_UNAVAILABLE_MESSAGE)
             return false
           }
         }
 
         this.streamingText = ''
-        this.captureError(error, '问答请求失败')
+        this.captureError(error, AI_UNAVAILABLE_MESSAGE)
         return false
       } finally {
         this.loading = false
@@ -295,12 +303,12 @@ export const useAgriQaStore = defineStore('agriQa', {
         })
         const text = response.text.trim()
         if (!text) {
-          this.error = '未能识别，请重试或改用文字输入'
+          this.error = RECOGNITION_FAILURE_MESSAGE
           return ''
         }
         return text
       } catch (error) {
-        this.captureError(error, '未能识别，请重试或改用文字输入')
+        this.captureError(error, RECOGNITION_FAILURE_MESSAGE)
         return ''
       } finally {
         this.loading = false

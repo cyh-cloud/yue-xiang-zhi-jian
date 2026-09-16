@@ -3,7 +3,7 @@ import { createPinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { ApiError, apiFetch, apiStream } from '@/api/client'
+import { apiFetch, apiStream } from '@/api/client'
 import AgriSkillsNav from '@/components/AgriSkillsNav.vue'
 import AppHeader from '@/components/AppHeader.vue'
 import VoiceInputButton from '@/components/VoiceInputButton.vue'
@@ -215,7 +215,7 @@ describe('AgriQaView', () => {
         return { success: true, conversations: [] } as never
       }
       if (path === '/api/agri-skills/speech/transcriptions') {
-        throw new ApiError('未能识别，请重试或改用文字输入', 422)
+        throw new TypeError('Failed to fetch')
       }
       throw new Error(`Unexpected request: ${path}`)
     })
