@@ -1,6 +1,9 @@
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from unittest.mock import patch
 
 from app import create_app
 from app.agri_skills.course_learning import (
@@ -30,6 +33,37 @@ class FakeCourseProvider:
 
     def get_quiz(self, course_id: int) -> dict | None:
         return None
+
+
+class BlockingProgressSnapshotConnection:
+    def __init__(self, connection, barrier: threading.Barrier) -> None:
+        self.connection = connection
+        self.barrier = barrier
+        if not hasattr(threading.current_thread(), "agri_snapshot_blocked"):
+            threading.current_thread().agri_snapshot_blocked = False
+        if not hasattr(threading.current_thread(), "agri_progress_written"):
+            threading.current_thread().agri_progress_written = False
+
+    def execute(self, statement: str, parameters=()):
+        cursor = self.connection.execute(statement, parameters)
+        normalized = " ".join(statement.upper().split())
+        if normalized.startswith("INSERT INTO AGRI_COURSE_PROGRESS"):
+            threading.current_thread().agri_progress_written = True
+        if (
+            normalized.startswith("SELECT * FROM AGRI_COURSE_PROGRESS")
+            and not threading.current_thread().agri_snapshot_blocked
+            and not threading.current_thread().agri_progress_written
+        ):
+            threading.current_thread().agri_snapshot_blocked = True
+            self.barrier.wait(timeout=5)
+        return cursor
+
+    def __enter__(self):
+        self.connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return self.connection.__exit__(exc_type, exc_value, traceback)
 
 
 class TestAgriCourseProgress(unittest.TestCase):
@@ -169,6 +203,42 @@ class TestAgriCourseProgress(unittest.TestCase):
             self.assertEqual(result["furthest_position_seconds"], 90)
             self.assertEqual(result["resume_position_seconds"], 40)
             self.assertEqual(result["progress_percent"], 90)
+
+    def test_concurrent_updates_merge_instead_of_overwriting_stale_progress(self):
+        barrier = threading.Barrier(2)
+
+        def update(position, watched_delta):
+            with self.app.app_context():
+                return update_course_progress(
+                    self.student_id,
+                    1,
+                    position,
+                    watched_delta,
+                )
+
+        def blocking_get_db():
+            return BlockingProgressSnapshotConnection(get_db(), barrier)
+
+        with patch(
+            "app.agri_skills.course_learning.get_db",
+            side_effect=blocking_get_db,
+        ):
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                results = [
+                    future.result()
+                    for future in (
+                        executor.submit(update, 40, 10),
+                        executor.submit(update, 90, 10),
+                    )
+                ]
+
+        self.assertEqual(len(results), 2)
+        with self.app.app_context():
+            progress = get_course_progress(self.student_id, 1)
+        self.assertEqual(progress["furthest_position_seconds"], 90)
+        self.assertEqual(progress["watched_seconds"], 20)
+        self.assertEqual(progress["progress_percent"], 90)
+        self.assertIsNotNone(progress["completed_at"])
 
     def test_invalid_progress_is_rejected_without_mutation(self):
         with self.app.app_context():

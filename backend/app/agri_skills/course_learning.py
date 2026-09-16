@@ -180,28 +180,12 @@ def update_course_progress(
     ):
         raise AgriValidationError("观看时长必须是非负整数")
 
-    row = get_db().execute(
-        """
-        SELECT *
-        FROM agri_course_progress
-        WHERE user_id = ? AND course_id = ?
-        """,
-        (user_id, course_id),
-    ).fetchone()
-    existing = dict(row) if row is not None else {}
     now = utc_now_iso()
-    furthest = max(
-        int(existing.get("furthest_position_seconds", 0)),
-        position_seconds,
-    )
-    watched = int(existing.get("watched_seconds", 0)) + watched_delta_seconds
-    progress_percent = (furthest * 100) // duration_value
-    completed_at = existing.get("completed_at")
-    if progress_percent >= 80 and completed_at is None:
-        completed_at = now
+    progress_percent = (position_seconds * 100) // duration_value
+    completed_at = now if progress_percent >= 80 else None
 
-    with get_db():
-        get_db().execute(
+    with get_db() as db:
+        db.execute(
             """
             INSERT INTO agri_course_progress (
                 user_id, course_id, duration_seconds,
@@ -212,11 +196,21 @@ def update_course_progress(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (user_id, course_id) DO UPDATE SET
                 duration_seconds = excluded.duration_seconds,
-                furthest_position_seconds = excluded.furthest_position_seconds,
+                furthest_position_seconds = MAX(
+                    agri_course_progress.furthest_position_seconds,
+                    excluded.furthest_position_seconds
+                ),
                 resume_position_seconds = excluded.resume_position_seconds,
-                progress_percent = excluded.progress_percent,
-                watched_seconds = excluded.watched_seconds,
-                completed_at = excluded.completed_at,
+                progress_percent = MAX(
+                    agri_course_progress.progress_percent,
+                    excluded.progress_percent
+                ),
+                watched_seconds = agri_course_progress.watched_seconds
+                    + excluded.watched_seconds,
+                completed_at = COALESCE(
+                    agri_course_progress.completed_at,
+                    excluded.completed_at
+                ),
                 last_viewed_at = excluded.last_viewed_at,
                 updated_at = excluded.updated_at
             """,
@@ -224,10 +218,10 @@ def update_course_progress(
                 user_id,
                 course_id,
                 duration_value,
-                furthest,
+                position_seconds,
                 position_seconds,
                 progress_percent,
-                watched,
+                watched_delta_seconds,
                 completed_at,
                 now,
                 now,
