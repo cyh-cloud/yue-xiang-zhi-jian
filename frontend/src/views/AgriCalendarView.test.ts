@@ -136,6 +136,25 @@ describe('AgriCalendarView', () => {
     expect(wrapper.find('[data-test="month-next"]').exists()).toBe(true)
   })
 
+  it('keeps a product catalog failure visible instead of loading invalid calendar state', async () => {
+    mockedApiFetch.mockImplementation(async (path: string) => {
+      if (path === '/api/agri-skills/products') {
+        throw new Error('农产品目录加载失败')
+      }
+      if (path.startsWith('/api/agri-skills/calendar?')) {
+        return { success: true, calendar } as never
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(wrapper.get('[role="alert"]').text()).toContain('农产品目录加载失败')
+    expect(wrapper.find('[data-test="calendar-tasks"]').exists()).toBe(false)
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+    expect(mockedApiFetch).toHaveBeenCalledWith('/api/agri-skills/products')
+  })
+
   it('keeps selected product and month controls in the month empty state', async () => {
     mockCalendarApi([litchi], {
       ...calendar,

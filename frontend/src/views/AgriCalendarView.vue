@@ -37,6 +37,9 @@ const emptyState = computed(() => {
 
 async function loadInitialCalendar() {
   await calendarStore.loadProducts()
+  if (calendarStore.error) {
+    return
+  }
   await calendarStore.loadCalendar(undefined, calendarStore.month)
 }
 
