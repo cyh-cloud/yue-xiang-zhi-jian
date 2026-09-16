@@ -22,6 +22,14 @@ from app.agri_skills.calendar import (
     subscribe_product,
     unsubscribe_product,
 )
+from app.agri_skills.course_learning import (
+    get_course_progress,
+    get_course_quiz,
+    list_agriculture_courses,
+    list_recommendations,
+    submit_course_quiz,
+    update_course_progress,
+)
 from app.agri_skills.diagnosis import (
     abandon_diagnosis,
     add_followup,
@@ -207,6 +215,69 @@ def delete_subscription(product_key: str):
         success=True,
         subscription=unsubscribe_product(int(session["id"]), product_key),
     )
+
+
+@agri_skills_bp.get("/courses")
+def get_agri_courses():
+    session = _student_session()
+    return jsonify(
+        success=True,
+        courses=list_agriculture_courses(int(session["id"])),
+    )
+
+
+@agri_skills_bp.get("/recommendations")
+def get_agri_recommendations():
+    session = _student_session()
+    return jsonify(
+        success=True,
+        courses=list_recommendations(int(session["id"])),
+    )
+
+
+@agri_skills_bp.get("/courses/<int:course_id>/progress")
+def get_progress_route(course_id: int):
+    session = _student_session()
+    return jsonify(
+        success=True,
+        progress=get_course_progress(int(session["id"]), course_id),
+    )
+
+
+@agri_skills_bp.put("/courses/<int:course_id>/progress")
+def put_progress_route(course_id: int):
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    progress = update_course_progress(
+        int(session["id"]),
+        course_id,
+        payload.get("position_seconds"),
+        payload.get("watched_delta_seconds", 0),
+    )
+    return jsonify(success=True, progress=progress)
+
+
+@agri_skills_bp.get("/courses/<int:course_id>/quiz")
+def get_quiz_route(course_id: int):
+    session = _student_session()
+    quiz = get_course_quiz(int(session["id"]), course_id)
+    if quiz is None:
+        return jsonify(success=False, message="暂无可用测验"), 404
+    return jsonify(success=True, quiz=quiz)
+
+
+@agri_skills_bp.post("/courses/<int:course_id>/quiz")
+def post_quiz_route(course_id: int):
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    attempt = submit_course_quiz(
+        int(session["id"]),
+        course_id,
+        payload.get("answers")
+        if isinstance(payload.get("answers"), dict)
+        else {},
+    )
+    return jsonify(success=True, attempt=attempt), 201
 
 
 @agri_skills_bp.post("/diagnoses")
