@@ -34,5 +34,27 @@ def list_learning_outcomes(
             ).fetchall()
         )
 
+    if kind in {None, "course_quiz"}:
+        outcomes.extend(
+            {
+                "kind": "course_quiz",
+                "source_id": int(row["id"]),
+                "diagnosis_session_id": None,
+                "course_id": int(row["course_id"]),
+                "score": int(row["score"]),
+                "is_formal": bool(row["is_formal"]),
+                "created_at": str(row["created_at"]),
+            }
+            for row in get_db().execute(
+                """
+                SELECT id, course_id, score, is_formal, created_at
+                FROM agri_course_quiz_attempts
+                WHERE user_id = ?
+                ORDER BY created_at, id
+                """,
+                (user_id,),
+            ).fetchall()
+        )
+
     outcomes.sort(key=lambda item: (item["created_at"], item["source_id"]))
     return outcomes
