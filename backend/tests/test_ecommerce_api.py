@@ -4,10 +4,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import httpx
 from werkzeug.security import generate_password_hash
 
 from app import create_app
-from app.agri_skills.ai_client import set_ai_client
+from app.agri_skills.ai_client import (
+    OpenAiCompatibleAiClient,
+    set_ai_client,
+)
 from app.agri_skills.errors import (
     AgriAccessError,
     AiUnavailableError,
@@ -107,6 +111,7 @@ ROUTES = [
         {"position_seconds": 240, "watched_delta_seconds": 240},
     ),
     ("GET", "/api/ecommerce-training/courses/1001/quiz", None),
+    ("GET", "/api/ecommerce-training/courses/1001/quiz/attempts", None),
     (
         "POST",
         "/api/ecommerce-training/courses/1001/quiz",
@@ -320,6 +325,10 @@ class TestEcommerceApi(unittest.TestCase):
             (
                 r"/courses/\d+/quiz$",
                 "/courses/<int:course_id>/quiz",
+            ),
+            (
+                r"/courses/\d+/quiz/attempts$",
+                "/courses/<int:course_id>/quiz/attempts",
             ),
         )
         expected = set()
@@ -630,6 +639,9 @@ class TestEcommerceApi(unittest.TestCase):
         quiz = self.client.get(
             "/api/ecommerce-training/courses/1001/quiz"
         )
+        attempts = self.client.get(
+            "/api/ecommerce-training/courses/1001/quiz/attempts"
+        )
         self.assertEqual(courses.status_code, 200)
         self.assertEqual(recommendations.status_code, 200)
         self.assertEqual(initial_progress.status_code, 200)
@@ -642,8 +654,97 @@ class TestEcommerceApi(unittest.TestCase):
             completed_progress.get_json()["progress"]["progress_percent"],
             80,
         )
-        self.assertEqual(quiz.status_code, 404)
-        self.assertEqual(quiz.get_json()["message"], "暂无可用测验")
+        self.assertEqual(quiz.status_code, 200)
+        self.assertEqual(
+            quiz.get_json()["quiz"]["questions"][0]["id"],
+            "ecommerce-1001-q1",
+        )
+        self.assertEqual(attempts.status_code, 200)
+        self.assertEqual(attempts.get_json()["attempts"], [])
+
+    def test_quiz_attempt_history_refreshes_and_stays_owner_scoped(self):
+        progress = self.client.put(
+            "/api/ecommerce-training/courses/1001/progress",
+            json={"position_seconds": 240, "watched_delta_seconds": 240},
+        )
+        self.assertEqual(progress.status_code, 200)
+
+        self.ai.complete_json.return_value = {
+            "score": 100,
+            "questions": [
+                {
+                    "id": "ecommerce-1001-q1",
+                    "correct": True,
+                    "explanation": "达到 80% 即完成。",
+                }
+            ],
+        }
+        submitted = self.client.post(
+            "/api/ecommerce-training/courses/1001/quiz",
+            json={"answers": {"ecommerce-1001-q1": "80%"}},
+        )
+        self.assertEqual(submitted.status_code, 201)
+
+        history = self.client.get(
+            "/api/ecommerce-training/courses/1001/quiz/attempts"
+        )
+        other_history = self.other_client.get(
+            "/api/ecommerce-training/courses/1001/quiz/attempts"
+        )
+        self.assertEqual(history.status_code, 200)
+        self.assertEqual(other_history.status_code, 200)
+        self.assertEqual(
+            [
+                (
+                    attempt["id"],
+                    attempt["score"],
+                    attempt["is_formal"],
+                    attempt["is_current"],
+                    attempt["is_latest"],
+                )
+                for attempt in history.get_json()["attempts"]
+            ],
+            [
+                (
+                    submitted.get_json()["attempt"]["id"],
+                    100,
+                    True,
+                    True,
+                    True,
+                )
+            ],
+        )
+        self.assertEqual(other_history.get_json()["attempts"], [])
+
+        self.ai.complete_json.side_effect = AiUnavailableError(
+            "raw provider failure"
+        )
+        failed = self.client.post(
+            "/api/ecommerce-training/courses/1001/quiz",
+            json={"answers": {"ecommerce-1001-q1": "60%"}},
+        )
+        refreshed = self.client.get(
+            "/api/ecommerce-training/courses/1001/quiz/attempts"
+        )
+
+        self.assertEqual(failed.status_code, 503)
+        self.assertEqual(
+            [
+                (
+                    attempt["id"],
+                    attempt["score"],
+                    attempt["is_formal"],
+                )
+                for attempt in refreshed.get_json()["attempts"]
+            ],
+            [
+                (
+                    submitted.get_json()["attempt"]["id"],
+                    100,
+                    True,
+                )
+            ],
+        )
 
     def test_errors_map_to_400_404_and_exact_503_without_leaks(self):
         invalid = self.client.post(
@@ -700,6 +801,40 @@ class TestEcommerceApi(unittest.TestCase):
             unavailable.get_data(as_text=True),
         )
 
+    def test_real_httpx_timeout_maps_to_fixed_ai_unavailable_prompt(self):
+        def timeout(request):
+            raise httpx.TimeoutException("upstream timed out")
+
+        set_ai_client(
+            self.app,
+            OpenAiCompatibleAiClient(
+                api_url="https://example.test/chat/completions",
+                api_key="test-key",
+                model="test-model",
+                timeout=0.01,
+                transport=httpx.MockTransport(timeout),
+            ),
+        )
+
+        response = self.client.post(
+            "/api/ecommerce-training/live-scripts",
+            json={
+                "product_name": "荔枝干",
+                "selling_points": ["香甜"],
+                "style": "enthusiastic",
+            },
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "success": False,
+                "message": "AI 服务暂时不可用",
+            },
+        )
+        self.assertNotIn("upstream timed out", response.get_data(as_text=True))
+
     def test_json_endpoints_reject_non_object_bodies(self):
         response = self.client.post(
             "/api/ecommerce-training/live-scripts",
@@ -716,6 +851,36 @@ class TestEcommerceApi(unittest.TestCase):
             },
         )
         self.ai.complete_json.assert_not_called()
+
+    def test_copy_training_rejects_unknown_presets_before_ai_or_insert(self):
+        with self.app.app_context():
+            before = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM ecommerce_copy_training_sessions
+                """
+            ).fetchone()["count"]
+
+        invalid_product = self.client.post(
+            "/api/ecommerce-training/copy-training",
+            json={"product_type": "unknown", "scene": "social_commerce"},
+        )
+        invalid_scene = self.client.post(
+            "/api/ecommerce-training/copy-training",
+            json={"product_type": "food", "scene": "unknown"},
+        )
+
+        self.assertEqual(invalid_product.status_code, 400)
+        self.assertEqual(invalid_scene.status_code, 400)
+        self.ai.complete_json.assert_not_called()
+        with self.app.app_context():
+            after = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM ecommerce_copy_training_sessions
+                """
+            ).fetchone()["count"]
+        self.assertEqual(after, before)
 
     def test_history_routes_do_not_leak_other_students_records(self):
         self.ai.complete_json.return_value = LIVE_SCRIPT_FIXTURE

@@ -122,6 +122,7 @@ class TestEcommerceFoundation(unittest.TestCase):
             ).fetchall()
             provider = DatabaseAgriCourseProvider()
             quiz = provider.get_quiz(1001)
+            no_quiz = provider.get_quiz(1002)
 
         self.assertEqual([row["id"] for row in rows], [1001, 1002, 1003, 1004, 1005])
         self.assertEqual(rows[0]["status"], "published")
@@ -138,7 +139,23 @@ class TestEcommerceFoundation(unittest.TestCase):
                 (1002, "电商运营", 1),
             ],
         )
-        self.assertIsNone(quiz)
+        self.assertEqual(
+            quiz,
+            {
+                "enabled": True,
+                "scoring_rule": "每题按 AI 判分，满分 100 分。",
+                "questions": [
+                    {
+                        "id": "ecommerce-1001-q1",
+                        "type": "single_choice",
+                        "prompt": "完成课程学习至少需要达到多少进度？",
+                        "options": ["60%", "80%", "100%"],
+                        "answer": "80%",
+                    }
+                ],
+            },
+        )
+        self.assertIsNone(no_quiz)
         self.assertEqual(rows[0]["direction"], "ecommerce")
         self.assertEqual(rows[2]["status"], "pending")
         self.assertEqual(rows[3]["direction"], "agriculture")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 
 
@@ -10,6 +11,22 @@ FIXTURES = (
     (1004, "农业对照课程（占位）", "agriculture", "published", 300, None),
     (1005, "无效时长电商课程（占位）", "ecommerce", "published", None, "电商运营"),
 )
+
+COURSE_QUIZZES = {
+    1001: {
+        "enabled": True,
+        "scoring_rule": "每题按 AI 判分，满分 100 分。",
+        "questions": [
+            {
+                "id": "ecommerce-1001-q1",
+                "type": "single_choice",
+                "prompt": "完成课程学习至少需要达到多少进度？",
+                "options": ["60%", "80%", "100%"],
+                "answer": "80%",
+            }
+        ],
+    }
+}
 
 
 def seed_ecommerce_course_fixtures(connection: sqlite3.Connection) -> None:
@@ -62,4 +79,26 @@ def seed_ecommerce_course_fixtures(connection: sqlite3.Connection) -> None:
             VALUES (?, ?)
             """,
             (course_id, int(tag_rows[0]["id"])),
+        )
+
+    for course_id, quiz in COURSE_QUIZZES.items():
+        connection.execute(
+            """
+            INSERT INTO course_quizzes (
+                course_id, enabled, scoring_rule, questions_json, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT (course_id) DO UPDATE SET
+                enabled = excluded.enabled,
+                scoring_rule = excluded.scoring_rule,
+                questions_json = excluded.questions_json,
+                updated_at = excluded.updated_at
+            """,
+            (
+                course_id,
+                1 if quiz["enabled"] is True else 0,
+                quiz["scoring_rule"],
+                json.dumps(quiz["questions"], ensure_ascii=False),
+                now,
+            ),
         )

@@ -40,6 +40,22 @@ REQUIRED_COURSE_TEXT_FIELDS = ("title", "summary", "teacher_name")
 def is_eligible_course(course: dict, direction: str) -> bool:
     if not isinstance(course, dict) or course.get("direction") != direction:
         return False
+    if direction == "ecommerce":
+        published_at = course.get("published_at")
+        tag_ids = course.get("tag_ids")
+        if (
+            course.get("status") != "published"
+            or not isinstance(published_at, str)
+            or not published_at.strip()
+            or not isinstance(tag_ids, list)
+            or not all(
+                isinstance(tag_id, int)
+                and not isinstance(tag_id, bool)
+                and tag_id > 0
+                for tag_id in tag_ids
+            )
+        ):
+            return False
     course_id = course.get("id")
     duration = course.get("duration_seconds")
     if (

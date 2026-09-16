@@ -10,7 +10,11 @@ from app.agri_skills.errors import (
     AiUnavailableError,
 )
 from app.db import get_db
-from app.ecommerce_training.presets import COPY_DEFECT_CATEGORIES
+from app.ecommerce_training.presets import (
+    COPY_DEFECT_CATEGORIES,
+    COPY_PRODUCT_TYPES,
+    COPY_TRAINING_SCENES,
+)
 from app.session_manager import utc_now_iso
 
 
@@ -221,6 +225,10 @@ def create_copy_training(
 ) -> dict:
     product_type = _require_text(product_type, "商品类型不能为空")
     scene = _require_text(scene, "训练场景不能为空")
+    if product_type not in COPY_PRODUCT_TYPES:
+        raise AgriValidationError("商品类型不在预设目录内")
+    if scene not in COPY_TRAINING_SCENES:
+        raise AgriValidationError("训练场景不在预设目录内")
     response = _call_ai(
         "case",
         {

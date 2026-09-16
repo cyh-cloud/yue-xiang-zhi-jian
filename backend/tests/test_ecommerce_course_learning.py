@@ -13,6 +13,7 @@ from app.ecommerce_training.course_learning import (
     get_ecommerce_course_progress,
     get_ecommerce_course_quiz,
     list_ecommerce_courses,
+    list_ecommerce_course_quiz_attempts,
     list_ecommerce_learning_outcomes,
     list_ecommerce_recommendations,
     submit_ecommerce_course_quiz,
@@ -88,6 +89,15 @@ class DirectionAwareCourseProvider:
                 "answer": "A",
             }
         ]
+        self.quiz_by_course = {
+            1002: {
+                "enabled": True,
+                "questions": [
+                    dict(question) for question in self.questions
+                ],
+                "scoring_rule": "每题按 AI 判分",
+            }
+        }
 
     def list_published_courses(
         self,
@@ -112,13 +122,18 @@ class DirectionAwareCourseProvider:
         )
 
     def get_quiz(self, course_id: int) -> dict | None:
-        if course_id != 1002:
-            return None
-        return {
-            "enabled": True,
-            "questions": [dict(question) for question in self.questions],
-            "scoring_rule": "每题按 AI 判分",
-        }
+        quiz = self.quiz_by_course.get(course_id)
+        return (
+            {
+                **quiz,
+                "questions": [
+                    dict(question)
+                    for question in quiz.get("questions", [])
+                ],
+            }
+            if quiz is not None
+            else None
+        )
 
 
 class TestEcommerceCourseLearning(unittest.TestCase):
@@ -373,6 +388,69 @@ class TestEcommerceCourseLearning(unittest.TestCase):
 
         self.ai.complete_json.assert_not_called()
 
+    def test_quiz_availability_requires_complete_and_valid_provider_config(self):
+        invalid_quizzes = (
+            None,
+            {
+                "questions": [dict(self.provider.questions[0])],
+                "scoring_rule": "规则",
+            },
+            {
+                "enabled": True,
+                "questions": [dict(self.provider.questions[0])],
+                "scoring_rule": "",
+            },
+            {
+                "enabled": True,
+                "questions": [
+                    {
+                        "id": "q1",
+                        "type": "single_choice",
+                        "prompt": "",
+                        "options": ["A", "B"],
+                        "answer": "A",
+                    }
+                ],
+                "scoring_rule": "规则",
+            },
+        )
+
+        with self.app.app_context():
+            update_ecommerce_course_progress(
+                self.student_id,
+                1002,
+                80,
+                80,
+            )
+            valid_progress = get_ecommerce_course_progress(
+                self.student_id,
+                1002,
+            )
+            self.assertTrue(valid_progress["quiz_available"])
+
+            for quiz in invalid_quizzes:
+                with self.subTest(quiz=quiz):
+                    self.provider.quiz_by_course[1002] = quiz
+                    progress = get_ecommerce_course_progress(
+                        self.student_id,
+                        1002,
+                    )
+                    self.assertFalse(progress["quiz_available"])
+                    self.assertIsNone(
+                        get_ecommerce_course_quiz(
+                            self.student_id,
+                            1002,
+                        )
+                    )
+
+            self.provider.quiz_by_course.pop(1002)
+            no_quiz_progress = get_ecommerce_course_progress(
+                self.student_id,
+                1002,
+            )
+
+        self.assertFalse(no_quiz_progress["quiz_available"])
+
     def test_ai_failure_is_exact_and_preserves_formal_score_and_answers(self):
         with self.app.app_context():
             update_ecommerce_course_progress(
@@ -418,6 +496,67 @@ class TestEcommerceCourseLearning(unittest.TestCase):
             json.loads(rows[0]["answers_json"]),
             {"q1": "A"},
         )
+
+    def test_quiz_attempt_history_is_owner_scoped_and_marks_latest_formal(self):
+        with self.app.app_context():
+            update_ecommerce_course_progress(
+                self.student_id,
+                1002,
+                80,
+                80,
+            )
+            self.ai.complete_json.side_effect = [
+                self._valid_grade(),
+                {
+                    "score": 20,
+                    "questions": [
+                        {
+                            "id": "q1",
+                            "correct": False,
+                            "explanation": "应选择 A。",
+                        }
+                    ],
+                },
+            ]
+            first = submit_ecommerce_course_quiz(
+                self.student_id,
+                1002,
+                {"q1": "A"},
+            )
+            second = submit_ecommerce_course_quiz(
+                self.student_id,
+                1002,
+                {"q1": "B"},
+            )
+
+            attempts = list_ecommerce_course_quiz_attempts(
+                self.student_id,
+                1002,
+            )
+            other_attempts = list_ecommerce_course_quiz_attempts(
+                self.other_student_id,
+                1002,
+            )
+
+        self.assertEqual(
+            [attempt["id"] for attempt in attempts],
+            [second["id"], first["id"]],
+        )
+        self.assertEqual(
+            [
+                (
+                    attempt["is_formal"],
+                    attempt["is_current"],
+                    attempt["is_latest"],
+                )
+                for attempt in attempts
+            ],
+            [
+                (True, True, True),
+                (False, False, False),
+            ],
+        )
+        self.assertEqual(other_attempts, [])
 
     def test_outcomes_are_owner_scoped(self):
         self._insert_outcome_sources(self.student_id)

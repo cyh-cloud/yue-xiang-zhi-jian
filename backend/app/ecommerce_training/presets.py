@@ -7,6 +7,18 @@ LIVE_SCRIPT_STYLES = (
     "humorous",
 )
 
+COPY_PRODUCT_TYPES = (
+    "food",
+    "craft",
+    "agricultural_product",
+)
+
+COPY_TRAINING_SCENES = (
+    "social_commerce",
+    "product_page",
+    "live_room",
+)
+
 SIMULATION_SCENES = {
     "opening": {
         "label": "开场白",

@@ -20,6 +20,7 @@ from app.ecommerce_training.course_learning import (
     get_ecommerce_course_progress as _get_ecommerce_course_progress,
     get_ecommerce_course_quiz as _get_ecommerce_course_quiz,
     list_ecommerce_courses as _list_ecommerce_courses,
+    list_ecommerce_course_quiz_attempts as _list_ecommerce_quiz_attempts,
     list_ecommerce_recommendations as _list_ecommerce_recommendations,
     submit_ecommerce_course_quiz as _submit_ecommerce_course_quiz,
     update_ecommerce_course_progress as _update_ecommerce_course_progress,
@@ -38,7 +39,11 @@ from app.ecommerce_training.live_script import (
     get_live_script as _get_live_script,
     list_live_scripts as _list_live_scripts,
 )
-from app.ecommerce_training.presets import COPY_DEFECT_CATEGORIES
+from app.ecommerce_training.presets import (
+    COPY_DEFECT_CATEGORIES,
+    COPY_PRODUCT_TYPES,
+    COPY_TRAINING_SCENES,
+)
 from app.ecommerce_training.simulation import (
     get_simulation as _get_simulation,
     list_simulation_scenes as _list_simulation_scenes,
@@ -60,18 +65,6 @@ ecommerce_training_bp = Blueprint(
     __name__,
     url_prefix="/api/ecommerce-training",
 )
-
-COPY_PRODUCT_TYPES = (
-    "food",
-    "craft",
-    "agricultural_product",
-)
-COPY_TRAINING_SCENES = (
-    "social_commerce",
-    "product_page",
-    "live_room",
-)
-
 
 def _student_session() -> dict:
     session = load_session(required=True, allowed_states={"active"})
@@ -450,6 +443,18 @@ def get_ecommerce_course_quiz_route(course_id: int):
     if quiz is None:
         raise AgriNotFoundError("暂无可用测验")
     return jsonify(success=True, quiz=quiz)
+
+
+@ecommerce_training_bp.get("/courses/<int:course_id>/quiz/attempts")
+def list_ecommerce_course_quiz_attempts_route(course_id: int):
+    session = _student_session()
+    return jsonify(
+        success=True,
+        attempts=_list_ecommerce_quiz_attempts(
+            int(session["id"]),
+            course_id,
+        ),
+    )
 
 
 @ecommerce_training_bp.post("/courses/<int:course_id>/quiz")

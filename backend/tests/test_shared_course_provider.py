@@ -5,8 +5,11 @@ from pathlib import Path
 from app import create_app
 from app.agri_skills.course_learning import (
     DatabaseAgriCourseProvider,
+    get_course_progress,
     list_courses,
+    list_recommendations,
 )
+from app.agri_skills.errors import AgriNotFoundError
 from app.agri_skills.providers import list_provider_courses, set_course_provider
 from app.db import get_db
 
@@ -23,20 +26,26 @@ class LegacyProvider:
 
 
 class DirectionProvider:
+    def __init__(self) -> None:
+        self.course = {
+            "id": 2,
+            "direction": "ecommerce",
+            "status": "published",
+            "title": "电商课程",
+            "summary": "电商课程简介",
+            "teacher_name": "陈老师",
+            "published_at": "2026-09-01T00:00:00+00:00",
+            "duration_seconds": 300,
+            "tag_ids": [1],
+        }
+
     def list_published_courses(self, student_id, direction):
-        return [
-            {
-                "id": 2,
-                "direction": direction,
-                "title": "电商课程",
-                "summary": "电商课程简介",
-                "teacher_name": "陈老师",
-                "duration_seconds": 300,
-            }
-        ]
+        return [{**self.course, "direction": direction}]
 
     def get_course(self, course_id):
-        return {"id": course_id, "direction": "ecommerce"}
+        if course_id != self.course["id"]:
+            return None
+        return dict(self.course)
 
     def get_quiz(self, course_id):
         return None
@@ -88,10 +97,13 @@ class TestSharedCourseProvider(unittest.TestCase):
                     {
                         "id": 3,
                         "direction": direction,
+                        "status": "published",
                         "title": "",
                         "summary": "无标题",
                         "teacher_name": "陈老师",
+                        "published_at": "2026-09-01T00:00:00+00:00",
                         "duration_seconds": 300,
+                        "tag_ids": [1],
                     },
                 ]
 
@@ -102,6 +114,73 @@ class TestSharedCourseProvider(unittest.TestCase):
                     course["id"]
                     for course in list_courses(1, "ecommerce")
                 ],
+                [2],
+            )
+
+    def test_ecommerce_provider_rejects_incomplete_or_unpublished_courses(self):
+        invalid_courses = (
+            {"status": "pending"},
+            {"status": "offline"},
+            {"published_at": None},
+            {"published_at": ""},
+            {"tag_ids": None},
+            {"tag_ids": [True]},
+            {"tag_ids": ["1"]},
+        )
+
+        with self.app.app_context():
+            for changes in invalid_courses:
+                with self.subTest(changes=changes):
+                    provider = DirectionProvider()
+                    provider.course.update(changes)
+                    set_course_provider(self.app, provider)
+
+                    self.assertEqual(
+                        list_courses(1, "ecommerce"),
+                        [],
+                    )
+                    self.assertEqual(
+                        list_recommendations(1, "ecommerce"),
+                        [],
+                    )
+                    with self.assertRaisesRegex(
+                        AgriNotFoundError,
+                        "课程不存在",
+                    ):
+                        get_course_progress(1, 2, "ecommerce")
+
+    def test_replacement_provider_accepts_complete_published_ecommerce_course(
+        self,
+    ):
+        with self.app.app_context():
+            set_course_provider(self.app, DirectionProvider())
+            courses = list_courses(1, "ecommerce")
+
+            self.assertEqual(
+                list(courses),
+                [
+                    {
+                        "id": 2,
+                        "direction": "ecommerce",
+                        "status": "published",
+                        "title": "电商课程",
+                        "summary": "电商课程简介",
+                        "teacher_name": "陈老师",
+                        "published_at": "2026-09-01T00:00:00+00:00",
+                        "duration_seconds": 300,
+                        "tag_ids": [1],
+                    }
+                ],
+            )
+
+    def test_ecommerce_recommendations_use_replacement_provider_catalog(self):
+        with self.app.app_context():
+            set_course_provider(self.app, DirectionProvider())
+
+            recommendations = list_recommendations(1, "ecommerce")
+
+            self.assertEqual(
+                [course["id"] for course in recommendations],
                 [2],
             )
 

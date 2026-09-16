@@ -56,7 +56,21 @@ class DatabaseAgriCourseProvider:
         return self._hydrate_course(dict(row)) if row else None
 
     def get_quiz(self, course_id: int) -> dict | None:
-        return None
+        row = get_db().execute(
+            """
+            SELECT enabled, scoring_rule, questions_json
+            FROM course_quizzes
+            WHERE course_id = ?
+            """,
+            (course_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return {
+            "enabled": bool(row["enabled"]),
+            "scoring_rule": str(row["scoring_rule"]),
+            "questions": json.loads(row["questions_json"]),
+        }
 
     def _hydrate_course(self, course: dict) -> dict:
         course_id = int(course["id"])
@@ -126,10 +140,98 @@ def _require_course(course_id: int, direction: str) -> dict:
     return course
 
 
+def _list_provider_recommendations(
+    student_id: int,
+    direction: str,
+) -> list[dict]:
+    courses = list_courses(student_id, direction)
+    student_tag_ids = {
+        int(row["tag_id"])
+        for row in get_db().execute(
+            """
+            SELECT tag_id
+            FROM student_interest_tags
+            WHERE user_id = ?
+            """,
+            (student_id,),
+        ).fetchall()
+    }
+    progress_by_course = {
+        int(row["course_id"]): dict(row)
+        for row in get_db().execute(
+            """
+            SELECT course_id, last_viewed_at, progress_percent, completed_at
+            FROM agri_course_progress
+            WHERE user_id = ?
+            """,
+            (student_id,),
+        ).fetchall()
+    }
+
+    recommendations = []
+    for course in courses:
+        course_id = int(course["id"])
+        progress = progress_by_course.get(course_id)
+        if progress is not None and progress["completed_at"] is not None:
+            continue
+        tag_ids = list(course.get("tag_ids", []))
+        recommendations.append(
+            {
+                "id": course_id,
+                "title": str(course["title"]),
+                "direction": str(course["direction"]),
+                "status": str(course["status"]),
+                "summary": str(course["summary"]),
+                "teacher_name": str(course["teacher_name"]),
+                "published_at": str(course["published_at"]),
+                "duration_seconds": int(course["duration_seconds"]),
+                "tag_ids": tag_ids,
+                "tag_match_count": len(
+                    set(tag_ids).intersection(student_tag_ids)
+                ),
+                "last_viewed_at": (
+                    progress["last_viewed_at"] if progress else None
+                ),
+                "progress_percent": (
+                    int(progress["progress_percent"] or 0)
+                    if progress
+                    else 0
+                ),
+                "completed_at": progress["completed_at"] if progress else None,
+            }
+        )
+
+    recommendations.sort(key=lambda item: int(item["id"]))
+    recommendations.sort(
+        key=lambda item: str(item.get("published_at") or ""),
+        reverse=True,
+    )
+    recommendations.sort(
+        key=lambda item: int(item.get("progress_percent", 0)),
+        reverse=True,
+    )
+    recommendations.sort(
+        key=lambda item: str(item.get("last_viewed_at") or ""),
+        reverse=True,
+    )
+    recommendations.sort(
+        key=lambda item: item.get("last_viewed_at") is not None,
+        reverse=True,
+    )
+    recommendations.sort(
+        key=lambda item: int(item.get("tag_match_count", 0)),
+        reverse=True,
+    )
+    return recommendations
+
+
 def list_recommendations(
     student_id: int,
     direction: str = "agriculture",
 ) -> list[dict]:
+    if direction == "ecommerce":
+        return _list_provider_recommendations(student_id, direction)
+
     has_duration = "duration_seconds" in _course_table_columns()
     duration_projection = (
         "c.duration_seconds"
@@ -146,6 +248,7 @@ def list_recommendations(
                 c.id,
                 c.title,
                 c.direction,
+                c.status,
                 c.summary,
                 c.teacher_name,
                 c.published_at,
@@ -187,10 +290,23 @@ def list_recommendations(
             "id": int(row["id"]),
             "title": str(row["title"]),
             "direction": str(row["direction"]),
+            "status": str(row["status"]),
             "summary": str(row["summary"]),
             "teacher_name": str(row["teacher_name"]),
             "published_at": row["published_at"],
             "duration_seconds": row["duration_seconds"],
+            "tag_ids": [
+                int(tag_row["tag_id"])
+                for tag_row in get_db().execute(
+                    """
+                    SELECT tag_id
+                    FROM course_interest_tags
+                    WHERE course_id = ?
+                    ORDER BY tag_id
+                    """,
+                    (int(row["id"]),),
+                ).fetchall()
+            ],
             "tag_match_count": int(row["tag_match_count"]),
             "last_viewed_at": row["last_viewed_at"],
             "progress_percent": int(row["progress_percent"] or 0),
@@ -232,8 +348,18 @@ def get_course_progress(
             "completed_at": None,
             "last_viewed_at": None,
             "updated_at": None,
+            "quiz_available": False,
         }
-    return dict(row)
+    progress = dict(row)
+    progress["quiz_available"] = (
+        row["completed_at"] is not None
+        and _normalize_course_quiz(
+            get_course_provider().get_quiz(course_id),
+            strict=direction == "ecommerce",
+        )
+        is not None
+    )
+    return progress
 
 
 def update_course_progress(
@@ -320,10 +446,22 @@ def update_course_progress(
     return get_course_progress(user_id, course_id, direction)
 
 
-def _normalize_course_quiz(quiz: dict | None) -> list[dict] | None:
+def _normalize_course_quiz(
+    quiz: dict | None,
+    *,
+    strict: bool = True,
+) -> list[dict] | None:
     if not isinstance(quiz, dict):
         return None
-    if quiz.get("enabled") is False or quiz.get("is_enabled") is False:
+    if strict:
+        scoring_rule = quiz.get("scoring_rule")
+        if (
+            quiz.get("enabled") is not True
+            or not isinstance(scoring_rule, str)
+            or not scoring_rule.strip()
+        ):
+            return None
+    elif quiz.get("enabled") is False or quiz.get("is_enabled") is False:
         return None
 
     raw_questions = quiz.get("questions")
@@ -352,10 +490,14 @@ def _normalize_course_quiz(quiz: dict | None) -> list[dict] | None:
             or not isinstance(options, list)
             or not options
             or not answer
+            or not all(
+                isinstance(option, str) and bool(option.strip())
+                for option in options
+            )
         ):
             return None
 
-        normalized_options = [str(option) for option in options]
+        normalized_options = [option.strip() for option in options]
         if answer not in normalized_options:
             return None
         questions.append(
@@ -393,7 +535,8 @@ def _load_available_course_quiz(
         return None
 
     questions = _normalize_course_quiz(
-        get_course_provider().get_quiz(course_id)
+        get_course_provider().get_quiz(course_id),
+        strict=direction == "ecommerce",
     )
     if questions is None:
         return None
@@ -429,6 +572,42 @@ def get_course_quiz(
         "course_id": course_id,
         "questions": _public_quiz_questions(questions),
     }
+
+
+def list_course_quiz_attempts(
+    user_id: int,
+    course_id: int,
+    direction: str = "agriculture",
+) -> list[dict]:
+    _require_course(course_id, direction)
+    rows = get_db().execute(
+        """
+        SELECT id, user_id, course_id, answers_json, result_json, score,
+               is_formal, created_at
+        FROM agri_course_quiz_attempts
+        WHERE user_id = ? AND course_id = ?
+        ORDER BY created_at DESC, id DESC
+        """,
+        (user_id, course_id),
+    ).fetchall()
+
+    attempts = []
+    for index, row in enumerate(rows):
+        result = json.loads(row["result_json"])
+        attempts.append(
+            {
+                "id": int(row["id"]),
+                "course_id": int(row["course_id"]),
+                "answers": json.loads(row["answers_json"]),
+                "score": int(row["score"]),
+                "questions": result.get("questions", []),
+                "is_formal": bool(row["is_formal"]),
+                "is_current": bool(row["is_formal"]),
+                "is_latest": index == 0,
+                "created_at": str(row["created_at"]),
+            }
+        )
+    return attempts
 
 
 def _validate_course_quiz_answers(
@@ -579,6 +758,8 @@ def submit_course_quiz(
         "course_id": course_id,
         "score": score,
         "is_formal": True,
+        "is_current": True,
+        "is_latest": True,
         "questions": graded_questions,
         "created_at": now,
     }

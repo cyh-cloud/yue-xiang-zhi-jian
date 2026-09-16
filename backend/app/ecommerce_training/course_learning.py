@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.agri_skills.course_learning import (
     get_course_progress,
     get_course_quiz,
+    list_course_quiz_attempts,
     list_courses,
     list_recommendations,
     submit_course_quiz,
@@ -48,6 +49,17 @@ def get_ecommerce_course_quiz(
     course_id: int,
 ) -> dict | None:
     return get_course_quiz(
+        user_id,
+        course_id,
+        direction="ecommerce",
+    )
+
+
+def list_ecommerce_course_quiz_attempts(
+    user_id: int,
+    course_id: int,
+) -> list[dict]:
+    return list_course_quiz_attempts(
         user_id,
         course_id,
         direction="ecommerce",

@@ -99,6 +99,14 @@ CREATE TABLE IF NOT EXISTS course_interest_tags (
     PRIMARY KEY (course_id, tag_id)
 );
 
+CREATE TABLE IF NOT EXISTS course_quizzes (
+    course_id INTEGER PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    scoring_rule TEXT NOT NULL DEFAULT '',
+    questions_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS message_conversations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     participant_low_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
