@@ -4,10 +4,20 @@ import json
 
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
+from app.agri_skills.calendar import (
+    get_calendar,
+    get_selected_product,
+    list_product_subscriptions,
+    list_products,
+    set_selected_product,
+    subscribe_product,
+    unsubscribe_product,
+)
 from app.agri_skills.errors import (
     AgriNotFoundError,
     AgriSkillError,
     AgriValidationError,
+    PresetContentUnavailableError,
 )
 from app.agri_skills.qa import (
     answer_qa_once,
@@ -45,6 +55,84 @@ def _validation_response(error: AgriValidationError):
 def _sse(event: str, payload: dict) -> str:
     data = json.dumps(payload, ensure_ascii=False)
     return f"event: {event}\ndata: {data}\n\n"
+
+
+@agri_skills_bp.get("/products")
+def get_products():
+    _student_session()
+    return jsonify(success=True, products=list_products())
+
+
+@agri_skills_bp.get("/calendar")
+def get_calendar_route():
+    session = _student_session()
+    product_key = request.args.get("product_key", "").strip()
+    if not product_key:
+        product_key = get_selected_product(int(session["id"]))
+    raw_month = request.args.get("month", "")
+    try:
+        month = int(raw_month)
+    except ValueError:
+        return jsonify(
+            success=False,
+            errors={"month": "月份必须是 1 至 12 的整数"},
+        ), 400
+    if not 1 <= month <= 12:
+        return jsonify(
+            success=False,
+            errors={"month": "月份必须是 1 至 12 的整数"},
+        ), 400
+    try:
+        calendar = get_calendar(product_key, month)
+    except PresetContentUnavailableError as error:
+        calendar = {
+            "product_key": product_key,
+            "month": month,
+            "empty_state": str(error),
+        }
+    return jsonify(success=True, calendar=calendar)
+
+
+@agri_skills_bp.put("/calendar/selection")
+def put_calendar_selection():
+    session = _student_session()
+    payload = request.get_json(silent=True) or {}
+    try:
+        product_key = set_selected_product(
+            int(session["id"]),
+            str(payload.get("product_key", "")).strip(),
+        )
+    except AgriValidationError as error:
+        return _validation_response(error)
+    return jsonify(success=True, product_key=product_key)
+
+
+@agri_skills_bp.get("/subscriptions")
+def get_subscriptions():
+    session = _student_session()
+    return jsonify(
+        success=True,
+        subscriptions=list_product_subscriptions(int(session["id"])),
+    )
+
+
+@agri_skills_bp.post("/subscriptions/<product_key>")
+def post_subscription(product_key: str):
+    session = _student_session()
+    try:
+        subscription = subscribe_product(int(session["id"]), product_key)
+    except AgriValidationError as error:
+        return _validation_response(error)
+    return jsonify(success=True, subscription=subscription)
+
+
+@agri_skills_bp.delete("/subscriptions/<product_key>")
+def delete_subscription(product_key: str):
+    session = _student_session()
+    return jsonify(
+        success=True,
+        subscription=unsubscribe_product(int(session["id"]), product_key),
+    )
 
 
 @agri_skills_bp.post("/qa/conversations")
