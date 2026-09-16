@@ -83,6 +83,29 @@ def _current_calendar_month() -> int:
     return datetime.now(ZoneInfo(timezone_name)).month
 
 
+def _parse_followup_id(payload: dict) -> int:
+    raw_followup_id = payload.get("followup_id", 0)
+    if (
+        isinstance(raw_followup_id, bool)
+        or (
+            isinstance(raw_followup_id, float)
+            and not raw_followup_id.is_integer()
+        )
+    ):
+        followup_id = 0
+    else:
+        try:
+            followup_id = int(raw_followup_id)
+        except (TypeError, ValueError):
+            followup_id = 0
+    if followup_id <= 0:
+        raise AgriValidationError(
+            "复诊记录无效",
+            details={"followup_id": "复诊记录无效"},
+        )
+    return followup_id
+
+
 @agri_skills_bp.errorhandler(AgriValidationError)
 def handle_validation(error):
     return jsonify(
@@ -266,7 +289,7 @@ def post_repeat_diagnosis(session_id: int):
     diagnosis = create_diagnosis_from_followup(
         int(session["id"]),
         session_id,
-        int(payload.get("followup_id", 0)),
+        _parse_followup_id(payload),
     )
     return jsonify(success=True, session=diagnosis), 201
 

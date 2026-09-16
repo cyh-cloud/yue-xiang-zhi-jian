@@ -137,6 +137,13 @@ class TestAgriDiagnosisApi(unittest.TestCase):
         self.ai.complete_json.side_effect = None
         return session_id
 
+    def _count_rows(self, table: str) -> int:
+        with self.app.app_context():
+            row = get_db().execute(
+                f"SELECT COUNT(*) AS count FROM {table}"
+            ).fetchone()
+        return int(row["count"])
+
     def test_create_list_detail_start_and_answer_routes(self):
         created = self.client.post(
             "/api/agri-skills/diagnoses",
@@ -203,6 +210,43 @@ class TestAgriDiagnosisApi(unittest.TestCase):
         self.assertEqual(
             answered.get_json()["session"]["conclusion"]["cause"],
             "果实受蒂蛀虫危害",
+        )
+
+    def test_start_recovers_missing_first_question(self):
+        created = self.client.post(
+            "/api/agri-skills/diagnoses",
+            json={
+                "product_key": "litchi",
+                "affected_part": "fruit",
+                "symptoms": ["虫蛀"],
+            },
+        )
+        session_id = created.get_json()["session"]["id"]
+        with self.app.app_context():
+            get_db().execute(
+                """
+                UPDATE agri_diagnosis_sessions
+                SET pending_question = NULL, pending_question_round = NULL
+                WHERE id = ?
+                """,
+                (session_id,),
+            )
+            get_db().commit()
+
+        self.ai.complete_json.return_value = {
+            "status": "follow_up_required",
+            "question": "恢复后的首个问题",
+            "conclusion": None,
+            "limited": False,
+        }
+        started = self.client.post(
+            f"/api/agri-skills/diagnoses/{session_id}/start"
+        )
+
+        self.assertEqual(started.status_code, 200)
+        self.assertEqual(
+            started.get_json()["session"]["pending_question"],
+            "恢复后的首个问题",
         )
 
     def test_abandon_route_is_idempotent(self):
@@ -312,6 +356,25 @@ class TestAgriDiagnosisApi(unittest.TestCase):
         self.assertEqual(result["score"], 100)
         self.assertTrue(all(item["correct"] for item in result["questions"]))
 
+    def test_two_invalid_selftests_return_fixed_ai_message(self):
+        session_id = self._complete_diagnosis()
+        invalid_payload = {"questions": self.questions[:2]}
+        self.ai.complete_json.side_effect = [
+            invalid_payload,
+            invalid_payload,
+        ]
+
+        response = self.client.post(
+            f"/api/agri-skills/diagnoses/{session_id}/self-test"
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.get_json()["message"],
+            "AI 服务暂时不可用",
+        )
+        self.assertEqual(self._count_rows("agri_self_tests"), 0)
+
     def test_error_mapping_and_resource_ownership(self):
         invalid = self.client.post(
             "/api/agri-skills/diagnoses",
@@ -361,6 +424,30 @@ class TestAgriDiagnosisApi(unittest.TestCase):
             unavailable.get_json()["message"],
             "AI 服务暂时不可用",
         )
+
+    def test_repeat_rejects_invalid_followup_id_with_400(self):
+        created = self.client.post(
+            "/api/agri-skills/diagnoses",
+            json={
+                "product_key": "litchi",
+                "affected_part": "fruit",
+                "symptoms": ["虫蛀"],
+            },
+        )
+        session_id = created.get_json()["session"]["id"]
+
+        for invalid in ("not-a-number", None, [], 1.5, 0):
+            with self.subTest(followup_id=invalid):
+                response = self.client.post(
+                    f"/api/agri-skills/diagnoses/{session_id}/repeat",
+                    json={"followup_id": invalid},
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.get_json()["errors"],
+                    {"followup_id": "复诊记录无效"},
+                )
 
     def test_all_routes_require_active_student(self):
         requests = [
