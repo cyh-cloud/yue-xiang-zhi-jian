@@ -365,6 +365,35 @@ class TestAgriCourseApi(unittest.TestCase):
         self.assertEqual(progress["watched_seconds"], 80)
         self.assertIsNotNone(progress["completed_at"])
 
+    def test_non_object_progress_body_is_rejected_without_mutation(self):
+        created = self.client.put(
+            "/api/agri-skills/courses/1/progress",
+            json={"position_seconds": 50, "watched_delta_seconds": 5},
+        )
+        self.assertEqual(created.status_code, 200)
+        before = self.client.get(
+            "/api/agri-skills/courses/1/progress"
+        ).get_json()["progress"]
+
+        invalid = self.client.put(
+            "/api/agri-skills/courses/1/progress",
+            json=[{"position_seconds": 80, "watched_delta_seconds": 10}],
+        )
+
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(
+            invalid.get_json(),
+            {
+                "success": False,
+                "message": "请求体格式不正确",
+                "errors": {"body": "请求体必须是 JSON 对象"},
+            },
+        )
+        after = self.client.get(
+            "/api/agri-skills/courses/1/progress"
+        ).get_json()["progress"]
+        self.assertEqual(after, before)
+
     def test_quiz_requires_owned_completed_course_and_hides_answers(self):
         unavailable = self.client.get(
             "/api/agri-skills/courses/1/quiz"
@@ -417,6 +446,26 @@ class TestAgriCourseApi(unittest.TestCase):
             "/api/agri-skills/courses/1/progress"
         ).get_json()["progress"]
         self.assertIsNotNone(progress["completed_at"])
+
+    def test_non_object_quiz_body_does_not_grade_or_create_attempt(self):
+        self._complete_course(1)
+
+        invalid = self.client.post(
+            "/api/agri-skills/courses/1/quiz",
+            json=[{"answers": {"q1": "A"}}],
+        )
+
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(
+            invalid.get_json(),
+            {
+                "success": False,
+                "message": "请求体格式不正确",
+                "errors": {"body": "请求体必须是 JSON 对象"},
+            },
+        )
+        self.ai.complete_json.assert_not_called()
+        self.assertEqual(self._attempt_rows(), [])
 
     def test_all_routes_require_active_student(self):
         requests = [

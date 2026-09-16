@@ -91,6 +91,18 @@ def _current_calendar_month() -> int:
     return datetime.now(ZoneInfo(timezone_name)).month
 
 
+def _json_object_payload() -> dict:
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return {}
+    if not isinstance(payload, dict):
+        raise AgriValidationError(
+            "请求体格式不正确",
+            details={"body": "请求体必须是 JSON 对象"},
+        )
+    return payload
+
+
 def _parse_followup_id(payload: dict) -> int:
     raw_followup_id = payload.get("followup_id", 0)
     if (
@@ -247,7 +259,7 @@ def get_progress_route(course_id: int):
 @agri_skills_bp.put("/courses/<int:course_id>/progress")
 def put_progress_route(course_id: int):
     session = _student_session()
-    payload = request.get_json(silent=True) or {}
+    payload = _json_object_payload()
     progress = update_course_progress(
         int(session["id"]),
         course_id,
@@ -269,7 +281,7 @@ def get_quiz_route(course_id: int):
 @agri_skills_bp.post("/courses/<int:course_id>/quiz")
 def post_quiz_route(course_id: int):
     session = _student_session()
-    payload = request.get_json(silent=True) or {}
+    payload = _json_object_payload()
     attempt = submit_course_quiz(
         int(session["id"]),
         course_id,
