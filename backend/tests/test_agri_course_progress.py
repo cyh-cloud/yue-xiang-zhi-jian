@@ -9,10 +9,11 @@ from app import create_app
 from app.agri_skills.course_learning import (
     DatabaseAgriCourseProvider,
     get_course_progress,
+    list_courses,
     list_recommendations,
     update_course_progress,
 )
-from app.agri_skills.errors import AgriValidationError
+from app.agri_skills.errors import AgriNotFoundError, AgriValidationError
 from app.agri_skills.providers import get_course_provider, set_course_provider
 from app.db import get_db
 
@@ -102,15 +103,30 @@ class TestAgriCourseProgress(unittest.TestCase):
                     id, title, direction, status, published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, 'agriculture', 'published', ?, '', '林老师', ?, ?)
+                VALUES (?, ?, 'agriculture', 'published', ?, ?, '林老师', ?, ?)
                 """,
                 (
-                    (1, "荔枝保果", "2026-09-01T00:00:00+00:00", now, now),
-                    (2, "水稻种植", "2026-09-03T00:00:00+00:00", now, now),
+                    (
+                        1,
+                        "荔枝保果",
+                        "2026-09-01T00:00:00+00:00",
+                        "荔枝保果课程简介",
+                        now,
+                        now,
+                    ),
+                    (
+                        2,
+                        "水稻种植",
+                        "2026-09-03T00:00:00+00:00",
+                        "水稻种植课程简介",
+                        now,
+                        now,
+                    ),
                     (
                         3,
                         "荔枝病虫害防治",
                         "2026-09-02T00:00:00+00:00",
+                        "荔枝病虫害防治课程简介",
                         now,
                         now,
                     ),
@@ -122,7 +138,10 @@ class TestAgriCourseProgress(unittest.TestCase):
                     id, title, direction, status, published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (4, '电商课程', 'ecommerce', 'published', ?, '', '', ?, ?)
+                VALUES (
+                    4, '电商课程', 'ecommerce', 'published', ?,
+                    '电商课程简介', '陈老师', ?, ?
+                )
                 """,
                 (now, now, now),
             )
@@ -334,8 +353,9 @@ class TestAgriCourseProgress(unittest.TestCase):
         with self.app.app_context():
             provider = DatabaseAgriCourseProvider()
 
-            courses = provider.list_published_agriculture_courses(
-                self.student_id
+            courses = provider.list_published_courses(
+                self.student_id,
+                "agriculture",
             )
 
             self.assertEqual([course["id"] for course in courses], [2, 3, 1])
@@ -347,8 +367,36 @@ class TestAgriCourseProgress(unittest.TestCase):
                 provider.get_course(2)["duration_seconds"],
                 duration,
             )
-            self.assertIsNone(provider.get_course(4))
+            ecommerce = provider.list_published_courses(
+                self.student_id,
+                "ecommerce",
+            )
+            self.assertEqual([course["id"] for course in ecommerce], [4])
+            self.assertEqual(provider.get_course(4)["direction"], "ecommerce")
             self.assertIsNone(provider.get_course(5))
+
+    def test_list_courses_and_recommendations_are_direction_aware(self):
+        with self.app.app_context():
+            self.app.extensions.pop("agri_course_provider", None)
+
+            agriculture = list_courses(self.student_id, "agriculture")
+            ecommerce = list_courses(self.student_id, "ecommerce")
+            recommendations = list_recommendations(
+                self.student_id,
+                "ecommerce",
+            )
+
+            self.assertEqual(
+                [course["id"] for course in agriculture],
+                [2, 3, 1],
+            )
+            self.assertEqual([course["id"] for course in ecommerce], [4])
+            self.assertEqual([course["id"] for course in recommendations], [4])
+
+    def test_course_actions_reject_courses_from_another_direction(self):
+        with self.app.app_context():
+            with self.assertRaises(AgriNotFoundError):
+                get_course_progress(self.student_id, 1, "ecommerce")
 
     def test_default_course_provider_supports_stable_progress_loop(self):
         with self.app.app_context():

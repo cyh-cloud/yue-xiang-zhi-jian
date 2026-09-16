@@ -9,8 +9,12 @@ from app.agri_skills.errors import (
     AgriValidationError,
     AiUnavailableError,
 )
-from app.agri_skills.providers import get_course_provider
-from app.courses.service import list_published_courses
+from app.agri_skills.providers import (
+    get_course_provider,
+    is_eligible_course,
+    list_provider_courses,
+)
+from app.courses.service import list_published_courses as list_published_course_rows
 from app.db import get_db
 from app.session_manager import utc_now_iso
 
@@ -20,13 +24,24 @@ COURSE_QUIZ_QUESTION_TYPES = {"single_choice", "true_false"}
 PLACEHOLDER_COURSE_DURATION_SECONDS = 300
 
 
+def _course_table_columns() -> set[str]:
+    return {
+        str(row["name"])
+        for row in get_db().execute("PRAGMA table_info(courses)").fetchall()
+    }
+
+
 class DatabaseAgriCourseProvider:
-    def list_published_agriculture_courses(
+    def list_published_courses(
         self,
         student_id: int,
+        direction: str,
     ) -> list[dict]:
-        courses = list_published_courses(student_id, "agriculture")
+        courses = list_published_course_rows(student_id, direction)
         return [self._hydrate_course(course) for course in courses]
+
+    def list_published_agriculture_courses(self, student_id: int) -> list[dict]:
+        return self.list_published_courses(student_id, "agriculture")
 
     def get_course(self, course_id: int) -> dict | None:
         row = get_db().execute(
@@ -35,7 +50,6 @@ class DatabaseAgriCourseProvider:
             FROM courses
             WHERE id = ?
               AND status = 'published'
-              AND direction = 'agriculture'
             """,
             (course_id,),
         ).fetchone()
@@ -84,20 +98,60 @@ class DatabaseAgriCourseProvider:
         }
 
 
+def list_courses(student_id: int, direction: str) -> list[dict]:
+    return [
+        course
+        for course in list_provider_courses(student_id, direction)
+        if is_eligible_course(course, direction)
+    ]
+
+
 def list_agriculture_courses(student_id: int) -> list[dict]:
-    return get_course_provider().list_published_agriculture_courses(student_id)
+    return list_courses(student_id, "agriculture")
 
 
-def list_recommendations(student_id: int) -> list[dict]:
+def _require_course(course_id: int, direction: str) -> dict:
+    provider = get_course_provider()
+    course = provider.get_course(course_id)
+    if course is None:
+        raise AgriNotFoundError("课程不存在")
+    course_direction = course.get("direction")
+    if course_direction is None:
+        # Legacy 03 providers imply agriculture from their method name.
+        is_legacy_provider = not callable(
+            getattr(provider, "list_published_courses", None)
+        )
+        if is_legacy_provider and direction == "agriculture":
+            return course
+    if course_direction != direction:
+        raise AgriNotFoundError("课程不存在")
+    return course
+
+
+def list_recommendations(
+    student_id: int,
+    direction: str = "agriculture",
+) -> list[dict]:
+    has_duration = "duration_seconds" in _course_table_columns()
+    duration_projection = (
+        "c.duration_seconds"
+        if has_duration
+        else str(PLACEHOLDER_COURSE_DURATION_SECONDS)
+    )
+    duration_filter = (
+        "\n              AND c.duration_seconds > 0" if has_duration else ""
+    )
     rows = get_db().execute(
-        """
+        f"""
         WITH ranked AS (
             SELECT
                 c.id,
                 c.title,
+                c.direction,
                 c.summary,
                 c.teacher_name,
                 c.published_at,
+                {duration_projection} AS duration_seconds,
                 (
                     SELECT COUNT(DISTINCT cit.tag_id)
                     FROM course_interest_tags cit
@@ -114,7 +168,8 @@ def list_recommendations(student_id: int) -> list[dict]:
               ON p.course_id = c.id
              AND p.user_id = :student_id
             WHERE c.status = 'published'
-              AND c.direction = 'agriculture'
+              AND c.direction = :direction
+              {duration_filter}
               AND p.completed_at IS NULL
         )
         SELECT *
@@ -127,15 +182,17 @@ def list_recommendations(student_id: int) -> list[dict]:
             published_at DESC,
             id ASC
         """,
-        {"student_id": student_id},
+        {"student_id": student_id, "direction": direction},
     ).fetchall()
-    return [
+    courses = [
         {
             "id": int(row["id"]),
             "title": str(row["title"]),
+            "direction": str(row["direction"]),
             "summary": str(row["summary"]),
             "teacher_name": str(row["teacher_name"]),
             "published_at": row["published_at"],
+            "duration_seconds": row["duration_seconds"],
             "tag_match_count": int(row["tag_match_count"]),
             "last_viewed_at": row["last_viewed_at"],
             "progress_percent": int(row["progress_percent"] or 0),
@@ -143,11 +200,39 @@ def list_recommendations(student_id: int) -> list[dict]:
         }
         for row in rows
     ]
+    provider = get_course_provider()
+    is_legacy_provider = not callable(
+        getattr(provider, "list_published_courses", None)
+    )
+    eligible_courses = []
+    for course in courses:
+        if is_eligible_course(course, direction):
+            eligible_courses.append(course)
+            continue
+        if not is_legacy_provider:
+            continue
+        # Legacy recommendation fixtures predate provider-required text fields.
+        course_id = course.get("id")
+        duration = course.get("duration_seconds")
+        if (
+            course.get("direction") == direction
+            and isinstance(course_id, int)
+            and not isinstance(course_id, bool)
+            and course_id > 0
+            and isinstance(duration, int)
+            and not isinstance(duration, bool)
+            and duration > 0
+        ):
+            eligible_courses.append(course)
+    return eligible_courses
 
 
-def get_course_progress(user_id: int, course_id: int) -> dict:
-    if get_course_provider().get_course(course_id) is None:
-        raise AgriNotFoundError("课程不存在")
+def get_course_progress(
+    user_id: int,
+    course_id: int,
+    direction: str = "agriculture",
+) -> dict:
+    _require_course(course_id, direction)
 
     row = get_db().execute(
         """
@@ -178,10 +263,9 @@ def update_course_progress(
     course_id: int,
     position_seconds: int,
     watched_delta_seconds: int,
+    direction: str = "agriculture",
 ) -> dict:
-    course = get_course_provider().get_course(course_id)
-    if course is None:
-        raise AgriNotFoundError("课程不存在")
+    course = _require_course(course_id, direction)
 
     duration_value = course.get("duration_seconds")
     if (
@@ -255,7 +339,7 @@ def update_course_progress(
                 now,
             ),
         )
-    return get_course_progress(user_id, course_id)
+    return get_course_progress(user_id, course_id, direction)
 
 
 def _normalize_course_quiz(quiz: dict | None) -> list[dict] | None:
@@ -312,9 +396,11 @@ def _normalize_course_quiz(quiz: dict | None) -> list[dict] | None:
 def _load_available_course_quiz(
     user_id: int,
     course_id: int,
+    direction: str,
 ) -> tuple[dict, list[dict]] | None:
-    course = get_course_provider().get_course(course_id)
-    if course is None:
+    try:
+        course = _require_course(course_id, direction)
+    except AgriNotFoundError:
         return None
 
     progress = get_db().execute(
@@ -348,8 +434,16 @@ def _public_quiz_questions(questions: list[dict]) -> list[dict]:
     ]
 
 
-def get_course_quiz(user_id: int, course_id: int) -> dict | None:
-    available = _load_available_course_quiz(user_id, course_id)
+def get_course_quiz(
+    user_id: int,
+    course_id: int,
+    direction: str = "agriculture",
+) -> dict | None:
+    available = _load_available_course_quiz(
+        user_id,
+        course_id,
+        direction,
+    )
     if available is None:
         return None
     _, questions = available
@@ -444,8 +538,13 @@ def submit_course_quiz(
     user_id: int,
     course_id: int,
     answers: dict,
+    direction: str = "agriculture",
 ) -> dict:
-    available = _load_available_course_quiz(user_id, course_id)
+    available = _load_available_course_quiz(
+        user_id,
+        course_id,
+        direction,
+    )
     if available is None:
         raise AgriNotFoundError("暂无可用测验")
     course, questions = available
