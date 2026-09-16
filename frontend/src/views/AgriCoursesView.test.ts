@@ -55,7 +55,8 @@ function progress(
     watched_seconds: progressPercent,
     completed_at:
       progressPercent >= 80 ? '2026-09-16T01:00:00+00:00' : null,
-    last_viewed_at: '2026-09-16T01:00:00+00:00'
+    last_viewed_at: '2026-09-16T01:00:00+00:00',
+    quiz_available: true
   }
 }
 
@@ -64,6 +65,8 @@ const gradedAttempt: CourseQuizAttempt = {
   course_id: 1,
   score: 100,
   is_formal: true,
+  is_current: true,
+  is_latest: true,
   questions: [
     {
       id: 'q1',
@@ -119,6 +122,9 @@ function mockApi(
     }
     if (path === '/api/agri-skills/courses/1/quiz' && options?.method === 'POST') {
       return { success: true, attempt: gradedAttempt } as never
+    }
+    if (path === '/api/agri-skills/courses/1/quiz/attempts') {
+      return { success: true, attempts: [] } as never
     }
     throw new Error(`Unexpected request: ${path}`)
   })

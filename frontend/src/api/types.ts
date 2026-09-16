@@ -315,6 +315,7 @@ export interface CourseProgress {
   watched_seconds: number
   completed_at: string | null
   last_viewed_at: string | null
+  quiz_available: boolean
 }
 
 export interface CourseQuizQuestion {
@@ -334,6 +335,8 @@ export interface CourseQuizAttempt {
   course_id: number
   score: number
   is_formal: boolean
+  is_current: boolean
+  is_latest: boolean
   questions: Array<CourseQuizQuestion & {
     correct: boolean
     explanation: string

@@ -95,7 +95,8 @@ function courseFixture(
       watched_seconds: progressPercent,
       completed_at:
         progressPercent >= 80 ? '2026-09-16T00:00:00+00:00' : null,
-      last_viewed_at: '2026-09-16T00:00:00+00:00'
+      last_viewed_at: '2026-09-16T00:00:00+00:00',
+      quiz_available: true
     }
   }
 }

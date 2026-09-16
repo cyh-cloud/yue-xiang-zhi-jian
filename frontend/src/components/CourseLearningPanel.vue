@@ -48,8 +48,31 @@ function progressPercent(courseId: number): number | undefined {
 }
 
 function canOpenQuiz(courseId: number): boolean {
-  const progress = progressPercent(courseId)
-  return progress !== undefined && progress >= 80
+  const progress = progressFor(courseId)
+  const percent = progressPercent(courseId)
+  return (
+    percent !== undefined &&
+    percent >= 80 &&
+    progress?.quiz_available === true
+  )
+}
+
+function quizGateMessage(courseId: number): string {
+  if (coursesStore.progressErrorsByCourse[courseId]) {
+    return '进度加载失败，重试后再参加测验'
+  }
+  const progress = progressFor(courseId)
+  if (!progress) {
+    return '学习进度加载中'
+  }
+  const percent = progressPercent(courseId)
+  if (percent === undefined) {
+    return '学习进度加载中'
+  }
+  if (percent < 80) {
+    return '达到 80% 后开放'
+  }
+  return '暂无可用测验'
 }
 
 function commentReturnTo(course: CourseLearningCourse): string {
@@ -62,9 +85,15 @@ function commentReturnTo(course: CourseLearningCourse): string {
 }
 
 function latestAttempt(courseId: number): CourseQuizAttempt | undefined {
-  return [...coursesStore.attempts]
-    .reverse()
-    .find(attempt => attempt.course_id === courseId)
+  return coursesStore.attempts.find(
+    attempt => attempt.course_id === courseId
+  )
+}
+
+function attemptsFor(courseId: number): CourseQuizAttempt[] {
+  return coursesStore.attempts.filter(
+    attempt => attempt.course_id === courseId
+  )
 }
 
 function quizIsComplete(courseId: number): boolean {
@@ -364,14 +393,11 @@ onMounted(() => {
                 <Trophy :size="17" aria-hidden="true" />
                 课后测验
               </button>
-              <small v-if="!canOpenQuiz(course.id)">
-                {{
-                  coursesStore.progressErrorsByCourse[course.id]
-                    ? '进度加载失败，重试后再参加测验'
-                    : progressFor(course.id)
-                      ? '达到 80% 后开放'
-                      : '学习进度加载中'
-                }}
+              <small
+                v-if="!canOpenQuiz(course.id)"
+                :data-test="`quiz-gate-${course.id}`"
+              >
+                {{ quizGateMessage(course.id) }}
               </small>
             </div>
 
@@ -387,6 +413,42 @@ onMounted(() => {
                 </div>
                 <Trophy :size="21" aria-hidden="true" />
               </header>
+
+              <section
+                v-if="attemptsFor(course.id).length"
+                class="quiz-history"
+                :data-test="`quiz-history-${course.id}`"
+              >
+                <header>
+                  <span>测验记录</span>
+                  <strong class="ark-data">
+                    {{ attemptsFor(course.id).length }} 次
+                  </strong>
+                </header>
+                <article
+                  v-for="attempt in attemptsFor(course.id)"
+                  :key="attempt.id"
+                  :data-test="`quiz-history-${attempt.id}`"
+                >
+                  <div>
+                    <time
+                      class="ark-data"
+                      :datetime="attempt.created_at"
+                    >
+                      {{ attempt.created_at }}
+                    </time>
+                    <span>
+                      {{
+                        attempt.is_current || attempt.is_formal
+                          ? '正式成绩'
+                          : '历史成绩'
+                      }}
+                    </span>
+                    <span v-if="attempt.is_latest">最新提交</span>
+                  </div>
+                  <strong class="ark-data">{{ attempt.score }} 分</strong>
+                </article>
+              </section>
 
               <form
                 class="quiz-form"
@@ -890,6 +952,46 @@ onMounted(() => {
   display: grid;
   gap: 20px;
   padding: 20px 16px;
+}
+
+.quiz-history {
+  border-bottom: 1px solid var(--ark-line);
+}
+
+.quiz-history > header,
+.quiz-history article,
+.quiz-history article > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quiz-history > header {
+  padding: 12px 16px;
+  background: var(--ark-surface-1);
+}
+
+.quiz-history > header span,
+.quiz-history article span,
+.quiz-history article time {
+  color: var(--ark-muted);
+  font-size: 0.72rem;
+}
+
+.quiz-history article {
+  padding: 12px 16px;
+  border-top: 1px solid var(--ark-line);
+}
+
+.quiz-history article > div {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.quiz-history article > strong {
+  flex: 0 0 auto;
+  color: var(--ark-signal);
 }
 
 .quiz-form fieldset {

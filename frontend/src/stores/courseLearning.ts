@@ -293,6 +293,16 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           quiz: CourseQuiz
         }>(`${this.apiPrefix}/courses/${courseId}/quiz`)
         this.activeQuiz = response.quiz
+        const attemptsResponse = await apiFetch<{
+          success: true
+          attempts: CourseQuizAttempt[]
+        }>(`${this.apiPrefix}/courses/${courseId}/quiz/attempts`)
+        this.attempts = [
+          ...this.attempts.filter(
+            attempt => attempt.course_id !== courseId
+          ),
+          ...attemptsResponse.attempts
+        ]
         return true
       } catch (error) {
         this.activeQuiz = null
@@ -317,14 +327,24 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           method: 'POST',
           body: JSON.stringify({ answers })
         })
-        const attempt = { ...response.attempt, is_formal: true }
+        const attempt = {
+          ...response.attempt,
+          is_formal: true,
+          is_current: true,
+          is_latest: true
+        }
         this.attempts = [
+          attempt,
           ...this.attempts.map(item =>
             item.course_id === courseId
-              ? { ...item, is_formal: false }
+              ? {
+                  ...item,
+                  is_formal: false,
+                  is_current: false,
+                  is_latest: false
+                }
               : item
-          ),
-          attempt
+          )
         ]
         return true
       } catch (error) {
