@@ -446,7 +446,7 @@ onMounted(() => {
 }
 
 .training-panel {
-  min-height: 460px;
+  min-height: clamp(280px, 42svh, 460px);
 }
 
 .active-scene {

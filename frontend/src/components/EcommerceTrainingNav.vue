@@ -72,13 +72,22 @@ const links = [
   gap: 4px;
   width: min(100%, var(--ark-shell-max));
   margin-inline: auto;
-  padding: 8px 24px;
+  padding: 8px 24px 10px;
   overflow-x: auto;
-  scrollbar-width: none;
+  scrollbar-color: var(--ark-line-strong) var(--ark-surface-1);
+  scrollbar-width: thin;
 }
 
 .ecommerce-training-nav__inner::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+
+.ecommerce-training-nav__inner::-webkit-scrollbar-track {
+  background: var(--ark-surface-1);
+}
+
+.ecommerce-training-nav__inner::-webkit-scrollbar-thumb {
+  background: var(--ark-line-strong);
 }
 
 .ecommerce-training-nav a {

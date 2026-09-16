@@ -21,11 +21,35 @@ vi.mock('@/api/client', async importOriginal => {
 const mockedApiFetch = vi.mocked(apiFetch)
 
 const scenarios: CustomerScenario[] = [
-  { key: 'product_info', label: '商品咨询', criteria: ['说明商品信息', '确认顾客需求'] },
-  { key: 'price_promo', label: '价格优惠', criteria: ['解释优惠规则', '促成下单'] },
-  { key: 'shipping', label: '物流配送', criteria: ['说明配送安排', '给出查询方式'] },
-  { key: 'after_sales', label: '售后处理', criteria: ['确认订单情况', '说明退换流程'] },
-  { key: 'complaint', label: '投诉处理', criteria: ['共情顾客诉求', '给出解决路径'] }
+  {
+    key: 'product_info',
+    label: '商品咨询',
+    criteria: [
+      'product_need_identified',
+      'accurate_info_and_next_step',
+      'legacy_unknown_key'
+    ]
+  },
+  {
+    key: 'price_promo',
+    label: '价格优惠',
+    criteria: ['promotion_rule_explained', 'eligibility_verified']
+  },
+  {
+    key: 'shipping',
+    label: '物流配送',
+    criteria: ['order_context_identified', 'delivery_and_next_step']
+  },
+  {
+    key: 'after_sales',
+    label: '售后处理',
+    criteria: ['issue_identified', 'policy_and_process_explained']
+  },
+  {
+    key: 'complaint',
+    label: '投诉处理',
+    criteria: ['emotion_acknowledged', 'resolution_or_escalation']
+  }
 ]
 
 function customerTurn(
@@ -113,6 +137,16 @@ describe('EcommerceCustomerServiceView', () => {
       '投诉处理'
     ])
     expect(cards.every(card => card.findAll('li').length >= 2)).toBe(true)
+    expect(cards[0].findAll('li').map(item => item.text())).toEqual([
+      '识别商品需求',
+      '提供准确信息与下一步',
+      '训练目标'
+    ])
+    expect(wrapper.get('h1').text()).toBe('客服模拟训练')
+    expect(wrapper.get('.page-kicker').text()).toBe('04 / 电商运营实训')
+    expect(wrapper.text()).not.toMatch(
+      /product_need_identified|accurate_info_and_next_step|promotion_rule_explained|eligibility_verified|order_context_identified|delivery_and_next_step|issue_identified|policy_and_process_explained|emotion_acknowledged|resolution_or_escalation|legacy_unknown_key/
+    )
     expect(
       wrapper
         .get('[data-test="customer-service-scenario-region"]')

@@ -18,6 +18,30 @@ const store = useEcommerceCustomerServiceStore()
 const auth = useAuthStore()
 const router = useRouter()
 
+const criterionLabels: Record<string, string> = {
+  product_need_identified: '识别商品需求',
+  accurate_info_and_next_step: '提供准确信息与下一步',
+  promotion_rule_explained: '说明优惠规则',
+  eligibility_verified: '确认参与资格',
+  order_context_identified: '确认订单与物流背景',
+  delivery_and_next_step: '说明时效与下一步',
+  issue_identified: '明确售后问题',
+  policy_and_process_explained: '说明政策与处理流程',
+  emotion_acknowledged: '回应顾客情绪',
+  resolution_or_escalation: '给出解决或升级路径'
+}
+
+function criterionLabel(value: string): string {
+  const normalized = value.trim()
+  if (!normalized) {
+    return '训练目标'
+  }
+  return (
+    criterionLabels[normalized] ??
+    (/^[a-z][a-z0-9_]*$/.test(normalized) ? '训练目标' : normalized)
+  )
+}
+
 const lastTurn = computed(() => {
   const turns = store.currentSession?.turns
   return turns?.length ? turns[turns.length - 1] : null
@@ -167,8 +191,8 @@ onMounted(() => {
       </p>
 
       <header class="page-heading">
-        <p class="eyebrow">客服模拟训练</p>
-        <h1>在真实咨询节奏中逐轮练习</h1>
+        <p class="page-kicker">04 / 电商运营实训</p>
+        <h1>客服模拟训练</h1>
         <p>
           AI 扮演客户发起咨询，每轮回复后给出证据、建议与目标状态；只有由你确认后才会结束。
         </p>
@@ -205,7 +229,7 @@ onMounted(() => {
               <h2>{{ scenario.label }}</h2>
               <ul>
                 <li v-for="criterion in scenario.criteria" :key="criterion">
-                  {{ criterion }}
+                  {{ criterionLabel(criterion) }}
                 </li>
               </ul>
               <span class="scenario-action">
@@ -304,7 +328,7 @@ onMounted(() => {
             v-for="criterion in store.currentSession.goal_criteria"
             :key="criterion"
           >
-            {{ criterion }}
+            {{ criterionLabel(criterion) }}
           </span>
         </div>
 
@@ -362,7 +386,7 @@ onMounted(() => {
                   v-for="(value, criterion) in turn.analysis.criteria"
                   :key="criterion"
                 >
-                  <strong>{{ criterion }}</strong>
+                  <strong>{{ criterionLabel(criterion) }}</strong>
                   <small>{{ criterionStatus(value) }}</small>
                 </span>
               </div>
@@ -491,6 +515,7 @@ onMounted(() => {
   margin: 0;
   font-size: 3.2rem;
   line-height: 1.08;
+  text-wrap: balance;
 }
 
 .page-heading > p:last-child {
@@ -498,11 +523,15 @@ onMounted(() => {
   color: var(--ark-muted);
 }
 
-.eyebrow,
+.page-kicker,
 .section-heading > div > span {
   color: var(--ark-signal);
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.page-kicker {
+  margin: 0 0 6px;
 }
 
 .section-heading {

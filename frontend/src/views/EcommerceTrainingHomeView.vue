@@ -188,8 +188,6 @@ async function logout() {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1px;
-  border: 1px solid var(--ark-line-strong);
-  background: var(--ark-line);
 }
 
 .ecommerce-training-card {
@@ -199,6 +197,7 @@ async function logout() {
   align-items: center;
   min-height: 144px;
   padding: 20px;
+  border: 1px solid var(--ark-line-strong);
   background: var(--ark-surface-0);
   color: var(--ark-paper);
   text-decoration: none;
@@ -234,19 +233,22 @@ async function logout() {
   font-size: 0.68rem;
 }
 
-.ecommerce-training-card__body strong,
 .ecommerce-training-card__body small {
   overflow-wrap: anywhere;
 }
 
 .ecommerce-training-card__body strong {
+  overflow-wrap: normal;
   font-size: 1rem;
+  text-wrap: balance;
+  word-break: keep-all;
 }
 
 .ecommerce-training-card__body small {
   color: var(--ark-muted);
   font-size: 0.8rem;
   line-height: 1.55;
+  text-wrap: pretty;
 }
 
 .ecommerce-training-card__arrow {
@@ -260,6 +262,10 @@ async function logout() {
 
   .ecommerce-training-home__intro h1 {
     font-size: 2.4rem;
+  }
+
+  .ecommerce-training-home__grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

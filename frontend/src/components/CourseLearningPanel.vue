@@ -572,9 +572,9 @@ onMounted(() => {
 }
 
 .section-empty {
-  min-height: 122px;
+  min-height: 0;
   margin: 0;
-  padding: 42px 18px;
+  padding: 32px 18px;
   color: var(--ark-muted);
   text-align: center;
 }
@@ -641,14 +641,18 @@ onMounted(() => {
 .recommendation-item h3 {
   margin: 0;
   font-size: 0.94rem;
+  text-wrap: balance;
 }
 
 .recommendation-item p {
   display: -webkit-box;
+  min-width: 0;
   margin: 7px 0 0;
   overflow: hidden;
+  overflow-wrap: anywhere;
   color: var(--ark-muted);
   font-size: 0.78rem;
+  text-wrap: balance;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -757,11 +761,11 @@ onMounted(() => {
 .course-progress progress {
   display: block;
   width: 100%;
-  height: 8px;
+  height: 10px;
   margin: 10px 0;
   overflow: hidden;
   appearance: none;
-  border: 0;
+  border: 1px solid var(--ark-line-strong);
   border-radius: 0;
   background: var(--ark-surface-2);
   color: var(--ark-signal);
@@ -818,6 +822,8 @@ onMounted(() => {
 .course-card__actions button,
 .course-card__actions a {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   gap: 7px;
@@ -828,6 +834,7 @@ onMounted(() => {
   color: var(--ark-paper);
   font-size: 0.82rem;
   text-decoration: none;
+  white-space: normal;
 }
 
 .course-card__actions a:hover,
@@ -846,9 +853,21 @@ onMounted(() => {
   color: var(--ark-surface-0);
 }
 
+.course-card__actions button:disabled {
+  border-color: var(--ark-line);
+  background: var(--ark-surface-1);
+  color: var(--ark-muted);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 .course-card__actions small {
+  flex: 1 0 100%;
+  min-width: 0;
   color: var(--ark-muted);
   font-size: 0.72rem;
+  line-height: 1.5;
+  text-wrap: balance;
 }
 
 .quiz-panel {

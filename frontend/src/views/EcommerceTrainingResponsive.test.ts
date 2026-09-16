@@ -326,14 +326,26 @@ describe('ecommerce responsive CSS contracts', () => {
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__grid')
     ).toContain('repeat(auto-fit, minmax(250px, 1fr))')
     expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__grid')
+    ).not.toContain('background: var(--ark-line)')
+    expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card')
     ).toContain('grid-template-columns: auto minmax(0, 1fr) auto')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card')
+    ).toContain('border: 1px solid var(--ark-line-strong)')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body')
     ).toContain('min-width: 0')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body strong')
-    ).toContain('overflow-wrap: anywhere')
+    ).toContain('word-break: keep-all')
+    expect(
+      cssRule(
+        mediaBlock(ecommerceTrainingHomeSource, 640),
+        '.ecommerce-training-home__grid'
+      )
+    ).toContain('grid-template-columns: minmax(0, 1fr)')
     expect(
       cssRule(
         mediaBlock(ecommerceTrainingHomeSource, 640),
@@ -367,6 +379,9 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(liveScriptTight, '.history-panel button')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
+    expect(cssRule(ecommerceLiveScriptSource, '.output-panel')).toContain(
+      'min-height: clamp(260px, 38svh, 360px)'
+    )
 
     const simulationMobile = mediaBlock(ecommerceSimulationSource, 900)
     const simulationTight = mediaBlock(ecommerceSimulationSource, 560)
@@ -387,6 +402,9 @@ describe('ecommerce responsive CSS contracts', () => {
     )
     expect(cssRule(simulationTight, '.score-row')).toContain(
       'grid-template-columns: minmax(0, 1fr) auto'
+    )
+    expect(cssRule(ecommerceSimulationSource, '.training-panel')).toContain(
+      'min-height: clamp(280px, 42svh, 460px)'
     )
     expect(
       cssRule(ecommerceSimulationSource, '.scene-panel button span')
@@ -427,6 +445,12 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(storeGuidanceMobile, '.workspace')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
+    expect(cssRule(ecommerceStoreGuidanceSource, '.page-kicker')).toContain(
+      'color: var(--ark-signal)'
+    )
+    expect(cssRule(ecommerceStoreGuidanceSource, '.output-panel')).toContain(
+      'min-height: clamp(280px, 42svh, 400px)'
+    )
     expect(cssRule(ecommerceStoreGuidanceSource, '.current-inputs')).toContain(
       'flex-wrap: wrap'
     )
@@ -457,6 +481,12 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(customerServiceMobile, '.summary-grid')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
+    expect(cssRule(ecommerceCustomerServiceSource, '.page-kicker')).toContain(
+      'color: var(--ark-signal)'
+    )
+    expect(cssRule(ecommerceCustomerServiceSource, '.page-heading h1')).toContain(
+      'text-wrap: balance'
+    )
     expect(cssRule(ecommerceCustomerServiceSource, '.message p')).toContain(
       'overflow-wrap: anywhere'
     )
@@ -486,6 +516,18 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(courseLearningPanelSource, '.course-card__actions')).toContain(
       'flex-wrap: wrap'
     )
+    expect(cssRule(courseLearningPanelSource, '.course-progress progress')).toContain(
+      'border: 1px solid var(--ark-line-strong)'
+    )
+    expect(
+      cssRule(courseLearningPanelSource, '.course-card__actions button:disabled')
+    ).toContain('color: var(--ark-muted)')
+    expect(cssRule(courseLearningPanelSource, '.course-card__actions small')).toContain(
+      'flex: 1 0 100%'
+    )
+    expect(cssRule(courseLearningPanelSource, '.recommendation-item p')).toContain(
+      'text-wrap: balance'
+    )
     expect(cssRule(coursesMobile, '.course-card__head')).toContain(
       'flex-direction: column'
     )
@@ -494,6 +536,15 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(
       cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav__inner')
     ).toContain('overflow-x: auto')
+    expect(
+      cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav__inner')
+    ).toContain('scrollbar-width: thin')
+    expect(
+      cssRule(
+        ecommerceTrainingNavSource,
+        '.ecommerce-training-nav__inner::-webkit-scrollbar'
+      )
+    ).toContain('height: 6px')
     expect(cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav a')).toContain(
       'flex: 0 0 auto'
     )
