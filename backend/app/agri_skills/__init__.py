@@ -29,6 +29,21 @@ from app.agri_skills.presets import (
 from app.agri_skills.providers import set_course_provider
 
 
+def configure_agri_providers(
+    app: Flask,
+    *,
+    preset_provider=None,
+    course_provider=None,
+    ai_client=None,
+) -> None:
+    if preset_provider is not None:
+        set_preset_provider(app, preset_provider)
+    if course_provider is not None:
+        set_course_provider(app, course_provider)
+    if ai_client is not None:
+        set_ai_client(app, ai_client)
+
+
 def install_default_agri_services(app: Flask) -> None:
     if "agri_ai_client" not in app.extensions:
         if app.config.get("AI_API_URL") and app.config.get("AI_API_KEY"):

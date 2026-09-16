@@ -49,6 +49,7 @@ from app.agri_skills.errors import (
     PresetContentUnavailableError,
 )
 from app.agri_skills.qa import (
+    NO_LOCAL_MATCH_MESSAGE,
     answer_qa_once,
     create_qa_conversation,
     get_qa_thread,
@@ -145,7 +146,11 @@ def handle_not_found(error):
 def handle_ai_unavailable(error):
     return jsonify(
         success=False,
-        message="AI 服务暂时不可用",
+        message=(
+            NO_LOCAL_MATCH_MESSAGE
+            if error.message == NO_LOCAL_MATCH_MESSAGE
+            else "AI 服务暂时不可用"
+        ),
     ), 503
 
 

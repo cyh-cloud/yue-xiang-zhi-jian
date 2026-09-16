@@ -160,4 +160,4 @@ http://127.0.0.1:5000/api/health
 
 ### AI 功能不可用
 
-检查 `.env` 中是否正确配置了 `AI_API_KEY`、`AI_API_URL` 和 `AI_MODEL`。修改 `.env` 后需要重启后端。
+检查 `.env` 中是否正确配置了 `AI_API_KEY`、`AI_API_URL` 和 `AI_MODEL`。语音识别使用 `AI_ASR_URL` 与 `AI_ASR_MODEL`，AI 请求超时由 `AI_TIMEOUT_SECONDS` 控制；这些值在生产环境中必须使用独立凭证，修改后需要重启后端。

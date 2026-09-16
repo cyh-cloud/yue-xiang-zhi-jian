@@ -69,6 +69,24 @@ def _load_diagnosis(user_id: int, session_id: int) -> dict:
         }
         for answer in answer_rows
     ]
+    followup_rows = get_db().execute(
+        """
+        SELECT id, outcome, note, created_at
+        FROM agri_diagnosis_followups
+        WHERE session_id = ?
+        ORDER BY created_at, id
+        """,
+        (session_id,),
+    ).fetchall()
+    followups = [
+        {
+            "id": int(followup["id"]),
+            "outcome": str(followup["outcome"]),
+            "note": str(followup["note"]),
+            "created_at": str(followup["created_at"]),
+        }
+        for followup in followup_rows
+    ]
 
     product_key = str(row["product_key"])
     product = get_preset_provider().get_product(product_key)
@@ -158,6 +176,7 @@ def _load_diagnosis(user_id: int, session_id: int) -> dict:
         "questions": questions,
         "answers": [answer["answer"] for answer in answer_records],
         "answer_records": answer_records,
+        "followups": followups,
         "source_session_id": source_session_id,
         "source_followup_id": source_followup_id,
         "source_available": source_available,

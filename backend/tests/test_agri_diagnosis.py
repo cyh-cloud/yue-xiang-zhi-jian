@@ -1,6 +1,7 @@
 import json
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -309,8 +310,12 @@ class TestAgriDiagnosis(unittest.TestCase):
         session = self._create_session()
 
         with self.app.app_context():
+            expiration_time = (
+                datetime.fromisoformat(session["updated_at"])
+                + timedelta(days=365, seconds=1)
+            ).isoformat()
             expired_count = expire_inactive_diagnoses(
-                "2027-09-16T00:00:00+00:00"
+                expiration_time
             )
             persisted = get_diagnosis(self.student_id, session["id"])
 

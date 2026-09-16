@@ -17,6 +17,7 @@ from app.session_manager import utc_now_iso
 
 INPUT_MODES = {"text", "voice"}
 ANSWER_MODES = {"ai", "local_kb"}
+NO_LOCAL_MATCH_MESSAGE = "暂无法回答，建议稍后再试"
 
 
 def _normalize_question(question: str) -> str:
@@ -51,7 +52,7 @@ def select_local_knowledge_entry(question: str) -> dict:
                 }
             )
     if not candidates:
-        raise AiUnavailableError("暂无法回答，建议稍后再试")
+        raise AiUnavailableError(NO_LOCAL_MATCH_MESSAGE)
     candidates.sort(
         key=lambda item: (
             -item["match_count"],
