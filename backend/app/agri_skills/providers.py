@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from flask import Flask, current_app
+
 
 class PresetContentProvider(Protocol):
     def list_products(self) -> list[dict]: ...
@@ -29,3 +31,17 @@ class AiClient(Protocol):
     def stream_chat(self, messages: list[dict], *, call_point: str) -> object: ...
     def complete_json(self, messages: list[dict], *, call_point: str) -> dict: ...
     def transcribe(self, audio: bytes, filename: str, *, call_point: str) -> str: ...
+
+
+def set_course_provider(app: Flask, provider: AgriCourseProvider) -> None:
+    app.extensions["agri_course_provider"] = provider
+
+
+def get_course_provider() -> AgriCourseProvider:
+    provider = current_app.extensions.get("agri_course_provider")
+    if provider is not None:
+        return provider
+
+    from app.agri_skills.course_learning import DatabaseAgriCourseProvider
+
+    return DatabaseAgriCourseProvider()

@@ -20,11 +20,13 @@ from app.agri_skills.calendar import (
     subscribe_product,
     unsubscribe_product,
 )
+from app.agri_skills.course_learning import DatabaseAgriCourseProvider
 from app.agri_skills.messaging_provider import AgriMessagingProvider
 from app.agri_skills.presets import (
     PlaceholderPresetProvider,
     set_preset_provider,
 )
+from app.agri_skills.providers import set_course_provider
 
 
 def install_default_agri_services(app: Flask) -> None:
@@ -43,3 +45,5 @@ def install_default_agri_services(app: Flask) -> None:
             set_ai_client(app, NullAiClient())
     if "agri_preset_provider" not in app.extensions:
         set_preset_provider(app, PlaceholderPresetProvider())
+    if "agri_course_provider" not in app.extensions:
+        set_course_provider(app, DatabaseAgriCourseProvider())
