@@ -1,0 +1,346 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
+
+import { apiFetch } from '@/api/client'
+import type { CustomerScenario, CustomerSession } from '@/api/types'
+import AppHeader from '@/components/AppHeader.vue'
+import EcommerceTrainingNav from '@/components/EcommerceTrainingNav.vue'
+
+import EcommerceCustomerServiceView from './EcommerceCustomerServiceView.vue'
+
+vi.mock('@/api/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn()
+  }
+})
+
+const mockedApiFetch = vi.mocked(apiFetch)
+
+const scenarios: CustomerScenario[] = [
+  { key: 'product_info', label: '商品咨询', criteria: ['说明商品信息', '确认顾客需求'] },
+  { key: 'price_promo', label: '价格优惠', criteria: ['解释优惠规则', '促成下单'] },
+  { key: 'shipping', label: '物流配送', criteria: ['说明配送安排', '给出查询方式'] },
+  { key: 'after_sales', label: '售后处理', criteria: ['确认订单情况', '说明退换流程'] },
+  { key: 'complaint', label: '投诉处理', criteria: ['共情顾客诉求', '给出解决路径'] }
+]
+
+function customerTurn(
+  turnNo: number,
+  patch: Partial<CustomerSession['turns'][number]> = {}
+): CustomerSession['turns'][number] {
+  return {
+    id: turnNo,
+    turn_no: turnNo,
+    customer_message: turnNo === 1 ? '这个商品拆封后还能退吗？' : '那需要准备什么材料？',
+    student_reply: null,
+    analysis: null,
+    created_at: `2026-09-17T08:0${turnNo}:00+08:00`,
+    ...patch
+  }
+}
+
+function customerSession(
+  patch: Partial<CustomerSession> = {}
+): CustomerSession {
+  return {
+    id: 7,
+    scenario_key: 'after_sales',
+    scenario_label: '售后处理',
+    goal_criteria: ['确认订单情况', '说明退换流程'],
+    status: 'active',
+    end_suggested: false,
+    turns: [customerTurn(1)],
+    summary: null,
+    confirmed_at: null,
+    created_at: '2026-09-17T08:00:00+08:00',
+    updated_at: '2026-09-17T08:00:00+08:00',
+    completed_at: null,
+    ...patch
+  }
+}
+
+function createTestRouter() {
+  return createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      '/',
+      '/login',
+      '/student/ecommerce-training',
+      '/student/ecommerce-training/customer-service'
+    ].map(path => ({
+      path,
+      component: { template: '<div />' }
+    }))
+  })
+}
+
+function mountView() {
+  const pinia = createPinia()
+  const wrapper = mount(EcommerceCustomerServiceView, {
+    global: {
+      plugins: [pinia, createTestRouter()]
+    }
+  })
+  return { pinia, wrapper }
+}
+
+describe('EcommerceCustomerServiceView', () => {
+  beforeEach(() => {
+    mockedApiFetch.mockReset()
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      scenarios
+    } as never)
+  })
+
+  it('renders all five scenario cards with labels and goal criteria', async () => {
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(wrapper.findComponent(AppHeader).exists()).toBe(true)
+    expect(wrapper.findComponent(EcommerceTrainingNav).exists()).toBe(true)
+    const cards = wrapper.findAll('[data-test="customer-service-scenario"]')
+    expect(cards).toHaveLength(5)
+    expect(cards.map(card => card.get('h2').text())).toEqual([
+      '商品咨询',
+      '价格优惠',
+      '物流配送',
+      '售后处理',
+      '投诉处理'
+    ])
+    expect(cards.every(card => card.findAll('li').length >= 2)).toBe(true)
+  })
+
+  it('renders ordered turns and only exposes continue or end for the allowed states', async () => {
+    const analyzed = customerSession({
+      turns: [
+        customerTurn(1, {
+          student_reply: '请提供订单号',
+          analysis: {
+            problem: '未先确认订单状态',
+            evidence: '学员直接要求提供订单号',
+            suggestion: '先共情，再确认订单和商品状态',
+            criteria: {
+              确认订单情况: true,
+              说明退换流程: false
+            },
+            goal_status: 'not_reached'
+          }
+        })
+      ]
+    })
+    const reached = customerSession({
+      status: 'goal_reached',
+      end_suggested: true,
+      turns: [
+        ...analyzed.turns,
+        customerTurn(2, {
+          student_reply: '拆封后可按流程申请',
+          analysis: {
+            problem: '可补充材料清单',
+            evidence: '学员说明拆封后可申请',
+            suggestion: '继续说明所需材料',
+            criteria: {
+              确认订单情况: true,
+              说明退换流程: true
+            },
+            goal_status: 'reached'
+          }
+        })
+      ]
+    })
+    const completed = customerSession({
+      ...reached,
+      status: 'completed',
+      summary: {
+        overall_performance: '整场回应清楚',
+        main_problems: ['首轮缺少共情'],
+        prioritized_improvements: ['先确认订单情况'],
+        goal_completion: '两项目标均已达成'
+      },
+      confirmed_at: '2026-09-17T08:03:00+08:00',
+      completed_at: '2026-09-17T08:03:00+08:00'
+    })
+    mockedApiFetch
+      .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({ success: true, session: customerSession() } as never)
+      .mockResolvedValueOnce({ success: true, session: analyzed } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        session: customerSession({ turns: [analyzed.turns[0], customerTurn(2)] })
+      } as never)
+      .mockResolvedValueOnce({ success: true, session: reached } as never)
+      .mockResolvedValueOnce({ success: true, session: completed } as never)
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    expect(
+      wrapper.find('[data-test="customer-service-continue"]').exists()
+    ).toBe(false)
+    expect(wrapper.find('[data-test="customer-service-end"]').exists()).toBe(
+      false
+    )
+
+    await wrapper
+      .get('[data-test="customer-service-scenario-after_sales"]')
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[data-test="customer-service-reply"]')
+      .setValue('请提供订单号')
+    await wrapper
+      .get('.reply-form')
+      .trigger('submit')
+    await flushPromises()
+
+    const firstTurn = wrapper
+      .findAll('[data-test="customer-service-turn"]')[0]
+    const firstText = firstTurn.text()
+    expect(firstText.indexOf('这个商品拆封后还能退吗？')).toBeLessThan(
+      firstText.indexOf('请提供订单号')
+    )
+    expect(firstText).toContain('未先确认订单状态')
+    expect(firstText).toContain('学员直接要求提供订单号')
+    expect(firstText).toContain('先共情，再确认订单和商品状态')
+    expect(firstText).toContain('确认订单情况')
+    expect(firstText).toContain('说明退换流程')
+    expect(wrapper.find('[data-test="customer-service-continue"]').exists()).toBe(
+      true
+    )
+    expect(wrapper.find('[data-test="customer-service-end"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.text()).not.toMatch(/第\s*\d+\s*轮|轮数上限/)
+
+    await wrapper
+      .get('[data-test="customer-service-continue"]')
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-test="customer-service-turn"]')).toHaveLength(
+      2
+    )
+
+    await wrapper
+      .get('[data-test="customer-service-reply"]')
+      .setValue('拆封后可按流程申请')
+    await wrapper
+      .get('.reply-form')
+      .trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="customer-service-continue"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.find('[data-test="customer-service-end"]').exists()).toBe(
+      true
+    )
+    expect(
+      mockedApiFetch.mock.calls.some(
+        ([url, options]) =>
+          url === '/api/ecommerce-training/customer-service/sessions/7/end' &&
+          options?.method === 'POST'
+      )
+    ).toBe(false)
+
+    await wrapper
+      .get('[data-test="customer-service-end"]')
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('整场回应清楚')
+    expect(wrapper.text()).toContain('首轮缺少共情')
+    expect(wrapper.text()).toContain('先确认订单情况')
+    expect(wrapper.text()).toContain('两项目标均已达成')
+  })
+
+  it('preserves transcript and pending reply after analysis failure without fabricating feedback', async () => {
+    mockedApiFetch
+      .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({ success: true, session: customerSession() } as never)
+      .mockRejectedValueOnce(new Error('provider timeout'))
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    await wrapper
+      .get('[data-test="customer-service-scenario-after_sales"]')
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .get('[data-test="customer-service-reply"]')
+      .setValue('请提供订单号')
+    await wrapper
+      .get('.reply-form')
+      .trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[aria-live="assertive"]').text()).toBe(
+      'AI 服务暂时不可用'
+    )
+    expect(
+      wrapper.get<HTMLTextAreaElement>(
+        '[data-test="customer-service-reply"]'
+      ).element.value
+    ).toBe('请提供订单号')
+    expect(
+      wrapper.findAll('[data-test="customer-service-turn"]')
+    ).toHaveLength(1)
+    expect(wrapper.text()).toContain('这个商品拆封后还能退吗？')
+    expect(wrapper.find('[data-test="customer-service-continue"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.find('[data-test="customer-service-end"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.text()).not.toMatch(/本地兜底|SSE|003|降级/)
+  })
+
+  it('safely renders string, list and dictionary analysis and summary values', async () => {
+    const mixed = customerSession({
+      status: 'completed',
+      end_suggested: true,
+      turns: [
+        customerTurn(1, {
+          student_reply: '请提供订单号',
+          analysis: {
+            problem: ['未先确认订单状态'],
+            evidence: { quote: '请提供订单号', reason: '未确认订单' },
+            suggestion: '先共情，再确认订单和商品状态',
+            criteria: {
+              确认订单情况: { reached: true, note: '已询问' },
+              说明退换流程: ['拆封后可申请', '需提供凭证']
+            },
+            goal_status: 'not_reached'
+          } as unknown as CustomerSession['turns'][number]['analysis']
+        })
+      ],
+      summary: {
+        overall_performance: '整场回应清楚',
+        main_problems: [{ title: '首轮缺少共情', detail: '可直接回应顾虑' }],
+        prioritized_improvements: ['先确认订单情况'],
+        goal_completion: { reached: 1, total: 2 }
+      }
+    } as unknown as Partial<CustomerSession>)
+    mockedApiFetch
+      .mockResolvedValueOnce({ success: true, scenarios } as never)
+      .mockResolvedValueOnce({ success: true, session: mixed } as never)
+    const { wrapper } = mountView()
+    await flushPromises()
+
+    await wrapper
+      .get('[data-test="customer-service-scenario-after_sales"]')
+      .trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('未先确认订单状态')
+    expect(wrapper.text()).toContain('未确认订单')
+    expect(wrapper.text()).toContain('拆封后可申请')
+    expect(wrapper.text()).toContain('需提供凭证')
+    expect(wrapper.text()).toContain('整场回应清楚')
+    expect(wrapper.text()).toContain('可直接回应顾虑')
+    expect(wrapper.text()).not.toContain('[object Object]')
+  })
+})
