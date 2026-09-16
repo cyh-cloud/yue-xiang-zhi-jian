@@ -81,6 +81,7 @@ class TestAgriCourseProgress(unittest.TestCase):
         )
         with self.app.app_context():
             db = get_db()
+            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
             cursor = db.execute(
                 """
                 INSERT INTO users (
@@ -102,10 +103,14 @@ class TestAgriCourseProgress(unittest.TestCase):
             db.executemany(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, 'agriculture', 'published', ?, ?, '林老师', ?, ?)
+                VALUES (
+                    ?, ?, 'agriculture', 'published', 300,
+                    ?, ?, '林老师', ?, ?
+                )
                 """,
                 (
                     (
@@ -137,11 +142,12 @@ class TestAgriCourseProgress(unittest.TestCase):
             db.execute(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
                 VALUES (
-                    4, '电商课程', 'ecommerce', 'published', ?,
+                    4, '电商课程', 'ecommerce', 'published', 300, ?,
                     '电商课程简介', '陈老师', ?, ?
                 )
                 """,
@@ -150,10 +156,14 @@ class TestAgriCourseProgress(unittest.TestCase):
             db.execute(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (5, '未上架农业课程', 'agriculture', 'offline', ?, '', '', ?, ?)
+                VALUES (
+                    5, '未上架农业课程', 'agriculture', 'offline', 300,
+                    ?, '', '', ?, ?
+                )
                 """,
                 (now, now, now),
             )

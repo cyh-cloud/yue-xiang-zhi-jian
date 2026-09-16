@@ -28,32 +28,55 @@ class StaticStreamTransport(httpx.BaseTransport):
 
 
 class TestAgriAiContext(unittest.TestCase):
-    def test_allowlists_match_each_ai_call_point(self):
-        self.assertEqual(
-            AI_FIELD_ALLOWLISTS,
-            {
-                "speech_to_text": {"audio", "filename"},
-                "qa_answer": {"question", "conversation_summary"},
-                "qa_followups": {"question", "answer"},
-                "diagnosis_turn": {
-                    "product_name",
-                    "affected_part",
-                    "symptoms",
-                    "round_no",
-                    "prior_questions",
-                    "prior_answers",
-                    "source_conclusion",
-                    "followup_status",
-                    "followup_note",
-                },
-                "selftest_generate": {"diagnosis_text"},
-                "selftest_grade": {"questions", "answers"},
-                "course_quiz_grade": {
-                    "course_summary",
-                    "questions",
-                    "answers",
-                },
+    def test_agri_allowlists_are_preserved(self):
+        expected = {
+            "speech_to_text": {"audio", "filename"},
+            "qa_answer": {"question", "conversation_summary"},
+            "qa_followups": {"question", "answer"},
+            "diagnosis_turn": {
+                "product_name",
+                "affected_part",
+                "symptoms",
+                "round_no",
+                "prior_questions",
+                "prior_answers",
+                "source_conclusion",
+                "followup_status",
+                "followup_note",
             },
+            "selftest_generate": {"diagnosis_text"},
+            "selftest_grade": {"questions", "answers"},
+            "course_quiz_grade": {
+                "course_summary",
+                "questions",
+                "answers",
+            },
+        }
+        for call_point, fields in expected.items():
+            self.assertEqual(AI_FIELD_ALLOWLISTS[call_point], fields)
+
+    def test_call_domains_separate_agriculture_and_ecommerce(self):
+        agriculture = build_ai_messages(
+            "qa_answer",
+            {"question": "荔枝落果怎么办"},
+        )
+        ecommerce = build_ai_messages(
+            "live_script_generate",
+            {
+                "product_name": "荔枝干",
+                "selling_points": ["香甜"],
+                "price_text": "39.9 元",
+                "style": "enthusiastic",
+            },
+        )
+
+        self.assertEqual(
+            agriculture[0]["content"],
+            "农业技能任务：qa_answer",
+        )
+        self.assertEqual(
+            ecommerce[0]["content"],
+            "电商运营实训任务：live_script_generate",
         )
 
     def test_allowlist_drops_account_and_other_student_fields(self):

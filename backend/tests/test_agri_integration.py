@@ -183,15 +183,20 @@ class TestAgriIntegration(unittest.TestCase):
         self.student_client = self._login("student01")
         self.other_client = self._login("student02")
         with self.app.app_context():
+            get_db().execute(
+                "DELETE FROM courses WHERE id BETWEEN 1001 AND 1005"
+            )
             now = "2026-09-15T00:00:00+00:00"
             get_db().execute(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
                 VALUES (
-                    1, '荔枝保果', 'agriculture', 'published', ?, ?, ?, ?, ?
+                    1, '荔枝保果', 'agriculture', 'published', 300,
+                    ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -729,10 +734,14 @@ class TestAgriIntegration(unittest.TestCase):
             db.executemany(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, 'agriculture', 'published', ?, ?, '林老师', ?, ?)
+                VALUES (
+                    ?, ?, 'agriculture', 'published', 300,
+                    ?, ?, '林老师', ?, ?
+                )
                 """,
                 (
                     (

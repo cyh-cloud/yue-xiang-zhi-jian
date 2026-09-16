@@ -49,6 +49,10 @@ class TestAgriCourseApi(unittest.TestCase):
                 "AI_MODEL": "test-model",
             }
         )
+        with self.app.app_context():
+            db = get_db()
+            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
+            db.commit()
         self.student_id = self._create_user("student01", "student")
         self.other_student_id = self._create_user("student02", "student")
         self._create_user("teacher01", "teacher")
@@ -62,10 +66,11 @@ class TestAgriCourseApi(unittest.TestCase):
             db.executemany(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, 300, ?, ?, ?, ?, ?)
                 """,
                 (
                     (

@@ -17,6 +17,10 @@ class TestCourseCatalog(unittest.TestCase):
                 "SESSION_HOURS": 24,
             }
         )
+        with self.app.app_context():
+            db = get_db()
+            db.execute("DELETE FROM courses WHERE id BETWEEN 1001 AND 1005")
+            db.commit()
         self.client = self.app.test_client()
 
     def tearDown(self):
@@ -35,10 +39,11 @@ class TestCourseCatalog(unittest.TestCase):
             cursor = db.execute(
                 """
                 INSERT INTO courses (
-                    title, direction, status, published_at, summary,
+                    title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, '', '测试教师', ?, ?)
+                VALUES (?, ?, ?, 300, ?, '', '测试教师', ?, ?)
                 """,
                 (
                     f"{direction}-{status}",
