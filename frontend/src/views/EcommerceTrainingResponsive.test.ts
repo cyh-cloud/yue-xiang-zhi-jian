@@ -322,6 +322,21 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home')).toContain(
       'overflow-x: clip'
     )
+    expect(cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home')).toContain(
+      'min-height: 100svh'
+    )
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__main')
+    ).not.toContain('min-height')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__intro p')
+    ).toContain('line-break: strict')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__intro p')
+    ).toContain('text-wrap: pretty')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__intro p')
+    ).toContain('word-break: keep-all')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-home__grid')
     ).toContain('repeat(auto-fit, minmax(250px, 1fr))')
@@ -349,6 +364,9 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
     ).toContain('text-wrap: balance')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
+    ).toContain('word-break: keep-all')
     expect(
       cssRule(
         mediaBlock(ecommerceTrainingHomeSource, 640),
@@ -496,6 +514,15 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(ecommerceCustomerServiceSource, '.page-heading h1')).toContain(
       'text-wrap: balance'
     )
+    expect(
+      cssRule(ecommerceCustomerServiceSource, '.page-heading > p:last-child')
+    ).toContain('line-break: strict')
+    expect(
+      cssRule(ecommerceCustomerServiceSource, '.page-heading > p:last-child')
+    ).toContain('text-wrap: pretty')
+    expect(
+      cssRule(ecommerceCustomerServiceSource, '.page-heading > p:last-child')
+    ).toContain('word-break: keep-all')
     expect(cssRule(ecommerceCustomerServiceSource, '.message p')).toContain(
       'overflow-wrap: anywhere'
     )
@@ -531,6 +558,21 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
       'line-break: strict'
     )
+    expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
+      'word-break: keep-all'
+    )
+    expect(
+      cssRule(courseLearningPanelSource, '.section-heading span')
+    ).toContain('color: var(--ark-paper)')
+    expect(
+      cssRule(courseLearningPanelSource, '.quiz-panel__head span')
+    ).toContain('color: var(--ark-paper)')
+    expect(cssRule(courseLearningPanelSource, '.course-card__index')).toContain(
+      'color: var(--ark-paper)'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card__meta dt')).toContain(
+      'color: var(--ark-paper)'
+    )
     expect(cssRule(courseLearningPanelSource, '.course-card__meta')).toContain(
       'flex-wrap: wrap'
     )
@@ -563,6 +605,8 @@ describe('ecommerce responsive CSS contracts', () => {
       'opacity: 1'
     )
 
+    const navEdge = mediaBlock(ecommerceTrainingNavSource, 900)
+    const navMobile = mediaBlock(ecommerceTrainingNavSource, 640)
     expect(cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav')).toContain(
       'position: relative'
     )
@@ -590,6 +634,12 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(
       cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav::after')
     ).toContain('linear-gradient(to left, var(--ark-surface-0), transparent)')
+    expect(cssRule(navEdge, '.ecommerce-training-nav::before')).toContain(
+      'width: 18px'
+    )
+    expect(cssRule(navMobile, '.ecommerce-training-nav__inner')).toContain(
+      'padding-inline: 24px'
+    )
   })
 })
 

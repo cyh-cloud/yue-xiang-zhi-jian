@@ -178,13 +178,14 @@ function mockApi() {
   })
 }
 
-function mountView() {
+function mountView(attachTo?: HTMLElement) {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', component: { template: '<div />' } }]
   })
 
   return mount(EcommerceCoursesView, {
+    attachTo,
     global: {
       plugins: [createPinia(), router]
     }
@@ -283,7 +284,7 @@ describe('EcommerceCoursesView quiz availability and history', () => {
 
   it('starts a fresh attempt after submission while retaining history', async () => {
     mockApi()
-    const wrapper = mountView()
+    const wrapper = mountView(document.body)
     await flushPromises()
     await wrapper.get('[data-test="quiz-entry-1"]').trigger('click')
     await flushPromises()
@@ -305,6 +306,7 @@ describe('EcommerceCoursesView quiz availability and history', () => {
     expect(wrapperItems(wrapper)).toHaveLength(3)
 
     await wrapper.get('[data-test="quiz-retake-1"]').trigger('click')
+    await flushPromises()
 
     expect(wrapper.get('[data-test="quiz-submit-1"]').text()).toContain(
       '提交测验'
@@ -313,6 +315,9 @@ describe('EcommerceCoursesView quiz availability and history', () => {
       wrapper.get('[data-test="quiz-submit-1"]').attributes('disabled')
     ).toBeDefined()
     expect(wrapper.find('[data-test="quiz-result-1"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-test="quiz-option-0-0"]').element
+    )
     expect(
       wrapper
         .findAll<HTMLInputElement>('input[type="radio"]')
@@ -327,6 +332,7 @@ describe('EcommerceCoursesView quiz availability and history', () => {
     expect(
       wrapper.get('[data-test="quiz-submit-1"]').attributes('disabled')
     ).toBeUndefined()
+    wrapper.unmount()
   })
 })
 

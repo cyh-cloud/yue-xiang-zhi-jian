@@ -8,7 +8,7 @@ import {
   Trophy,
   XCircle
 } from 'lucide-vue-next'
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { CourseProgress, CourseQuizAttempt } from '@/api/types'
@@ -185,11 +185,18 @@ async function openQuiz(courseId: number) {
   await coursesStore.loadQuiz(courseId)
 }
 
-function startRetake(courseId: number) {
+async function startRetake(courseId: number, event?: MouseEvent) {
+  const quizPanel = (event?.currentTarget as HTMLElement | null)?.closest(
+    '.quiz-panel'
+  )
   Object.keys(quizAnswers).forEach(key => {
     delete quizAnswers[key]
   })
   retakingCourseId.value = courseId
+  await nextTick()
+  quizPanel
+    ?.querySelector<HTMLInputElement>('.quiz-form input[type="radio"]')
+    ?.focus()
 }
 
 async function submitQuiz(courseId: number) {
@@ -569,7 +576,7 @@ onMounted(() => {
                     class="quiz-submit quiz-retake"
                     type="button"
                     :data-test="`quiz-retake-${course.id}`"
-                    @click="startRetake(course.id)"
+                    @click="startRetake(course.id, $event)"
                   >
                     <RefreshCw :size="17" aria-hidden="true" />
                     再次测验
@@ -698,7 +705,7 @@ onMounted(() => {
 
 .section-heading span,
 .quiz-panel__head span {
-  color: var(--ark-muted);
+  color: var(--ark-paper);
   font-size: 0.68rem;
 }
 
@@ -827,7 +834,7 @@ onMounted(() => {
 }
 
 .course-card__index {
-  color: var(--ark-signal);
+  color: var(--ark-paper);
   font-size: 0.69rem;
 }
 
@@ -852,6 +859,7 @@ onMounted(() => {
   line-break: strict;
   overflow-wrap: anywhere;
   text-wrap: balance;
+  word-break: keep-all;
 }
 
 .course-card__meta {
@@ -867,7 +875,7 @@ onMounted(() => {
 }
 
 .course-card__meta dt {
-  color: var(--ark-muted);
+  color: var(--ark-paper);
   font-size: 0.7rem;
 }
 

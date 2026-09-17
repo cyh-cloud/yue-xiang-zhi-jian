@@ -164,6 +164,10 @@ async function logout() {
   max-width: 58ch;
   margin: 16px 0 0;
   color: var(--ark-muted);
+  line-break: strict;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  word-break: keep-all;
 }
 
 .ecommerce-training-home__section-head {
@@ -248,6 +252,7 @@ async function logout() {
   font-size: 0.8rem;
   line-height: 1.55;
   text-wrap: balance;
+  word-break: keep-all;
 }
 
 .ecommerce-training-card__arrow {

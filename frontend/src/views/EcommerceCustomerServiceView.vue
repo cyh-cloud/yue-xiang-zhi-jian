@@ -521,6 +521,10 @@ onMounted(() => {
 .page-heading > p:last-child {
   margin: 14px 0 0;
   color: var(--ark-muted);
+  line-break: strict;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  word-break: keep-all;
 }
 
 .page-kicker,

@@ -170,7 +170,7 @@ watch(() => route.fullPath, revealActiveLink, { flush: 'post' })
 
 @media (max-width: 640px) {
   .ecommerce-training-nav__inner {
-    padding-inline: 14px;
+    padding-inline: 24px;
   }
 }
 </style>
