@@ -14,11 +14,15 @@ whole-branch review.
 - Batch B partially completed: quiz disabled contrast, retake state/focus, mobile
   navigation affordances, CJK layout improvements, and mobile empty-state wording.
   Commits: `dcbfa24`, `92900e7`, `f04403e`, `10af068`.
+- Memory handoff committed as `f0b00e7`.
+- Feature branch merged into `v2/lixKRT/dev` with merge commit `bc58a2a`.
 
 ## Verified
 
 - Batch A: backend `344/344`, frontend `244/244`, type-check and production build pass.
 - Batch B at `10af068`: frontend `246/246`, type-check and production build pass.
+- Integration branch `v2/lixKRT/dev` at `bc58a2a`: backend `344/344`,
+  frontend `246/246`, type-check and production build pass.
 - Browser checks at 320/375/1280 show no horizontal overflow or active-tab clipping.
 - Image-understanding review closed most visual items; remaining CJK details are listed below.
 
@@ -33,7 +37,8 @@ whole-branch review.
 
 ## Handoff
 
-- Resume from branch `v2/lixKRT/004-ecommerce-training`, HEAD `10af068`.
+- The integrated feature is on `v2/lixKRT/dev`. Continue the next repair from the
+  feature source commit `10af068` or a fresh worktree based on the integration branch.
 - Required next repair is structural CJK wrapping in Batch B:
   - home-1280 still has a 2-character `获得` orphan and mid-word splits in
     `参考`, `分析`, and `记录`;
@@ -45,6 +50,8 @@ whole-branch review.
 - Batch C is not started: use a controlled AI stub in an isolated environment
   to capture browser failure evidence for AI-04, AI-05, AI-06, AI-09, AI-10,
   and AI-11.
-- Worktree currently has a runtime change in tracked `data/yuexiang.db`.
-  Do not commit it. Decide with the user whether to restore it from HEAD or
-  archive it before handoff.
+- The browser-acceptance database was archived and the tracked database was
+  restored to HEAD. Archive:
+  `E:\Project\skipped_work\粤乡智匠项目\.superpowers\archive\runtime-data\yuexiang-004-batch-b-stop-20260917-124139.db`;
+  SHA-256 `F384F4C1F200499CFE87EE6F09DCEB26C9324E5ED6FF27878C55E51A0C09DBE1`.
+- Both the feature worktree and integration worktree are clean.

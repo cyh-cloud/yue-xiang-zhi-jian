@@ -9,14 +9,16 @@ Status: ACTIVE
 - Purpose: prototype platform for YueXiang artisan training.
 - Architecture: Flask REST API and SQLite backend; Vue 3 + Vite + Pinia frontend; Vercel serverless entry.
 - Repository root: the repository containing this `.agents/memories/` directory.
-- Current branch: `v2/lixKRT/004-ecommerce-training`; HEAD `10af068`.
+- Current integration branch: `v2/lixKRT/dev`; latest 004 merge `bc58a2a`.
+  Feature source head: `10af068`.
 - Dependency authority: `pyproject.toml` and `uv.lock`; `requirements.txt` is a generated Vercel export.
 
 ## Current Focus
 
 - Active milestone: post-review repair for `004-ecommerce-training`.
 - Last completed work: Tasks 10-17 and final branch review (`31821dc`);
-  post-review Batch A and Batch B repairs through `10af068`.
+  post-review Batch A and Batch B repairs through `10af068`; memory handoff
+  `f0b00e7`; integration merge `bc58a2a`.
 - Current blocker: Batch B round 4 cannot start because the mandated
   `基元律动/glm-5.3` provider returned HTTP 402 (`余额不足`). See
   `failures/INDEX.md`.
