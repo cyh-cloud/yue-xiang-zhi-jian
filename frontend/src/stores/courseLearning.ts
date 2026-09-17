@@ -15,6 +15,7 @@ const DEFAULT_DIRECTION = 'agriculture' as const
 export type CourseLearningCourse = EcommerceCourse
 
 interface CourseLearningState {
+  requestEpoch: number
   apiPrefix: string
   direction: CourseDirection
   courses: CourseLearningCourse[]
@@ -127,6 +128,7 @@ function isEligibleRecommendation(
 
 export const useCourseLearningStore = defineStore('courseLearning', {
   state: (): CourseLearningState => ({
+    requestEpoch: 0,
     apiPrefix: DEFAULT_API_PREFIX,
     direction: DEFAULT_DIRECTION,
     courses: [],
@@ -143,6 +145,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
   actions: {
     configure(apiPrefix: string, direction: CourseDirection) {
       if (this.apiPrefix === apiPrefix && this.direction === direction) return
+      this.requestEpoch += 1
       this.apiPrefix = apiPrefix
       this.direction = direction
       this.courses = []
@@ -160,6 +163,8 @@ export const useCourseLearningStore = defineStore('courseLearning', {
       this.error = errorMessage(error, fallback)
     },
     async loadCourses() {
+      const epoch = this.requestEpoch
+      const direction = this.direction
       this.loading = true
       this.error = ''
 
@@ -168,8 +173,9 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           success: true
           courses: CourseLearningCourse[]
         }>(`${this.apiPrefix}/courses`)
+        if (this.requestEpoch !== epoch) return false
         const courses = response.courses.filter(course =>
-          isEligibleCourse(course, this.direction)
+          isEligibleCourse(course, direction)
         )
         this.courses = courses
 
@@ -192,6 +198,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
             }
           })
         )
+        if (this.requestEpoch !== epoch) return false
         this.progressByCourse = Object.fromEntries(
           progressEntries.filter(
             (
@@ -200,13 +207,20 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           )
         )
         this.progressErrorsByCourse = progressErrors
+        return true
       } catch (error) {
-        this.captureError(error, '课程加载失败')
+        if (this.requestEpoch === epoch) {
+          this.captureError(error, '课程加载失败')
+        }
+        return false
       } finally {
-        this.loading = false
+        if (this.requestEpoch === epoch) {
+          this.loading = false
+        }
       }
     },
     async loadProgress(courseId: number): Promise<boolean> {
+      const epoch = this.requestEpoch
       this.loading = true
 
       try {
@@ -214,20 +228,26 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           success: true
           progress: CourseProgress
         }>(`${this.apiPrefix}/courses/${courseId}/progress`)
+        if (this.requestEpoch !== epoch) return false
         this.progressByCourse[courseId] = response.progress
         delete this.progressErrorsByCourse[courseId]
         return true
       } catch (error) {
+        if (this.requestEpoch !== epoch) return false
         this.progressErrorsByCourse[courseId] = errorMessage(
           error,
           '学习进度加载失败'
         )
         return false
       } finally {
-        this.loading = false
+        if (this.requestEpoch === epoch) {
+          this.loading = false
+        }
       }
     },
     async loadRecommendations(): Promise<boolean> {
+      const epoch = this.requestEpoch
+      const direction = this.direction
       this.loading = true
       this.recommendationError = ''
 
@@ -236,15 +256,19 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           success: true
           courses: CourseLearningCourse[]
         }>(`${this.apiPrefix}/recommendations`)
+        if (this.requestEpoch !== epoch) return false
         this.recommendations = response.courses.filter(course =>
-          isEligibleRecommendation(course, this.direction)
+          isEligibleRecommendation(course, direction)
         )
         return true
       } catch (error) {
+        if (this.requestEpoch !== epoch) return false
         this.recommendationError = errorMessage(error, '推荐课程加载失败')
         return false
       } finally {
-        this.loading = false
+        if (this.requestEpoch === epoch) {
+          this.loading = false
+        }
       }
     },
     async saveProgress(
@@ -252,6 +276,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
       positionSeconds: number,
       watchedDeltaSeconds: number
     ): Promise<boolean> {
+      const epoch = this.requestEpoch
       this.loading = true
       this.error = ''
 
@@ -266,6 +291,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
             watched_delta_seconds: watchedDeltaSeconds
           })
         })
+        if (this.requestEpoch !== epoch) return false
         this.progressByCourse[courseId] = response.progress
         delete this.progressErrorsByCourse[courseId]
 
@@ -280,13 +306,17 @@ export const useCourseLearningStore = defineStore('courseLearning', {
         }
         return true
       } catch (error) {
+        if (this.requestEpoch !== epoch) return false
         this.captureError(error, '学习进度保存失败')
         return false
       } finally {
-        this.loading = false
+        if (this.requestEpoch === epoch) {
+          this.loading = false
+        }
       }
     },
     async loadQuiz(courseId: number): Promise<boolean> {
+      const epoch = this.requestEpoch
       this.loading = true
       this.error = ''
       this.justSubmittedCourseId = null
@@ -296,11 +326,13 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           success: true
           quiz: CourseQuiz
         }>(`${this.apiPrefix}/courses/${courseId}/quiz`)
+        if (this.requestEpoch !== epoch) return false
         this.activeQuiz = response.quiz
         const attemptsResponse = await apiFetch<{
           success: true
           attempts: CourseQuizAttempt[]
         }>(`${this.apiPrefix}/courses/${courseId}/quiz/attempts`)
+        if (this.requestEpoch !== epoch) return false
         this.attempts = [
           ...this.attempts.filter(
             attempt => attempt.course_id !== courseId
@@ -309,17 +341,21 @@ export const useCourseLearningStore = defineStore('courseLearning', {
         ]
         return true
       } catch (error) {
+        if (this.requestEpoch !== epoch) return false
         this.activeQuiz = null
         this.captureError(error, '课后测验加载失败')
         return false
       } finally {
-        this.loading = false
+        if (this.requestEpoch === epoch) {
+          this.loading = false
+        }
       }
     },
     async submitQuiz(
       courseId: number,
       answers: Record<string, string>
     ): Promise<boolean> {
+      const epoch = this.requestEpoch
       this.loading = true
       this.error = ''
       this.justSubmittedCourseId = null
@@ -332,6 +368,7 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           method: 'POST',
           body: JSON.stringify({ answers })
         })
+        if (this.requestEpoch !== epoch) return false
         const attempt = {
           ...response.attempt,
           is_formal: true,
@@ -354,10 +391,13 @@ export const useCourseLearningStore = defineStore('courseLearning', {
         this.justSubmittedCourseId = courseId
         return true
       } catch (error) {
+        if (this.requestEpoch !== epoch) return false
         this.captureError(error, '课后测验提交失败')
         return false
       } finally {
-        this.loading = false
+        if (this.requestEpoch === epoch) {
+          this.loading = false
+        }
       }
     }
   }

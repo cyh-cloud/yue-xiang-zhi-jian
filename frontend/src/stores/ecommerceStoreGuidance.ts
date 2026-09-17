@@ -19,9 +19,7 @@ export interface StoreGuidanceForm {
 
 export type StorePlanSectionKey = keyof StorePlan['plan']
 
-export type StorePlanWire = Omit<StorePlan, 'plan'> & {
-  plan: Record<StorePlanSectionKey, unknown>
-}
+export type StorePlanWire = StorePlan
 
 interface EcommerceStoreGuidanceState {
   form: StoreGuidanceForm

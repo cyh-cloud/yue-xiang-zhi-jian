@@ -1,4 +1,5 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
@@ -252,6 +253,50 @@ class TestEcommerceSimulation(unittest.TestCase):
             loaded = get_simulation(self.student_id, training["id"])
 
         self.assertEqual(loaded["segments"][0]["text"], "第一次提交")
+
+    def test_concurrent_saves_for_different_segments_keep_both(self):
+        with self.app.app_context():
+            training = start_simulation(self.student_id, "opening")
+
+        barrier = threading.Barrier(2)
+        errors = []
+
+        def save_segment(segment_key: str, text: str):
+            try:
+                with self.app.app_context():
+                    barrier.wait()
+                    save_simulation_segment(
+                        self.student_id,
+                        training["id"],
+                        segment_key,
+                        text,
+                    )
+            except BaseException as error:
+                errors.append(error)
+
+        threads = [
+            threading.Thread(
+                target=save_segment,
+                args=("greeting", "并发提交的问候"),
+            ),
+            threading.Thread(
+                target=save_segment,
+                args=("hook", "并发提交的引题"),
+            ),
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        with self.app.app_context():
+            loaded = get_simulation(self.student_id, training["id"])
+
+        self.assertEqual(
+            [segment["text"] for segment in loaded["segments"]],
+            ["并发提交的问候", "并发提交的引题", ""],
+        )
 
     def test_scores_every_segment_and_calculates_equal_weight_total(self):
         self.ai.complete_json.return_value = self._score_fixture()

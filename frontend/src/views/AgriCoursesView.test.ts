@@ -47,6 +47,7 @@ function progress(
   progressPercent: number
 ): CourseProgress {
   return {
+    user_id: 1,
     course_id: courseId,
     duration_seconds: 100,
     furthest_position_seconds: progressPercent,
@@ -56,6 +57,7 @@ function progress(
     completed_at:
       progressPercent >= 80 ? '2026-09-16T01:00:00+00:00' : null,
     last_viewed_at: '2026-09-16T01:00:00+00:00',
+    updated_at: '2026-09-16T01:00:00+00:00',
     quiz_available: true
   }
 }

@@ -44,6 +44,7 @@ const courseFixture: CourseRow = {
 }
 
 const progressFixture: CourseProgress = {
+  user_id: 1,
   course_id: 1,
   duration_seconds: 100,
   furthest_position_seconds: 80,
@@ -52,6 +53,7 @@ const progressFixture: CourseProgress = {
   watched_seconds: 80,
   completed_at: '2026-09-16T01:00:00+00:00',
   last_viewed_at: '2026-09-16T01:00:00+00:00',
+  updated_at: '2026-09-16T01:00:00+00:00',
   quiz_available: true
 }
 

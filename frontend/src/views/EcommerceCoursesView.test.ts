@@ -17,7 +17,7 @@ vi.mock('@/api/client', () => ({
 }))
 
 describe('EcommerceCoursesView', () => {
-  it('uses the shared course panel for ecommerce only', async () => {
+  it('passes the ecommerce configuration to the shared course panel', async () => {
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [

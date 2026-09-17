@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
 import EcommerceTrainingNav from '@/components/EcommerceTrainingNav.vue'
+import type { StorePlanValue } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 import {
   STORE_PLATFORMS,
@@ -67,7 +68,7 @@ function formatTime(value: string): string {
       })
 }
 
-function formatWireValue(value: unknown, depth = 0): string {
+function formatWireValue(value: StorePlanValue, depth = 0): string {
   if (value === null || value === undefined) {
     return '未提供'
   }
@@ -88,7 +89,7 @@ function formatWireValue(value: unknown, depth = 0): string {
       return '复杂内容'
     }
 
-    const parts = Object.entries(value as Record<string, unknown>).map(
+    const parts = Object.entries(value).map(
       ([key, item]) => `${key}：${formatWireValue(item, depth + 1)}`
     )
     return parts.length ? parts.join('；') : '未提供'
@@ -182,7 +183,7 @@ onMounted(() => {
                 class="primary-action"
                 data-test="store-guidance-generate"
                 type="submit"
-                :disabled="store.generating"
+                :disabled="store.isBusy"
               >
                 <RefreshCw
                   v-if="store.current"

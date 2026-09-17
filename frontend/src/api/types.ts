@@ -296,6 +296,8 @@ export interface SelfTestResult {
   questions: SelfTestResultQuestion[]
 }
 
+export type CourseDirection = 'agriculture' | 'ecommerce'
+
 export interface AgriculturalCourse {
   id: number
   title: string
@@ -304,17 +306,22 @@ export interface AgriculturalCourse {
   published_at: string
   tag_ids: number[]
   duration_seconds: number | null
+  direction?: string
+  status?: string | null
+  interest_match?: boolean
 }
 
 export interface CourseProgress {
+  user_id: number
   course_id: number
-  duration_seconds: number
+  duration_seconds: number | null
   furthest_position_seconds: number
   resume_position_seconds: number
   progress_percent: number
   watched_seconds: number
   completed_at: string | null
   last_viewed_at: string | null
+  updated_at: string | null
   quiz_available: boolean
 }
 
@@ -333,6 +340,7 @@ export interface CourseQuiz {
 export interface CourseQuizAttempt {
   id: number
   course_id: number
+  answers?: Record<string, string>
   score: number
   is_formal: boolean
   is_current: boolean
@@ -344,11 +352,10 @@ export interface CourseQuizAttempt {
   created_at: string
 }
 
-export type CourseDirection = 'agriculture' | 'ecommerce'
-
 export interface EcommerceCourse extends AgriculturalCourse {
   direction: CourseDirection
-  status?: string | null
+  status: string
+  interest_match: boolean
   publication_status?: string | null
   is_published?: boolean | null
   learning_direction?: string | null
@@ -438,16 +445,28 @@ export interface CopyTrainingSession {
   completed_at: string | null
 }
 
+export type StorePlanScalar = string | number | boolean | null
+
+export type StorePlanObjectValue =
+  | StorePlanScalar
+  | StorePlanScalar[]
+  | { [key: string]: StorePlanScalar | StorePlanScalar[] }
+
+export type StorePlanValue =
+  | StorePlanScalar
+  | StorePlanScalar[]
+  | { [key: string]: StorePlanObjectValue }
+
 export interface StorePlan {
   id: number
   store_type: string
   platform: string
   style_preference: string
   plan: {
-    home_layout: string[]
-    color_scheme: Record<string, string>
-    detail_structure: string[]
-    navigation: string[]
+    home_layout: StorePlanValue
+    color_scheme: StorePlanValue
+    detail_structure: StorePlanValue
+    navigation: StorePlanValue
   }
   created_at: string
 }

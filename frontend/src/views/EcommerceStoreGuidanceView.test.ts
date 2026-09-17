@@ -125,7 +125,7 @@ describe('EcommerceStoreGuidanceView', () => {
             primary: '首页',
             utility: ['客服', '我的']
           }
-        } as unknown as StorePlan['plan']
+        }
       })
     } as never)
 
@@ -222,6 +222,29 @@ describe('EcommerceStoreGuidanceView', () => {
       '请选择支持的店铺平台'
     )
     expect(store.current).toBeNull()
+  })
+
+  it('disables generation while any store operation is pending', async () => {
+    const { pinia, wrapper } = mountView()
+    await flushPromises()
+    const store = useEcommerceStoreGuidanceStore(pinia)
+    const generateButton = wrapper.get(
+      '[data-test="store-guidance-generate"]'
+    )
+
+    store.loading = true
+    await wrapper.vm.$nextTick()
+    expect(generateButton.attributes()).toHaveProperty('disabled')
+
+    store.loading = false
+    store.opening = true
+    await wrapper.vm.$nextTick()
+    expect(generateButton.attributes()).toHaveProperty('disabled')
+
+    store.opening = false
+    store.generating = true
+    await wrapper.vm.$nextTick()
+    expect(generateButton.attributes()).toHaveProperty('disabled')
   })
 
   it('shows the exact AI failure while preserving the form and omitting fabricated output', async () => {

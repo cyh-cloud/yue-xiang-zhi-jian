@@ -123,29 +123,32 @@ def save_simulation_segment(
     segment_key: str,
     text: str,
 ) -> dict:
-    row = _get_training_row(user_id, training_id)
-    if row["status"] != "draft":
-        raise AgriValidationError("训练已完成，不能修改")
     if not isinstance(text, str) or not text.strip():
         raise AgriValidationError("环节内容不能为空")
 
-    segments = json.loads(row["segments_json"])
-    target = next(
-        (
-            segment
-            for segment in segments
-            if segment.get("key") == segment_key
-        ),
-        None,
-    )
-    if target is None:
-        raise AgriValidationError("模拟环节不存在")
-    if str(target.get("text", "")).strip():
-        raise AgriValidationError("该环节已提交")
-
-    target["text"] = text.strip()
     db = get_db()
     with db:
+        if not db.in_transaction:
+            db.execute("BEGIN IMMEDIATE")
+        row = _get_training_row(user_id, training_id)
+        if row["status"] != "draft":
+            raise AgriValidationError("训练已完成，不能修改")
+
+        segments = json.loads(row["segments_json"])
+        target = next(
+            (
+                segment
+                for segment in segments
+                if segment.get("key") == segment_key
+            ),
+            None,
+        )
+        if target is None:
+            raise AgriValidationError("模拟环节不存在")
+        if str(target.get("text", "")).strip():
+            raise AgriValidationError("该环节已提交")
+
+        target["text"] = text.strip()
         db.execute(
             """
             UPDATE ecommerce_simulation_trainings
