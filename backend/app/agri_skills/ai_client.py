@@ -11,6 +11,22 @@ from flask import has_app_context
 from app.agri_skills.errors import AgriValidationError, AiUnavailableError
 
 
+AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
+
+
+class DuplicateJsonFieldError(ValueError):
+    pass
+
+
+def _reject_duplicate_json_keys(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateJsonFieldError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
 def extract_json_object(content: str) -> str:
     if not isinstance(content, str):
         raise ValueError("AI response content must be a string")
@@ -155,7 +171,17 @@ class OpenAiCompatibleAiClient:
                 )
                 response.raise_for_status()
                 content = response.json()["choices"][0]["message"]["content"]
-                return json.loads(extract_json_object(content))
+                return json.loads(
+                    extract_json_object(content),
+                    object_pairs_hook=_reject_duplicate_json_keys,
+                )
+        except DuplicateJsonFieldError as exc:
+            self._log_failure(
+                call_point,
+                operation="complete_json",
+                message_count=len(messages),
+            )
+            raise AiUnavailableError(AI_UNAVAILABLE_MESSAGE) from exc
         except Exception as exc:
             self._log_failure(
                 call_point,

@@ -528,6 +528,70 @@ class TestOpenAiCompatibleAiClient(unittest.TestCase):
             with self.assertRaises(AiUnavailableError):
                 client.complete_json([], call_point="selftest_grade")
 
+    def test_duplicate_top_level_json_field_is_unavailable(self):
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": '{"score": 90, "score": 80}',
+                            }
+                        }
+                    ]
+                },
+                request=request,
+            )
+        )
+        client = OpenAiCompatibleAiClient(
+            api_url="https://example.test/chat/completions",
+            api_key="key",
+            model="model",
+            timeout=5,
+            transport=transport,
+        )
+
+        with self.app.app_context():
+            with self.assertRaises(AiUnavailableError) as raised:
+                client.complete_json([], call_point="selftest_grade")
+
+        self.assertEqual(str(raised.exception), "AI 服务暂时不可用")
+
+    def test_duplicate_nested_json_field_is_unavailable(self):
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "content": (
+                                    '{"questions": ['
+                                    '{"id": "q1", "id": "q2"}'
+                                    "]}"
+                                ),
+                            }
+                        }
+                    ]
+                },
+                request=request,
+            )
+        )
+        client = OpenAiCompatibleAiClient(
+            api_url="https://example.test/chat/completions",
+            api_key="key",
+            model="model",
+            timeout=5,
+            transport=transport,
+        )
+
+        with self.app.app_context():
+            with self.assertRaises(AiUnavailableError) as raised:
+                client.complete_json([], call_point="selftest_grade")
+
+        self.assertEqual(str(raised.exception), "AI 服务暂时不可用")
+
     def test_default_service_installs_configured_http_client(self):
         self.app.config.update(
             {
