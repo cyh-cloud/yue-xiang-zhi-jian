@@ -194,7 +194,9 @@ onMounted(() => {
         <p class="page-kicker">04 / 电商运营实训</p>
         <h1>客服模拟训练</h1>
         <p>
-          AI 扮演客户发起咨询，每轮回复后给出证据、建议与目标状态；只有由你确认后才会结束。
+          AI 扮演客户发起咨询，每轮回复后给出证据、<span
+            class="page-heading__nowrap"
+          >建议与目标状态</span>；只有由你确认后才会结束。
         </p>
       </header>
 
@@ -525,6 +527,10 @@ onMounted(() => {
   overflow-wrap: anywhere;
   text-wrap: pretty;
   word-break: keep-all;
+}
+
+.page-heading__nowrap {
+  white-space: nowrap;
 }
 
 .page-kicker,

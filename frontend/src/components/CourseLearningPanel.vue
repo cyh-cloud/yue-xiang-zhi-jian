@@ -45,6 +45,21 @@ const attemptTimestampFormatter = new Intl.DateTimeFormat('zh-CN', {
 
 const orderedCourses = computed(() => coursesStore.courses)
 const orderedRecommendations = computed(() => coursesStore.recommendations)
+const courseDescriptionParts = computed(() => {
+  const nowrapPhrase = '获取推荐'
+  const start = props.description.indexOf(nowrapPhrase)
+  if (start < 0) {
+    return [{ text: props.description, nowrap: false }]
+  }
+  return [
+    { text: props.description.slice(0, start), nowrap: false },
+    { text: nowrapPhrase, nowrap: true },
+    {
+      text: props.description.slice(start + nowrapPhrase.length),
+      nowrap: false
+    }
+  ].filter(part => part.text)
+})
 
 function progressFor(courseId: number): CourseProgress | undefined {
   return coursesStore.progressByCourse[courseId]
@@ -152,11 +167,18 @@ function formatPublishedAt(value: string): string {
   if (Number.isNaN(date.getTime())) {
     return value
   }
-  return new Intl.DateTimeFormat('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).format(date)
+  const values = Object.fromEntries(
+    new Intl.DateTimeFormat('zh-CN', {
+      timeZone: 'Asia/Shanghai',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    })
+      .formatToParts(date)
+      .filter(part => part.type !== 'literal')
+      .map(part => [part.type, part.value])
+  )
+  return [values.year, values.month, values.day].join('-')
 }
 
 function formatAttemptTimestamp(value: string): string {
@@ -254,7 +276,20 @@ onMounted(() => {
           COURSES
         </span>
         <h1>{{ props.title }}</h1>
-        <p>{{ props.description }}</p>
+        <p>
+          <template
+            v-for="(part, index) in courseDescriptionParts"
+            :key="index"
+          >
+            <span
+              v-if="part.nowrap"
+              class="agri-courses-heading__nowrap"
+            >
+              {{ part.text }}
+            </span>
+            <template v-else>{{ part.text }}</template>
+          </template>
+        </p>
       </header>
 
       <div
@@ -544,10 +579,23 @@ onMounted(() => {
                     <span>{{ option }}</span>
                   </label>
                 </fieldset>
+                <p
+                  v-if="!quizIsComplete(course.id)"
+                  :id="`quiz-submit-hint-${course.id}`"
+                  class="quiz-form__hint"
+                  :data-test="`quiz-submit-hint-${course.id}`"
+                >
+                  请选择一个选项
+                </p>
                 <button
                   class="quiz-submit"
                   type="submit"
                   :data-test="`quiz-submit-${course.id}`"
+                  :aria-describedby="
+                    !quizIsComplete(course.id)
+                      ? `quiz-submit-hint-${course.id}`
+                      : undefined
+                  "
                   :disabled="!quizIsComplete(course.id) || coursesStore.loading"
                 >
                   <CheckCircle2 :size="17" aria-hidden="true" />
@@ -656,6 +704,14 @@ onMounted(() => {
   max-width: 64ch;
   margin: 15px 0 0;
   color: var(--ark-muted);
+  line-break: strict;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  word-break: keep-all;
+}
+
+.agri-courses-heading__nowrap {
+  white-space: nowrap;
 }
 
 .agri-courses-error {
@@ -1112,6 +1168,12 @@ onMounted(() => {
 .quiz-form input {
   flex: 0 0 auto;
   accent-color: var(--ark-signal);
+}
+
+.quiz-form__hint {
+  margin: -8px 0 0;
+  color: var(--ark-muted);
+  font-size: 0.76rem;
 }
 
 .quiz-submit {

@@ -363,10 +363,10 @@ describe('ecommerce responsive CSS contracts', () => {
     ).toContain('line-break: strict')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
-    ).toContain('text-wrap: balance')
+    ).toContain('text-wrap: pretty')
     expect(
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
-    ).toContain('word-break: keep-all')
+    ).not.toContain('word-break: keep-all')
     expect(
       cssRule(
         mediaBlock(ecommerceTrainingHomeSource, 640),
@@ -523,6 +523,9 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(
       cssRule(ecommerceCustomerServiceSource, '.page-heading > p:last-child')
     ).toContain('word-break: keep-all')
+    expect(
+      cssRule(ecommerceCustomerServiceSource, '.page-heading__nowrap')
+    ).toContain('white-space: nowrap')
     expect(cssRule(ecommerceCustomerServiceSource, '.message p')).toContain(
       'overflow-wrap: anywhere'
     )
@@ -559,6 +562,15 @@ describe('ecommerce responsive CSS contracts', () => {
       'line-break: strict'
     )
     expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
+      'word-break: keep-all'
+    )
+    expect(
+      cssRule(courseLearningPanelSource, '.agri-courses-heading__nowrap')
+    ).toContain('white-space: nowrap')
+    expect(cssRule(courseLearningPanelSource, '.agri-courses-heading p')).toContain(
+      'line-break: strict'
+    )
+    expect(cssRule(courseLearningPanelSource, '.agri-courses-heading p')).toContain(
       'word-break: keep-all'
     )
     expect(

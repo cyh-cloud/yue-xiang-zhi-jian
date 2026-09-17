@@ -41,6 +41,7 @@ describe('EcommerceCoursesView', () => {
       title: '电商课程',
       apiPrefix: '/api/ecommerce-training'
     })
+    expect(panel.get('.agri-courses-heading__nowrap').text()).toBe('获取推荐')
     expect(panel.findComponent(EcommerceTrainingNav).exists()).toBe(true)
   })
 })

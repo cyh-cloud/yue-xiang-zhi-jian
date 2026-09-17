@@ -247,6 +247,39 @@ describe('EcommerceCoursesView quiz availability and history', () => {
     expect(
       refreshed.get('[data-test="quiz-history-22"]').text()
     ).not.toContain('2026-09-16T03:00:00+00:00')
+    expect(refreshed.get('.course-card__head time').text()).toContain(
+      '2026-09-16'
+    )
+    expect(refreshed.get('.course-card__head time').text()).not.toContain('/')
+  })
+
+  it('shows a disabled submit hint until every question is answered', async () => {
+    mockApi()
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="quiz-entry-1"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="quiz-retake-1"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="quiz-submit-hint-1"]').text()).toContain(
+      '请选择一个选项'
+    )
+    expect(
+      wrapper.get('[data-test="quiz-submit-1"]').attributes('aria-describedby')
+    ).toBe('quiz-submit-hint-1')
+
+    await wrapper.get('[data-test="quiz-option-0-1"]').setValue()
+
+    expect(wrapper.find('[data-test="quiz-submit-hint-1"]').exists()).toBe(
+      false
+    )
+    expect(
+      wrapper.get('[data-test="quiz-submit-1"]').attributes('aria-describedby')
+    ).toBeUndefined()
+    expect(
+      wrapper.get('[data-test="quiz-submit-1"]').attributes('disabled')
+    ).toBeUndefined()
   })
 
   it('labels only the just-submitted result as current and refreshed results as latest history', async () => {

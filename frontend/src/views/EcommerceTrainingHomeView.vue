@@ -251,8 +251,7 @@ async function logout() {
   color: var(--ark-muted);
   font-size: 0.8rem;
   line-height: 1.55;
-  text-wrap: balance;
-  word-break: keep-all;
+  text-wrap: pretty;
 }
 
 .ecommerce-training-card__arrow {
