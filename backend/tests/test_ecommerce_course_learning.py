@@ -374,6 +374,26 @@ class TestEcommerceCourseLearning(unittest.TestCase):
         }
         self.assertEqual(provider_keys, {"agri_course_provider"})
 
+    def test_quiz_ai_context_identifies_course_direction(self):
+        with self.app.app_context():
+            update_ecommerce_course_progress(
+                self.student_id,
+                1002,
+                80,
+                80,
+            )
+            self.ai.complete_json.return_value = self._valid_grade()
+            submit_ecommerce_course_quiz(
+                self.student_id,
+                1002,
+                {"q1": "A"},
+            )
+
+        call = self.ai.complete_json.call_args
+        context = json.loads(call.args[0][1]["content"])
+        self.assertEqual(call.kwargs["call_point"], "course_quiz_grade")
+        self.assertEqual(context["course_direction"], "ecommerce")
+
     def test_quiz_requires_owned_completed_course(self):
         with self.app.app_context():
             self.assertIsNone(

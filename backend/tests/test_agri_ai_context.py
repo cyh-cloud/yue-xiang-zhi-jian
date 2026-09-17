@@ -50,10 +50,138 @@ class TestAgriAiContext(unittest.TestCase):
                 "course_summary",
                 "questions",
                 "answers",
+                "course_direction",
+            },
+            "handcraft_ar_guidance_generate": {
+                "craft_key",
+                "craft_name",
+                "project_label",
             },
         }
         for call_point, fields in expected.items():
             self.assertEqual(AI_FIELD_ALLOWLISTS[call_point], fields)
+
+    def test_course_quiz_domain_uses_course_direction(self):
+        agriculture = build_ai_messages(
+            "course_quiz_grade",
+            {"course_summary": "农业课程"},
+        )
+        ecommerce = build_ai_messages(
+            "course_quiz_grade",
+            {
+                "course_summary": "电商课程",
+                "course_direction": "ecommerce",
+            },
+        )
+        handcraft = build_ai_messages(
+            "course_quiz_grade",
+            {
+                "course_summary": "广绣课程",
+                "course_direction": "handcraft",
+            },
+        )
+
+        self.assertEqual(
+            agriculture[0]["content"],
+            "农业技能任务：course_quiz_grade",
+        )
+        self.assertEqual(
+            ecommerce[0]["content"],
+            "电商运营实训任务：course_quiz_grade",
+        )
+        self.assertEqual(
+            handcraft[0]["content"],
+            "手工传承任务：course_quiz_grade",
+        )
+
+    def test_handcraft_ar_guidance_uses_handcraft_domain(self):
+        messages = build_ai_messages(
+            "handcraft_ar_guidance_generate",
+            {
+                "craft_key": "guangxiu",
+                "craft_name": "广绣",
+                "project_label": "绣制花瓣",
+            },
+        )
+
+        self.assertEqual(
+            messages[0]["content"],
+            "手工传承任务：handcraft_ar_guidance_generate",
+        )
+
+    def test_handcraft_payloads_only_include_allowlisted_fields(self):
+        cases = (
+            (
+                "handcraft_ar_guidance_generate",
+                {
+                    "craft_key": "guangxiu",
+                    "craft_name": "广绣",
+                    "project_label": "绣制花瓣",
+                    "username": "student01",
+                    "contact": "13800000000",
+                    "user_id": 99,
+                    "token": "plain-token",
+                    "other_student_id": 100,
+                    "unexpected_field": "must-not-send",
+                },
+                {
+                    "craft_key": "guangxiu",
+                    "craft_name": "广绣",
+                    "project_label": "绣制花瓣",
+                },
+            ),
+            (
+                "course_quiz_grade",
+                {
+                    "course_direction": "handcraft",
+                    "course_summary": "广绣基础课程",
+                    "questions": [
+                        {
+                            "id": "q1",
+                            "prompt": "题目",
+                            "options": ["A", "B"],
+                        }
+                    ],
+                    "answers": {"q1": "A"},
+                    "username": "student01",
+                    "contact": "13800000000",
+                    "user_id": 99,
+                    "token": "plain-token",
+                    "student_id": 100,
+                    "unexpected_field": "must-not-send",
+                },
+                {
+                    "course_direction": "handcraft",
+                    "course_summary": "广绣基础课程",
+                    "questions": [
+                        {
+                            "id": "q1",
+                            "prompt": "题目",
+                            "options": ["A", "B"],
+                        }
+                    ],
+                    "answers": {"q1": "A"},
+                },
+            ),
+        )
+        forbidden_values = (
+            "student01",
+            "13800000000",
+            "99",
+            "plain-token",
+            "100",
+            "must-not-send",
+        )
+
+        for call_point, context, expected in cases:
+            with self.subTest(call_point=call_point):
+                messages = build_ai_messages(call_point, context)
+                payload = json.loads(messages[1]["content"])
+
+                self.assertEqual(payload, expected)
+                serialized = json.dumps(messages, ensure_ascii=False)
+                for forbidden in forbidden_values:
+                    self.assertNotIn(forbidden, serialized)
 
     def test_call_domains_separate_agriculture_and_ecommerce(self):
         agriculture = build_ai_messages(

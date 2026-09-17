@@ -81,6 +81,45 @@ class TestSharedCourseProvider(unittest.TestCase):
                 "ecommerce",
             )
 
+    def test_direction_provider_serves_handcraft_without_new_registry(self):
+        class RecordingDirectionProvider(DirectionProvider):
+            def __init__(self) -> None:
+                super().__init__()
+                self.requested_directions = []
+
+            def list_published_courses(self, student_id, direction):
+                self.requested_directions.append(direction)
+                return super().list_published_courses(student_id, direction)
+
+        with self.app.app_context():
+            provider = RecordingDirectionProvider()
+            set_course_provider(self.app, provider)
+
+            courses = list_courses(1, "handcraft")
+            recommendations = list_recommendations(1, "handcraft")
+            provider_keys = {
+                key
+                for key in self.app.extensions
+                if "course_provider" in key
+            }
+
+        self.assertEqual(
+            [(course["id"], course["direction"]) for course in courses],
+            [(2, "handcraft")],
+        )
+        self.assertEqual(
+            [
+                (course["id"], course["direction"])
+                for course in recommendations
+            ],
+            [(2, "handcraft")],
+        )
+        self.assertEqual(
+            provider.requested_directions,
+            ["handcraft", "handcraft"],
+        )
+        self.assertEqual(provider_keys, {"agri_course_provider"})
+
     def test_database_provider_keeps_legacy_agriculture_method(self):
         with self.app.app_context():
             provider = DatabaseAgriCourseProvider()

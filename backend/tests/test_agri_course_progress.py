@@ -27,6 +27,17 @@ class FakeCourseProvider:
     def __init__(self, courses: list[dict]) -> None:
         self.courses = [dict(course) for course in courses]
 
+    def list_published_courses(
+        self,
+        student_id: int,
+        direction: str,
+    ) -> list[dict]:
+        return [
+            dict(course)
+            for course in self.courses
+            if course["direction"] == direction
+        ]
+
     def list_published_agriculture_courses(self, student_id: int) -> list[dict]:
         return [dict(course) for course in self.courses]
 
@@ -189,6 +200,7 @@ class TestAgriCourseProgress(unittest.TestCase):
             "id": 1,
             "title": "荔枝保果",
             "direction": "agriculture",
+            "status": "published",
             "summary": "保果与病虫害管理",
             "teacher_name": "林老师",
             "published_at": "2026-09-01T00:00:00+00:00",
@@ -496,6 +508,56 @@ class TestAgriCourseProgress(unittest.TestCase):
                     {},
                     "ecommerce",
                 )
+
+    def test_handcraft_courses_reuse_shared_provider_and_progress(self):
+        with self.app.app_context():
+            get_db().execute(
+                """
+                INSERT INTO courses (
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary, teacher_name, created_at, updated_at
+                )
+                VALUES (
+                    99, '广绣基础', 'handcraft', 'published', 100,
+                    '2026-09-04T00:00:00+00:00', '广绣基础简介', '梁老师',
+                    '2026-09-15T00:00:00+00:00',
+                    '2026-09-15T00:00:00+00:00'
+                )
+                """
+            )
+            get_db().commit()
+            self.course_provider.courses.append(
+                {
+                    **self.course_fixture,
+                    "id": 99,
+                    "title": "广绣基础",
+                    "direction": "handcraft",
+                }
+            )
+
+            courses = list_courses(self.student_id, "handcraft")
+            recommendations = list_recommendations(
+                self.student_id,
+                "handcraft",
+            )
+            progress = update_course_progress(
+                self.student_id,
+                99,
+                80,
+                80,
+                "handcraft",
+            )
+
+        self.assertEqual(
+            [(course["id"], course["direction"]) for course in courses],
+            [(99, "handcraft")],
+        )
+        self.assertEqual(
+            [course["id"] for course in recommendations],
+            [99],
+        )
+        self.assertEqual(progress["progress_percent"], 80)
+        self.assertIsNotNone(progress["completed_at"])
 
     def test_default_course_provider_supports_stable_progress_loop(self):
         with self.app.app_context():

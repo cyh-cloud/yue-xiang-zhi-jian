@@ -229,7 +229,7 @@ def list_recommendations(
     student_id: int,
     direction: str = "agriculture",
 ) -> list[dict]:
-    if direction == "ecommerce":
+    if direction in {"ecommerce", "handcraft"}:
         return _list_provider_recommendations(student_id, direction)
 
     has_duration = "duration_seconds" in _course_table_columns()
@@ -355,7 +355,7 @@ def get_course_progress(
         row["completed_at"] is not None
         and _normalize_course_quiz(
             get_course_provider().get_quiz(course_id),
-            strict=direction == "ecommerce",
+            strict=direction in {"ecommerce", "handcraft"},
         )
         is not None
     )
@@ -536,7 +536,7 @@ def _load_available_course_quiz(
 
     questions = _normalize_course_quiz(
         get_course_provider().get_quiz(course_id),
-        strict=direction == "ecommerce",
+        strict=direction in {"ecommerce", "handcraft"},
     )
     if questions is None:
         return None
@@ -707,15 +707,19 @@ def submit_course_quiz(
     course, questions = available
     normalized_answers = _validate_course_quiz_answers(questions, answers)
 
+    ai_context = {
+        "course_summary": str(course.get("summary", "")).strip(),
+        "questions": questions,
+        "answers": normalized_answers,
+    }
+    if direction != "agriculture":
+        ai_context["course_direction"] = direction
+
     try:
         payload = get_ai_client().complete_json(
             build_ai_messages(
                 "course_quiz_grade",
-                {
-                    "course_summary": str(course.get("summary", "")).strip(),
-                    "questions": questions,
-                    "answers": normalized_answers,
-                },
+                ai_context,
             ),
             call_point="course_quiz_grade",
         )

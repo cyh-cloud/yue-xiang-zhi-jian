@@ -20,7 +20,17 @@ AI_FIELD_ALLOWLISTS = {
     },
     "selftest_generate": {"diagnosis_text"},
     "selftest_grade": {"questions", "answers"},
-    "course_quiz_grade": {"course_summary", "questions", "answers"},
+    "course_quiz_grade": {
+        "course_direction",
+        "course_summary",
+        "questions",
+        "answers",
+    },
+    "handcraft_ar_guidance_generate": {
+        "craft_key",
+        "craft_name",
+        "project_label",
+    },
     "live_script_generate": {"product_name", "selling_points", "price_text", "style"},
     "simulation_score": {"scene_label", "segments"},
     "copy_case_generate": {"product_type", "scene"},
@@ -46,11 +56,19 @@ ECOMMERCE_AI_CALL_POINTS = {
     "customer_summary",
 }
 
+HANDCRAFT_AI_CALL_POINTS = {
+    "handcraft_ar_guidance_generate",
+}
+
 AI_CALL_DOMAINS = {
     call_point: (
         "电商运营实训任务"
         if call_point in ECOMMERCE_AI_CALL_POINTS
-        else "农业技能任务"
+        else (
+            "手工传承任务"
+            if call_point in HANDCRAFT_AI_CALL_POINTS
+            else "农业技能任务"
+        )
     )
     for call_point in AI_FIELD_ALLOWLISTS
 }
@@ -94,12 +112,23 @@ def allowed_context(call_point: str, context: dict) -> dict:
     }
 
 
+def _call_domain(call_point: str, context: dict) -> str:
+    if call_point == "course_quiz_grade":
+        direction = context.get("course_direction")
+        if direction == "ecommerce":
+            return "电商运营实训任务"
+        if direction == "handcraft":
+            return "手工传承任务"
+        return "农业技能任务"
+    return AI_CALL_DOMAINS[call_point]
+
+
 def build_ai_messages(call_point: str, context: dict) -> list[dict]:
     sanitized = allowed_context(call_point, context)
     return [
         {
             "role": "system",
-            "content": f"{AI_CALL_DOMAINS[call_point]}：{call_point}",
+            "content": f"{_call_domain(call_point, context)}：{call_point}",
         },
         {
             "role": "user",
