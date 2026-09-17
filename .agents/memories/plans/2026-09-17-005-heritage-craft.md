@@ -322,7 +322,7 @@ process_pending_events(user_id: int, limit: int = 100) -> list[dict]
 - [ ] Ensure timer failure leaves pending lots for the next access or scheduled run.
 - [ ] Run `uv run --directory backend python -m unittest tests.test_handcraft_points_expiry -v`.
 
-### Task 8: Points Integration for 005 and 004 Successful Training
+### Task 8: Points Integration for 005 and 004 Successful Training（executed after Task 13）
 
 **Files:**
 - Modify: `backend/app/handcraft_inheritance/crafts.py`
