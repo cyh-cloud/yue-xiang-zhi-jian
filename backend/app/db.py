@@ -6,6 +6,7 @@ from pathlib import Path
 from flask import current_app, g
 
 from app.ecommerce_training.seed import seed_ecommerce_course_fixtures
+from app.handcraft_inheritance.seed import seed_handcraft_fixtures
 from app.seed import seed_interest_tags
 
 
@@ -603,6 +604,7 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_course_duration_column(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
+    seed_handcraft_fixtures(db)
     db.commit()
 
 
