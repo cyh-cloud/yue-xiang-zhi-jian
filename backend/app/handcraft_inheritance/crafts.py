@@ -5,7 +5,7 @@ from copy import deepcopy
 
 from app.agri_skills.errors import AgriValidationError
 from app.db import get_db
-from app.handcraft_inheritance.points import enqueue_learning_event
+from app.handcraft_inheritance.points import record_duration_points
 from app.handcraft_inheritance.providers import get_craft_preset_provider
 from app.session_manager import utc_now_iso
 
@@ -451,13 +451,13 @@ def complete_craft_step(
     )
     result["points_source_event_id"] = source_event_id
     try:
-        points_event = enqueue_learning_event(
+        points_event = record_duration_points(
             user_id,
             "handcraft",
-            "duration",
-            source_event_id,
-            now,
+            craft["craft_key"],
             active_seconds,
+            now,
+            f"{step_no}:{event_id.strip()}",
         )
         result["points_event"] = points_event
         result["points_status"] = points_event["status"]

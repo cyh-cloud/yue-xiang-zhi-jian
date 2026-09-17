@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
@@ -11,11 +12,13 @@ from app.agri_skills.errors import (
 )
 from app.db import get_db
 from app.ecommerce_training.presets import LIVE_SCRIPT_STYLES
+from app.handcraft_inheritance.points import record_training_points
 from app.session_manager import utc_now_iso
 
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 SCRIPT_KEYS = ("opening", "product_intro", "interaction", "closing")
+LOGGER = logging.getLogger(__name__)
 
 
 def _validate_payload(payload: dict) -> dict:
@@ -130,7 +133,21 @@ def generate_live_script(user_id: int, payload: dict) -> dict:
 
     if row is None:
         raise AgriNotFoundError("直播话术版本不存在")
-    return _serialize_row(row)
+    version = _serialize_row(row)
+    try:
+        record_training_points(
+            user_id,
+            "ecommerce",
+            "live_script",
+            f"live-script:{version['id']}",
+            version["created_at"],
+        )
+    except Exception as error:
+        LOGGER.warning(
+            "Live-script points recording failed: %s",
+            type(error).__name__,
+        )
+    return version
 
 
 def list_live_scripts(user_id: int) -> list[dict]:

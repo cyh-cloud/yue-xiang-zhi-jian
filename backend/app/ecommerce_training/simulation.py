@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
@@ -12,11 +13,13 @@ from app.agri_skills.errors import (
 )
 from app.db import get_db
 from app.ecommerce_training.presets import SIMULATION_SCENES
+from app.handcraft_inheritance.points import record_training_points
 from app.session_manager import utc_now_iso
 
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 DIMENSION_KEYS = ("pacing", "emotion", "interaction", "selling_point")
+LOGGER = logging.getLogger(__name__)
 
 
 def list_simulation_scenes() -> list[dict]:
@@ -264,7 +267,21 @@ def score_simulation(user_id: int, training_id: int) -> dict:
         )
         if updated.rowcount != 1:
             return _serialize_row(_get_training_row(user_id, training_id))
-    return get_simulation(user_id, training_id)
+    completed = get_simulation(user_id, training_id)
+    try:
+        record_training_points(
+            user_id,
+            "ecommerce",
+            "simulation",
+            f"simulation:{training_id}",
+            str(completed["completed_at"]),
+        )
+    except Exception as error:
+        LOGGER.warning(
+            "Simulation points recording failed: %s",
+            type(error).__name__,
+        )
+    return completed
 
 
 def list_simulations(user_id: int) -> list[dict]:

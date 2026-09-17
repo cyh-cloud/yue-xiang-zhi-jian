@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
@@ -15,10 +16,12 @@ from app.ecommerce_training.presets import (
     COPY_PRODUCT_TYPES,
     COPY_TRAINING_SCENES,
 )
+from app.handcraft_inheritance.points import record_training_points
 from app.session_manager import utc_now_iso
 
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
+LOGGER = logging.getLogger(__name__)
 TRANSITIONS = {
     ("case_ready", "critique"): "critique_ready",
     ("critique_ready", "copy"): "copy_ready",
@@ -415,7 +418,21 @@ def generate_optimization_critique(
         )
         if updated.rowcount != 1:
             return _serialize_row(_get_session_row(user_id, session_id))
-    return _serialize_row(_get_session_row(user_id, session_id))
+    completed = _serialize_row(_get_session_row(user_id, session_id))
+    try:
+        record_training_points(
+            user_id,
+            "ecommerce",
+            "copy_training",
+            f"copy-training:{session_id}",
+            str(completed["completed_at"]),
+        )
+    except Exception as error:
+        LOGGER.warning(
+            "Copy-training points recording failed: %s",
+            type(error).__name__,
+        )
+    return completed
 
 
 def get_copy_training(user_id: int, session_id: int) -> dict:

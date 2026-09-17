@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from app.agri_skills.course_learning import (
     get_course_progress,
     get_course_quiz,
@@ -9,6 +11,10 @@ from app.agri_skills.course_learning import (
     submit_course_quiz,
     update_course_progress,
 )
+from app.handcraft_inheritance.points import record_duration_points
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 def list_handcraft_courses(student_id: int) -> list[dict]:
@@ -33,13 +39,34 @@ def update_handcraft_course_progress(
     position_seconds: int,
     watched_delta_seconds: int,
 ) -> dict:
-    return update_course_progress(
+    before = get_handcraft_course_progress(user_id, course_id)
+    progress = update_course_progress(
         user_id,
         course_id,
         position_seconds,
         watched_delta_seconds,
         direction="handcraft",
     )
+    effective_delta = max(
+        0,
+        int(progress["watched_seconds"]) - int(before["watched_seconds"]),
+    )
+    if effective_delta > 0:
+        try:
+            record_duration_points(
+                user_id,
+                "handcraft",
+                f"handcraft-course:{course_id}",
+                effective_delta,
+                str(progress["updated_at"]),
+                str(progress["watched_seconds"]),
+            )
+        except Exception as error:
+            LOGGER.warning(
+                "Handcraft course points recording failed: %s",
+                type(error).__name__,
+            )
+    return progress
 
 
 def get_handcraft_course_quiz(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
@@ -12,10 +13,12 @@ from app.agri_skills.errors import (
 )
 from app.db import get_db
 from app.ecommerce_training.presets import CUSTOMER_SCENARIOS
+from app.handcraft_inheritance.points import record_training_points
 from app.session_manager import utc_now_iso
 
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
+LOGGER = logging.getLogger(__name__)
 GOAL_STATUSES = ("reached", "not_reached")
 SUMMARY_KEYS = (
     "overall_performance",
@@ -508,4 +511,18 @@ def end_customer_session(user_id: int, session_id: int) -> dict:
         if updated.rowcount != 1:
             return get_customer_session(user_id, session_id)
 
-    return get_customer_session(user_id, session_id)
+    completed = get_customer_session(user_id, session_id)
+    try:
+        record_training_points(
+            user_id,
+            "ecommerce",
+            "customer_service",
+            f"customer-service:{session_id}",
+            str(completed["completed_at"]),
+        )
+    except Exception as error:
+        LOGGER.warning(
+            "Customer-service points recording failed: %s",
+            type(error).__name__,
+        )
+    return completed
