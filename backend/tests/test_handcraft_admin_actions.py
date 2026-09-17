@@ -14,7 +14,12 @@ from app.handcraft_inheritance import (
     get_fulfillment_action_provider,
     get_video_review_action_provider,
     set_fulfillment_action_provider,
+    set_teaching_video_provider,
     set_video_review_action_provider,
+)
+from app.handcraft_inheritance.videos import (
+    get_video_playback,
+    list_video_reviews,
 )
 
 
@@ -34,6 +39,32 @@ class ReplacementFulfillmentAdminProvider:
     def apply(self, action):
         self.actions.append(dict(action))
         return {"status": "replacement-issued", "notification": None}
+
+
+class StaticVideoProvider:
+    def __init__(self, videos):
+        self.videos = [dict(video) for video in videos]
+
+    def list_videos(self, craft_key=None):
+        return [
+            dict(video)
+            for video in self.videos
+            if craft_key is None or video["craft_key"] == craft_key
+        ]
+
+    def get_video(self, video_id):
+        return next(
+            (
+                dict(video)
+                for video in self.videos
+                if video["video_id"] == video_id
+            ),
+            None,
+        )
+
+    def get_review_status(self, video_id):
+        video = self.get_video(video_id)
+        return video["review_status"] if video is not None else None
 
 
 class TestHandcraftAdminActions(unittest.TestCase):
@@ -137,6 +168,72 @@ class TestHandcraftAdminActions(unittest.TestCase):
         )
         db.commit()
 
+    def _run_video_actions_concurrently(self, actions):
+        barrier = threading.Barrier(len(actions))
+
+        def perform(action):
+            with self.app.app_context():
+                barrier.wait(timeout=5)
+                try:
+                    result = apply_video_review(dict(action))
+                    return "ok", result["status"]
+                except AgriValidationError as error:
+                    return "error", str(error)
+
+        with patch(
+            "app.handcraft_inheritance.admin_actions.emit_review_result"
+        ):
+            with ThreadPoolExecutor(max_workers=len(actions)) as executor:
+                return list(executor.map(perform, actions))
+
+    def _assert_one_success_and_version_conflict(self, results):
+        successes = [result for result in results if result[0] == "ok"]
+        failures = [result for result in results if result[0] == "error"]
+        self.assertEqual(len(successes), 1)
+        self.assertEqual(len(failures), 1)
+        self.assertIn("版本", failures[0][1])
+        return successes[0]
+
+    def _video_provider_record(self, video_id):
+        row = get_db().execute(
+            """
+            SELECT video_id, craft_key, title, review_status,
+                   source_available, media_url, version
+            FROM heritage_videos
+            WHERE video_id = ?
+            """,
+            (video_id,),
+        ).fetchone()
+        return {
+            "video_id": str(row["video_id"]),
+            "craft_key": str(row["craft_key"]),
+            "title": str(row["title"]),
+            "review_status": str(row["review_status"]),
+            "source_available": bool(row["source_available"]),
+            "media_url": str(row["media_url"]),
+            "version": int(row["version"]),
+        }
+
+    def _assert_final_video_provider_consistency(self, video_id):
+        with self.app.app_context():
+            final_record = self._video_provider_record(video_id)
+            set_teaching_video_provider(
+                self.app,
+                StaticVideoProvider([final_record]),
+            )
+            review = next(
+                item
+                for item in list_video_reviews()
+                if item["video_id"] == video_id
+            )
+            playback = get_video_playback(video_id)
+        self.assertTrue(review["contract_valid"])
+        self.assertEqual(
+            playback["available"],
+            final_record["review_status"] == "approved",
+        )
+        return final_record
+
     def test_approve_video_updates_state_and_emits_after_commit(self):
         with self.app.app_context():
             self._insert_video()
@@ -173,8 +270,9 @@ class TestHandcraftAdminActions(unittest.TestCase):
             }
 
         self.assertEqual(result["status"], "approved")
+        self.assertEqual(result["version"], 2)
         self.assertEqual(row["review_status"], "approved")
-        self.assertEqual(row["version"], 1)
+        self.assertEqual(row["version"], 2)
         self.assertIsNone(row["rejection_opinion"])
         emit.assert_called_once_with(
             event_id="handcraft-video-review:review-video:v1:approve",
@@ -227,14 +325,16 @@ class TestHandcraftAdminActions(unittest.TestCase):
                 )
                 row = get_db().execute(
                     """
-                    SELECT review_status, rejection_opinion
+                    SELECT review_status, rejection_opinion, version
                     FROM heritage_videos
                     WHERE video_id = 'review-video'
                     """
                 ).fetchone()
 
         self.assertEqual(result["status"], "rejected")
+        self.assertEqual(result["version"], 2)
         self.assertEqual(row["review_status"], "rejected")
+        self.assertEqual(row["version"], 2)
         self.assertEqual(
             row["rejection_opinion"],
             "画面不稳定，请重新录制。",
@@ -492,6 +592,181 @@ class TestHandcraftAdminActions(unittest.TestCase):
             emit.call_args.kwargs["approved"],
             expected_approved,
         )
+
+    def test_concurrent_edits_allow_only_one_version_and_no_overwrite(self):
+        with self.app.app_context():
+            self._insert_video()
+            original_provider = self._video_provider_record("review-video")
+            set_teaching_video_provider(
+                self.app,
+                StaticVideoProvider([original_provider]),
+            )
+
+        results = self._run_video_actions_concurrently(
+            [
+                {
+                    "video_id": "review-video",
+                    "action": "edit",
+                    "actor_role": "teacher",
+                    "actor_id": 1,
+                    "submitter_id": 1,
+                    "version": 1,
+                    "title": "编辑甲",
+                    "media_url": "https://example.test/edit-a.mp4",
+                },
+                {
+                    "video_id": "review-video",
+                    "action": "edit",
+                    "actor_role": "teacher",
+                    "actor_id": 1,
+                    "submitter_id": 1,
+                    "version": 1,
+                    "title": "编辑乙",
+                    "media_url": "https://example.test/edit-b.mp4",
+                },
+            ]
+        )
+        self._assert_one_success_and_version_conflict(results)
+
+        with self.app.app_context():
+            stale_playback = get_video_playback("review-video")
+            row = get_db().execute(
+                """
+                SELECT review_status, version, title, media_url
+                FROM heritage_videos
+                WHERE video_id = 'review-video'
+                """
+            ).fetchone()
+            final_record = self._assert_final_video_provider_consistency(
+                "review-video"
+            )
+
+        self.assertEqual(row["review_status"], "pending")
+        self.assertEqual(row["version"], 2)
+        self.assertIn(row["title"], {"编辑甲", "编辑乙"})
+        self.assertIn(
+            row["media_url"],
+            {
+                "https://example.test/edit-a.mp4",
+                "https://example.test/edit-b.mp4",
+            },
+        )
+        self.assertFalse(stale_playback["available"])
+        self.assertEqual(final_record["version"], 2)
+
+    def test_concurrent_edit_and_approve_allow_only_one_version(self):
+        with self.app.app_context():
+            self._insert_video()
+            original_provider = self._video_provider_record("review-video")
+            set_teaching_video_provider(
+                self.app,
+                StaticVideoProvider([original_provider]),
+            )
+
+        results = self._run_video_actions_concurrently(
+            [
+                {
+                    "video_id": "review-video",
+                    "action": "edit",
+                    "actor_role": "teacher",
+                    "actor_id": 1,
+                    "submitter_id": 1,
+                    "version": 1,
+                    "title": "教师并发修订",
+                    "media_url": "https://example.test/concurrent-edit.mp4",
+                },
+                {
+                    "video_id": "review-video",
+                    "action": "approve",
+                    "reviewer_role": "admin",
+                    "submitter_id": 1,
+                    "version": 1,
+                },
+            ]
+        )
+        success = self._assert_one_success_and_version_conflict(results)
+
+        with self.app.app_context():
+            stale_playback = get_video_playback("review-video")
+            row = get_db().execute(
+                """
+                SELECT title, review_status, published_at, version
+                FROM heritage_videos
+                WHERE video_id = 'review-video'
+                """
+            ).fetchone()
+            final_record = self._assert_final_video_provider_consistency(
+                "review-video"
+            )
+
+        self.assertEqual(row["version"], 2)
+        if success[1] == "approved":
+            self.assertEqual(row["review_status"], "approved")
+            self.assertEqual(row["title"], "广绣教学")
+            self.assertIsNotNone(row["published_at"])
+            self.assertTrue(final_record["review_status"] == "approved")
+        else:
+            self.assertEqual(row["review_status"], "pending")
+            self.assertEqual(row["title"], "教师并发修订")
+            self.assertIsNone(row["published_at"])
+            self.assertFalse(stale_playback["available"])
+
+    def test_concurrent_edit_and_reject_allow_only_one_version(self):
+        with self.app.app_context():
+            self._insert_video()
+            original_provider = self._video_provider_record("review-video")
+            set_teaching_video_provider(
+                self.app,
+                StaticVideoProvider([original_provider]),
+            )
+
+        results = self._run_video_actions_concurrently(
+            [
+                {
+                    "video_id": "review-video",
+                    "action": "edit",
+                    "actor_role": "teacher",
+                    "actor_id": 1,
+                    "submitter_id": 1,
+                    "version": 1,
+                    "title": "待驳回并发修订",
+                    "media_url": "https://example.test/reject-edit.mp4",
+                },
+                {
+                    "video_id": "review-video",
+                    "action": "reject",
+                    "reviewer_role": "admin",
+                    "submitter_id": 1,
+                    "version": 1,
+                    "opinion": "并发审核驳回。",
+                },
+            ]
+        )
+        success = self._assert_one_success_and_version_conflict(results)
+
+        with self.app.app_context():
+            stale_playback = get_video_playback("review-video")
+            row = get_db().execute(
+                """
+                SELECT title, review_status, rejection_opinion, version
+                FROM heritage_videos
+                WHERE video_id = 'review-video'
+                """
+            ).fetchone()
+            final_record = self._assert_final_video_provider_consistency(
+                "review-video"
+            )
+
+        self.assertEqual(row["version"], 2)
+        if success[1] == "rejected":
+            self.assertEqual(row["review_status"], "rejected")
+            self.assertEqual(row["title"], "广绣教学")
+            self.assertEqual(row["rejection_opinion"], "并发审核驳回。")
+        else:
+            self.assertEqual(row["review_status"], "pending")
+            self.assertEqual(row["title"], "待驳回并发修订")
+            self.assertIsNone(row["rejection_opinion"])
+            self.assertFalse(stale_playback["available"])
 
     def test_issue_fulfillment_updates_state_and_emits_after_commit(self):
         with self.app.app_context():

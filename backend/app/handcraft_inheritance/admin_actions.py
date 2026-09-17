@@ -106,6 +106,7 @@ class DatabaseTeachingVideoReviewActionProvider:
             action.get("version"),
             "版本号必须是正整数",
         )
+        requested_version = version
         operation = action.get("action")
         if operation not in {"approve", "reject", "edit"}:
             raise AgriValidationError("不支持的视频审核动作")
@@ -115,6 +116,7 @@ class DatabaseTeachingVideoReviewActionProvider:
             _require_teacher_owner(action)
 
         with _get_db() as db:
+            db.execute("BEGIN IMMEDIATE")
             row = db.execute(
                 """
                 SELECT *
@@ -144,17 +146,22 @@ class DatabaseTeachingVideoReviewActionProvider:
                     SET review_status = 'approved',
                         rejection_opinion = NULL,
                         published_at = ?,
-                        updated_at = ?
-                    WHERE video_id = ? AND review_status = 'pending'
+                        updated_at = ?,
+                        version = ?
+                    WHERE video_id = ?
+                      AND version = ?
+                      AND review_status = 'pending'
                     """,
-                    (now, now, video_id),
+                    (now, now, version + 1, video_id, version),
                 )
                 if cursor.rowcount != 1:
-                    raise AgriValidationError("当前视频状态不可审核通过")
+                    raise AgriValidationError("审核版本已变化")
+                version += 1
                 result_status = "approved"
                 notification = {
                     "event_id": (
-                        f"handcraft-video-review:{video_id}:v{version}:approve"
+                        "handcraft-video-review:"
+                        f"{video_id}:v{requested_version}:approve"
                     ),
                     "submitter_id": submitter_id,
                     "content_type": "handcraft_teaching_video",
@@ -178,17 +185,22 @@ class DatabaseTeachingVideoReviewActionProvider:
                     SET review_status = 'rejected',
                         rejection_opinion = ?,
                         published_at = NULL,
-                        updated_at = ?
-                    WHERE video_id = ? AND review_status = 'pending'
+                        updated_at = ?,
+                        version = ?
+                    WHERE video_id = ?
+                      AND version = ?
+                      AND review_status = 'pending'
                     """,
-                    (opinion, now, video_id),
+                    (opinion, now, version + 1, video_id, version),
                 )
                 if cursor.rowcount != 1:
-                    raise AgriValidationError("当前视频状态不可驳回")
+                    raise AgriValidationError("审核版本已变化")
+                version += 1
                 result_status = "rejected"
                 notification = {
                     "event_id": (
-                        f"handcraft-video-review:{video_id}:v{version}:reject"
+                        "handcraft-video-review:"
+                        f"{video_id}:v{requested_version}:reject"
                     ),
                     "submitter_id": submitter_id,
                     "content_type": "handcraft_teaching_video",
@@ -218,7 +230,7 @@ class DatabaseTeachingVideoReviewActionProvider:
                         "notification": notification,
                     }
                 next_version = version + 1
-                db.execute(
+                cursor = db.execute(
                     """
                     UPDATE heritage_videos
                     SET title = ?,
@@ -229,6 +241,8 @@ class DatabaseTeachingVideoReviewActionProvider:
                         version = ?,
                         updated_at = ?
                     WHERE video_id = ?
+                      AND version = ?
+                      AND review_status IN ('pending', 'approved')
                     """,
                     (
                         title,
@@ -236,8 +250,11 @@ class DatabaseTeachingVideoReviewActionProvider:
                         next_version,
                         now,
                         video_id,
+                        version,
                     ),
                 )
+                if cursor.rowcount != 1:
+                    raise AgriValidationError("审核版本已变化")
                 result_status = "pending"
                 version = next_version
 

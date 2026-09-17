@@ -151,6 +151,23 @@ def get_video_review_action_provider() -> TeachingVideoReviewActionProvider:
     return current_app.extensions["handcraft_video_review_action"]
 
 
+def set_video_review_provider(
+    app: Flask,
+    provider: TeachingVideoProvider | TeachingVideoReviewActionProvider,
+) -> None:
+    supports_read = any(
+        hasattr(provider, method)
+        for method in ("list_videos", "get_video", "get_review_status")
+    )
+    supports_actions = hasattr(provider, "apply")
+    if not supports_read and not supports_actions:
+        raise TypeError("video review provider must support read or action calls")
+    if supports_read:
+        set_teaching_video_provider(app, provider)
+    if supports_actions:
+        set_video_review_action_provider(app, provider)
+
+
 def set_fulfillment_action_provider(
     app: Flask,
     provider: FulfillmentAdminActionProvider,
