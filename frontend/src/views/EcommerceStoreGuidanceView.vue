@@ -122,7 +122,9 @@ onMounted(() => {
         <p class="page-kicker">04 / 电商运营实训</p>
         <h1>店铺装修指导</h1>
         <p>
-          输入店铺定位与风格偏好，生成首页布局、色彩方案、详情页结构和导航分类。
+          输入店铺定位与风格偏好，生成首页布局、<span
+            class="page-heading__nowrap"
+          >色彩方案</span>、详情页结构和导航分类。
         </p>
       </header>
 
@@ -316,6 +318,10 @@ onMounted(() => {
   font-size: 3.35rem;
   line-height: 1.05;
   text-wrap: balance;
+}
+
+.page-heading__nowrap {
+  white-space: nowrap;
 }
 
 .page-heading > p:last-child {

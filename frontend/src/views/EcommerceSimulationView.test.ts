@@ -210,6 +210,9 @@ describe('EcommerceSimulationView', () => {
 
     expect(wrapper.findComponent(AppHeader).exists()).toBe(true)
     expect(wrapper.findComponent(EcommerceTrainingNav).exists()).toBe(true)
+    expect(wrapper.get('.training-panel .empty-state').text()).toBe(
+      '请先从场景列表选择一个场景开始独立训练。'
+    )
     expect(wrapper.findAll('[data-test="simulation-scene-option"]')).toHaveLength(
       5
     )

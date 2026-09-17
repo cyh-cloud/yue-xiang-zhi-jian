@@ -86,7 +86,9 @@ onMounted(() => {
     <main class="simulation-shell">
       <header class="page-heading">
         <p class="page-kicker">04 / 电商运营实训</p>
-        <h1>文字直播间模拟训练</h1>
+        <h1>
+          <span class="page-heading__nowrap">文字直播间</span>模拟训练
+        </h1>
         <p>
           每次选择一个直播场景，按固定顺序完成全部文字环节，再提交整场四维评分。
         </p>
@@ -252,7 +254,7 @@ onMounted(() => {
           </div>
 
           <p v-else class="empty-state">
-            请从左侧选择一个场景开始独立训练。
+            请先从场景列表选择一个场景开始独立训练。
           </p>
         </section>
 
@@ -321,6 +323,11 @@ onMounted(() => {
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 1.05;
+  text-wrap: balance;
+}
+
+.page-heading__nowrap {
+  white-space: nowrap;
 }
 
 .page-heading > p:last-child {

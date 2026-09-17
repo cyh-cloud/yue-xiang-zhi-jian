@@ -368,6 +368,9 @@ describe('ecommerce responsive CSS contracts', () => {
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
     ).not.toContain('word-break: keep-all')
     expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__nowrap')
+    ).toContain('white-space: nowrap')
+    expect(
       cssRule(
         mediaBlock(ecommerceTrainingHomeSource, 640),
         '.ecommerce-training-home__grid'
@@ -418,6 +421,9 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(ecommerceSimulationSource, '.simulation-page')).toContain(
       'overflow-x: clip'
     )
+    expect(
+      cssRule(ecommerceSimulationSource, '.page-heading__nowrap')
+    ).toContain('white-space: nowrap')
     expect(cssRule(simulationMobile, '.workspace')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
@@ -445,6 +451,9 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(ecommerceCopyTrainingSource, '.copy-training-page')).toContain(
       'overflow-x: clip'
     )
+    expect(
+      cssRule(ecommerceCopyTrainingSource, '.page-heading__nowrap')
+    ).toContain('white-space: nowrap')
     expect(cssRule(copyTrainingMobile, '.selection-form')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
@@ -469,6 +478,9 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(ecommerceStoreGuidanceSource, '.store-guidance-page')).toContain(
       'overflow-x: clip'
     )
+    expect(
+      cssRule(ecommerceStoreGuidanceSource, '.page-heading__nowrap')
+    ).toContain('white-space: nowrap')
     expect(cssRule(storeGuidanceMobile, '.workspace')).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )

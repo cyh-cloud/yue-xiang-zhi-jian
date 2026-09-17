@@ -24,6 +24,7 @@ const entries = [
     code: '总览',
     title: '电商运营实训首页',
     description: '查看直播、文案、装修、客服和课程学习入口。',
+    nowrap: [],
     icon: Home
   },
   {
@@ -31,6 +32,7 @@ const entries = [
     code: '话术',
     title: '直播话术',
     description: '按商品信息与风格生成四段完整直播脚本。',
+    nowrap: ['四段', '完整直播脚本。'],
     icon: Radio
   },
   {
@@ -38,6 +40,7 @@ const entries = [
     code: '模拟',
     title: '文字直播间模拟',
     description: '按场景完成有序环节，获得四维评分与改进建议。',
+    nowrap: ['获得', '四维评分与改进建议。'],
     icon: Mic2
   },
   {
@@ -45,6 +48,7 @@ const entries = [
     code: '文案',
     title: '文案提示词训练',
     description: '判断教学案例，对照 AI 参考评判并优化文案提示词。',
+    nowrap: ['文案提示词。'],
     icon: PenLine
   },
   {
@@ -52,6 +56,7 @@ const entries = [
     code: '装修',
     title: '店铺装修指导',
     description: '生成首页、色彩、详情页和导航四部分装修方案。',
+    nowrap: ['四部分装修方案。'],
     icon: Store
   },
   {
@@ -59,6 +64,7 @@ const entries = [
     code: '客服',
     title: '客服模拟训练',
     description: '逐轮回复客户，查看分析、目标状态和整场总结。',
+    nowrap: ['整场总结。'],
     icon: MessagesSquare
   },
   {
@@ -66,9 +72,36 @@ const entries = [
     code: '课程',
     title: '电商课程',
     description: '学习已上架电商课程、记录进度并完成 AI 课后测验。',
+    nowrap: ['课后测验。'],
     icon: BookOpen
   }
 ] as const
+
+function descriptionParts(description: string, phrases: readonly string[]) {
+  const matches = phrases
+    .map(phrase => ({ phrase, start: description.indexOf(phrase) }))
+    .filter(match => match.start >= 0)
+    .sort((first, second) => first.start - second.start)
+  if (matches.length === 0) {
+    return [{ text: description, nowrap: false }]
+  }
+  const parts: Array<{ text: string; nowrap: boolean }> = []
+  let cursor = 0
+  for (const match of matches) {
+    if (match.start > cursor) {
+      parts.push({
+        text: description.slice(cursor, match.start),
+        nowrap: false
+      })
+    }
+    parts.push({ text: match.phrase, nowrap: true })
+    cursor = match.start + match.phrase.length
+  }
+  if (cursor < description.length) {
+    parts.push({ text: description.slice(cursor), nowrap: false })
+  }
+  return parts
+}
 
 async function logout() {
   await auth.logout()
@@ -116,7 +149,23 @@ async function logout() {
                 {{ entry.code }}
               </span>
               <strong>{{ entry.title }}</strong>
-              <small>{{ entry.description }}</small>
+              <small>
+                <template
+                  v-for="(part, index) in descriptionParts(
+                    entry.description,
+                    entry.nowrap
+                  )"
+                  :key="index"
+                >
+                  <span
+                    v-if="part.nowrap"
+                    class="ecommerce-training-card__nowrap"
+                  >
+                    {{ part.text }}
+                  </span>
+                  <template v-else>{{ part.text }}</template>
+                </template>
+              </small>
             </span>
             <ArrowRight
               class="ecommerce-training-card__arrow"
@@ -252,6 +301,10 @@ async function logout() {
   font-size: 0.8rem;
   line-height: 1.55;
   text-wrap: pretty;
+}
+
+.ecommerce-training-card__nowrap {
+  white-space: nowrap;
 }
 
 .ecommerce-training-card__arrow {

@@ -99,7 +99,9 @@ onMounted(() => {
         <p class="page-kicker">04 / 电商运营实训</p>
         <h1>文案提示词训练</h1>
         <p>
-          从教学案例出发，先完成判断与参考对照，再设计优化提示词并检验新旧文案差异。
+          从教学案例出发，先完成判断与参考对照，再<span
+            class="page-heading__nowrap"
+          >设计优化提示词</span>并检验新旧文案差异。
         </p>
       </header>
 
@@ -504,6 +506,10 @@ onMounted(() => {
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.4rem);
   line-height: 1.05;
+}
+
+.page-heading__nowrap {
+  white-space: nowrap;
 }
 
 .page-heading > p:last-child {
