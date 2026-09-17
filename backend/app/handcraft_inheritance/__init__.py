@@ -34,6 +34,9 @@ from app.handcraft_inheritance.presets import (
     PlaceholderRewardCatalogProvider,
     PlaceholderTeachingVideoProvider,
 )
+from app.handcraft_inheritance.fulfillment import (
+    retry_pending_fulfillment_notifications,
+)
 from app.handcraft_inheritance.points import (
     PointsPolicyUnavailable,
     enqueue_learning_event,
@@ -111,6 +114,7 @@ __all__ = [
     "record_training_points",
     "redeem_reward",
     "refund_points",
+    "retry_pending_fulfillment_notifications",
     "retry_pending_expiry_notifications",
     "run_expiry_settlement",
     "set_craft_preset_provider",
