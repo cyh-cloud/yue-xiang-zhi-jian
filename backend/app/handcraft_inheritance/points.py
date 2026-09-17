@@ -1022,6 +1022,177 @@ def spend_points(
         )
 
 
+def refund_points_in_transaction(
+    db,
+    user_id: int,
+    amount: int,
+    source_module: str,
+    source_event_id: str,
+    spend_transaction_id: int,
+    normalized_time: str,
+    policy: dict,
+) -> dict:
+    spend = db.execute(
+        """
+        SELECT id, delta
+        FROM points_transactions
+        WHERE id = ?
+          AND user_id = ?
+          AND transaction_type = 'spend'
+        """,
+        (spend_transaction_id, user_id),
+    ).fetchone()
+    if spend is None:
+        raise AgriValidationError("消费流水不存在")
+    if amount != -int(spend["delta"]):
+        raise AgriValidationError("回退金额与原消费不一致")
+    existing = _existing_transaction(
+        db,
+        user_id,
+        "refund",
+        source_module,
+        source_event_id,
+    )
+    if existing is not None:
+        return existing
+    existing_spend_refund = _existing_refund_for_spend(
+        db,
+        user_id,
+        spend_transaction_id,
+    )
+    if existing_spend_refund is not None:
+        return existing_spend_refund
+    allocations = db.execute(
+        """
+        SELECT
+            pa.lot_id,
+            pa.points,
+            l.original_points,
+            l.remaining_points,
+            l.expires_at
+        FROM points_allocations pa
+        JOIN points_lots l ON l.id = pa.lot_id
+        WHERE pa.transaction_id = ?
+        ORDER BY l.created_at, l.id
+        """,
+        (spend_transaction_id,),
+    ).fetchall()
+    allocated = sum(int(row["points"]) for row in allocations)
+    if allocated < amount:
+        raise AgriValidationError("回退积分超过原消费")
+
+    _ensure_account(db, user_id, normalized_time)
+    account = db.execute(
+        """
+        SELECT balance
+        FROM points_accounts
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    balance_after = int(account["balance"]) + amount
+    cursor = db.execute(
+        """
+        INSERT INTO points_transactions (
+            user_id, transaction_type, source_module, source_event_id,
+            delta, balance_after, metadata_json, created_at
+        )
+        VALUES (?, 'refund', ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            user_id,
+            source_module,
+            source_event_id,
+            amount,
+            balance_after,
+            json.dumps(
+                {"spend_transaction_id": spend_transaction_id},
+                ensure_ascii=False,
+            ),
+            normalized_time,
+        ),
+    )
+    transaction_id = int(cursor.lastrowid)
+    remaining = amount
+    expired_restore = 0
+    for allocation in allocations:
+        if remaining <= 0:
+            break
+        restore = min(remaining, int(allocation["points"]))
+        if (
+            allocation["expires_at"] is not None
+            and str(allocation["expires_at"]) <= normalized_time
+        ):
+            expired_restore += restore
+            remaining -= restore
+            continue
+        db.execute(
+            """
+            UPDATE points_lots
+            SET remaining_points = MIN(
+                original_points,
+                remaining_points + ?
+            )
+            WHERE id = ?
+            """,
+            (restore, int(allocation["lot_id"])),
+        )
+        db.execute(
+            """
+            INSERT INTO points_allocations (
+                transaction_id, lot_id, points
+            )
+            VALUES (?, ?, ?)
+            """,
+            (transaction_id, int(allocation["lot_id"]), restore),
+        )
+        remaining -= restore
+    if expired_restore > 0:
+        cursor = db.execute(
+            """
+            INSERT INTO points_lots (
+                user_id, award_transaction_id, original_points,
+                remaining_points, expires_at, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                user_id,
+                transaction_id,
+                expired_restore,
+                expired_restore,
+                _expires_at(normalized_time, policy),
+                normalized_time,
+            ),
+        )
+        db.execute(
+            """
+            INSERT INTO points_allocations (
+                transaction_id, lot_id, points
+            )
+            VALUES (?, ?, ?)
+            """,
+            (transaction_id, int(cursor.lastrowid), expired_restore),
+        )
+    db.execute(
+        """
+        UPDATE points_accounts
+        SET balance = ?, updated_at = ?
+        WHERE user_id = ?
+        """,
+        (balance_after, normalized_time, user_id),
+    )
+    return {
+        "id": transaction_id,
+        "transaction_type": "refund",
+        "delta": amount,
+        "balance_after": balance_after,
+        "source_module": source_module,
+        "source_event_id": source_event_id,
+        "created_at": normalized_time,
+    }
+
+
 def refund_points(
     user_id: int,
     amount: int,
@@ -1044,166 +1215,16 @@ def refund_points(
 
     with _get_db() as db:
         db.execute("BEGIN IMMEDIATE")
-        spend = db.execute(
-            """
-            SELECT id, delta
-            FROM points_transactions
-            WHERE id = ?
-              AND user_id = ?
-              AND transaction_type = 'spend'
-            """,
-            (spend_transaction_id, user_id),
-        ).fetchone()
-        if spend is None:
-            raise AgriValidationError("消费流水不存在")
-        if amount != -int(spend["delta"]):
-            raise AgriValidationError("回退金额与原消费不一致")
-        existing = _existing_transaction(
+        return refund_points_in_transaction(
             db,
             user_id,
-            "refund",
+            amount,
             source_module,
             source_event_id,
-        )
-        if existing is not None:
-            return existing
-        existing_spend_refund = _existing_refund_for_spend(
-            db,
-            user_id,
             spend_transaction_id,
+            normalized_time,
+            policy,
         )
-        if existing_spend_refund is not None:
-            return existing_spend_refund
-        allocations = db.execute(
-            """
-            SELECT
-                pa.lot_id,
-                pa.points,
-                l.original_points,
-                l.remaining_points,
-                l.expires_at
-            FROM points_allocations pa
-            JOIN points_lots l ON l.id = pa.lot_id
-            WHERE pa.transaction_id = ?
-            ORDER BY l.created_at, l.id
-            """,
-            (spend_transaction_id,),
-        ).fetchall()
-        allocated = sum(int(row["points"]) for row in allocations)
-        if allocated < amount:
-            raise AgriValidationError("回退积分超过原消费")
-
-        _ensure_account(db, user_id, normalized_time)
-        account = db.execute(
-            """
-            SELECT balance
-            FROM points_accounts
-            WHERE user_id = ?
-            """,
-            (user_id,),
-        ).fetchone()
-        balance_after = int(account["balance"]) + amount
-        cursor = db.execute(
-            """
-            INSERT INTO points_transactions (
-                user_id, transaction_type, source_module, source_event_id,
-                delta, balance_after, metadata_json, created_at
-            )
-            VALUES (?, 'refund', ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                user_id,
-                source_module,
-                source_event_id,
-                amount,
-                balance_after,
-                json.dumps(
-                    {"spend_transaction_id": spend_transaction_id},
-                    ensure_ascii=False,
-                ),
-                normalized_time,
-            ),
-        )
-        transaction_id = int(cursor.lastrowid)
-        remaining = amount
-        expired_restore = 0
-        for allocation in allocations:
-            if remaining <= 0:
-                break
-            restore = min(remaining, int(allocation["points"]))
-            if (
-                allocation["expires_at"] is not None
-                and str(allocation["expires_at"]) <= normalized_time
-            ):
-                expired_restore += restore
-                remaining -= restore
-                continue
-            db.execute(
-                """
-                UPDATE points_lots
-                SET remaining_points = MIN(
-                    original_points,
-                    remaining_points + ?
-                )
-                WHERE id = ?
-                """,
-                (restore, int(allocation["lot_id"])),
-            )
-            db.execute(
-                """
-                INSERT INTO points_allocations (
-                    transaction_id, lot_id, points
-                )
-                VALUES (?, ?, ?)
-                """,
-                (transaction_id, int(allocation["lot_id"]), restore),
-            )
-            remaining -= restore
-        if expired_restore > 0:
-            cursor = db.execute(
-                """
-                INSERT INTO points_lots (
-                    user_id, award_transaction_id, original_points,
-                    remaining_points, expires_at, created_at
-                )
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    user_id,
-                    transaction_id,
-                    expired_restore,
-                    expired_restore,
-                    _expires_at(normalized_time, policy),
-                    normalized_time,
-                ),
-            )
-            db.execute(
-                """
-                INSERT INTO points_allocations (
-                    transaction_id, lot_id, points
-                )
-                VALUES (?, ?, ?)
-                """,
-                (transaction_id, int(cursor.lastrowid), expired_restore),
-            )
-        db.execute(
-            """
-            UPDATE points_accounts
-            SET balance = ?, updated_at = ?
-            WHERE user_id = ?
-            """,
-            (balance_after, normalized_time, user_id),
-        )
-
-    return {
-        "id": transaction_id,
-        "transaction_type": "refund",
-        "delta": amount,
-        "balance_after": balance_after,
-        "source_module": source_module,
-        "source_event_id": source_event_id,
-        "created_at": normalized_time,
-    }
 
 
 def settle_user_expiry(

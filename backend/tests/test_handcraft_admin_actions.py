@@ -528,6 +528,74 @@ class TestHandcraftAdminActions(unittest.TestCase):
     def test_cancel_pending_fulfillment_emits_restored_points(self):
         with self.app.app_context():
             self._insert_fulfillment()
+            db = get_db()
+            db.execute(
+                """
+                INSERT INTO points_accounts (user_id, balance, updated_at)
+                VALUES (1, 970, '2026-09-17T00:00:00+08:00')
+                """
+            )
+            award = db.execute(
+                """
+                INSERT INTO points_transactions (
+                    user_id, transaction_type, source_module,
+                    source_event_id, delta, balance_after,
+                    metadata_json, created_at
+                )
+                VALUES (
+                    1, 'award', 'test', 'fixture-award', 1000, 1000,
+                    '{}', '2026-09-17T00:00:00+08:00'
+                )
+                """
+            )
+            lot = db.execute(
+                """
+                INSERT INTO points_lots (
+                    user_id, award_transaction_id, original_points,
+                    remaining_points, expires_at, created_at
+                )
+                VALUES (
+                    1, ?, 1000, 970, NULL,
+                    '2026-09-17T00:00:00+08:00'
+                )
+                """,
+                (award.lastrowid,),
+            )
+            spend = db.execute(
+                """
+                INSERT INTO points_transactions (
+                    user_id, transaction_type, source_module,
+                    source_event_id, delta, balance_after,
+                    metadata_json, created_at
+                )
+                VALUES (
+                    1, 'spend', 'handcraft', 'redemption:request-1',
+                    -30, 970, '{}', '2026-09-17T00:00:00+08:00'
+                )
+                """
+            )
+            db.execute(
+                """
+                INSERT INTO points_allocations (
+                    transaction_id, lot_id, points
+                )
+                VALUES (?, ?, 30)
+                """,
+                (spend.lastrowid, lot.lastrowid),
+            )
+            db.execute(
+                """
+                INSERT INTO reward_stock_reservations (
+                    reservation_id, redemption_id, reward_id,
+                    quantity, status, created_at
+                )
+                VALUES (
+                    '10', 10, 'reward-1', 1, 'reserved',
+                    '2026-09-17T00:00:00+08:00'
+                )
+                """
+            )
+            db.commit()
             with patch(
                 "app.handcraft_inheritance.admin_actions."
                 "emit_fulfillment_cancelled"

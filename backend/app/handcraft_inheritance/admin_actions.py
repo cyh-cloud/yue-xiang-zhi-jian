@@ -5,6 +5,12 @@ from __future__ import annotations
 # must never be treated as trusted authorization data.
 
 from app.agri_skills.errors import AgriNotFoundError, AgriValidationError
+from app.handcraft_inheritance.fulfillment import (
+    cancel_pending_fulfillment,
+    deliver_fulfillment_outbox,
+    issue_fulfillment,
+    manual_verify_fulfillment,
+)
 from app.handcraft_inheritance.providers import (
     get_fulfillment_action_provider,
     get_video_review_action_provider,
@@ -246,7 +252,7 @@ class DatabaseTeachingVideoReviewActionProvider:
 class DatabaseFulfillmentAdminActionProvider:
     def apply(self, action: dict) -> dict:
         action = _require_action(action)
-        _require_admin_role(action, "admin_role")
+        admin_role = _require_admin_role(action, "admin_role")
         fulfillment_id = _require_positive_int(
             action.get("fulfillment_id"),
             "履约单标识必须是正整数",
@@ -255,136 +261,40 @@ class DatabaseFulfillmentAdminActionProvider:
         if operation not in {"issue", "cancel_pending", "manual_verify"}:
             raise AgriValidationError("不支持的履约管理动作")
 
-        with _get_db() as db:
-            row = db.execute(
+        if operation == "issue":
+            status = _get_db().execute(
                 """
-                SELECT
-                    f.id,
-                    f.user_id,
-                    f.status,
-                    r.reward_name,
-                    r.points_cost
-                FROM fulfillments f
-                JOIN redemptions r ON r.id = f.redemption_id
-                WHERE f.id = ?
+                SELECT status, issued_at
+                FROM fulfillments
+                WHERE id = ?
                 """,
                 (fulfillment_id,),
             ).fetchone()
-            if row is None:
+            if status is None:
                 raise AgriNotFoundError("履约单不存在")
-
-            current_status = str(row["status"])
-            now = _utc_now_iso()
-            notification = None
-            if operation == "issue":
-                if current_status != "pending":
-                    raise AgriValidationError("当前履约状态不可发放")
-                cursor = db.execute(
-                    """
-                    UPDATE fulfillments
-                    SET status = 'issued',
-                        issued_at = ?,
-                        updated_at = ?
-                    WHERE id = ? AND status = 'pending'
-                    """,
-                    (now, now, fulfillment_id),
+            if (
+                status["status"] != "pending"
+                and not (
+                    status["status"] == "issued"
+                    and status["issued_at"] is not None
                 )
-                if cursor.rowcount != 1:
-                    raise AgriValidationError("当前履约状态不可发放")
-                db.execute(
-                    """
-                    UPDATE redemptions
-                    SET status = 'issued', updated_at = ?
-                    WHERE id = (
-                        SELECT redemption_id
-                        FROM fulfillments
-                        WHERE id = ?
-                    )
-                    """,
-                    (now, fulfillment_id),
-                )
-                result_status = "issued"
-                notification = {
-                    "event_id": (
-                        f"handcraft-fulfillment:{fulfillment_id}:issue"
-                    ),
-                    "student_id": int(row["user_id"]),
-                    "fulfillment_id": str(fulfillment_id),
-                    "prize_name": str(row["reward_name"]),
-                }
-            elif operation == "cancel_pending":
-                if current_status != "pending":
-                    raise AgriValidationError("当前履约状态不可取消")
-                cursor = db.execute(
-                    """
-                    UPDATE fulfillments
-                    SET status = 'canceled',
-                        canceled_at = ?,
-                        updated_at = ?
-                    WHERE id = ? AND status = 'pending'
-                    """,
-                    (now, now, fulfillment_id),
-                )
-                if cursor.rowcount != 1:
-                    raise AgriValidationError("当前履约状态不可取消")
-                db.execute(
-                    """
-                    UPDATE redemptions
-                    SET status = 'canceled',
-                        canceled_at = ?,
-                        updated_at = ?
-                    WHERE id = (
-                        SELECT redemption_id
-                        FROM fulfillments
-                        WHERE id = ?
-                    )
-                    """,
-                    (now, now, fulfillment_id),
-                )
-                result_status = "canceled"
-                notification = {
-                    "event_id": (
-                        f"handcraft-fulfillment:{fulfillment_id}:cancel_pending"
-                    ),
-                    "student_id": int(row["user_id"]),
-                    "fulfillment_id": str(fulfillment_id),
-                    "prize_name": str(row["reward_name"]),
-                    "restored_points": int(row["points_cost"]),
-                }
-            else:
-                if current_status != "issued":
-                    raise AgriValidationError("当前履约状态不可手工核销")
-                cursor = db.execute(
-                    """
-                    UPDATE fulfillments
-                    SET status = 'verified',
-                        verified_at = ?,
-                        updated_at = ?
-                    WHERE id = ? AND status = 'issued'
-                    """,
-                    (now, now, fulfillment_id),
-                )
-                if cursor.rowcount != 1:
-                    raise AgriValidationError("当前履约状态不可手工核销")
-                db.execute(
-                    """
-                    UPDATE redemptions
-                    SET status = 'verified', updated_at = ?
-                    WHERE id = (
-                        SELECT redemption_id
-                        FROM fulfillments
-                        WHERE id = ?
-                    )
-                    """,
-                    (now, fulfillment_id),
-                )
-                result_status = "verified"
-
-        return {
-            "fulfillment_id": fulfillment_id,
-            "status": result_status,
-            "notification": notification,
-        }
+            ):
+                raise AgriValidationError("当前履约状态不可发放")
+            return issue_fulfillment(
+                fulfillment_id,
+                role=admin_role,
+                emit_notification=False,
+            )
+        if operation == "cancel_pending":
+            return cancel_pending_fulfillment(
+                fulfillment_id,
+                role=admin_role,
+                emit_notification=False,
+            )
+        return manual_verify_fulfillment(
+            fulfillment_id,
+            role=admin_role,
+        )
 
 
 def apply_video_review(action: dict) -> dict:
@@ -402,7 +312,23 @@ def apply_video_review(action: dict) -> dict:
 def apply_fulfillment_admin_action(action: dict) -> dict:
     result = get_fulfillment_action_provider().apply(action)
     notification = result.get("notification")
-    if notification is not None:
+    outbox_id = result.get("outbox_id")
+    if outbox_id is not None and notification is not None:
+        if result.get("notification_type") == "cancelled":
+            deliver_fulfillment_outbox(
+                outbox_id,
+                emit_callback=lambda payload: emit_fulfillment_cancelled(
+                    **payload
+                ),
+            )
+        else:
+            deliver_fulfillment_outbox(
+                outbox_id,
+                emit_callback=lambda payload: emit_fulfillment_issued(
+                    **payload
+                ),
+            )
+    elif notification is not None:
         if notification.get("restored_points") is not None:
             emit_fulfillment_cancelled(**notification)
         else:
@@ -410,5 +336,5 @@ def apply_fulfillment_admin_action(action: dict) -> dict:
     return {
         key: value
         for key, value in result.items()
-        if key != "notification"
+        if key not in {"notification", "outbox_id", "notification_type"}
     }

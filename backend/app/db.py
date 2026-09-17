@@ -591,6 +591,28 @@ CREATE TABLE IF NOT EXISTS fulfillments (
 
 CREATE INDEX IF NOT EXISTS idx_fulfillments_user_status
     ON fulfillments(user_id, status, updated_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS fulfillment_notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fulfillment_id INTEGER NOT NULL
+        REFERENCES fulfillments(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL CHECK (
+        event_type IN ('issued', 'cancelled')
+    ),
+    event_id TEXT NOT NULL UNIQUE,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'sent')
+    ),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    sent_at TEXT,
+    UNIQUE (fulfillment_id, event_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_fulfillment_outbox_pending
+    ON fulfillment_notification_outbox(status, created_at, id);
 """
 
 
