@@ -11,7 +11,10 @@ from app.agri_skills.course_learning import (
     submit_course_quiz,
     update_course_progress,
 )
-from app.handcraft_inheritance.points import record_duration_points
+from app.handcraft_inheritance.points import (
+    MAX_SEGMENT_SECONDS,
+    record_duration_points,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -57,7 +60,7 @@ def update_handcraft_course_progress(
                 user_id,
                 "handcraft",
                 f"handcraft-course:{course_id}",
-                effective_delta,
+                min(effective_delta, MAX_SEGMENT_SECONDS),
                 str(progress["updated_at"]),
                 str(progress["watched_seconds"]),
             )

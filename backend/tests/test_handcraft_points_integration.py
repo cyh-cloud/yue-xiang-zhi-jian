@@ -3,8 +3,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
+import app.handcraft_inheritance.points as points_module
 from app import create_app
 from app.agri_skills.ai_client import set_ai_client
 from app.agri_skills.errors import AiUnavailableError
@@ -38,6 +39,7 @@ from app.handcraft_inheritance.points import (
 )
 from app.handcraft_inheritance.presets import PlaceholderPointsPolicyProvider
 from app.handcraft_inheritance.providers import set_points_policy_provider
+from app.session_manager import utc_now_iso
 
 
 AR_GUIDANCE = {
@@ -599,13 +601,16 @@ class TestHandcraftPointsIntegration(unittest.TestCase):
                 self.student_id,
                 customer_session["id"],
             )
-            list_live_scripts_dummy = [
-                live["id"],
-            ]
+            from app.ecommerce_training.live_script import list_live_scripts
+
+            live_scripts = list_live_scripts(self.student_id)
             inbox, ledger, account = self._points_state()
 
         self.ai.complete_json.assert_not_called()
-        self.assertEqual(list_live_scripts_dummy, [live["id"]])
+        self.assertEqual(
+            [script["id"] for script in live_scripts],
+            [live["id"]],
+        )
         self.assertEqual(account["balance"], 40)
         self.assertEqual(
             [row["event_type"] for row in inbox],
@@ -651,6 +656,104 @@ class TestHandcraftPointsIntegration(unittest.TestCase):
         self.assertEqual(inbox[0]["status"], "processed")
         self.assertEqual(account["balance"], 10)
         self.assertEqual(len(ledger), 1)
+
+    def test_processing_exception_keeps_event_retryable_without_duplicates(self):
+        with self.app.app_context():
+            enqueued = points_module.enqueue_learning_event(
+                self.student_id,
+                "ecommerce",
+                "simulation",
+                "retry-simulation",
+                utc_now_iso(),
+            )
+            original_process_event = points_module._process_event
+
+            def process_then_fail(db, event, policy):
+                original_process_event(db, event, policy)
+                raise RuntimeError("temporary processing failure")
+
+            with patch.object(
+                points_module,
+                "_process_event",
+                side_effect=process_then_fail,
+            ):
+                first = process_pending_events(self.student_id)
+            first_inbox, first_ledger, first_account = self._points_state()
+            stored_error = get_db().execute(
+                """
+                SELECT error
+                FROM points_event_inbox
+                WHERE id = ?
+                """,
+                (enqueued["event_id"],),
+            ).fetchone()["error"]
+
+            second = process_pending_events(self.student_id)
+            inbox, ledger, account = self._points_state()
+
+        self.assertEqual(
+            [result["status"] for result in first],
+            ["pending"],
+        )
+        self.assertEqual(stored_error, "temporary processing failure")
+        self.assertEqual(first_inbox[0]["status"], "pending")
+        self.assertEqual(first_inbox[0]["duration_seconds"], None)
+        self.assertEqual(first_ledger, [])
+        self.assertEqual(first_account["balance"], 0)
+        self.assertEqual(
+            [result["status"] for result in second],
+            ["processed"],
+        )
+        self.assertEqual(inbox[0]["status"], "processed")
+        self.assertEqual(account["balance"], 10)
+        self.assertEqual(
+            [
+                (
+                    row["source_module"],
+                    row["source_event_id"],
+                    row["delta"],
+                )
+                for row in ledger
+            ],
+            [("ecommerce", "retry-simulation", 10)],
+        )
+
+    def test_large_course_progress_delta_is_capped_to_one_event(self):
+        provider = StaticHandcraftCourseProvider()
+        provider.course["duration_seconds"] = 9000
+        set_course_provider(self.app, provider)
+
+        with self.app.app_context():
+            progress = update_handcraft_course_progress(
+                self.student_id,
+                201,
+                9000,
+                9000,
+            )
+            inbox, ledger, account = self._points_state()
+
+        self.assertEqual(progress["watched_seconds"], 9000)
+        self.assertEqual(len(inbox), 1)
+        self.assertEqual(inbox[0]["status"], "processed")
+        self.assertEqual(inbox[0]["duration_seconds"], 7200)
+        self.assertEqual(len(ledger), 1)
+        self.assertEqual(ledger[0]["delta"], 12)
+        self.assertEqual(account["balance"], 12)
+
+    def test_ar_without_active_seconds_creates_no_points_event(self):
+        self.ai.complete_json.return_value = AR_GUIDANCE
+
+        with self.app.app_context():
+            generate_ar_guidance(
+                self.student_id,
+                "guangxiu",
+                "practice",
+            )
+            inbox, ledger, account = self._points_state()
+
+        self.assertEqual(inbox, [])
+        self.assertEqual(ledger, [])
+        self.assertEqual(account["balance"], 0)
 
 
 if __name__ == "__main__":

@@ -802,14 +802,13 @@ def process_pending_events(user_id: int, limit: int = 100) -> list[dict]:
                 db.execute(
                     """
                     UPDATE points_event_inbox
-                    SET status = 'failed',
+                    SET status = 'pending',
                         error = ?,
-                        processed_at = ?
+                        processed_at = NULL
                     WHERE id = ?
                     """,
                     (
                         str(error),
-                        _platform_now().isoformat(timespec="seconds"),
                         int(event["id"]),
                     ),
                 )
@@ -817,7 +816,7 @@ def process_pending_events(user_id: int, limit: int = 100) -> list[dict]:
                 _event_result(
                     db,
                     event,
-                    status="failed",
+                    status="pending",
                     error=str(error),
                 )
             )
