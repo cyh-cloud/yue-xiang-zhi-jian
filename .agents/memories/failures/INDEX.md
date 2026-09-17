@@ -10,7 +10,7 @@ No open cases.
 
 ## Blocked
 
-No blocked cases.
+- `yuexiang-20260917-glm-balance-402 | 2026-09-17 | BLOCKED | project | SDD, subagent, glm-5.3, CC Switch, HTTP 402, balance | Round 4/5 model-upgrade spawn failed before execution | cases/2026-09-17-glm-balance-402.md | 2026-09-17`
 
 ## Resolved
 
