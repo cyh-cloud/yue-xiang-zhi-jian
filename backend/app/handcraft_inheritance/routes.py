@@ -18,6 +18,8 @@ from app.handcraft_inheritance.course_learning import (
     get_handcraft_course_progress as _get_handcraft_course_progress,
     get_handcraft_course_quiz as _get_handcraft_course_quiz,
     list_handcraft_courses as _list_handcraft_courses,
+    list_handcraft_course_quiz_attempts as
+    _list_handcraft_course_quiz_attempts,
     list_handcraft_recommendations as _list_handcraft_recommendations,
     submit_handcraft_course_quiz as _submit_handcraft_course_quiz,
     update_handcraft_course_progress as _update_handcraft_course_progress,
@@ -318,6 +320,20 @@ def get_handcraft_course_quiz_route(course_id: int):
     if quiz is None:
         raise AgriNotFoundError("暂无可用测验")
     return jsonify(success=True, quiz=quiz)
+
+
+@handcraft_inheritance_bp.get(
+    "/courses/<int:course_id>/quiz/attempts"
+)
+def list_handcraft_course_quiz_attempts_route(course_id: int):
+    session = _student_session()
+    return jsonify(
+        success=True,
+        attempts=_list_handcraft_course_quiz_attempts(
+            int(session["id"]),
+            course_id,
+        ),
+    )
 
 
 @handcraft_inheritance_bp.post("/courses/<int:course_id>/quiz")

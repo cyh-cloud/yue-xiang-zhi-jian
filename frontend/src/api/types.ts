@@ -296,7 +296,7 @@ export interface SelfTestResult {
   questions: SelfTestResultQuestion[]
 }
 
-export type CourseDirection = 'agriculture' | 'ecommerce'
+export type CourseDirection = 'agriculture' | 'ecommerce' | 'handcraft'
 
 export interface AgriculturalCourse {
   id: number
@@ -362,6 +362,222 @@ export interface EcommerceCourse extends AgriculturalCourse {
   return_to?: string | null
   returnTo?: string | null
   comment_url?: string | null
+}
+
+export interface HandcraftCourse extends AgriculturalCourse {
+  direction: 'handcraft'
+  status: string
+  interest_match: boolean
+  publication_status?: string | null
+  is_published?: boolean | null
+  learning_direction?: string | null
+  return_to?: string | null
+  returnTo?: string | null
+  comment_url?: string | null
+}
+
+export interface HandcraftStep {
+  step_key: string
+  step_no: number
+  title: string
+  description: string
+  tips: string[]
+}
+
+export interface HandcraftMaterial {
+  name: string
+  reference_price: string
+  purchase_channel: string
+  precautions: string
+  taobao_keyword: string
+}
+
+export interface HandcraftCraft {
+  craft_key: string | null
+  name: string | null
+  sort_order: number | null
+  introduction: string
+  is_demo: boolean
+  source_available: boolean
+  status: string
+  available: boolean
+  unavailable_reason: string | null
+  steps: HandcraftStep[]
+  material_guide: HandcraftMaterial[]
+}
+
+export interface HandcraftProgress {
+  user_id: number
+  craft_key: string | null
+  status: string
+  available: boolean
+  unavailable_reason: string | null
+  completed_steps: number[]
+  completed_step_count: number
+  resume_step_no: number | null
+  is_completed: boolean
+  updated_at: string | null
+}
+
+export interface HandcraftStepCompletion extends HandcraftProgress {
+  accepted: boolean
+  reason: string | null
+  step_no: number
+  points_source_event_id: string | null
+  points_event: Record<string, unknown> | null
+  points_status: string
+  points_error?: string
+}
+
+export interface HandcraftVideo {
+  video_id: string
+  craft_key: string | null
+  title: string | null
+  review_status: string | null
+  source_available: boolean
+  media_url: string | null
+  playback_url: string | null
+  version: number | null
+  is_demo: boolean
+  available: boolean
+  status: string
+  unavailable_reason: string | null
+  published_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface HandcraftArGuidance {
+  craft_key: string
+  tool_preparation: string[]
+  operating_points: string[]
+  common_errors: string[]
+  steps: Array<{
+    step_no: number
+    title: string
+    instruction: string
+  }>
+}
+
+export interface HandcraftPointsAccount {
+  user_id: number
+  balance: number
+  updated_at: string | null
+}
+
+export interface HandcraftLedgerEntry {
+  id: number
+  user_id: number
+  transaction_type: string
+  source_module: string
+  source_event_id: string
+  delta: number
+  balance_after: number
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface HandcraftReward {
+  reward_id: string
+  name: string
+  points_cost: number
+  stock: number
+  is_online: boolean
+  is_demo: boolean
+  source_available: boolean
+  affordable: boolean
+  can_redeem: boolean
+  unavailable_reason: string | null
+}
+
+export interface HandcraftRewardSnapshot {
+  reward_id: string
+  name: string
+  points_cost: number
+  stock: number
+  is_online: boolean
+  is_demo?: boolean
+  source_available?: boolean
+}
+
+export type HandcraftFulfillmentStatus =
+  | 'pending'
+  | 'issued'
+  | 'verified'
+  | 'canceled'
+
+export interface HandcraftRedemption {
+  id: number
+  user_id: number
+  reward_id: string
+  reward_name: string
+  reward: HandcraftRewardSnapshot
+  points_cost: number
+  request_id: string
+  status: HandcraftFulfillmentStatus
+  reservation_status: string | null
+  created_at: string
+  updated_at: string
+  canceled_at: string | null
+}
+
+export interface HandcraftFulfillment {
+  id: number
+  redemption_id: number
+  status: HandcraftFulfillmentStatus
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface HandcraftRedemptionHistory {
+  fulfillment: HandcraftFulfillment
+  redemption: Pick<
+    HandcraftRedemption,
+    | 'id'
+    | 'reward_id'
+    | 'reward_name'
+    | 'points_cost'
+    | 'request_id'
+    | 'status'
+    | 'created_at'
+    | 'updated_at'
+  >
+  stock_reservation: {
+    reservation_id: string | null
+    status: string | null
+  }
+  status: HandcraftFulfillmentStatus
+  restored_points: number
+}
+
+export interface HandcraftCancellation {
+  fulfillment_id: number
+  redemption_id: number
+  user_id: number
+  status: HandcraftFulfillmentStatus
+  changed: boolean
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  points_cost: number
+  restored_points: number
+  outbox_id: number | null
+  notification_type: 'issued' | 'cancelled' | null
+  notification: Record<string, unknown> | null
+}
+
+export interface HandcraftLearningOutcome {
+  outcome_type: string
+  source_id: number
+  created_at: string
+  source_available: boolean
+  summary: string
+  score: number | null
+  is_formal: boolean
+  archive_written: boolean
 }
 
 export interface LiveScriptVersion {

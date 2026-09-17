@@ -11,7 +11,11 @@ import {
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import type { CourseProgress, CourseQuizAttempt } from '@/api/types'
+import type {
+  CourseDirection,
+  CourseProgress,
+  CourseQuizAttempt
+} from '@/api/types'
 import AppHeader from '@/components/AppHeader.vue'
 import {
   useCourseLearningStore,
@@ -20,7 +24,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
-  direction: 'agriculture' | 'ecommerce'
+  direction: CourseDirection
   moduleCode: string
   title: string
   description: string
@@ -272,7 +276,13 @@ onMounted(() => {
       <header class="agri-courses-heading">
         <span class="agri-courses-heading__code ark-data">
           {{ props.moduleCode }} /
-          {{ props.direction === 'agriculture' ? 'AGRICULTURAL' : 'E-COMMERCE' }}
+          {{
+            props.direction === 'agriculture'
+              ? 'AGRICULTURAL'
+              : props.direction === 'ecommerce'
+                ? 'E-COMMERCE'
+                : 'HANDCRAFT'
+          }}
           COURSES
         </span>
         <h1>{{ props.title }}</h1>

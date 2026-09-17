@@ -6,13 +6,14 @@ import type {
   CourseProgress,
   CourseQuiz,
   CourseQuizAttempt,
-  EcommerceCourse
+  EcommerceCourse,
+  HandcraftCourse
 } from '@/api/types'
 
 const DEFAULT_API_PREFIX = '/api/agri-skills'
 const DEFAULT_DIRECTION = 'agriculture' as const
 
-export type CourseLearningCourse = EcommerceCourse
+export type CourseLearningCourse = EcommerceCourse | HandcraftCourse
 
 interface CourseLearningState {
   requestEpoch: number

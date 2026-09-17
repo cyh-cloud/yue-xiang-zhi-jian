@@ -68,6 +68,48 @@ describe('courseLearning store', () => {
     expect(apiFetch).toHaveBeenCalledWith('/api/agri-skills/courses')
   })
 
+  it('keeps only handcraft courses for the handcraft direction', async () => {
+    const store = useCourseLearningStore()
+    store.configure('/api/handcraft-inheritance', 'handcraft')
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        courses: [
+          course(501, 'handcraft'),
+          course(1, 'agriculture'),
+          course(2, 'ecommerce')
+        ]
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        progress: {
+          user_id: 1,
+          course_id: 501,
+          duration_seconds: 300,
+          furthest_position_seconds: 0,
+          resume_position_seconds: 0,
+          progress_percent: 0,
+          watched_seconds: 0,
+          completed_at: null,
+          last_viewed_at: null,
+          updated_at: null,
+          quiz_available: false
+        }
+      })
+
+    expect(await store.loadCourses()).toBe(true)
+    expect(store.direction).toBe('handcraft')
+    expect(store.courses.map(item => item.id)).toEqual([501])
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/handcraft-inheritance/courses'
+    )
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      2,
+      '/api/handcraft-inheritance/courses/501/progress'
+    )
+  })
+
   it('ignores a stale recommendation response after switching direction', async () => {
     const store = useCourseLearningStore()
     const agricultureRequest = deferred<{

@@ -78,6 +78,11 @@ LEARNER_ROUTES = (
         None,
     ),
     (
+        "GET",
+        "/api/handcraft-inheritance/courses/501/quiz/attempts",
+        None,
+    ),
+    (
         "POST",
         "/api/handcraft-inheritance/courses/501/quiz",
         {"answers": {"q1": "A"}},
@@ -352,6 +357,10 @@ class TestHandcraftApi(unittest.TestCase):
             (
                 "/api/handcraft-inheritance/courses/<int:course_id>/quiz"
             ): {"GET", "POST"},
+            (
+                "/api/handcraft-inheritance/courses/<int:course_id>/"
+                "quiz/attempts"
+            ): {"GET"},
             (
                 "/api/handcraft-inheritance/internal/points-expiry/run"
             ): {"POST"},
@@ -682,6 +691,62 @@ class TestHandcraftApi(unittest.TestCase):
             },
         )
         self.assertEqual(course_progress["user_id"], self.student_id)
+
+    def test_quiz_attempt_history_is_active_student_scoped(self):
+        self.ai.complete_json.return_value = QUIZ_GRADE
+        self.student_client.put(
+            "/api/handcraft-inheritance/courses/501/progress",
+            json={"position_seconds": 80, "watched_delta_seconds": 80},
+        )
+        self.other_student_client.put(
+            "/api/handcraft-inheritance/courses/501/progress",
+            json={"position_seconds": 80, "watched_delta_seconds": 80},
+        )
+        other_attempt = self.other_student_client.post(
+            "/api/handcraft-inheritance/courses/501/quiz",
+            json={"answers": {"q1": "B"}},
+        )
+        first_attempt = self.student_client.post(
+            "/api/handcraft-inheritance/courses/501/quiz",
+            json={"answers": {"q1": "A"}},
+        )
+        second_attempt = self.student_client.post(
+            "/api/handcraft-inheritance/courses/501/quiz",
+            json={"answers": {"q1": "B"}},
+        )
+
+        attempts_path = (
+            "/api/handcraft-inheritance/courses/501/quiz/attempts"
+        )
+        anonymous = self.app.test_client().get(attempts_path)
+        history = self.student_client.get(attempts_path)
+        other_history = self.other_student_client.get(attempts_path)
+
+        self.assertEqual(anonymous.status_code, 401)
+        self.assertEqual(history.status_code, 200)
+        attempts = history.get_json()["attempts"]
+        self.assertEqual(
+            [attempt["id"] for attempt in attempts],
+            [
+                second_attempt.get_json()["attempt"]["id"],
+                first_attempt.get_json()["attempt"]["id"],
+            ],
+        )
+        self.assertEqual(
+            [attempt["is_formal"] for attempt in attempts],
+            [True, False],
+        )
+        self.assertNotIn(
+            other_attempt.get_json()["attempt"]["id"],
+            [attempt["id"] for attempt in attempts],
+        )
+        self.assertEqual(
+            [
+                attempt["id"]
+                for attempt in other_history.get_json()["attempts"]
+            ],
+            [other_attempt.get_json()["attempt"]["id"]],
+        )
 
     def test_quiz_ai_failure_returns_exact_503_without_overwriting_attempt(self):
         self.student_client.put(
