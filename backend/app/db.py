@@ -505,6 +505,7 @@ CREATE TABLE IF NOT EXISTS points_learning_accruals (
         accumulated_seconds >= 0
     ),
     awarded_units INTEGER NOT NULL DEFAULT 0 CHECK (awarded_units >= 0),
+    consumed_units INTEGER NOT NULL DEFAULT 0 CHECK (consumed_units >= 0),
     updated_at TEXT NOT NULL,
     PRIMARY KEY (user_id, source_module, source_key)
 );
@@ -598,10 +599,36 @@ def _ensure_course_duration_column(db: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_points_consumed_units_column(
+    db: sqlite3.Connection,
+) -> None:
+    columns = {
+        row["name"]
+        for row in db.execute(
+            "PRAGMA table_info(points_learning_accruals)"
+        )
+    }
+    if "consumed_units" not in columns:
+        db.execute(
+            """
+            ALTER TABLE points_learning_accruals
+            ADD COLUMN consumed_units INTEGER NOT NULL DEFAULT 0
+            CHECK (consumed_units >= 0)
+            """
+        )
+        db.execute(
+            """
+            UPDATE points_learning_accruals
+            SET consumed_units = awarded_units
+            """
+        )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
     _ensure_course_duration_column(db)
+    _ensure_points_consumed_units_column(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
