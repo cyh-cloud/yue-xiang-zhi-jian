@@ -9,6 +9,10 @@ from app.auth.routes import auth_bp
 from app.config import build_config
 from app.courses.routes import student_courses_bp
 from app.db import close_db, init_db
+from app.ecommerce_training.routes import (
+    ecommerce_training_bp,
+    register_ecommerce_training_error_handlers,
+)
 from app.messaging.routes import messages_bp
 from app.messaging.source_provider import register_messaging_source_provider
 from app.onboarding.routes import onboarding_bp
@@ -26,6 +30,7 @@ PROTECTED_API_PREFIXES = (
     "/api/onboarding",
     "/api/messages",
     "/api/agri-skills",
+    "/api/ecommerce-training",
 )
 
 
@@ -63,6 +68,8 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(student_profile_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(agri_skills_bp)
+    app.register_blueprint(ecommerce_training_bp)
+    register_ecommerce_training_error_handlers(app)
 
     with app.app_context():
         init_db()

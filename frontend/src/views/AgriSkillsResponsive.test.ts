@@ -87,6 +87,7 @@ function courseFixture(
       status: 'published'
     },
     progress: {
+      user_id: 1,
       course_id: id,
       duration_seconds: 100,
       furthest_position_seconds: progressPercent,
@@ -95,7 +96,9 @@ function courseFixture(
       watched_seconds: progressPercent,
       completed_at:
         progressPercent >= 80 ? '2026-09-16T00:00:00+00:00' : null,
-      last_viewed_at: '2026-09-16T00:00:00+00:00'
+      last_viewed_at: '2026-09-16T00:00:00+00:00',
+      updated_at: '2026-09-16T00:00:00+00:00',
+      quiz_available: true
     }
   }
 }

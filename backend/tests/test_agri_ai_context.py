@@ -28,33 +28,129 @@ class StaticStreamTransport(httpx.BaseTransport):
 
 
 class TestAgriAiContext(unittest.TestCase):
-    def test_allowlists_match_each_ai_call_point(self):
-        self.assertEqual(
-            AI_FIELD_ALLOWLISTS,
+    def test_agri_allowlists_are_preserved(self):
+        expected = {
+            "speech_to_text": {"audio", "filename"},
+            "qa_answer": {"question", "conversation_summary"},
+            "qa_followups": {"question", "answer"},
+            "diagnosis_turn": {
+                "product_name",
+                "affected_part",
+                "symptoms",
+                "round_no",
+                "prior_questions",
+                "prior_answers",
+                "source_conclusion",
+                "followup_status",
+                "followup_note",
+            },
+            "selftest_generate": {"diagnosis_text"},
+            "selftest_grade": {"questions", "answers"},
+            "course_quiz_grade": {
+                "course_summary",
+                "questions",
+                "answers",
+            },
+        }
+        for call_point, fields in expected.items():
+            self.assertEqual(AI_FIELD_ALLOWLISTS[call_point], fields)
+
+    def test_call_domains_separate_agriculture_and_ecommerce(self):
+        agriculture = build_ai_messages(
+            "qa_answer",
+            {"question": "荔枝落果怎么办"},
+        )
+        ecommerce = build_ai_messages(
+            "live_script_generate",
             {
-                "speech_to_text": {"audio", "filename"},
-                "qa_answer": {"question", "conversation_summary"},
-                "qa_followups": {"question", "answer"},
-                "diagnosis_turn": {
-                    "product_name",
-                    "affected_part",
-                    "symptoms",
-                    "round_no",
-                    "prior_questions",
-                    "prior_answers",
-                    "source_conclusion",
-                    "followup_status",
-                    "followup_note",
-                },
-                "selftest_generate": {"diagnosis_text"},
-                "selftest_grade": {"questions", "answers"},
-                "course_quiz_grade": {
-                    "course_summary",
-                    "questions",
-                    "answers",
-                },
+                "product_name": "荔枝干",
+                "selling_points": ["香甜"],
+                "price_text": "39.9 元",
+                "style": "enthusiastic",
             },
         )
+
+        self.assertEqual(
+            agriculture[0]["content"],
+            "农业技能任务：qa_answer",
+        )
+        self.assertEqual(
+            ecommerce[0]["content"],
+            "电商运营实训任务：live_script_generate",
+        )
+
+    def test_ecommerce_allowlists_are_exact_and_strip_sensitive_fields(self):
+        expected = {
+            "live_script_generate": {
+                "product_name",
+                "selling_points",
+                "price_text",
+                "style",
+            },
+            "simulation_score": {"scene_label", "segments"},
+            "copy_case_generate": {"product_type", "scene"},
+            "copy_reference_critique": {
+                "case_text",
+                "defect_categories",
+                "learner_critique",
+            },
+            "copy_revised_generate": {
+                "optimized_prompt",
+                "case_text",
+            },
+            "copy_optimization_critique": {
+                "original_copy",
+                "revised_copy",
+                "optimized_prompt",
+            },
+            "store_plan_generate": {
+                "store_type",
+                "platform",
+                "style_preference",
+            },
+            "customer_message_generate": {
+                "scenario",
+                "goal_criteria",
+                "prior_turns",
+                "turn_no",
+            },
+            "customer_reply_analyze": {
+                "scenario",
+                "goal_criteria",
+                "customer_message",
+                "student_reply",
+            },
+            "customer_summary": {
+                "scenario",
+                "goal_criteria",
+                "turns",
+            },
+        }
+        sensitive_fields = {
+            "username": "student01",
+            "contact": "13800000000",
+            "password": "plain-password",
+            "token": "plain-token",
+            "api_key": "plain-api-key",
+        }
+
+        for call_point, fields in expected.items():
+            with self.subTest(call_point=call_point):
+                self.assertEqual(AI_FIELD_ALLOWLISTS[call_point], fields)
+                context = {
+                    **{field: f"allowed-{field}" for field in fields},
+                    **sensitive_fields,
+                }
+
+                messages = build_ai_messages(call_point, context)
+
+                self.assertEqual(
+                    json.loads(messages[1]["content"]),
+                    {field: f"allowed-{field}" for field in fields},
+                )
+                serialized = json.dumps(messages, ensure_ascii=False)
+                for sensitive_value in sensitive_fields.values():
+                    self.assertNotIn(sensitive_value, serialized)
 
     def test_allowlist_drops_account_and_other_student_fields(self):
         messages = build_ai_messages(

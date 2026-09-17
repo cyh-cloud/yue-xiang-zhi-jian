@@ -21,10 +21,56 @@ class QuizQuestion(Protocol):
     answer: str
 
 
-class AgriCourseProvider(Protocol):
-    def list_published_agriculture_courses(self, student_id: int) -> list[dict]: ...
+class CourseProvider(Protocol):
+    def list_published_courses(
+        self,
+        student_id: int,
+        direction: str,
+    ) -> list[dict]: ...
     def get_course(self, course_id: int) -> dict | None: ...
     def get_quiz(self, course_id: int) -> dict | None: ...
+
+
+AgriCourseProvider = CourseProvider
+
+
+REQUIRED_COURSE_TEXT_FIELDS = ("title", "summary", "teacher_name")
+
+
+def is_eligible_course(course: dict, direction: str) -> bool:
+    if not isinstance(course, dict) or course.get("direction") != direction:
+        return False
+    if direction == "ecommerce":
+        published_at = course.get("published_at")
+        tag_ids = course.get("tag_ids")
+        if (
+            course.get("status") != "published"
+            or not isinstance(published_at, str)
+            or not published_at.strip()
+            or not isinstance(tag_ids, list)
+            or not all(
+                isinstance(tag_id, int)
+                and not isinstance(tag_id, bool)
+                and tag_id > 0
+                for tag_id in tag_ids
+            )
+        ):
+            return False
+    course_id = course.get("id")
+    duration = course.get("duration_seconds")
+    if (
+        not isinstance(course_id, int)
+        or isinstance(course_id, bool)
+        or course_id <= 0
+        or not isinstance(duration, int)
+        or isinstance(duration, bool)
+        or duration <= 0
+    ):
+        return False
+    return all(
+        isinstance(course.get(field), str) and bool(course[field].strip())
+        for field in REQUIRED_COURSE_TEXT_FIELDS
+    )
 
 
 class AiClient(Protocol):
@@ -33,11 +79,11 @@ class AiClient(Protocol):
     def transcribe(self, audio: bytes, filename: str, *, call_point: str) -> str: ...
 
 
-def set_course_provider(app: Flask, provider: AgriCourseProvider) -> None:
+def set_course_provider(app: Flask, provider: CourseProvider) -> None:
     app.extensions["agri_course_provider"] = provider
 
 
-def get_course_provider() -> AgriCourseProvider:
+def get_course_provider() -> CourseProvider:
     provider = current_app.extensions.get("agri_course_provider")
     if provider is not None:
         return provider
@@ -45,3 +91,14 @@ def get_course_provider() -> AgriCourseProvider:
     from app.agri_skills.course_learning import DatabaseAgriCourseProvider
 
     return DatabaseAgriCourseProvider()
+
+
+def list_provider_courses(student_id: int, direction: str) -> list[dict]:
+    provider = get_course_provider()
+    directional = getattr(provider, "list_published_courses", None)
+    if callable(directional):
+        return directional(student_id, direction)
+    legacy = getattr(provider, "list_published_agriculture_courses", None)
+    if direction == "agriculture" and callable(legacy):
+        return legacy(student_id)
+    raise ValueError("课程 provider 不支持该方向")

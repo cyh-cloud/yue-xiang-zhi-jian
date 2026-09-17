@@ -22,6 +22,7 @@ from app.messaging.notification_service import list_notifications
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 NO_LOCAL_MATCH_MESSAGE = "暂无法回答，建议稍后再试"
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
 
 
 class FakeCourseProvider:
@@ -187,11 +188,13 @@ class TestAgriIntegration(unittest.TestCase):
             get_db().execute(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
                 VALUES (
-                    1, '荔枝保果', 'agriculture', 'published', ?, ?, ?, ?, ?
+                    1, '荔枝保果', 'agriculture', 'published', 300,
+                    ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -208,6 +211,7 @@ class TestAgriIntegration(unittest.TestCase):
         self.course = {
             "id": 1,
             "title": "荔枝保果",
+            "direction": "agriculture",
             "summary": "保果与病虫害管理",
             "teacher_name": "林老师",
             "published_at": "2026-09-01T00:00:00+00:00",
@@ -728,16 +732,21 @@ class TestAgriIntegration(unittest.TestCase):
             db.executemany(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, 'agriculture', 'published', ?, '', '林老师', ?, ?)
+                VALUES (
+                    ?, ?, 'agriculture', 'published', 300,
+                    ?, ?, '林老师', ?, ?
+                )
                 """,
                 (
                     (
                         course_id,
                         f"课程 {course_id}",
                         "2026-09-01T00:00:00+00:00",
+                        f"课程 {course_id} 简介",
                         now,
                         now,
                     )
@@ -832,9 +841,14 @@ class TestAgriIntegration(unittest.TestCase):
 
         self.assertNotIn(11, recommendation_ids)
         self.assertEqual(
-            recommendation_ids,
+            [
+                course_id
+                for course_id in recommendation_ids
+                if course_id not in ECOMMERCE_FIXTURE_IDS
+            ],
             [1, 8, 9, 7, 6, 4, 5, 3, 2, 10],
         )
+        self.assertIn(1004, recommendation_ids)
 
     def test_latest_valid_course_quiz_attempt_is_formal(self):
         self._complete_course()

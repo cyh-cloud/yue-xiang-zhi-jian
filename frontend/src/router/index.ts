@@ -8,6 +8,13 @@ import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
 import CourseCatalogView from '@/views/CourseCatalogView.vue'
+import EcommerceCopyTrainingView from '@/views/EcommerceCopyTrainingView.vue'
+import EcommerceCoursesView from '@/views/EcommerceCoursesView.vue'
+import EcommerceCustomerServiceView from '@/views/EcommerceCustomerServiceView.vue'
+import EcommerceLiveScriptView from '@/views/EcommerceLiveScriptView.vue'
+import EcommerceSimulationView from '@/views/EcommerceSimulationView.vue'
+import EcommerceStoreGuidanceView from '@/views/EcommerceStoreGuidanceView.vue'
+import EcommerceTrainingHomeView from '@/views/EcommerceTrainingHomeView.vue'
 import EnterprisePortalView from '@/views/EnterprisePortalView.vue'
 import GovernmentPortalView from '@/views/GovernmentPortalView.vue'
 import HomeView from '@/views/HomeView.vue'
@@ -96,6 +103,48 @@ const router = createRouter({
       path: '/student/agri-skills/courses',
       name: 'student-agri-courses',
       component: AgriCoursesView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training',
+      name: 'student-ecommerce-training',
+      component: EcommerceTrainingHomeView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training/live-script',
+      name: 'student-ecommerce-live-script',
+      component: EcommerceLiveScriptView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training/simulation',
+      name: 'student-ecommerce-simulation',
+      component: EcommerceSimulationView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training/copy-training',
+      name: 'student-ecommerce-copy-training',
+      component: EcommerceCopyTrainingView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training/store-guidance',
+      name: 'student-ecommerce-store-guidance',
+      component: EcommerceStoreGuidanceView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training/customer-service',
+      name: 'student-ecommerce-customer-service',
+      component: EcommerceCustomerServiceView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/ecommerce-training/courses',
+      name: 'student-ecommerce-courses',
+      component: EcommerceCoursesView,
       meta: { requiresAuth: true, roles: ['student'] }
     },
     {

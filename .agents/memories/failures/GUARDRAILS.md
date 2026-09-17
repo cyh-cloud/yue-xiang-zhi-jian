@@ -10,3 +10,13 @@ Stable prevention rules derived from verified project failure cases.
 - Do not scope accessibility checks to `#app` unless the current page root has been verified.
 - After a daemon restart followed by failure, stop repeating the command and inspect session/daemon state.
 - After two failed browser attempts, record or update the failure case before one final minimal probe.
+
+## Model Ladder
+
+- Before a round 4-5 mandatory model upgrade, verify the provider/account is
+  usable with one minimal readiness call.
+- Treat HTTP 402, quota, or balance errors as external `BLOCKED` state, not as
+  a code failure.
+- Do not silently downgrade a mandated round-4/5 model and do not repeat the
+  same spawn after a balance failure.
+- Resume only after the user confirms the provider balance/account has changed.

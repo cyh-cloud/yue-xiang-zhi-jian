@@ -6,6 +6,9 @@ from app import create_app
 from app.db import get_db
 
 
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
+
+
 class TestCourseCatalog(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -35,10 +38,11 @@ class TestCourseCatalog(unittest.TestCase):
             cursor = db.execute(
                 """
                 INSERT INTO courses (
-                    title, direction, status, published_at, summary,
+                    title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, '', '测试教师', ?, ?)
+                VALUES (?, ?, ?, 300, ?, '', '测试教师', ?, ?)
                 """,
                 (
                     f"{direction}-{status}",
@@ -102,7 +106,9 @@ class TestCourseCatalog(unittest.TestCase):
             "/api/student/courses?direction=agriculture"
         )
         titles = [
-            item["title"] for item in response.get_json()["courses"]
+            item["title"]
+            for item in response.get_json()["courses"]
+            if item["id"] not in ECOMMERCE_FIXTURE_IDS
         ]
         self.assertEqual(titles, ["agriculture-published"])
 
@@ -147,6 +153,7 @@ class TestCourseCatalog(unittest.TestCase):
             [
                 item["published_at"]
                 for item in response.get_json()["courses"]
+                if item["id"] not in ECOMMERCE_FIXTURE_IDS
             ],
             [
                 "2026-09-12T00:00:00+00:00",

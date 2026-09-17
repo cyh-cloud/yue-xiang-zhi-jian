@@ -47,6 +47,7 @@ function progress(
   progressPercent: number
 ): CourseProgress {
   return {
+    user_id: 1,
     course_id: courseId,
     duration_seconds: 100,
     furthest_position_seconds: progressPercent,
@@ -55,7 +56,9 @@ function progress(
     watched_seconds: progressPercent,
     completed_at:
       progressPercent >= 80 ? '2026-09-16T01:00:00+00:00' : null,
-    last_viewed_at: '2026-09-16T01:00:00+00:00'
+    last_viewed_at: '2026-09-16T01:00:00+00:00',
+    updated_at: '2026-09-16T01:00:00+00:00',
+    quiz_available: true
   }
 }
 
@@ -64,6 +67,8 @@ const gradedAttempt: CourseQuizAttempt = {
   course_id: 1,
   score: 100,
   is_formal: true,
+  is_current: true,
+  is_latest: true,
   questions: [
     {
       id: 'q1',
@@ -119,6 +124,9 @@ function mockApi(
     }
     if (path === '/api/agri-skills/courses/1/quiz' && options?.method === 'POST') {
       return { success: true, attempt: gradedAttempt } as never
+    }
+    if (path === '/api/agri-skills/courses/1/quiz/attempts') {
+      return { success: true, attempts: [] } as never
     }
     throw new Error(`Unexpected request: ${path}`)
   })
@@ -235,6 +243,10 @@ describe('AgriCoursesView', () => {
     await wrapper.get('[data-test="quiz-entry-1"]').trigger('click')
     await flushPromises()
 
+    expect(wrapper.get('[data-test="quiz-1"]').element).toBeTruthy()
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/agri-skills/courses/1/quiz/attempts'
+    )
     expect(wrapper.get('[data-test="quiz-1"]').text()).toContain(
       '达到多少进度视为完成？'
     )

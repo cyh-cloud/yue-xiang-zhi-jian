@@ -9,12 +9,18 @@ from app import create_app
 from app.agri_skills.course_learning import (
     DatabaseAgriCourseProvider,
     get_course_progress,
+    get_course_quiz,
+    list_courses,
     list_recommendations,
+    submit_course_quiz,
     update_course_progress,
 )
-from app.agri_skills.errors import AgriValidationError
+from app.agri_skills.errors import AgriNotFoundError, AgriValidationError
 from app.agri_skills.providers import get_course_provider, set_course_provider
 from app.db import get_db
+
+
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
 
 
 class FakeCourseProvider:
@@ -99,18 +105,37 @@ class TestAgriCourseProgress(unittest.TestCase):
             db.executemany(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, 'agriculture', 'published', ?, '', '林老师', ?, ?)
+                VALUES (
+                    ?, ?, 'agriculture', 'published', 300,
+                    ?, ?, '林老师', ?, ?
+                )
                 """,
                 (
-                    (1, "荔枝保果", "2026-09-01T00:00:00+00:00", now, now),
-                    (2, "水稻种植", "2026-09-03T00:00:00+00:00", now, now),
+                    (
+                        1,
+                        "荔枝保果",
+                        "2026-09-01T00:00:00+00:00",
+                        "荔枝保果课程简介",
+                        now,
+                        now,
+                    ),
+                    (
+                        2,
+                        "水稻种植",
+                        "2026-09-03T00:00:00+00:00",
+                        "水稻种植课程简介",
+                        now,
+                        now,
+                    ),
                     (
                         3,
                         "荔枝病虫害防治",
                         "2026-09-02T00:00:00+00:00",
+                        "荔枝病虫害防治课程简介",
                         now,
                         now,
                     ),
@@ -119,20 +144,28 @@ class TestAgriCourseProgress(unittest.TestCase):
             db.execute(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (4, '电商课程', 'ecommerce', 'published', ?, '', '', ?, ?)
+                VALUES (
+                    4, '电商课程', 'ecommerce', 'published', 300, ?,
+                    '电商课程简介', '陈老师', ?, ?
+                )
                 """,
                 (now, now, now),
             )
             db.execute(
                 """
                 INSERT INTO courses (
-                    id, title, direction, status, published_at, summary,
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (5, '未上架农业课程', 'agriculture', 'offline', ?, '', '', ?, ?)
+                VALUES (
+                    5, '未上架农业课程', 'agriculture', 'offline', 300,
+                    ?, '', '', ?, ?
+                )
                 """,
                 (now, now, now),
             )
@@ -282,17 +315,22 @@ class TestAgriCourseProgress(unittest.TestCase):
                 0,
             )
 
-    def test_missing_duration_rejects_progress_without_mutation(self):
+    def test_invalid_course_rejects_progress_without_mutation(self):
         with self.app.app_context():
             self.course_provider.courses[0]["duration_seconds"] = None
 
-            with self.assertRaisesRegex(AgriValidationError, "课程时长不可用"):
+            with self.assertRaises(AgriNotFoundError):
                 update_course_progress(self.student_id, 1, 10, 10)
 
-            self.assertEqual(
-                get_course_progress(self.student_id, 1)["progress_percent"],
-                0,
-            )
+            row = get_db().execute(
+                """
+                SELECT *
+                FROM agri_course_progress
+                WHERE user_id = ? AND course_id = ?
+                """,
+                (self.student_id, 1),
+            ).fetchone()
+            self.assertIsNone(row)
 
     def test_recommendations_sort_by_intersection_viewing_and_time(self):
         with self.app.app_context():
@@ -328,17 +366,40 @@ class TestAgriCourseProgress(unittest.TestCase):
                 item["id"] for item in list_recommendations(self.student_id)
             ]
 
-            self.assertEqual(ids, [3, 2, 1])
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [3, 2, 1],
+            )
+            self.assertIn(1004, ids)
 
     def test_database_provider_filters_and_hydrates_agriculture_courses(self):
         with self.app.app_context():
             provider = DatabaseAgriCourseProvider()
 
-            courses = provider.list_published_agriculture_courses(
-                self.student_id
+            courses = provider.list_published_courses(
+                self.student_id,
+                "agriculture",
             )
 
-            self.assertEqual([course["id"] for course in courses], [2, 3, 1])
+            course_ids = [course["id"] for course in courses]
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in course_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [2, 3, 1],
+            )
+            self.assertIn(1004, course_ids)
+            courses = [
+                course
+                for course in courses
+                if course["id"] not in ECOMMERCE_FIXTURE_IDS
+            ]
             self.assertEqual(courses[0]["tag_ids"], [1])
             duration = courses[0]["duration_seconds"]
             self.assertIsInstance(duration, int)
@@ -347,8 +408,94 @@ class TestAgriCourseProgress(unittest.TestCase):
                 provider.get_course(2)["duration_seconds"],
                 duration,
             )
-            self.assertIsNone(provider.get_course(4))
+            ecommerce = provider.list_published_courses(
+                self.student_id,
+                "ecommerce",
+            )
+            ecommerce_ids = [course["id"] for course in ecommerce]
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in ecommerce_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [4],
+            )
+            self.assertTrue(
+                {1001, 1002, 1005}.issubset(ecommerce_ids)
+            )
+            self.assertEqual(provider.get_course(4)["direction"], "ecommerce")
             self.assertIsNone(provider.get_course(5))
+
+    def test_list_courses_and_recommendations_are_direction_aware(self):
+        with self.app.app_context():
+            self.app.extensions.pop("agri_course_provider", None)
+
+            agriculture = list_courses(self.student_id, "agriculture")
+            ecommerce = list_courses(self.student_id, "ecommerce")
+            recommendations = list_recommendations(
+                self.student_id,
+                "ecommerce",
+            )
+
+            agriculture_ids = [course["id"] for course in agriculture]
+            ecommerce_ids = [course["id"] for course in ecommerce]
+            recommendation_ids = [
+                course["id"] for course in recommendations
+            ]
+
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in agriculture_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [2, 3, 1],
+            )
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in ecommerce_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [4],
+            )
+            self.assertEqual(
+                [
+                    course_id
+                    for course_id in recommendation_ids
+                    if course_id not in ECOMMERCE_FIXTURE_IDS
+                ],
+                [4],
+            )
+            self.assertIn(1004, agriculture_ids)
+            self.assertTrue({1001, 1002}.issubset(ecommerce_ids))
+            self.assertTrue(
+                {1001, 1002}.issubset(recommendation_ids)
+            )
+
+    def test_course_actions_reject_courses_from_another_direction(self):
+        with self.app.app_context():
+            with self.assertRaises(AgriNotFoundError):
+                get_course_progress(self.student_id, 1, "ecommerce")
+            with self.assertRaises(AgriNotFoundError):
+                update_course_progress(
+                    self.student_id,
+                    1,
+                    10,
+                    10,
+                    "ecommerce",
+                )
+            self.assertIsNone(
+                get_course_quiz(self.student_id, 1, "ecommerce")
+            )
+            with self.assertRaises(AgriNotFoundError):
+                submit_course_quiz(
+                    self.student_id,
+                    1,
+                    {},
+                    "ecommerce",
+                )
 
     def test_default_course_provider_supports_stable_progress_loop(self):
         with self.app.app_context():

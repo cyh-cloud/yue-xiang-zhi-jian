@@ -2,26 +2,49 @@
 
 ## Goal
 
-Complete and verify the Vue 3 student-home prototype, frontend review fixes, and uv-based backend dependency migration.
+Finish the post-review repair set for `004-ecommerce-training` after the feature's
+whole-branch review.
 
 ## Completed
 
-- Fixed Grid named-area layout behavior, runtime database restoration, repository ignore rules, dialog focus restoration, documentation placement, anchor scroll spacing, and Vite TypeScript project inputs.
-- Moved backend dependency management to `uv`; `pyproject.toml` and `uv.lock` are authoritative.
-- Established the agent-facing project memory scaffold under `.agents/memories/`.
+- Tasks 10-17 are complete and the whole-branch review approved commit `31821dc`.
+- Batch A completed: SQLite-safe simulation writes, course-store request epochs,
+  precise course/quiz DTOs, unified busy UI, and test-name correction.
+  Commits: `a064b50`, `08a26c3`.
+- Batch B partially completed: quiz disabled contrast, retake state/focus, mobile
+  navigation affordances, CJK layout improvements, and mobile empty-state wording.
+  Commits: `dcbfa24`, `92900e7`, `f04403e`, `10af068`.
 
 ## Verified
 
-- `npm run build` passed and generated `frontend/dist`.
-- `npx tsc -b --noEmit` passed.
-- `uv sync --frozen` completed successfully.
-- `uv run --frozen python -m unittest test_app.py` passed 14 tests; the observed AI 401 path is expected by the test.
-- Desktop grid geometry, anchor scrolling, dialog focus, and 320px overflow checks passed.
-- Last application verification date: 2026-09-09.
+- Batch A: backend `344/344`, frontend `244/244`, type-check and production build pass.
+- Batch B at `10af068`: frontend `246/246`, type-check and production build pass.
+- Browser checks at 320/375/1280 show no horizontal overflow or active-tab clipping.
+- Image-understanding review closed most visual items; remaining CJK details are listed below.
+
+## Blocked
+
+- Batch B round 4/5 required the model-ladder upgrade to
+  `基元律动/glm-5.3`, effort high. The subagent could not start because the
+  CC Switch local proxy returned HTTP 402 (`余额不足`).
+- Do not downgrade the mandated round-4 model or repeatedly retry while the
+  provider balance remains unavailable. See
+  `failures/cases/2026-09-17-glm-balance-402.md`.
 
 ## Handoff
 
-- Read `PROJECT_INDEX.md` before starting nontrivial work.
-- Read `RUNBOOK.md` before running or validating the application.
-- Verify the live branch, worktree, port, and process state before release or handoff.
-- Do not treat this snapshot as proof of current runtime state.
+- Resume from branch `v2/lixKRT/004-ecommerce-training`, HEAD `10af068`.
+- Required next repair is structural CJK wrapping in Batch B:
+  - home-1280 still has a 2-character `获得` orphan and mid-word splits in
+    `参考`, `分析`, and `记录`;
+  - simulation-375 empty state still leaves `练。` alone and its hero splits
+    `文字`;
+  - copy-training-320 still leaves `异。` alone.
+- Correct the layout/copy structurally, then rerun code review and
+  image-understanding review.
+- Batch C is not started: use a controlled AI stub in an isolated environment
+  to capture browser failure evidence for AI-04, AI-05, AI-06, AI-09, AI-10,
+  and AI-11.
+- Worktree currently has a runtime change in tracked `data/yuexiang.db`.
+  Do not commit it. Decide with the user whether to restore it from HEAD or
+  archive it before handoff.

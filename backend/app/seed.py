@@ -23,6 +23,7 @@ DEFAULT_COURSES = (
         "title": "荔枝保果与采收管理",
         "direction": "agriculture",
         "status": "published",
+        "duration_seconds": 300,
         "published_at": "2026-09-01T08:00:00+00:00",
         "summary": "学习荔枝保果、采收与采后处理的关键操作。",
         "teacher_name": "林老师",
@@ -32,6 +33,7 @@ DEFAULT_COURSES = (
         "title": "水稻绿色种植基础",
         "direction": "agriculture",
         "status": "published",
+        "duration_seconds": 300,
         "published_at": "2026-09-10T08:00:00+00:00",
         "summary": "掌握水稻绿色种植、田间管理与质量控制基础。",
         "teacher_name": "周老师",
@@ -41,6 +43,7 @@ DEFAULT_COURSES = (
         "title": "农产品直播运营入门",
         "direction": "ecommerce",
         "status": "published",
+        "duration_seconds": 300,
         "published_at": "2026-09-08T08:00:00+00:00",
         "summary": "从直播筹备到复盘，建立农产品直播运营基础。",
         "teacher_name": "梁老师",
@@ -50,6 +53,7 @@ DEFAULT_COURSES = (
         "title": "竹编基础与产品设计",
         "direction": "handcraft",
         "status": "offline",
+        "duration_seconds": 300,
         "published_at": None,
         "summary": "认识竹编材料、基础技法与产品设计方法。",
         "teacher_name": "何老师",
@@ -93,6 +97,7 @@ def seed_courses(connection: sqlite3.Connection) -> None:
             course["title"],
             course["direction"],
             course["status"],
+            course["duration_seconds"],
             course["published_at"],
             course["summary"],
             course["teacher_name"],
@@ -101,10 +106,11 @@ def seed_courses(connection: sqlite3.Connection) -> None:
             cursor = connection.execute(
                 """
                 INSERT INTO courses (
-                    title, direction, status, published_at, summary,
+                    title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (*values, now, now),
             )
@@ -118,6 +124,7 @@ def seed_courses(connection: sqlite3.Connection) -> None:
                     title = ?,
                     direction = ?,
                     status = ?,
+                    duration_seconds = ?,
                     published_at = ?,
                     summary = ?,
                     teacher_name = ?,

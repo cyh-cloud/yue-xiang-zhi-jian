@@ -5,6 +5,7 @@ from pathlib import Path
 
 from flask import current_app, g
 
+from app.ecommerce_training.seed import seed_ecommerce_course_fixtures
 from app.seed import seed_interest_tags
 
 
@@ -81,6 +82,7 @@ CREATE TABLE IF NOT EXISTS courses (
         direction IN ('agriculture', 'ecommerce', 'handcraft')
     ),
     status TEXT NOT NULL CHECK (status IN ('draft', 'pending', 'published', 'offline')),
+    duration_seconds INTEGER,
     published_at TEXT,
     summary TEXT NOT NULL DEFAULT '',
     teacher_name TEXT NOT NULL DEFAULT '',
@@ -95,6 +97,14 @@ CREATE TABLE IF NOT EXISTS course_interest_tags (
     course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     tag_id INTEGER NOT NULL REFERENCES interest_tags(id) ON DELETE CASCADE,
     PRIMARY KEY (course_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS course_quizzes (
+    course_id INTEGER PRIMARY KEY REFERENCES courses(id) ON DELETE CASCADE,
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    scoring_rule TEXT NOT NULL DEFAULT '',
+    questions_json TEXT NOT NULL DEFAULT '[]',
+    updated_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS message_conversations (
@@ -297,6 +307,90 @@ CREATE TABLE IF NOT EXISTS agri_course_quiz_attempts (
 
 CREATE INDEX IF NOT EXISTS idx_agri_quiz_attempts_course
     ON agri_course_quiz_attempts(user_id, course_id, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS ecommerce_live_script_versions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_name TEXT NOT NULL,
+    selling_points_json TEXT NOT NULL,
+    price_text TEXT NOT NULL DEFAULT '',
+    style TEXT NOT NULL CHECK (style IN ('enthusiastic', 'professional', 'humorous')),
+    script_json TEXT NOT NULL,
+    is_current INTEGER NOT NULL DEFAULT 1 CHECK (is_current IN (0, 1)),
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ecommerce_simulation_trainings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scene_key TEXT NOT NULL,
+    segments_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('draft', 'completed')),
+    scores_json TEXT,
+    total_score INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ecommerce_copy_training_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    product_type TEXT NOT NULL,
+    scene_key TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN (
+            'case_ready', 'critique_ready', 'copy_ready', 'completed'
+        )
+    ),
+    case_json TEXT NOT NULL,
+    learner_critique TEXT,
+    reference_json TEXT,
+    optimized_prompt TEXT,
+    revised_copy TEXT,
+    optimization_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ecommerce_store_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    store_type TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    style_preference TEXT NOT NULL,
+    plan_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS ecommerce_customer_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scenario_key TEXT NOT NULL,
+    goal_criteria_json TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN ('active', 'goal_reached', 'completed')
+    ),
+    end_suggested INTEGER NOT NULL DEFAULT 0 CHECK (end_suggested IN (0, 1)),
+    confirmed_at TEXT,
+    summary_json TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ecommerce_customer_turns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL
+        REFERENCES ecommerce_customer_sessions(id) ON DELETE CASCADE,
+    turn_no INTEGER NOT NULL,
+    customer_message TEXT NOT NULL,
+    student_reply TEXT,
+    analysis_json TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (session_id, turn_no)
+);
 """
 
 
@@ -311,10 +405,25 @@ def get_db() -> sqlite3.Connection:
     return g.db
 
 
+def _ensure_course_duration_column(db: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(courses)")}
+    if "duration_seconds" not in columns:
+        db.execute("ALTER TABLE courses ADD COLUMN duration_seconds INTEGER")
+        db.execute(
+            """
+            UPDATE courses
+            SET duration_seconds = 300
+            WHERE duration_seconds IS NULL
+            """
+        )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
+    _ensure_course_duration_column(db)
     seed_interest_tags(db)
+    seed_ecommerce_course_fixtures(db)
     db.commit()
 
 

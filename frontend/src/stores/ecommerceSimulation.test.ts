@@ -1,0 +1,517 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { ApiError, apiFetch } from '@/api/client'
+import type { SimulationScene, SimulationTraining } from '@/api/types'
+
+import { useEcommerceSimulationStore } from './ecommerceSimulation'
+
+vi.mock('@/api/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return {
+    ...actual,
+    apiFetch: vi.fn()
+  }
+})
+
+const mockedApiFetch = vi.mocked(apiFetch)
+
+const scenes: SimulationScene[] = [
+  {
+    key: 'opening',
+    label: '开场白',
+    segments: [
+      { key: 'greeting', label: '欢迎问候' },
+      { key: 'hook', label: '利益吸引' },
+      { key: 'audience_call', label: '观众召集' }
+    ]
+  },
+  {
+    key: 'product_intro',
+    label: '产品介绍',
+    segments: [
+      { key: 'feature', label: '核心卖点' },
+      { key: 'proof', label: '信任证明' }
+    ]
+  }
+]
+
+function training(
+  patch: Partial<SimulationTraining> = {}
+): SimulationTraining {
+  return {
+    id: 1,
+    scene_key: 'opening',
+    scene_label: '开场白',
+    segments: [
+      { key: 'greeting', label: '欢迎问候', text: '' },
+      { key: 'hook', label: '利益吸引', text: '' },
+      { key: 'audience_call', label: '观众召集', text: '' }
+    ],
+    status: 'draft',
+    scores: null,
+    suggestions: null,
+    total_score: null,
+    created_at: '2026-09-17T01:00:00+00:00',
+    updated_at: '2026-09-17T01:00:00+00:00',
+    completed_at: null,
+    ...patch
+  }
+}
+
+function completedTraining(): SimulationTraining {
+  return training({
+    status: 'completed',
+    segments: [
+      { key: 'greeting', label: '欢迎问候', text: '欢迎来到直播间' },
+      { key: 'hook', label: '利益吸引', text: '今天带来广东荔枝干' },
+      { key: 'audience_call', label: '观众召集', text: '想要的扣一' }
+    ],
+    scores: {
+      pacing: 80,
+      emotion: 70,
+      interaction: 90,
+      selling_point: 60
+    },
+    suggestions: {
+      pacing: '适当停顿',
+      emotion: '增强感染力',
+      interaction: '增加提问',
+      selling_point: '突出产地优势'
+    },
+    total_score: 64,
+    completed_at: '2026-09-17T01:10:00+00:00'
+  })
+}
+
+describe('ecommerceSimulation store', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    mockedApiFetch.mockReset()
+  })
+
+  it('loads scenes in backend order and starts exactly one selected scene', async () => {
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        scenes
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        training: training()
+      } as never)
+    const store = useEcommerceSimulationStore()
+
+    await store.loadScenes()
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/ecommerce-training/simulations/scenes'
+    )
+    expect(store.scenes.map(scene => scene.key)).toEqual([
+      'opening',
+      'product_intro'
+    ])
+    expect(store.scenes[0].segments.map(segment => segment.key)).toEqual([
+      'greeting',
+      'hook',
+      'audience_call'
+    ])
+
+    expect(await store.start('opening')).toBe(true)
+    expect(mockedApiFetch).toHaveBeenLastCalledWith(
+      '/api/ecommerce-training/simulations',
+      {
+        method: 'POST',
+        body: JSON.stringify({ scene_key: 'opening' })
+      }
+    )
+    expect(store.current?.scene_key).toBe('opening')
+    expect(store.current?.segments.map(segment => segment.key)).toEqual([
+      'greeting',
+      'hook',
+      'audience_call'
+    ])
+  })
+
+  it('saves each segment before enabling scoring', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = training()
+    store.drafts = {
+      greeting: '欢迎来到直播间',
+      hook: '今天带来广东荔枝干',
+      audience_call: ''
+    }
+
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        training: training({
+          segments: [
+            { key: 'greeting', label: '欢迎问候', text: '欢迎来到直播间' },
+            { key: 'hook', label: '利益吸引', text: '' },
+            { key: 'audience_call', label: '观众召集', text: '' }
+          ]
+        })
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        training: training({
+          segments: [
+            { key: 'greeting', label: '欢迎问候', text: '欢迎来到直播间' },
+            {
+              key: 'hook',
+              label: '利益吸引',
+              text: '今天带来广东荔枝干'
+            },
+            { key: 'audience_call', label: '观众召集', text: '' }
+          ]
+        })
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        training: training({
+          segments: [
+            { key: 'greeting', label: '欢迎问候', text: '欢迎来到直播间' },
+            {
+              key: 'hook',
+              label: '利益吸引',
+              text: '今天带来广东荔枝干'
+            },
+            {
+              key: 'audience_call',
+              label: '观众召集',
+              text: '想要的扣一'
+            }
+          ]
+        })
+      } as never)
+
+    expect(store.canScore).toBe(false)
+    expect(await store.saveSegment('greeting', '欢迎来到直播间')).toBe(true)
+    expect(store.canScore).toBe(false)
+    expect(await store.saveSegment('hook', '今天带来广东荔枝干')).toBe(true)
+    expect(store.canScore).toBe(false)
+    expect(await store.saveSegment('audience_call', '想要的扣一')).toBe(true)
+    expect(store.canScore).toBe(true)
+
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      1,
+      '/api/ecommerce-training/simulations/1/segments/greeting',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ text: '欢迎来到直播间' })
+      }
+    )
+    expect(mockedApiFetch).toHaveBeenNthCalledWith(
+      3,
+      '/api/ecommerce-training/simulations/1/segments/audience_call',
+      {
+        method: 'PUT',
+        body: JSON.stringify({ text: '想要的扣一' })
+      }
+    )
+  })
+
+  it('uses the backend score and total without recalculating them', async () => {
+    const scored = completedTraining()
+    const store = useEcommerceSimulationStore()
+    store.current = training({
+      segments: scored.segments
+    })
+    store.drafts = Object.fromEntries(
+      scored.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    mockedApiFetch.mockResolvedValueOnce({
+      success: true,
+      training: scored
+    } as never)
+
+    expect(await store.score()).toBe(true)
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/ecommerce-training/simulations/1/score',
+      { method: 'POST' }
+    )
+    expect(store.current?.scores).toEqual(scored.scores)
+    expect(store.current?.total_score).toBe(64)
+    expect(store.current?.status).toBe('completed')
+  })
+
+  it('keeps drafts, saved state, and current training when scoring fails, then retries', async () => {
+    const scored = completedTraining()
+    const store = useEcommerceSimulationStore()
+    store.current = training({ segments: scored.segments })
+    store.drafts = Object.fromEntries(
+      scored.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    const original = store.current
+    mockedApiFetch
+      .mockRejectedValueOnce(new ApiError('provider timeout', 503))
+      .mockResolvedValueOnce({
+        success: true,
+        training: scored
+      } as never)
+
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('AI 服务暂时不可用')
+    expect(store.current).toEqual(original)
+    expect(store.drafts).toEqual({
+      greeting: '欢迎来到直播间',
+      hook: '今天带来广东荔枝干',
+      audience_call: '想要的扣一'
+    })
+    expect(store.savedSegments).toEqual({
+      greeting: true,
+      hook: true,
+      audience_call: true
+    })
+    expect(store.canScore).toBe(true)
+
+    expect(await store.score()).toBe(true)
+    expect(mockedApiFetch).toHaveBeenCalledTimes(2)
+    expect(store.error).toBe('')
+    expect(store.current?.total_score).toBe(64)
+  })
+
+  it('rejects context changes while a save is pending and applies its own response', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = training()
+    store.drafts = {
+      greeting: '欢迎来到直播间',
+      hook: '',
+      audience_call: ''
+    }
+    store.savedSegments = {
+      greeting: false,
+      hook: false,
+      audience_call: false
+    }
+    let resolveSave:
+      | ((value: {
+          success: true
+          training: SimulationTraining
+        }) => void)
+      | undefined
+    mockedApiFetch.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveSave = resolve
+        }) as never
+    )
+
+    const saveRequest = store.saveSegment(
+      'greeting',
+      '欢迎来到直播间'
+    )
+    expect(await store.start('product_intro')).toBe(false)
+    expect(store.current?.id).toBe(1)
+    resolveSave?.({
+      success: true,
+      training: training({
+        id: 1,
+        segments: [
+          {
+            key: 'greeting',
+            label: '欢迎问候',
+            text: '欢迎来到直播间'
+          },
+          { key: 'hook', label: '利益吸引', text: '' },
+          { key: 'audience_call', label: '观众召集', text: '' }
+        ]
+      })
+    })
+    await saveRequest
+
+    expect(store.current?.id).toBe(1)
+    expect(store.current?.scene_key).toBe('opening')
+    expect(store.drafts).toEqual({
+      greeting: '欢迎来到直播间',
+      hook: '',
+      audience_call: ''
+    })
+    expect(store.savedSegments).toEqual({
+      greeting: true,
+      hook: false,
+      audience_call: false
+    })
+    expect(store.isBusy).toBe(false)
+  })
+
+  it('rejects context mutations while scoring is pending and clears busy state after settle', async () => {
+    const store = useEcommerceSimulationStore()
+    const scored = completedTraining()
+    store.current = training({ segments: scored.segments })
+    store.drafts = Object.fromEntries(
+      scored.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    const nextTraining = training({
+      id: 2,
+      scene_key: 'product_intro',
+      scene_label: '产品介绍',
+      segments: [{ key: 'feature', label: '核心卖点', text: '' }]
+    })
+    let resolveScore:
+      | ((value: {
+          success: true
+          training: SimulationTraining
+        }) => void)
+      | undefined
+    mockedApiFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveScore = resolve
+          }) as never
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        training: nextTraining
+      } as never)
+
+    const scoreRequest = store.score()
+    expect(store.scoring).toBe(true)
+    expect(await store.start('product_intro')).toBe(false)
+    expect(await store.openTraining(2)).toBe(false)
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+
+    resolveScore?.({
+      success: true,
+      training: scored
+    })
+    await scoreRequest
+
+    expect(store.scoring).toBe(false)
+    expect(store.isBusy).toBe(false)
+    expect(await store.start('product_intro')).toBe(true)
+    expect(store.current?.id).toBe(2)
+  })
+
+  it('keeps loading active until every overlapping read has settled', async () => {
+    const store = useEcommerceSimulationStore()
+    let resolveScenes:
+      | ((value: { success: true; scenes: SimulationScene[] }) => void)
+      | undefined
+    mockedApiFetch
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveScenes = resolve
+          }) as never
+      )
+      .mockResolvedValueOnce({
+        success: true,
+        trainings: []
+      } as never)
+
+    const scenesRequest = store.loadScenes()
+    const historyRequest = store.loadHistory()
+    await historyRequest
+
+    expect(store.loading).toBe(true)
+
+    resolveScenes?.({
+      success: true,
+      scenes
+    })
+    await scenesRequest
+
+    expect(store.loading).toBe(false)
+  })
+
+  it('maps 400 and 500 score failures without claiming AI is unavailable', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = training({ segments: completedTraining().segments })
+    store.drafts = Object.fromEntries(
+      store.current.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    mockedApiFetch
+      .mockRejectedValueOnce(new ApiError('训练尚未完成', 400))
+      .mockRejectedValueOnce(new ApiError('评分服务异常', 500))
+
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('训练尚未完成')
+    expect(store.error).not.toBe('AI 服务暂时不可用')
+
+    store.current = training({ segments: completedTraining().segments })
+    store.drafts = Object.fromEntries(
+      store.current.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('评分服务异常')
+    expect(store.error).not.toBe('AI 服务暂时不可用')
+  })
+
+  it('leaves 401 handling to the existing session flow', async () => {
+    const store = useEcommerceSimulationStore()
+    store.current = completedTraining()
+    store.drafts = Object.fromEntries(
+      store.current.segments.map(segment => [segment.key, segment.text])
+    )
+    store.savedSegments = {
+      greeting: true,
+      hook: true,
+      audience_call: true
+    }
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError('登录已过期', 401)
+    )
+
+    expect(await store.score()).toBe(false)
+    expect(store.error).toBe('')
+  })
+
+  it('loads history and opens a historical training record', async () => {
+    const scored = completedTraining()
+    const store = useEcommerceSimulationStore()
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        trainings: [scored]
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        training: scored
+      } as never)
+
+    await store.loadHistory()
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/ecommerce-training/simulations'
+    )
+    expect(store.history).toEqual([scored])
+
+    expect(await store.openTraining(1)).toBe(true)
+    expect(mockedApiFetch).toHaveBeenLastCalledWith(
+      '/api/ecommerce-training/simulations/1'
+    )
+    expect(store.current?.status).toBe('completed')
+    expect(store.canScore).toBe(false)
+    expect(store.drafts).toEqual({
+      greeting: '欢迎来到直播间',
+      hook: '今天带来广东荔枝干',
+      audience_call: '想要的扣一'
+    })
+  })
+})

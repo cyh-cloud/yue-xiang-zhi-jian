@@ -19,6 +19,7 @@ ROLE_PATHS = {
     "super_admin": "/admin",
     "admin": "/admin",
 }
+ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
 
 
 class TestUserPortalIntegration(unittest.TestCase):
@@ -76,9 +77,10 @@ class TestUserPortalIntegration(unittest.TestCase):
             cursor = db.execute(
                 """
                 INSERT INTO courses (
-                    title, direction, status, published_at, summary,
+                    title, direction, status, duration_seconds,
+                    published_at, summary,
                     teacher_name, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, '', '测试教师', ?, ?)
+                ) VALUES (?, ?, ?, 300, ?, '', '测试教师', ?, ?)
                 """,
                 (
                     title,
@@ -190,14 +192,20 @@ class TestUserPortalIntegration(unittest.TestCase):
         courses = self.client.get(
             "/api/student/courses?direction=agriculture"
         ).get_json()["courses"]
+        legacy_courses = [
+            course
+            for course in courses
+            if course["id"] not in ECOMMERCE_FIXTURE_IDS
+        ]
         self.assertEqual(
-            [course["title"] for course in courses],
+            [course["title"] for course in legacy_courses],
             ["荔枝保果", "水稻新课程"],
         )
         self.assertEqual(
-            [course["interest_match"] for course in courses],
+            [course["interest_match"] for course in legacy_courses],
             [True, False],
         )
+        self.assertIn(1004, [course["id"] for course in courses])
 
         for role, expected in ROLE_PATHS.items():
             with self.subTest(role=role):

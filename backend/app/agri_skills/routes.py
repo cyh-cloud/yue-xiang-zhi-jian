@@ -27,6 +27,7 @@ from app.agri_skills.course_learning import (
     get_course_progress,
     get_course_quiz,
     list_agriculture_courses,
+    list_course_quiz_attempts,
     list_recommendations,
     submit_course_quiz,
     update_course_progress,
@@ -311,6 +312,19 @@ def get_quiz_route(course_id: int):
     if quiz is None:
         return jsonify(success=False, message="暂无可用测验"), 404
     return jsonify(success=True, quiz=quiz)
+
+
+@agri_skills_bp.get("/courses/<int:course_id>/quiz/attempts")
+def list_quiz_attempts_route(course_id: int):
+    session = _student_session()
+    return jsonify(
+        success=True,
+        attempts=list_course_quiz_attempts(
+            int(session["id"]),
+            course_id,
+            direction="agriculture",
+        ),
+    )
 
 
 @agri_skills_bp.post("/courses/<int:course_id>/quiz")
