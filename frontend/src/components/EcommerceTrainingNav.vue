@@ -81,6 +81,7 @@ watch(() => route.fullPath, revealActiveLink, { flush: 'post' })
 
 <style scoped>
 .ecommerce-training-nav {
+  position: relative;
   border-bottom: 1px solid var(--ark-line);
   background: var(--ark-surface-0);
 }
@@ -135,6 +136,36 @@ watch(() => route.fullPath, revealActiveLink, { flush: 'post' })
 .ecommerce-training-nav a.is-active {
   border-bottom-color: var(--ark-signal);
   color: var(--ark-signal);
+}
+
+@media (max-width: 900px) {
+  .ecommerce-training-nav {
+    overflow: hidden;
+  }
+
+  .ecommerce-training-nav::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 1;
+    width: 18px;
+    content: "";
+    background: linear-gradient(to right, var(--ark-surface-0), transparent);
+    pointer-events: none;
+  }
+
+  .ecommerce-training-nav::after {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 18px;
+    content: "";
+    background: linear-gradient(to left, var(--ark-surface-0), transparent);
+    pointer-events: none;
+  }
 }
 
 @media (max-width: 640px) {

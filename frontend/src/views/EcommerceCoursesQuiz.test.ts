@@ -254,6 +254,7 @@ describe('EcommerceCoursesView quiz availability and history', () => {
     await flushPromises()
     await submitted.get('[data-test="quiz-entry-1"]').trigger('click')
     await flushPromises()
+    await submitted.get('[data-test="quiz-retake-1"]').trigger('click')
     await submitted.get('[data-test="quiz-option-0-1"]').setValue()
     await submitted.get('[data-test="quiz-form-1"]').trigger('submit')
     await flushPromises()
@@ -278,6 +279,54 @@ describe('EcommerceCoursesView quiz availability and history', () => {
       refreshed.get('[data-test="quiz-feedback-label"]').text()
     ).toContain('上次解析')
     expect(refreshed.get('.quiz-result').text()).not.toContain('本次')
+  })
+
+  it('starts a fresh attempt after submission while retaining history', async () => {
+    mockApi()
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-test="quiz-entry-1"]').trigger('click')
+    await flushPromises()
+    await wrapper.get('[data-test="quiz-retake-1"]').trigger('click')
+
+    const submit = wrapper.get('[data-test="quiz-submit-1"]')
+    expect(submit.text()).toContain('提交测验')
+    expect(submit.attributes('disabled')).toBeDefined()
+
+    await wrapper.get('[data-test="quiz-option-0-1"]').setValue()
+    expect(submit.attributes('disabled')).toBeUndefined()
+    await wrapper.get('[data-test="quiz-form-1"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="quiz-retake-1"]').text()).toContain(
+      '再次测验'
+    )
+    expect(wrapper.find('[data-test="quiz-form-1"]').exists()).toBe(false)
+    expect(wrapperItems(wrapper)).toHaveLength(3)
+
+    await wrapper.get('[data-test="quiz-retake-1"]').trigger('click')
+
+    expect(wrapper.get('[data-test="quiz-submit-1"]').text()).toContain(
+      '提交测验'
+    )
+    expect(
+      wrapper.get('[data-test="quiz-submit-1"]').attributes('disabled')
+    ).toBeDefined()
+    expect(wrapper.find('[data-test="quiz-result-1"]').exists()).toBe(false)
+    expect(
+      wrapper
+        .findAll<HTMLInputElement>('input[type="radio"]')
+        .every(input => !input.element.checked)
+    ).toBe(true)
+    expect(wrapperItems(wrapper)).toHaveLength(3)
+    expect(
+      wrapper.find('[data-test="quiz-history-23"]').exists()
+    ).toBe(true)
+
+    await wrapper.get('[data-test="quiz-option-0-1"]').setValue()
+    expect(
+      wrapper.get('[data-test="quiz-submit-1"]').attributes('disabled')
+    ).toBeUndefined()
   })
 })
 

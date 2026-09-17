@@ -233,10 +233,6 @@ async function logout() {
   font-size: 0.68rem;
 }
 
-.ecommerce-training-card__body small {
-  overflow-wrap: anywhere;
-}
-
 .ecommerce-training-card__body strong {
   overflow-wrap: normal;
   font-size: 1rem;
@@ -245,10 +241,13 @@ async function logout() {
 }
 
 .ecommerce-training-card__body small {
+  min-width: 0;
+  line-break: strict;
+  overflow-wrap: anywhere;
   color: var(--ark-muted);
   font-size: 0.8rem;
   line-height: 1.55;
-  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 .ecommerce-training-card__arrow {

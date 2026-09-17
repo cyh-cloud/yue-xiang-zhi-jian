@@ -8,7 +8,7 @@ import {
   Trophy,
   XCircle
 } from 'lucide-vue-next'
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import type { CourseProgress, CourseQuizAttempt } from '@/api/types'
@@ -31,6 +31,7 @@ const coursesStore = useCourseLearningStore()
 const auth = useAuthStore()
 const router = useRouter()
 const quizAnswers = reactive<Record<string, string>>({})
+const retakingCourseId = ref<number | null>(null)
 const attemptTimestampFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
   year: 'numeric',
@@ -97,6 +98,12 @@ function commentReturnTo(course: CourseLearningCourse): string {
 function latestAttempt(courseId: number): CourseQuizAttempt | undefined {
   return coursesStore.attempts.find(
     attempt => attempt.course_id === courseId
+  )
+}
+
+function showsLatestResult(courseId: number): boolean {
+  return Boolean(
+    latestAttempt(courseId) && retakingCourseId.value !== courseId
   )
 }
 
@@ -171,17 +178,30 @@ function formatAttemptTimestamp(value: string): string {
 }
 
 async function openQuiz(courseId: number) {
+  retakingCourseId.value = null
   Object.keys(quizAnswers).forEach(key => {
     delete quizAnswers[key]
   })
   await coursesStore.loadQuiz(courseId)
 }
 
+function startRetake(courseId: number) {
+  Object.keys(quizAnswers).forEach(key => {
+    delete quizAnswers[key]
+  })
+  retakingCourseId.value = courseId
+}
+
 async function submitQuiz(courseId: number) {
   if (!quizIsComplete(courseId) || coursesStore.loading) {
     return
   }
-  await coursesStore.submitQuiz(courseId, { ...quizAnswers })
+  const submitted = await coursesStore.submitQuiz(courseId, {
+    ...quizAnswers
+  })
+  if (submitted) {
+    retakingCourseId.value = null
+  }
 }
 
 async function retryAll() {
@@ -491,6 +511,7 @@ onMounted(() => {
               </section>
 
               <form
+                v-if="!showsLatestResult(course.id)"
                 class="quiz-form"
                 :data-test="`quiz-form-${course.id}`"
                 @submit.prevent="submitQuiz(course.id)"
@@ -528,7 +549,7 @@ onMounted(() => {
               </form>
 
               <div
-                v-if="latestAttempt(course.id)"
+                v-if="showsLatestResult(course.id)"
                 class="quiz-result"
                 :data-test="`quiz-result-${course.id}`"
               >
@@ -542,6 +563,17 @@ onMounted(() => {
                   >
                     {{ latestAttempt(course.id)?.score }} 分
                   </strong>
+                </div>
+                <div class="quiz-result__actions">
+                  <button
+                    class="quiz-submit quiz-retake"
+                    type="button"
+                    :data-test="`quiz-retake-${course.id}`"
+                    @click="startRetake(course.id)"
+                  >
+                    <RefreshCw :size="17" aria-hidden="true" />
+                    再次测验
+                  </button>
                 </div>
                 <div
                   class="quiz-result__feedback-heading"
@@ -817,8 +849,9 @@ onMounted(() => {
   max-width: 78ch;
   margin: 13px 0 0;
   color: var(--ark-muted);
+  line-break: strict;
   overflow-wrap: anywhere;
-  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 .course-card__meta {
@@ -1091,6 +1124,14 @@ onMounted(() => {
   background: var(--ark-paper);
 }
 
+.quiz-submit:disabled {
+  border-color: var(--ark-line-strong);
+  background: var(--ark-surface-2);
+  color: var(--ark-paper);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
 .quiz-result {
   display: grid;
   border-top: 1px solid var(--ark-line);
@@ -1113,6 +1154,13 @@ onMounted(() => {
 .quiz-result__score strong {
   color: var(--ark-signal);
   font-size: 1.55rem;
+}
+
+.quiz-result__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  border-top: 1px solid var(--ark-line);
 }
 
 .quiz-result__feedback-heading {

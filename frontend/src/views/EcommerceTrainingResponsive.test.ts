@@ -344,6 +344,12 @@ describe('ecommerce responsive CSS contracts', () => {
       cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body strong')
     ).toContain('word-break: keep-all')
     expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
+    ).toContain('line-break: strict')
+    expect(
+      cssRule(ecommerceTrainingHomeSource, '.ecommerce-training-card__body small')
+    ).toContain('text-wrap: balance')
+    expect(
       cssRule(
         mediaBlock(ecommerceTrainingHomeSource, 640),
         '.ecommerce-training-home__grid'
@@ -520,7 +526,10 @@ describe('ecommerce responsive CSS contracts', () => {
       'overflow-wrap: anywhere'
     )
     expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
-      'text-wrap: pretty'
+      'text-wrap: balance'
+    )
+    expect(cssRule(courseLearningPanelSource, '.course-card__summary')).toContain(
+      'line-break: strict'
     )
     expect(cssRule(courseLearningPanelSource, '.course-card__meta')).toContain(
       'flex-wrap: wrap'
@@ -544,7 +553,19 @@ describe('ecommerce responsive CSS contracts', () => {
       'flex-direction: column'
     )
     expect(cssRule(coursesMobile, '.quiz-submit')).toContain('width: 100%')
+    expect(cssRule(courseLearningPanelSource, '.quiz-submit:disabled')).toContain(
+      'background: var(--ark-surface-2)'
+    )
+    expect(cssRule(courseLearningPanelSource, '.quiz-submit:disabled')).toContain(
+      'color: var(--ark-paper)'
+    )
+    expect(cssRule(courseLearningPanelSource, '.quiz-submit:disabled')).toContain(
+      'opacity: 1'
+    )
 
+    expect(cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav')).toContain(
+      'position: relative'
+    )
     expect(
       cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav__inner')
     ).toContain('overflow-x: auto')
@@ -563,6 +584,12 @@ describe('ecommerce responsive CSS contracts', () => {
     expect(cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav a')).toContain(
       'white-space: nowrap'
     )
+    expect(
+      cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav::before')
+    ).toContain('linear-gradient(to right, var(--ark-surface-0), transparent)')
+    expect(
+      cssRule(ecommerceTrainingNavSource, '.ecommerce-training-nav::after')
+    ).toContain('linear-gradient(to left, var(--ark-surface-0), transparent)')
   })
 })
 
