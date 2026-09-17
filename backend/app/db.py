@@ -391,6 +391,185 @@ CREATE TABLE IF NOT EXISTS ecommerce_customer_turns (
     created_at TEXT NOT NULL,
     UNIQUE (session_id, turn_no)
 );
+
+CREATE TABLE IF NOT EXISTS heritage_craft_progress (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    craft_key TEXT NOT NULL,
+    completed_steps_json TEXT NOT NULL DEFAULT '[]',
+    resume_step_no INTEGER CHECK (
+        resume_step_no IS NULL OR resume_step_no BETWEEN 1 AND 6
+    ),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, craft_key)
+);
+
+CREATE TABLE IF NOT EXISTS heritage_videos (
+    video_id TEXT PRIMARY KEY,
+    craft_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    review_status TEXT NOT NULL CHECK (
+        review_status IN ('pending', 'approved', 'rejected', 'offline')
+    ),
+    source_available INTEGER NOT NULL DEFAULT 1 CHECK (
+        source_available IN (0, 1)
+    ),
+    media_url TEXT NOT NULL DEFAULT '',
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    rejection_opinion TEXT,
+    published_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_heritage_videos_craft_status
+    ON heritage_videos(craft_key, review_status, published_at DESC, video_id);
+
+CREATE TABLE IF NOT EXISTS points_accounts (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS points_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    transaction_type TEXT NOT NULL CHECK (
+        transaction_type IN ('award', 'spend', 'refund', 'expire')
+    ),
+    source_module TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    delta INTEGER NOT NULL CHECK (delta <> 0),
+    balance_after INTEGER NOT NULL CHECK (balance_after >= 0),
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    UNIQUE (
+        user_id, transaction_type, source_module, source_event_id
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_transactions_user_created
+    ON points_transactions(user_id, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS points_lots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    award_transaction_id INTEGER NOT NULL
+        REFERENCES points_transactions(id) ON DELETE CASCADE,
+    original_points INTEGER NOT NULL CHECK (original_points > 0),
+    remaining_points INTEGER NOT NULL CHECK (
+        remaining_points >= 0 AND remaining_points <= original_points
+    ),
+    expires_at TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_lots_user_expiry
+    ON points_lots(user_id, expires_at, id);
+
+CREATE TABLE IF NOT EXISTS points_allocations (
+    transaction_id INTEGER NOT NULL
+        REFERENCES points_transactions(id) ON DELETE CASCADE,
+    lot_id INTEGER NOT NULL REFERENCES points_lots(id) ON DELETE CASCADE,
+    points INTEGER NOT NULL CHECK (points > 0),
+    PRIMARY KEY (transaction_id, lot_id)
+);
+
+CREATE TABLE IF NOT EXISTS points_event_inbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source_module TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    source_event_id TEXT NOT NULL,
+    occurred_at TEXT NOT NULL,
+    duration_seconds INTEGER CHECK (
+        duration_seconds IS NULL OR duration_seconds >= 0
+    ),
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'processed', 'failed')
+    ),
+    error TEXT,
+    processed_at TEXT,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, source_module, event_type, source_event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_event_inbox_status
+    ON points_event_inbox(status, created_at, id);
+
+CREATE TABLE IF NOT EXISTS points_learning_accruals (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source_module TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    accumulated_seconds INTEGER NOT NULL DEFAULT 0 CHECK (
+        accumulated_seconds >= 0
+    ),
+    awarded_units INTEGER NOT NULL DEFAULT 0 CHECK (awarded_units >= 0),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, source_module, source_key)
+);
+
+CREATE TABLE IF NOT EXISTS points_policy_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version TEXT NOT NULL,
+    policy_json TEXT NOT NULL,
+    observed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_policy_snapshots_observed
+    ON points_policy_snapshots(observed_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS redemptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reward_id TEXT NOT NULL,
+    reward_name TEXT NOT NULL,
+    reward_snapshot_json TEXT NOT NULL DEFAULT '{}',
+    points_cost INTEGER NOT NULL CHECK (points_cost > 0),
+    request_id TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (
+        status IN ('pending', 'issued', 'verified', 'canceled')
+    ),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    canceled_at TEXT,
+    UNIQUE (user_id, request_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_redemptions_user_created
+    ON redemptions(user_id, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS reward_stock_reservations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reservation_id TEXT NOT NULL UNIQUE,
+    redemption_id INTEGER NOT NULL UNIQUE
+        REFERENCES redemptions(id) ON DELETE CASCADE,
+    reward_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    status TEXT NOT NULL CHECK (status IN ('reserved', 'released')),
+    created_at TEXT NOT NULL,
+    released_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_reward_stock_reservations_reward_status
+    ON reward_stock_reservations(reward_id, status);
+
+CREATE TABLE IF NOT EXISTS fulfillments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    redemption_id INTEGER NOT NULL UNIQUE
+        REFERENCES redemptions(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (
+        status IN ('pending', 'issued', 'verified', 'canceled')
+    ),
+    issued_at TEXT,
+    verified_at TEXT,
+    canceled_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fulfillments_user_status
+    ON fulfillments(user_id, status, updated_at DESC, id DESC);
 """
 
 
