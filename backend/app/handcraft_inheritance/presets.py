@@ -326,6 +326,11 @@ PLACEHOLDER_CRAFTS = (
     },
 )
 
+PLACEHOLDER_CRAFT_BY_KEY = {
+    craft["craft_key"]: craft
+    for craft in PLACEHOLDER_CRAFTS
+}
+
 PLACEHOLDER_VIDEOS = tuple(
     {
         "video_id": f"demo-{craft['craft_key']}-approved",
@@ -404,17 +409,18 @@ PLACEHOLDER_POINTS_POLICY = {
 
 class PlaceholderCraftPresetProvider(EmptyCraftPresetProvider):
     def list_crafts(self) -> list[dict]:
-        return deepcopy(list(PLACEHOLDER_CRAFTS))
+        return deepcopy(
+            sorted(
+                PLACEHOLDER_CRAFTS,
+                key=lambda craft: (
+                    craft["sort_order"],
+                    craft["craft_key"],
+                ),
+            )
+        )
 
     def get_craft(self, craft_key: str) -> dict | None:
-        craft = next(
-            (
-                item
-                for item in PLACEHOLDER_CRAFTS
-                if item["craft_key"] == craft_key
-            ),
-            None,
-        )
+        craft = PLACEHOLDER_CRAFT_BY_KEY.get(craft_key)
         return deepcopy(craft) if craft is not None else None
 
 
