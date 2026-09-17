@@ -36,6 +36,14 @@ class PointsPolicyProvider(Protocol):
     def get_policy(self) -> dict | None: ...
 
 
+class TeachingVideoReviewActionProvider(Protocol):
+    def apply(self, action: dict) -> dict: ...
+
+
+class FulfillmentAdminActionProvider(Protocol):
+    def apply(self, action: dict) -> dict: ...
+
+
 class EmptyCraftPresetProvider:
     def list_crafts(self) -> list[dict]:
         return []
@@ -130,3 +138,25 @@ def get_points_policy_provider() -> PointsPolicyProvider:
         "handcraft_points_policy_provider",
         UnavailablePointsPolicyProvider(),
     )
+
+
+def set_video_review_action_provider(
+    app: Flask,
+    provider: TeachingVideoReviewActionProvider,
+) -> None:
+    app.extensions["handcraft_video_review_action"] = provider
+
+
+def get_video_review_action_provider() -> TeachingVideoReviewActionProvider:
+    return current_app.extensions["handcraft_video_review_action"]
+
+
+def set_fulfillment_action_provider(
+    app: Flask,
+    provider: FulfillmentAdminActionProvider,
+) -> None:
+    app.extensions["handcraft_fulfillment_action"] = provider
+
+
+def get_fulfillment_action_provider() -> FulfillmentAdminActionProvider:
+    return current_app.extensions["handcraft_fulfillment_action"]
