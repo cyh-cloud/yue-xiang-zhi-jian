@@ -445,17 +445,19 @@ export interface CopyTrainingSession {
   completed_at: string | null
 }
 
-export type StorePlanScalar = string | number | boolean | null
+export interface StorePlanObject {
+  [key: string]: StorePlanValue
+}
 
-export type StorePlanObjectValue =
-  | StorePlanScalar
-  | StorePlanScalar[]
-  | { [key: string]: StorePlanScalar | StorePlanScalar[] }
+export interface StorePlanArray extends Array<StorePlanValue> {}
 
 export type StorePlanValue =
-  | StorePlanScalar
-  | StorePlanScalar[]
-  | { [key: string]: StorePlanObjectValue }
+  | string
+  | number
+  | boolean
+  | null
+  | StorePlanArray
+  | StorePlanObject
 
 export interface StorePlan {
   id: number

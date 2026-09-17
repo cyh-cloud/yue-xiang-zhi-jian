@@ -76,18 +76,37 @@ const storePlanFixture = {
   platform: 'taobao',
   style_preference: '温暖可靠',
   plan: {
-    home_layout: '顶部轮播与商品分组',
+    home_layout: [
+      {
+        zone: '首屏',
+        modules: [
+          {
+            key: 'hero',
+            title: '主视觉',
+            position: { row: 1, column: 'left' },
+            visible: true
+          }
+        ]
+      }
+    ],
     color_scheme: {
       primary: '暖红',
-      accent: {
-        label: '点缀金',
-        usage: '活动角标'
-      }
+      variants: [
+        {
+          name: '点缀金',
+          tokens: { hex: '#F7C948', contrast: 4.5 }
+        }
+      ]
     },
     detail_structure: ['卖点', '参数', '售后'],
     navigation: {
-      primary: '首页',
-      utility: ['客服', '我的']
+      primary: {
+        label: '首页',
+        children: [
+          { label: '新品', order: 1, active: true },
+          { label: '优惠', order: 2, active: false }
+        ]
+      }
     }
   },
   created_at: '2026-09-17T00:00:00+00:00'
@@ -155,17 +174,36 @@ describe('004 wire DTOs', () => {
   })
 
   it('accepts variable platform plan values without unknown casts', () => {
-    expect(storePlanFixture.plan.home_layout).toBe('顶部轮播与商品分组')
+    expect(storePlanFixture.plan.home_layout).toEqual([
+      {
+        zone: '首屏',
+        modules: [
+          {
+            key: 'hero',
+            title: '主视觉',
+            position: { row: 1, column: 'left' },
+            visible: true
+          }
+        ]
+      }
+    ])
     expect(storePlanFixture.plan.color_scheme).toEqual({
       primary: '暖红',
-      accent: {
-        label: '点缀金',
-        usage: '活动角标'
-      }
+      variants: [
+        {
+          name: '点缀金',
+          tokens: { hex: '#F7C948', contrast: 4.5 }
+        }
+      ]
     })
     expect(storePlanFixture.plan.navigation).toEqual({
-      primary: '首页',
-      utility: ['客服', '我的']
+      primary: {
+        label: '首页',
+        children: [
+          { label: '新品', order: 1, active: true },
+          { label: '优惠', order: 2, active: false }
+        ]
+      }
     })
   })
 })

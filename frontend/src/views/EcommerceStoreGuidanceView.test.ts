@@ -112,18 +112,37 @@ describe('EcommerceStoreGuidanceView', () => {
       success: true,
       plan: storePlan(1, {
         plan: {
-          home_layout: '顶部轮播与商品分组',
+          home_layout: [
+            {
+              zone: '首屏',
+              modules: [
+                {
+                  key: 'hero',
+                  title: '主视觉',
+                  position: { row: 1, column: 'left' },
+                  visible: true
+                }
+              ]
+            }
+          ],
           color_scheme: {
             primary: '暖红',
-            accent: {
-              label: '点缀金',
-              usage: '活动角标'
-            }
+            variants: [
+              {
+                name: '点缀金',
+                tokens: { hex: '#F7C948', contrast: 4.5 }
+              }
+            ]
           },
           detail_structure: ['卖点', '参数', '售后'],
           navigation: {
-            primary: '首页',
-            utility: ['客服', '我的']
+            primary: {
+              label: '首页',
+              children: [
+                { label: '新品', order: 1, active: true },
+                { label: '优惠', order: 2, active: false }
+              ]
+            }
           }
         }
       })
@@ -145,12 +164,17 @@ describe('EcommerceStoreGuidanceView', () => {
       '详情页结构',
       '导航分类'
     ])
-    expect(sections[0].text()).toContain('顶部轮播与商品分组')
-    expect(sections[1].text()).toContain('primary')
+    expect(sections[0].text()).toContain('zone')
+    expect(sections[0].text()).toContain('首屏')
+    expect(sections[0].text()).toContain('modules')
+    expect(sections[0].text()).toContain('复杂内容')
+    expect(sections[1].text()).toContain('variants')
     expect(sections[1].text()).toContain('点缀金')
-    expect(sections[1].text()).toContain('活动角标')
+    expect(sections[1].text()).toContain('tokens')
+    expect(sections[1].text()).toContain('复杂内容')
     expect(sections[2].text()).toContain('参数')
-    expect(sections[3].text()).toContain('客服')
+    expect(sections[3].text()).toContain('children')
+    expect(sections[3].text()).toContain('复杂内容')
     expect(wrapper.text()).not.toContain('[object Object]')
 
     const history = wrapper.get('[data-test="store-guidance-history"]')
