@@ -18,6 +18,7 @@ interface HandcraftInheritanceState {
   progressByCraft: Record<string, HandcraftProgress>
   videosByCraft: Record<string, HandcraftVideo[]>
   arGuidance: HandcraftArGuidance | null
+  lastStepCompletion: HandcraftStepCompletion | null
   loading: boolean
   completingStep: boolean
   generatingGuidance: boolean
@@ -42,6 +43,7 @@ export const useHandcraftInheritanceStore = defineStore(
       progressByCraft: {},
       videosByCraft: {},
       arGuidance: null,
+      lastStepCompletion: null,
       loading: false,
       completingStep: false,
       generatingGuidance: false,
@@ -111,6 +113,7 @@ export const useHandcraftInheritanceStore = defineStore(
       ): Promise<boolean> {
         this.completingStep = true
         this.error = ''
+        this.lastStepCompletion = null
         try {
           const response = await apiFetch<{
             success: true
@@ -125,7 +128,10 @@ export const useHandcraftInheritanceStore = defineStore(
               })
             }
           )
-          this.progressByCraft[craftKey] = response.progress
+          this.lastStepCompletion = response.progress
+          if (response.progress.accepted) {
+            this.progressByCraft[craftKey] = response.progress
+          }
           return true
         } catch (error) {
           this.error = errorMessage(error, '步骤完成状态保存失败')
