@@ -1,0 +1,85 @@
+from __future__ import annotations
+
+from app.agri_skills.course_learning import (
+    get_course_progress,
+    get_course_quiz,
+    list_course_quiz_attempts,
+    list_courses,
+    list_recommendations,
+    submit_course_quiz,
+    update_course_progress,
+)
+
+
+def list_handcraft_courses(student_id: int) -> list[dict]:
+    return list_courses(student_id, "handcraft")
+
+
+def list_handcraft_recommendations(student_id: int) -> list[dict]:
+    return list_recommendations(student_id, "handcraft")
+
+
+def get_handcraft_course_progress(user_id: int, course_id: int) -> dict:
+    return get_course_progress(
+        user_id,
+        course_id,
+        direction="handcraft",
+    )
+
+
+def update_handcraft_course_progress(
+    user_id: int,
+    course_id: int,
+    position_seconds: int,
+    watched_delta_seconds: int,
+) -> dict:
+    return update_course_progress(
+        user_id,
+        course_id,
+        position_seconds,
+        watched_delta_seconds,
+        direction="handcraft",
+    )
+
+
+def get_handcraft_course_quiz(
+    user_id: int,
+    course_id: int,
+) -> dict | None:
+    return get_course_quiz(
+        user_id,
+        course_id,
+        direction="handcraft",
+    )
+
+
+def list_handcraft_course_quiz_attempts(
+    user_id: int,
+    course_id: int,
+) -> list[dict]:
+    return list_course_quiz_attempts(
+        user_id,
+        course_id,
+        direction="handcraft",
+    )
+
+
+def submit_handcraft_course_quiz(
+    user_id: int,
+    course_id: int,
+    answers: dict,
+) -> dict:
+    return submit_course_quiz(
+        user_id,
+        course_id,
+        answers,
+        direction="handcraft",
+    )
+
+
+def list_handcraft_learning_outcomes(user_id: int) -> list[dict]:
+    from app.handcraft_inheritance.outcomes import (
+        list_handcraft_learning_outcomes as project_outcomes,
+    )
+
+    return project_outcomes(user_id)
