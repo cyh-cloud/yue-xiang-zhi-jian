@@ -319,7 +319,7 @@ class TestHandcraftPresets(unittest.TestCase):
                 )
             )
 
-        self.assertEqual(sum(results), 1)
+        self.assertEqual(sum(result is not None for result in results), 1)
         self.assertEqual(provider.list_rewards()[0]["stock"], 0)
 
     def test_providers_are_replaceable_through_existing_extensions(self):

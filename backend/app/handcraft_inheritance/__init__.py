@@ -47,6 +47,11 @@ from app.handcraft_inheritance.points import (
     settle_user_expiry,
     spend_points,
 )
+from app.handcraft_inheritance.rewards import (
+    list_redemptions,
+    list_rewards,
+    redeem_reward,
+)
 
 
 def install_default_handcraft_services(app: Flask) -> None:
@@ -97,9 +102,12 @@ __all__ = [
     "get_teaching_video_provider",
     "get_video_review_action_provider",
     "install_default_handcraft_services",
+    "list_redemptions",
+    "list_rewards",
     "process_pending_events",
     "record_duration_points",
     "record_training_points",
+    "redeem_reward",
     "refund_points",
     "set_craft_preset_provider",
     "set_fulfillment_action_provider",

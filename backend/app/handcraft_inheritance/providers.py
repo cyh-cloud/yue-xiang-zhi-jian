@@ -27,7 +27,7 @@ class RewardCatalogProvider(Protocol):
         reward_id: str,
         quantity: int,
         reservation_id: str,
-    ) -> bool: ...
+    ) -> str | None: ...
 
     def release_stock(self, reservation_id: str) -> bool: ...
 
@@ -72,8 +72,8 @@ class EmptyRewardCatalogProvider:
         reward_id: str,
         quantity: int,
         reservation_id: str,
-    ) -> bool:
-        return False
+    ) -> str | None:
+        return None
 
     def release_stock(self, reservation_id: str) -> bool:
         return False

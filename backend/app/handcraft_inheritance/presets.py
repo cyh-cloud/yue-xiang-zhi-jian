@@ -445,6 +445,7 @@ class PlaceholderTeachingVideoProvider(EmptyTeachingVideoProvider):
 class PlaceholderRewardCatalogProvider(EmptyRewardCatalogProvider):
     def __init__(self) -> None:
         self._lock = RLock()
+        self._database_backed = False
         self._stock = {
             reward["reward_id"]: int(reward["stock"])
             for reward in PLACEHOLDER_REWARDS
@@ -452,7 +453,115 @@ class PlaceholderRewardCatalogProvider(EmptyRewardCatalogProvider):
         self._reservations: dict[str, tuple[str, int]] = {}
         self._released: set[str] = set()
 
+    @staticmethod
+    def _base_stock(reward_id: str) -> int | None:
+        reward = next(
+            (
+                item
+                for item in PLACEHOLDER_REWARDS
+                if item["reward_id"] == reward_id
+            ),
+            None,
+        )
+        return int(reward["stock"]) if reward is not None else None
+
+    @staticmethod
+    def _get_db():
+        try:
+            from flask import current_app
+
+            if not current_app:
+                return None
+            from app.db import get_db
+
+            return get_db()
+        except RuntimeError:
+            return None
+
+    @staticmethod
+    def _run_db_write(db, operation):
+        owns_transaction = not db.in_transaction
+        if owns_transaction:
+            db.execute("BEGIN IMMEDIATE")
+        try:
+            result = operation()
+        except Exception:
+            if owns_transaction:
+                db.rollback()
+            raise
+        if owns_transaction:
+            db.commit()
+        return result
+
+    def _database_has_state(self, db) -> bool:
+        try:
+            row = db.execute(
+                """
+                SELECT
+                    EXISTS(
+                        SELECT 1 FROM reward_stock_reservations
+                    ) OR EXISTS(
+                        SELECT 1 FROM redemptions
+                    ) AS has_state
+                """
+            ).fetchone()
+            return bool(row["has_state"])
+        except Exception:
+            return False
+
+    def _database_stock(self, db, reward_id: str) -> int | None:
+        base_stock = self._base_stock(reward_id)
+        if base_stock is None:
+            return None
+        try:
+            row = db.execute(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS reserved
+                FROM reward_stock_reservations
+                WHERE reward_id = ? AND status = 'reserved'
+                """,
+                (reward_id,),
+            ).fetchone()
+        except Exception:
+            return None
+        return max(0, base_stock - int(row["reserved"]))
+
+    @staticmethod
+    def _redemption_id(db, reservation_id: str) -> int | None:
+        normalized = str(reservation_id).strip()
+        if normalized.startswith("redemption:"):
+            normalized = normalized.split(":", 1)[1]
+        if not normalized.isdigit():
+            return None
+        try:
+            row = db.execute(
+                """
+                SELECT id
+                FROM redemptions
+                WHERE id = ?
+                """,
+                (int(normalized),),
+            ).fetchone()
+        except Exception:
+            return None
+        return int(row["id"]) if row else None
+
     def list_rewards(self) -> list[dict]:
+        db = self._get_db()
+        if db is not None and (
+            self._database_backed or self._database_has_state(db)
+        ):
+            self._database_backed = True
+            return [
+                {
+                    **deepcopy(reward),
+                    "stock": self._database_stock(
+                        db,
+                        reward["reward_id"],
+                    ),
+                }
+                for reward in PLACEHOLDER_REWARDS
+            ]
         with self._lock:
             return [
                 {
@@ -467,7 +576,7 @@ class PlaceholderRewardCatalogProvider(EmptyRewardCatalogProvider):
         reward_id: str,
         quantity: int,
         reservation_id: str,
-    ) -> bool:
+    ) -> str | None:
         if (
             not reward_id
             or not reservation_id
@@ -475,22 +584,121 @@ class PlaceholderRewardCatalogProvider(EmptyRewardCatalogProvider):
             or isinstance(quantity, bool)
             or quantity <= 0
         ):
-            return False
+            return None
+
+        db = self._get_db()
+        redemption_id = (
+            self._redemption_id(db, reservation_id)
+            if db is not None
+            else None
+        )
+        if db is not None and (
+            redemption_id is not None or self._database_backed
+        ):
+            self._database_backed = True
+
+            def reserve_database():
+                existing = db.execute(
+                    """
+                    SELECT reward_id, quantity, status
+                    FROM reward_stock_reservations
+                    WHERE reservation_id = ?
+                    """,
+                    (reservation_id,),
+                ).fetchone()
+                if existing is not None:
+                    return (
+                        str(reservation_id)
+                        if (
+                            existing["status"] == "reserved"
+                            and str(existing["reward_id"]) == reward_id
+                            and int(existing["quantity"]) == quantity
+                        )
+                        else None
+                    )
+                available = self._database_stock(db, reward_id)
+                if available is None or available < quantity:
+                    return None
+                db.execute(
+                    """
+                    INSERT INTO reward_stock_reservations (
+                        reservation_id, redemption_id, reward_id,
+                        quantity, status, created_at
+                    )
+                    VALUES (?, ?, ?, ?, 'reserved', ?)
+                    """,
+                    (
+                        reservation_id,
+                        redemption_id,
+                        reward_id,
+                        quantity,
+                        _utc_now_iso(),
+                    ),
+                )
+                return str(reservation_id)
+
+            return self._run_db_write(db, reserve_database)
 
         with self._lock:
             existing = self._reservations.get(reservation_id)
             if existing is not None:
-                return existing == (reward_id, quantity)
+                return (
+                    str(reservation_id)
+                    if existing == (reward_id, quantity)
+                    else None
+                )
             if reservation_id in self._released:
-                return False
+                return None
             available = self._stock.get(reward_id)
             if available is None or available < quantity:
-                return False
+                return None
             self._stock[reward_id] = available - quantity
             self._reservations[reservation_id] = (reward_id, quantity)
-            return True
+            return str(reservation_id)
 
     def release_stock(self, reservation_id: str) -> bool:
+        db = self._get_db()
+        if db is not None:
+            existing = None
+            try:
+                existing = db.execute(
+                    """
+                    SELECT status
+                    FROM reward_stock_reservations
+                    WHERE reservation_id = ?
+                    """,
+                    (reservation_id,),
+                ).fetchone()
+            except Exception:
+                existing = None
+            if existing is not None or self._database_backed:
+                self._database_backed = True
+
+                def release_database():
+                    row = db.execute(
+                        """
+                        SELECT status
+                        FROM reward_stock_reservations
+                        WHERE reservation_id = ?
+                        """,
+                        (reservation_id,),
+                    ).fetchone()
+                    if row is None:
+                        return False
+                    if row["status"] == "released":
+                        return True
+                    db.execute(
+                        """
+                        UPDATE reward_stock_reservations
+                        SET status = 'released', released_at = ?
+                        WHERE reservation_id = ? AND status = 'reserved'
+                        """,
+                        (_utc_now_iso(), reservation_id),
+                    )
+                    return True
+
+                return self._run_db_write(db, release_database)
+
         with self._lock:
             if reservation_id in self._released:
                 return True
@@ -501,6 +709,12 @@ class PlaceholderRewardCatalogProvider(EmptyRewardCatalogProvider):
             self._stock[reward_id] += quantity
             self._released.add(reservation_id)
             return True
+
+
+def _utc_now_iso() -> str:
+    from app.session_manager import utc_now_iso
+
+    return utc_now_iso()
 
 
 class PlaceholderPointsPolicyProvider(UnavailablePointsPolicyProvider):

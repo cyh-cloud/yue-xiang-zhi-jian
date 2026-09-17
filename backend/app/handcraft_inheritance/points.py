@@ -797,6 +797,114 @@ def record_training_points(
     return result or enqueued
 
 
+def spend_points_in_transaction(
+    db,
+    user_id: int,
+    amount: int,
+    source_module: str,
+    source_event_id: str,
+    normalized_time: str,
+) -> dict:
+    existing = _existing_transaction(
+        db,
+        user_id,
+        "spend",
+        source_module,
+        source_event_id,
+    )
+    if existing is not None:
+        return existing
+    _ensure_account(db, user_id, normalized_time)
+    account = db.execute(
+        """
+        SELECT balance
+        FROM points_accounts
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    balance = int(account["balance"])
+    if balance < amount:
+        raise AgriValidationError("积分不足")
+    lots = db.execute(
+        """
+        SELECT id, remaining_points
+        FROM points_lots
+        WHERE user_id = ?
+          AND remaining_points > 0
+          AND (expires_at IS NULL OR expires_at > ?)
+        ORDER BY created_at, id
+        """,
+        (user_id, normalized_time),
+    ).fetchall()
+    if sum(int(row["remaining_points"]) for row in lots) < amount:
+        raise AgriValidationError("积分不足")
+
+    balance_after = balance - amount
+    cursor = db.execute(
+        """
+        INSERT INTO points_transactions (
+            user_id, transaction_type, source_module, source_event_id,
+            delta, balance_after, metadata_json, created_at
+        )
+        VALUES (?, 'spend', ?, ?, ?, ?, '{}', ?)
+        """,
+        (
+            user_id,
+            source_module,
+            source_event_id,
+            -amount,
+            balance_after,
+            normalized_time,
+        ),
+    )
+    transaction_id = int(cursor.lastrowid)
+    remaining = amount
+    for lot in lots:
+        if remaining <= 0:
+            break
+        lot_points = min(remaining, int(lot["remaining_points"]))
+        cursor = db.execute(
+            """
+            UPDATE points_lots
+            SET remaining_points = remaining_points - ?
+            WHERE id = ? AND remaining_points >= ?
+            """,
+            (lot_points, int(lot["id"]), lot_points),
+        )
+        if cursor.rowcount != 1:
+            raise AgriValidationError("积分批次已变化")
+        db.execute(
+            """
+            INSERT INTO points_allocations (
+                transaction_id, lot_id, points
+            )
+            VALUES (?, ?, ?)
+            """,
+            (transaction_id, int(lot["id"]), lot_points),
+        )
+        remaining -= lot_points
+    if remaining != 0:
+        raise AgriValidationError("积分批次不足")
+    db.execute(
+        """
+        UPDATE points_accounts
+        SET balance = ?, updated_at = ?
+        WHERE user_id = ?
+        """,
+        (balance_after, normalized_time, user_id),
+    )
+    return {
+        "id": transaction_id,
+        "transaction_type": "spend",
+        "delta": -amount,
+        "balance_after": balance_after,
+        "source_module": source_module,
+        "source_event_id": source_event_id,
+        "created_at": normalized_time,
+    }
+
+
 def spend_points(
     user_id: int,
     amount: int,
@@ -812,104 +920,15 @@ def spend_points(
     get_effective_policy()
 
     with _get_db() as db:
-        existing = _existing_transaction(
+        db.execute("BEGIN IMMEDIATE")
+        return spend_points_in_transaction(
             db,
             user_id,
-            "spend",
+            amount,
             source_module,
             source_event_id,
+            normalized_time,
         )
-        if existing is not None:
-            return existing
-        db.execute("BEGIN IMMEDIATE")
-        _ensure_account(db, user_id, normalized_time)
-        account = db.execute(
-            """
-            SELECT balance
-            FROM points_accounts
-            WHERE user_id = ?
-            """,
-            (user_id,),
-        ).fetchone()
-        balance = int(account["balance"])
-        if balance < amount:
-            raise AgriValidationError("积分不足")
-        lots = db.execute(
-            """
-            SELECT id, remaining_points
-            FROM points_lots
-            WHERE user_id = ?
-              AND remaining_points > 0
-              AND (expires_at IS NULL OR expires_at > ?)
-            ORDER BY created_at, id
-            """,
-            (user_id, normalized_time),
-        ).fetchall()
-        if sum(int(row["remaining_points"]) for row in lots) < amount:
-            raise AgriValidationError("积分不足")
-
-        balance_after = balance - amount
-        cursor = db.execute(
-            """
-            INSERT INTO points_transactions (
-                user_id, transaction_type, source_module, source_event_id,
-                delta, balance_after, metadata_json, created_at
-            )
-            VALUES (?, 'spend', ?, ?, ?, ?, '{}', ?)
-            """,
-            (
-                user_id,
-                source_module,
-                source_event_id,
-                -amount,
-                balance_after,
-                normalized_time,
-            ),
-        )
-        transaction_id = int(cursor.lastrowid)
-        remaining = amount
-        for lot in lots:
-            if remaining <= 0:
-                break
-            lot_points = min(remaining, int(lot["remaining_points"]))
-            db.execute(
-                """
-                UPDATE points_lots
-                SET remaining_points = remaining_points - ?
-                WHERE id = ? AND remaining_points >= ?
-                """,
-                (lot_points, int(lot["id"]), lot_points),
-            )
-            db.execute(
-                """
-                INSERT INTO points_allocations (
-                    transaction_id, lot_id, points
-                )
-                VALUES (?, ?, ?)
-                """,
-                (transaction_id, int(lot["id"]), lot_points),
-            )
-            remaining -= lot_points
-        if remaining != 0:
-            raise AgriValidationError("积分批次不足")
-        db.execute(
-            """
-            UPDATE points_accounts
-            SET balance = ?, updated_at = ?
-            WHERE user_id = ?
-            """,
-            (balance_after, normalized_time, user_id),
-        )
-
-    return {
-        "id": transaction_id,
-        "transaction_type": "spend",
-        "delta": -amount,
-        "balance_after": balance_after,
-        "source_module": source_module,
-        "source_event_id": source_event_id,
-        "created_at": normalized_time,
-    }
 
 
 def refund_points(
