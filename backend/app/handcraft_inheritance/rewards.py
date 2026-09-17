@@ -250,7 +250,7 @@ def redeem_reward(
             redemption = existing
         else:
             reward = dict(preliminary_reward)
-            account = get_points_account(user_id)
+            account = get_points_account(user_id, settle=False)
             _validate_reward(reward, int(account["balance"]))
             cursor = db.execute(
                 """

@@ -4,6 +4,8 @@ import json
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from flask import current_app
+
 from app.agri_skills.errors import AgriValidationError
 from app.handcraft_inheritance.providers import get_points_policy_provider
 
@@ -21,6 +23,92 @@ def _get_db():
     from app.db import get_db
 
     return get_db()
+
+
+def emit_points_expired(**payload):
+    from app.messaging.events import emit_points_expired as emit
+
+    return emit(**payload)
+
+
+def retry_pending_expiry_notifications(user_id: int) -> dict:
+    user_id = _require_positive_int(user_id, "学员标识必须是正整数")
+    rows = _get_db().execute(
+        """
+        SELECT id, event_id, payload_json
+        FROM points_notification_outbox
+        WHERE user_id = ?
+          AND event_type = 'points_expired'
+          AND status = 'pending'
+        ORDER BY id
+        """,
+        (user_id,),
+    ).fetchall()
+    sent = 0
+    failed = 0
+    for row in rows:
+        payload = json.loads(row["payload_json"])
+        try:
+            emit_points_expired(
+                event_id=str(row["event_id"]),
+                student_id=int(payload["student_id"]),
+                points_cleared=int(payload["points_cleared"]),
+            )
+            with _get_db() as db:
+                db.execute(
+                    """
+                    UPDATE points_notification_outbox
+                    SET status = 'sent', sent_at = ?
+                    WHERE id = ? AND status = 'pending'
+                    """,
+                    (
+                        _platform_now().isoformat(timespec="seconds"),
+                        int(row["id"]),
+                    ),
+                )
+            sent += 1
+        except Exception:
+            failed += 1
+    return {
+        "attempted": len(rows),
+        "sent": sent,
+        "failed": failed,
+    }
+
+
+def _retry_pending_expiry_users(
+    batch_size: int,
+    *,
+    skip_user_ids: set[int] | None = None,
+) -> dict:
+    skip_user_ids = skip_user_ids or set()
+    rows = _get_db().execute(
+        """
+        SELECT DISTINCT user_id
+        FROM points_notification_outbox
+        WHERE event_type = 'points_expired'
+          AND status = 'pending'
+        ORDER BY user_id
+        LIMIT ?
+        """,
+        (batch_size + len(skip_user_ids),),
+    ).fetchall()
+    notifications = 0
+    failed = 0
+    for row in rows:
+        if notifications + failed >= batch_size:
+            break
+        user_id = int(row["user_id"])
+        if user_id in skip_user_ids:
+            continue
+        result = retry_pending_expiry_notifications(user_id)
+        notifications += result["sent"]
+        failed += result["failed"]
+    return {
+        "users": len(rows),
+        "notifications": notifications,
+        "failed": failed,
+    }
 
 
 def _platform_now() -> datetime:
@@ -284,8 +372,10 @@ def _ensure_account(db, user_id: int, updated_at: str) -> None:
     )
 
 
-def get_points_account(user_id: int) -> dict:
+def get_points_account(user_id: int, *, settle: bool = True) -> dict:
     user_id = _require_positive_int(user_id, "学员标识必须是正整数")
+    if settle:
+        settle_user_expiry(user_id)
     row = _get_db().execute(
         """
         SELECT user_id, balance, updated_at
@@ -917,6 +1007,7 @@ def spend_points(
     source_module = _require_text(source_module, "来源模块不能为空")
     source_event_id = _require_text(source_event_id, "来源事件标识不能为空")
     _, normalized_time = _normalize_event_time(occurred_at)
+    settle_user_expiry(user_id, normalized_time)
     get_effective_policy()
 
     with _get_db() as db:
@@ -948,6 +1039,7 @@ def refund_points(
         "消费流水标识必须是正整数",
     )
     _, normalized_time = _normalize_event_time(occurred_at)
+    settle_user_expiry(user_id, normalized_time)
     policy = get_effective_policy()
 
     with _get_db() as db:
@@ -1119,9 +1211,29 @@ def settle_user_expiry(
     now: str | None = None,
 ) -> dict:
     user_id = _require_positive_int(user_id, "学员标识必须是正整数")
-    policy = get_effective_policy()
+    try:
+        policy = get_effective_policy()
+    except PointsPolicyUnavailable as error:
+        retry = retry_pending_expiry_notifications(user_id)
+        return {
+            "points_cleared": 0,
+            "lots": 0,
+            "transaction_id": None,
+            "paused": True,
+            "notification_sent": retry["sent"] > 0,
+            "notification_failed": retry["failed"],
+            "error": str(error),
+        }
     if policy["expiry_mode"] == "permanent":
-        return {"points_cleared": 0, "lots": 0, "transaction_id": None}
+        retry = retry_pending_expiry_notifications(user_id)
+        return {
+            "points_cleared": 0,
+            "lots": 0,
+            "transaction_id": None,
+            "paused": False,
+            "notification_sent": retry["sent"] > 0,
+            "notification_failed": retry["failed"],
+        }
     _, normalized_now = _normalize_event_time(now)
 
     with _get_db() as db:
@@ -1140,82 +1252,203 @@ def settle_user_expiry(
         ).fetchall()
         points_cleared = sum(int(row["remaining_points"]) for row in lots)
         if points_cleared == 0:
-            return {
+            result = {
                 "points_cleared": 0,
                 "lots": 0,
                 "transaction_id": None,
+                "paused": False,
             }
-        _ensure_account(db, user_id, normalized_now)
-        account = db.execute(
-            """
-            SELECT balance
-            FROM points_accounts
-            WHERE user_id = ?
-            """,
-            (user_id,),
-        ).fetchone()
-        balance_after = max(0, int(account["balance"]) - points_cleared)
-        source_event_id = f"expiry:{user_id}:{normalized_now}"
-        existing = _existing_transaction(
-            db,
-            user_id,
-            "expire",
-            "points",
-            source_event_id,
-        )
-        if existing is not None:
-            return {
-                "points_cleared": 0,
-                "lots": 0,
-                "transaction_id": existing["id"],
-            }
-        cursor = db.execute(
-            """
-            INSERT INTO points_transactions (
-                user_id, transaction_type, source_module, source_event_id,
-                delta, balance_after, metadata_json, created_at
-            )
-            VALUES (?, 'expire', 'points', ?, ?, ?, '{}', ?)
-            """,
-            (
+        else:
+            _ensure_account(db, user_id, normalized_now)
+            account = db.execute(
+                """
+                SELECT balance
+                FROM points_accounts
+                WHERE user_id = ?
+                """,
+                (user_id,),
+            ).fetchone()
+            balance_after = max(0, int(account["balance"]) - points_cleared)
+            source_event_id = f"expiry:{user_id}:{normalized_now}"
+            existing = _existing_transaction(
+                db,
                 user_id,
+                "expire",
+                "points",
                 source_event_id,
-                -points_cleared,
-                balance_after,
-                normalized_now,
-            ),
-        )
-        transaction_id = int(cursor.lastrowid)
-        for lot in lots:
-            lot_points = int(lot["remaining_points"])
-            db.execute(
-                """
-                UPDATE points_lots
-                SET remaining_points = 0
-                WHERE id = ? AND remaining_points = ?
-                """,
-                (int(lot["id"]), lot_points),
             )
-            db.execute(
-                """
-                INSERT INTO points_allocations (
-                    transaction_id, lot_id, points
+            if existing is not None:
+                result = {
+                    "points_cleared": 0,
+                    "lots": 0,
+                    "transaction_id": existing["id"],
+                    "paused": False,
+                }
+            else:
+                cursor = db.execute(
+                    """
+                    INSERT INTO points_transactions (
+                        user_id, transaction_type, source_module,
+                        source_event_id, delta, balance_after,
+                        metadata_json, created_at
+                    )
+                    VALUES (?, 'expire', 'points', ?, ?, ?, '{}', ?)
+                    """,
+                    (
+                        user_id,
+                        source_event_id,
+                        -points_cleared,
+                        balance_after,
+                        normalized_now,
+                    ),
                 )
-                VALUES (?, ?, ?)
-                """,
-                (transaction_id, int(lot["id"]), lot_points),
-            )
-        db.execute(
-            """
-            UPDATE points_accounts
-            SET balance = ?, updated_at = ?
-            WHERE user_id = ?
-            """,
-            (balance_after, normalized_now, user_id),
-        )
+                transaction_id = int(cursor.lastrowid)
+                event_id = f"handcraft-points-expiry:{transaction_id}"
+                db.execute(
+                    """
+                    INSERT INTO points_notification_outbox (
+                        user_id, event_type, event_id, transaction_id,
+                        payload_json, status, created_at, sent_at
+                    )
+                    VALUES (?, 'points_expired', ?, ?, ?, 'pending', ?, NULL)
+                    """,
+                    (
+                        user_id,
+                        event_id,
+                        transaction_id,
+                        json.dumps(
+                            {
+                                "student_id": user_id,
+                                "points_cleared": points_cleared,
+                            },
+                            ensure_ascii=False,
+                        ),
+                        normalized_now,
+                    ),
+                )
+                for lot in lots:
+                    lot_points = int(lot["remaining_points"])
+                    db.execute(
+                        """
+                        UPDATE points_lots
+                        SET remaining_points = 0
+                        WHERE id = ? AND remaining_points = ?
+                        """,
+                        (int(lot["id"]), lot_points),
+                    )
+                    db.execute(
+                        """
+                        INSERT INTO points_allocations (
+                            transaction_id, lot_id, points
+                        )
+                        VALUES (?, ?, ?)
+                        """,
+                        (transaction_id, int(lot["id"]), lot_points),
+                    )
+                db.execute(
+                    """
+                    UPDATE points_accounts
+                    SET balance = ?, updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (balance_after, normalized_now, user_id),
+                )
+                result = {
+                    "points_cleared": points_cleared,
+                    "lots": len(lots),
+                    "transaction_id": transaction_id,
+                    "paused": False,
+                }
 
+    retry = retry_pending_expiry_notifications(user_id)
+    result["notification_sent"] = retry["sent"] > 0
+    result["notification_failed"] = retry["failed"]
+    return result
+
+
+def run_expiry_settlement(
+    now: str | None = None,
+    batch_size: int | None = None,
+) -> dict:
+    if batch_size is None:
+        batch_size = int(
+            current_app.config.get("POINTS_EXPIRY_BATCH_SIZE", 100)
+        )
+    batch_size = _require_positive_int(
+        batch_size,
+        "过期结算批大小必须是正整数",
+    )
+    try:
+        policy = get_effective_policy()
+    except PointsPolicyUnavailable as error:
+        retry = _retry_pending_expiry_users(batch_size)
+        return {
+            "paused": True,
+            "paused_users": 0,
+            "processed_users": 0,
+            "points_cleared": 0,
+            "notifications": retry["notifications"],
+            "failed_users": 0,
+            "error": str(error),
+        }
+    if policy["expiry_mode"] == "permanent":
+        retry = _retry_pending_expiry_users(batch_size)
+        return {
+            "paused": False,
+            "paused_users": 0,
+            "processed_users": 0,
+            "points_cleared": 0,
+            "notifications": retry["notifications"],
+            "failed_users": 0,
+        }
+    _, normalized_now = _normalize_event_time(now)
+    users = _get_db().execute(
+        """
+        SELECT DISTINCT user_id
+        FROM points_lots
+        WHERE expires_at IS NOT NULL
+          AND expires_at <= ?
+          AND remaining_points > 0
+        ORDER BY user_id
+        LIMIT ?
+        """,
+        (normalized_now, batch_size),
+    ).fetchall()
+
+    processed_users = 0
+    points_cleared = 0
+    notifications = 0
+    failed_users = 0
+    paused_users = 0
+    selected_user_ids = set()
+    for row in users:
+        selected_user_ids.add(int(row["user_id"]))
+        try:
+            result = settle_user_expiry(
+                int(row["user_id"]),
+                normalized_now,
+            )
+        except Exception:
+            failed_users += 1
+            continue
+        if result.get("paused"):
+            paused_users += 1
+            continue
+        if result["points_cleared"] > 0:
+            processed_users += 1
+            points_cleared += int(result["points_cleared"])
+            if result.get("notification_sent"):
+                notifications += 1
+    retry = _retry_pending_expiry_users(
+        batch_size,
+        skip_user_ids=selected_user_ids,
+    )
+    notifications += retry["notifications"]
     return {
+        "paused": paused_users > 0,
+        "paused_users": paused_users,
+        "processed_users": processed_users,
         "points_cleared": points_cleared,
-        "lots": len(lots),
-        "transaction_id": transaction_id,
+        "notifications": notifications,
+        "failed_users": failed_users,
     }

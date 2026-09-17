@@ -27,6 +27,18 @@ def build_config() -> dict[str, object]:
             )
         if not session_cookie_secure:
             raise RuntimeError("Production SESSION_COOKIE_SECURE must be true")
+    try:
+        points_expiry_batch_size = int(
+            os.environ.get("POINTS_EXPIRY_BATCH_SIZE", "100")
+        )
+    except (TypeError, ValueError):
+        raise RuntimeError(
+            "POINTS_EXPIRY_BATCH_SIZE must be a positive integer"
+        ) from None
+    if points_expiry_batch_size <= 0:
+        raise RuntimeError(
+            "POINTS_EXPIRY_BATCH_SIZE must be a positive integer"
+        )
 
     return {
         "SECRET_KEY": secret_key,
@@ -47,4 +59,8 @@ def build_config() -> dict[str, object]:
             "AI_ASR_MODEL", "FunAudioLLM/SenseVoiceSmall"
         ).strip(),
         "AI_TIMEOUT_SECONDS": float(os.environ.get("AI_TIMEOUT_SECONDS", "60")),
+        "POINTS_EXPIRY_TOKEN": os.environ.get(
+            "POINTS_EXPIRY_TOKEN", ""
+        ).strip(),
+        "POINTS_EXPIRY_BATCH_SIZE": points_expiry_batch_size,
     }

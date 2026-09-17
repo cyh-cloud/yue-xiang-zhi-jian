@@ -44,6 +44,8 @@ from app.handcraft_inheritance.points import (
     record_duration_points,
     record_training_points,
     refund_points,
+    retry_pending_expiry_notifications,
+    run_expiry_settlement,
     settle_user_expiry,
     spend_points,
 )
@@ -109,6 +111,8 @@ __all__ = [
     "record_training_points",
     "redeem_reward",
     "refund_points",
+    "retry_pending_expiry_notifications",
+    "run_expiry_settlement",
     "set_craft_preset_provider",
     "set_fulfillment_action_provider",
     "set_points_policy_provider",

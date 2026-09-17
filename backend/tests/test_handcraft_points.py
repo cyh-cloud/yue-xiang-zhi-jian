@@ -478,7 +478,7 @@ class TestHandcraftPoints(unittest.TestCase):
                 "training-expiry",
                 "2025-06-01T09:00:00+08:00",
             )
-            before = get_points_account(1)["balance"]
+            before = get_points_account(1, settle=False)["balance"]
             first = settle_user_expiry(
                 1,
                 "2026-01-01T00:00:00+08:00",

@@ -520,6 +520,25 @@ CREATE TABLE IF NOT EXISTS points_policy_snapshots (
 CREATE INDEX IF NOT EXISTS idx_points_policy_snapshots_observed
     ON points_policy_snapshots(observed_at DESC, id DESC);
 
+CREATE TABLE IF NOT EXISTS points_notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL CHECK (event_type = 'points_expired'),
+    event_id TEXT NOT NULL,
+    transaction_id INTEGER NOT NULL
+        REFERENCES points_transactions(id) ON DELETE CASCADE,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'sent')
+    ),
+    created_at TEXT NOT NULL,
+    sent_at TEXT,
+    UNIQUE (event_type, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_points_notification_outbox_pending
+    ON points_notification_outbox(status, user_id, id);
+
 CREATE TABLE IF NOT EXISTS redemptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
