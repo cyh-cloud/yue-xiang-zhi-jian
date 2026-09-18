@@ -2649,61 +2649,21 @@ git add frontend/src/api/types.ts frontend/src/stores/enterpriseConsole.ts front
 git commit -m "前端：增加企业工作台状态层"
 ```
 
-### Task 10: Enterprise Routes, Portal Navigation and Dashboard
+### Task 10: Enterprise Portal Navigation and Dashboard
 
 **Files:**
 - Create: `frontend/src/components/EnterpriseConsoleNav.vue`
 - Create: `frontend/src/components/EnterpriseDashboardCards.vue`
-- Create: `frontend/src/router/enterpriseRoutes.test.ts`
 - Create: `frontend/src/views/EnterprisePortalView.test.ts`
 - Modify: `frontend/src/components/PortalShell.vue`
-- Modify: `frontend/src/data/portal-guides.ts`
-- Modify: `frontend/src/router/index.ts`
 - Modify: `frontend/src/views/EnterprisePortalView.vue`
 
 **Interfaces:**
 - Consumes: `useEnterpriseConsoleStore`, `PortalShell`, `AppHeader`.
-- Produces routes `/enterprise`, `/enterprise/jobs`, `/enterprise/applications`, `/enterprise/applications/:applicationId`.
+- Produces enterprise navigation and dashboard components.
+- Route registration and portal-guide href updates are intentionally deferred to Task 13 so no route is registered before its view exists.
 
 - [ ] **Step 1: Write failing route and dashboard tests**
-
-Create `frontend/src/router/enterpriseRoutes.test.ts` following `handcraftRoutes.test.ts`:
-
-```typescript
-const enterpriseRoutes = [
-  { path: '/enterprise', visitPath: '/enterprise', name: 'enterprise-portal' },
-  { path: '/enterprise/jobs', visitPath: '/enterprise/jobs', name: 'enterprise-jobs' },
-  {
-    path: '/enterprise/applications',
-    visitPath: '/enterprise/applications',
-    name: 'enterprise-applications'
-  },
-  {
-    path: '/enterprise/applications/:applicationId',
-    visitPath: '/enterprise/applications/application-1',
-    name: 'enterprise-application-detail'
-  }
-] as const
-```
-
-Assert each route has `requiresAuth: true`, `roles: ['enterprise']`; anonymous users redirect to login; student/teacher roles redirect to their default portals; enterprise users pass.
-
-Assert portal guide entries now contain:
-
-```typescript
-{
-  id: 'enterprise-job-publish',
-  href: '/enterprise/jobs'
-}
-{
-  id: 'enterprise-applications',
-  href: '/enterprise/applications'
-}
-{
-  id: 'enterprise-dashboard',
-  href: '/enterprise'
-}
-```
 
 Create `EnterprisePortalView.test.ts`, mock dashboard and jobs APIs, and assert:
 
@@ -2757,7 +2717,7 @@ defineProps<{
 
 Render exactly two articles with `data-test="active-job-count"` and `data-test="received-resume-count"`. Do not add求购、人才库、面试、签约或 AI cards.
 
-- [ ] **Step 4: Upgrade `/enterprise` and register routes**
+- [ ] **Step 4: Upgrade `/enterprise` dashboard only**
 
 Modify `PortalShell.vue` by adding a default slot immediately before the `entry-index` section:
 
@@ -2803,7 +2763,7 @@ onMounted(() => {
 </template>
 ```
 
-Add lazy or direct imports for the three enterprise views in `router/index.ts` and register the four routes. Update enterprise portal guide entries with real `href` values.
+Do not modify `router/index.ts` or `portal-guides.ts` in this task. Task 11 and Task 12 create the target views; Task 13 registers all enterprise routes and updates portal hrefs after the views exist.
 
 - [ ] **Step 5: Run tests and commit**
 
@@ -2811,14 +2771,14 @@ Run:
 
 ```bash
 cd frontend
-npm test -- src/router/enterpriseRoutes.test.ts src/views/EnterprisePortalView.test.ts src/components/PortalShell.test.ts
+npm test -- src/views/EnterprisePortalView.test.ts src/components/PortalShell.test.ts
 npx tsc -b --noEmit
 ```
 
 Expected: PASS.
 
 ```bash
-git add frontend/src/components/EnterpriseConsoleNav.vue frontend/src/components/EnterpriseDashboardCards.vue frontend/src/components/PortalShell.vue frontend/src/data/portal-guides.ts frontend/src/router/index.ts frontend/src/router/enterpriseRoutes.test.ts frontend/src/views/EnterprisePortalView.vue frontend/src/views/EnterprisePortalView.test.ts
+git add frontend/src/components/EnterpriseConsoleNav.vue frontend/src/components/EnterpriseDashboardCards.vue frontend/src/components/PortalShell.vue frontend/src/views/EnterprisePortalView.vue frontend/src/views/EnterprisePortalView.test.ts
 git commit -m "前端：建立企业门户与看板入口"
 ```
 
@@ -3078,10 +3038,13 @@ git commit -m "前端：实现申请筛选与状态处理"
 **Files:**
 - Create: `backend/app/enterprise_console/seed.py`
 - Create: `backend/tests/test_enterprise_integration.py`
+- Create: `frontend/src/router/enterpriseRoutes.test.ts`
 - Create: `frontend/src/views/EnterpriseConsoleResponsive.test.ts`
 - Modify: `backend/app/seed_dev.py`
 - Modify: `backend/app/db.py`
 - Modify: `backend/app/enterprise_console/__init__.py`
+- Modify: `frontend/src/router/index.ts`
+- Modify: `frontend/src/data/portal-guides.ts`
 
 **Interfaces:**
 - Consumes: all 09 services and existing local seed entrypoint.
@@ -3196,6 +3159,17 @@ DEMO_JOBS = (
 
 Call the function from `seed_local_data()` after `_seed_accounts()` and keep it out of production `create_app()` startup.
 
+After Tasks 11 and 12 have created the real enterprise views, register the four routes in `frontend/src/router/index.ts`:
+
+```text
+/enterprise                              enterprise-portal
+/enterprise/jobs                         enterprise-jobs
+/enterprise/applications                 enterprise-applications
+/enterprise/applications/:applicationId  enterprise-application-detail
+```
+
+Update `frontend/src/data/portal-guides.ts` so `enterprise-job-publish`, `enterprise-applications` and `enterprise-dashboard` point to `/enterprise/jobs`, `/enterprise/applications`, and `/enterprise` respectively. Create `frontend/src/router/enterpriseRoutes.test.ts` to assert `requiresAuth: true`, `roles: ['enterprise']`, guest redirects, non-enterprise redirects and portal guide hrefs. This delayed registration follows the project frontend rule that routes and portal registration happen only after their target views exist.
+
 - [ ] **Step 4: Run full automated verification**
 
 Run:
@@ -3254,7 +3228,7 @@ With the seeded `enterprise_demo` account, verify in the browser:
 Capture the browser-visible desktop and mobile evidence in the task handoff.
 
 ```bash
-git add backend/app/enterprise_console/seed.py backend/app/enterprise_console/__init__.py backend/app/seed_dev.py backend/app/db.py backend/tests/test_enterprise_integration.py frontend/src/views/EnterpriseConsoleResponsive.test.ts
+git add backend/app/enterprise_console/seed.py backend/app/enterprise_console/__init__.py backend/app/seed_dev.py backend/app/db.py backend/tests/test_enterprise_integration.py frontend/src/router/index.ts frontend/src/router/enterpriseRoutes.test.ts frontend/src/data/portal-guides.ts frontend/src/views/EnterpriseConsoleResponsive.test.ts
 git commit -m "测试：完成企业工作台端到端验收"
 ```
 
