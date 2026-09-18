@@ -689,6 +689,56 @@ CREATE TABLE IF NOT EXISTS handcraft_notification_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_handcraft_notification_outbox_pending
     ON handcraft_notification_outbox(status, created_at, id);
+
+CREATE TABLE IF NOT EXISTS government_policies (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category_code TEXT NOT NULL CHECK (
+        category_code IN (
+            'subsidy', 'ecommerce', 'heritage', 'training',
+            'certification', 'general', 'entrepreneurship'
+        )
+    ),
+    status TEXT NOT NULL CHECK (status IN ('active', 'unpublished')),
+    view_count INTEGER NOT NULL DEFAULT 0 CHECK (view_count >= 0),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    published_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS government_news (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    category_code TEXT NOT NULL CHECK (
+        category_code IN ('news', 'disaster_warning', 'policy_update')
+    ),
+    view_count INTEGER NOT NULL DEFAULT 0 CHECK (view_count >= 0),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    published_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS government_publication_requests (
+    content_type TEXT NOT NULL CHECK (content_type IN ('policy', 'news')),
+    request_id TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (content_type, request_id)
+);
+
+CREATE TABLE IF NOT EXISTS government_view_events (
+    content_type TEXT NOT NULL CHECK (content_type IN ('policy', 'news')),
+    content_id TEXT NOT NULL,
+    view_event_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (content_type, view_event_id)
+);
 """
 
 

@@ -13,6 +13,7 @@ from app.ecommerce_training.routes import (
     ecommerce_training_bp,
     register_ecommerce_training_error_handlers,
 )
+from app.government_console import install_default_government_services
 from app.handcraft_inheritance import install_default_handcraft_services
 from app.handcraft_inheritance.routes import (
     handcraft_inheritance_bp,
@@ -52,6 +53,7 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     install_default_agri_services(app)
     install_default_handcraft_services(app)
+    install_default_government_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
         app,
