@@ -79,7 +79,11 @@ def get_<provider_key>_provider() -> <ProviderProtocol>: ...
 该 facade；05 保持现有视频专用 action provider，不改已合并代码，由 11
 提供视频专用 action 到通用动作的适配器。
 
-### 3.2 状态机
+### 3.2 状态机（目标契约）
+
+以下状态机是 08、09、11 的目标契约。05 当前实现是它的子集：已覆盖
+`pending -> approved/rejected` 和 `pending/approved -> pending`，
+尚未覆盖 `rejected -> pending`、首次 `submit_for_review`。
 
 状态值冻结为：
 
@@ -94,7 +98,8 @@ rejected -> pending       # 修改后重新提交
 约束：
 
 - `pending` 内容学员端不可见。
-- `pending` 编辑后仍为 `pending`，版本前进。
+- `pending` 编辑后仍为 `pending`；有实际字段变化时版本前进，无变化提交
+  返回原状态与原版本，不创建新的审核轮次。
 - `approved` 编辑后必须回到 `pending`。
 - `rejected` 修改后重新提交进入 `pending`。
 - `approve`、`reject`、`edit`、`submit` 都必须用版本号阻止旧写入覆盖新写入。
@@ -156,6 +161,16 @@ class ContentReviewProvider(Protocol):
         payload: dict,
     ) -> dict: ...
 ```
+
+`submit_for_review()` 的对象必须是内容模块已经持久化、已有稳定
+`content_id` 和当前 `expected_version` 的记录。审核 provider 不负责创建
+课程、职位或非遗视频记录，也不生成跨模块稳定 ID。
+
+- 首次提交时 `expected_version` 是内容记录当前版本；内容模块负责在提交前
+  建立草稿。
+- 编辑后重新提交时，`expected_version` 必须是读取到的最新版本。
+- 旧版本、状态不允许转换或 provider 无法表达该动作时，抛出
+  `ProviderConflictError`。
 
 `content_type` 冻结值：
 
@@ -226,14 +241,25 @@ category
 description
 ```
 
-`handcraft_teaching_video` 的 payload 特有字段：
+`handcraft_teaching_video` 的记录特有字段：
 
 ```text
 craft_key
-title
-media_url
 source_available
 ```
+
+`handcraft_teaching_video` 的可写 payload 字段：
+
+```text
+title
+media_url
+```
+
+`craft_key` 是创建后不可通过审核动作改变的关联字段；`source_available`
+是 producer 提供的只读状态，两者不属于可写审核 payload。
+如写入 payload 试图改变 `craft_key`，适配器必须拒绝并抛出
+`ProviderValidationError`；`source_available` 的写入值必须忽略或拒绝，
+不得由 consumer 伪造。
 
 ### 3.6 通知触发归属
 
@@ -273,7 +299,15 @@ emit_review_result(
 - 05 action 结果的 `status` 映射为通用 `review_status`。
 - 05 已存在的 `handcraft_teaching_video` 通知类型保持不变。
 - 05 没有新建/提交入口；初始提交仍由 08 的教师工作台承担。11 适配器
-  不得伪造 05 不存在的提交能力。
+  不得伪造 05 不存在的提交能力；`submit_for_review` 只可映射到 05 已存在
+  且状态允许 `edit` 的记录，否则返回 `ProviderConflictError` 或
+  `ProviderUnavailableError`。
+- `reviewer_id` 必须由 11 从 01 会话覆盖并用于授权与审计。client 传入值
+  无效；05 当前 action 不读取该字段，因此映射层可仅在 11 侧保留审计信息，
+  但不得放弃身份校验。
+- `course_video.content_id` 是通用审核层的字符串稳定标识；与既有课程
+  provider 的整数 `course.id` 通过适配器做 `str(course_id)` / `int(...)`
+  双向映射。课程 provider 自身继续使用整数 ID。
 
 ## 4. 通用 Provider 约定
 
@@ -322,7 +356,7 @@ cursor 对 consumer 不透明，不把 `page/page_size` 暴露为 provider 契�
 
 ### 4.5 错误目标形状
 
-新增模块的 provider 边界错误必须遵循以下形状：
+新增 08、09、10、11 的 provider 边界错误必须遵循以下形状：
 
 ```python
 class ProviderError(RuntimeError):
@@ -347,7 +381,7 @@ class ProviderAccessDeniedError(ProviderError): ...
 | `ProviderUnavailableError` | producer 未实现、来源不可达或规则源不可用 |
 | `ProviderAccessDeniedError` | 当前会话角色无权执行 provider 动作 |
 
-新增 08、09、10 的 provider 边界必须直接使用该目标形状，或使用可被
+新增 08、09、10、11 的 provider 边界必须直接使用该目标形状，或使用可被
 consumer 按相同 `code/message/details` 识别的兼容子类。
 
 此建议只冻结目标，不要求回改 03/04/05/02：
@@ -401,7 +435,7 @@ consumer 按相同 `code/message/details` 识别的兼容子类。
 | 用户 ID | 正整数 `int` | 正整数 `int` | 否 | 已一致 |
 | 时间 | UTC `Z` 与 `+08:00` 混用 | 带时区 ISO 8601；新模块规范为 `+08:00`；比较前解析 | 否 | 新模块立即；旧来源由适配器规范 |
 | 列表 | 完整列表，方法各自排序 | 完整列表；稳定 tie-breaker；仅 spec 授权时使用 cursor 分页 | 否 | 新模块立即 |
-| Provider 错误 | 03/05 用 Agri 错误；02 用自己的错误；部分用 `ValueError` | 新增边界用 `ProviderError` 目标层级 | 否；新增模块强制 | 08/09/10 立即 |
+| Provider 错误 | 03/05 用 Agri 错误；02 用自己的错误；部分用 `ValueError` | 新增边界用 `ProviderError` 目标层级 | 否；新增模块强制 | 08/09/10/11 立即 |
 | 内容审核 | 05 只有视频 action + `status` | 通用 `ContentReviewProvider` + `review_status`；11 适配 05 | 否 | 11 实现契约时 |
 | 课程 Provider | `list_published_courses(student_id, direction)` 等已存在 | 保持现有形状 | 否 | 08 立即按其实现 |
 | 05 奖品 / 积分 / 履约 | 05 内已有 Protocol 与 set/get | 11 spec 冻结 producer 形状；兼容现有消费签名 | 否 | 11 实现时 |
