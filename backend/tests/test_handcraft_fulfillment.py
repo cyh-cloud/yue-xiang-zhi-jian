@@ -92,7 +92,7 @@ class TestHandcraftFulfillment(unittest.TestCase):
                 result = record_training_points(
                     user_id,
                     "ecommerce",
-                    "funding",
+                    "live_script",
                     f"funding-{user_id}",
                     "2026-09-17T09:00:00+08:00",
                 )
@@ -704,6 +704,10 @@ class TestHandcraftFulfillment(unittest.TestCase):
         )
         self.assertFalse(normal_record["capabilities"]["manage_accounts"])
         self.assertTrue(normal_record["capabilities"]["manage_rewards"])
+        self.assertTrue(
+            normal_record["capabilities"]["view_complete_redemption_records"]
+        )
+        self.assertTrue(normal_record["capabilities"]["view_points_flow"])
         self.assertTrue(
             normal_record["capabilities"]["view_user_details"]
         )

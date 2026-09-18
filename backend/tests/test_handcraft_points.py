@@ -8,6 +8,7 @@ from pathlib import Path
 from app import create_app
 from app.agri_skills.errors import AgriValidationError
 from app.db import get_db
+from app.handcraft_inheritance import points as points_module
 from app.handcraft_inheritance import (
     PointsPolicyUnavailable,
     enqueue_learning_event,
@@ -328,14 +329,14 @@ class TestHandcraftPoints(unittest.TestCase):
             later = enqueue_learning_event(
                 1,
                 "handcraft",
-                "training",
+                "live_script",
                 "later-event",
                 "2026-09-17T10:00:00+08:00",
             )
             older = enqueue_learning_event(
                 1,
                 "handcraft",
-                "training",
+                "live_script",
                 "older-event",
                 "2026-09-16T10:00:00+08:00",
             )
@@ -535,6 +536,42 @@ class TestHandcraftPoints(unittest.TestCase):
             {"award", "spend", "refund", "expire"},
         )
 
+    def test_unknown_training_event_type_earns_no_points(self):
+        self.use_policy(
+            seconds_per_point=1,
+            daily_limit=100,
+            training_weights={"default": 1},
+        )
+        with self.app.app_context():
+            result = record_training_points(
+                1,
+                "ecommerce",
+                "unknown_training",
+                "unknown-training",
+                "2026-09-17T10:00:00+08:00",
+            )
+            account = get_points_account(1, settle=False)
+            ledger = get_points_ledger(1)
+
+        self.assertEqual(result["status"], "pending")
+        self.assertEqual(result["awarded"], 0)
+        self.assertIn("不支持的训练类型", result["error"])
+        self.assertEqual(account["balance"], 0)
+        self.assertEqual(ledger, [])
+
+    def test_unsupported_training_weight_key_is_rejected(self):
+        policy = copy.deepcopy(PLACEHOLDER_POINTS_POLICY)
+        policy["training_weights"]["unknown_training"] = 1
+
+        with self.assertRaisesRegex(
+            AgriValidationError,
+            "不支持的训练积分权重类型",
+        ):
+            points_module._normalize_policy(
+                policy,
+                source_available=True,
+            )
+
     def test_refund_of_expired_lot_creates_new_usable_lot(self):
         self.use_policy(
             seconds_per_point=1,
@@ -672,7 +709,7 @@ class TestHandcraftPoints(unittest.TestCase):
                 return record_training_points(
                     1,
                     "handcraft",
-                    "training",
+                    "simulation",
                     "same-event",
                     "2026-09-17T10:00:00+08:00",
                 )
@@ -704,7 +741,7 @@ class TestHandcraftPoints(unittest.TestCase):
             record_training_points(
                 1,
                 "ecommerce",
-                "training",
+                "customer_service",
                 "funding-event",
                 "2026-09-17T09:00:00+08:00",
             )
@@ -712,7 +749,7 @@ class TestHandcraftPoints(unittest.TestCase):
                 record_training_points(
                     1,
                     "ecommerce",
-                    "training",
+                    "customer_service",
                     f"funding-event-{index}",
                     f"2026-09-17T09:0{index + 1}:00+08:00",
                 )

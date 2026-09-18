@@ -176,7 +176,7 @@ class TestHandcraftPlaceholderAcceptance(unittest.TestCase):
             result = record_training_points(
                 1,
                 "ecommerce",
-                "placeholder_funding",
+                "live_script",
                 "placeholder-funding",
                 "2026-09-18T09:00:00+08:00",
             )

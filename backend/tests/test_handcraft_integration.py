@@ -292,7 +292,7 @@ class HandcraftIntegrationAcceptance(unittest.TestCase):
             result = record_training_points(
                 user_id,
                 "ecommerce",
-                "integration_funding",
+                "live_script",
                 source_id,
                 occurred_at,
             )

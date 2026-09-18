@@ -196,7 +196,7 @@ class TestHandcraftFinalReviewFixes(unittest.TestCase):
             result = record_training_points(
                 self.student_id,
                 "ecommerce",
-                "review-fix-funding",
+                "live_script",
                 "review-fix-funding",
                 "2026-09-18T09:00:00+08:00",
             )

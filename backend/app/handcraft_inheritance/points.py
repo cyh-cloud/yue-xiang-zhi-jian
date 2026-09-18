@@ -13,6 +13,14 @@ from app.handcraft_inheritance.providers import get_points_policy_provider
 PLATFORM_TIMEZONE = ZoneInfo("Asia/Shanghai")
 MAX_SEGMENT_SECONDS = 7200
 DURATION_EVENT_SEPARATOR = "|"
+SUPPORTED_TRAINING_EVENT_TYPES = frozenset(
+    {
+        "live_script",
+        "simulation",
+        "copy_training",
+        "customer_service",
+    }
+)
 
 
 class PointsPolicyUnavailable(AgriValidationError):
@@ -189,6 +197,10 @@ def _normalize_policy(
             weight,
             "训练积分权重必须是正整数",
         )
+    if not set(training_weights).issubset(
+        SUPPORTED_TRAINING_EVENT_TYPES | {"default"}
+    ):
+        raise AgriValidationError("不支持的训练积分权重类型")
     if "default" not in training_weights:
         raise AgriValidationError("积分规则缺少默认训练权重")
     return {
@@ -706,7 +718,9 @@ def _award_duration_event(db, event, policy: dict) -> dict | None:
 
 
 def _award_training_event(db, event, policy: dict) -> dict | None:
-    event_type = str(event["event_type"])
+    event_type = _require_text(event["event_type"], "训练类型不能为空")
+    if event_type not in SUPPORTED_TRAINING_EVENT_TYPES:
+        raise AgriValidationError("不支持的训练类型")
     weight = int(
         policy["training_weights"].get(
             event_type,

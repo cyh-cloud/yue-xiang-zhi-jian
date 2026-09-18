@@ -110,7 +110,7 @@ class TestHandcraftRewards(unittest.TestCase):
             result = record_training_points(
                 user_id,
                 "ecommerce",
-                "funding",
+                "live_script",
                 f"funding-{user_id}-{amount}",
                 "2026-09-17T09:00:00+08:00",
             )

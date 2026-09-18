@@ -357,7 +357,7 @@ class TestHandcraftApi(unittest.TestCase):
             result = record_training_points(
                 user_id,
                 "ecommerce",
-                "api_funding",
+                "live_script",
                 source_id,
                 occurred_at,
             )
