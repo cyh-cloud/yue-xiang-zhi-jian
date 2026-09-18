@@ -2,6 +2,18 @@ from __future__ import annotations
 
 from flask import Flask
 
+from app.enterprise_console.applications import (
+    APPLICATION_STATUSES,
+    APPLICATION_SORTS,
+    CLOSED_STATUS_LABEL,
+    MANUAL_STATUSES,
+    STATUS_LABELS,
+    change_application_status,
+    get_application,
+    list_applications,
+    record_application_submission,
+    serialize_application,
+)
 from app.enterprise_console.jobs import (
     JOB_REVIEW_CONTENT_TYPE,
     JOB_REVIEW_STATUSES,
@@ -15,8 +27,8 @@ from app.enterprise_console.jobs import (
     sync_job_review_projection,
 )
 from app.enterprise_console.providers import (
+    DatabaseJobApplicationIntakeProvider,
     DatabaseJobPositionProvider,
-    EmptyJobApplicationIntakeProvider,
     get_job_application_intake_provider,
     get_job_position_provider,
     set_job_application_intake_provider,
@@ -36,27 +48,38 @@ def install_default_enterprise_services(app: Flask) -> None:
     if "job_application_intake_provider" not in app.extensions:
         set_job_application_intake_provider(
             app,
-            EmptyJobApplicationIntakeProvider(),
+            DatabaseJobApplicationIntakeProvider(),
         )
     if "content_review_provider" not in app.extensions:
         set_content_review_provider(app, UnavailableContentReviewProvider())
 
 
 __all__ = [
+    "APPLICATION_STATUSES",
+    "APPLICATION_SORTS",
+    "CLOSED_STATUS_LABEL",
     "ContentReviewProvider",
+    "DatabaseJobApplicationIntakeProvider",
     "JOB_REVIEW_CONTENT_TYPE",
     "JOB_REVIEW_STATUSES",
     "JOB_TEXT_LIMITS",
     "JOB_TRANSITIONS",
+    "MANUAL_STATUSES",
+    "STATUS_LABELS",
+    "change_application_status",
     "create_job",
     "edit_job",
+    "get_application",
     "get_content_review_provider",
     "get_job",
     "get_job_application_intake_provider",
     "get_job_position_provider",
     "install_default_enterprise_services",
+    "list_applications",
     "list_jobs",
+    "record_application_submission",
     "serialize_job",
+    "serialize_application",
     "set_job_application_intake_provider",
     "set_content_review_provider",
     "set_job_position_provider",

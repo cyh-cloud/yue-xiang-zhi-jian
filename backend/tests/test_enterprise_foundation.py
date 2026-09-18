@@ -7,6 +7,7 @@ from app import create_app
 from app.db import get_db
 from app.enterprise_console.errors import ProviderUnavailableError
 from app.enterprise_console.providers import (
+    DatabaseJobApplicationIntakeProvider,
     EmptyJobApplicationIntakeProvider,
     EmptyJobPositionProvider,
     configure_enterprise_providers,
@@ -607,7 +608,7 @@ class TestEnterpriseFoundation(unittest.TestCase):
             )
             self.assertIsInstance(
                 get_job_application_intake_provider(),
-                EmptyJobApplicationIntakeProvider,
+                DatabaseJobApplicationIntakeProvider,
             )
             self.assertIsInstance(
                 get_content_review_provider(),
@@ -628,7 +629,7 @@ class TestEnterpriseFoundation(unittest.TestCase):
             )
 
             with self.assertRaises(ProviderUnavailableError):
-                get_job_application_intake_provider().submit_application(
+                EmptyJobApplicationIntakeProvider().submit_application(
                     job_id="job-1",
                     student_id=1,
                     resume_snapshot={"summary": "resume"},

@@ -85,6 +85,45 @@ class EmptyJobApplicationIntakeProvider:
         raise ProviderUnavailableError("申请接收服务暂不可用")
 
 
+class DatabaseJobApplicationIntakeProvider:
+    """Database-backed application intake provider."""
+
+    @staticmethod
+    def _database_call(operation):
+        try:
+            return operation()
+        except sqlite3.Error as error:
+            from app.enterprise_console.errors import ProviderUnavailableError
+
+            raise ProviderUnavailableError(
+                "Application intake data is unavailable"
+            ) from error
+
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict:
+        def record():
+            from app.enterprise_console.applications import (
+                record_application_submission,
+            )
+
+            return record_application_submission(
+                job_id=job_id,
+                student_id=student_id,
+                resume_snapshot=resume_snapshot,
+                skill_profile_snapshot=skill_profile_snapshot,
+                idempotency_key=idempotency_key,
+            )
+
+        return self._database_call(record)
+
+
 def set_job_position_provider(
     app: Flask,
     provider: JobPositionProvider,
