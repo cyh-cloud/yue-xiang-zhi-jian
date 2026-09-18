@@ -22,7 +22,6 @@ from app.messaging.notification_service import list_notifications
 
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 NO_LOCAL_MATCH_MESSAGE = "暂无法回答，建议稍后再试"
-ECOMMERCE_FIXTURE_IDS = {1001, 1002, 1003, 1004, 1005}
 
 
 class FakeCourseProvider:
@@ -834,6 +833,31 @@ class TestAgriIntegration(unittest.TestCase):
                 ),
             )
             db.commit()
+
+            def directional_courses(student_id, direction):
+                del student_id
+                if direction != "agriculture":
+                    return []
+                return [
+                    {
+                        "id": course_id,
+                        "title": f"课程 {course_id}",
+                        "direction": "agriculture",
+                        "status": "published",
+                        "summary": f"课程 {course_id} 简介",
+                        "teacher_name": "林老师",
+                        "published_at": (
+                            "2026-09-02T00:00:00+00:00"
+                            if course_id == 7
+                            else "2026-09-01T00:00:00+00:00"
+                        ),
+                        "duration_seconds": 300,
+                        "tag_ids": list(course_tags[course_id]),
+                    }
+                    for course_id in range(1, 12)
+                ]
+
+            self.course_provider.list_published_courses = directional_courses
             recommendation_ids = [
                 item["id"]
                 for item in list_recommendations(self.student_id)
@@ -844,11 +868,10 @@ class TestAgriIntegration(unittest.TestCase):
             [
                 course_id
                 for course_id in recommendation_ids
-                if course_id not in ECOMMERCE_FIXTURE_IDS
             ],
             [1, 8, 9, 7, 6, 4, 5, 3, 2, 10],
         )
-        self.assertIn(1004, recommendation_ids)
+        self.assertNotIn(1004, recommendation_ids)
 
     def test_latest_valid_course_quiz_attempt_is_formal(self):
         self._complete_course()
