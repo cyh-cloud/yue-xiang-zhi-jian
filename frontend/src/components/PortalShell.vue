@@ -114,6 +114,8 @@ onMounted(() => {
         </div>
       </section>
 
+      <slot />
+
       <section class="entry-index" aria-labelledby="portal-entries-title">
         <header class="section-heading">
           <h2 id="portal-entries-title">核心入口</h2>
