@@ -425,6 +425,28 @@ CREATE TABLE IF NOT EXISTS heritage_videos (
 CREATE INDEX IF NOT EXISTS idx_heritage_videos_craft_status
     ON heritage_videos(craft_key, review_status, published_at DESC, video_id);
 
+CREATE TABLE IF NOT EXISTS handcraft_learning_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    outcome_type TEXT NOT NULL,
+    source_key TEXT NOT NULL,
+    source_id INTEGER,
+    created_at TEXT NOT NULL,
+    source_available INTEGER NOT NULL DEFAULT 1 CHECK (
+        source_available IN (0, 1)
+    ),
+    summary TEXT NOT NULL,
+    score INTEGER,
+    is_formal INTEGER NOT NULL DEFAULT 0 CHECK (is_formal IN (0, 1)),
+    archive_written INTEGER NOT NULL DEFAULT 0 CHECK (
+        archive_written IN (0, 1)
+    ),
+    UNIQUE (user_id, outcome_type, source_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_handcraft_outcomes_user_created
+    ON handcraft_learning_outcomes(user_id, created_at, id);
+
 CREATE TABLE IF NOT EXISTS points_accounts (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     balance INTEGER NOT NULL DEFAULT 0 CHECK (balance >= 0),

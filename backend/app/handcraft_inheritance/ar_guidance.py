@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import logging
+from uuid import uuid4
 
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
 from app.agri_skills.errors import AgriValidationError, AiUnavailableError
+from app.db import get_db
 from app.handcraft_inheritance.crafts import get_craft
+from app.handcraft_inheritance.outcomes import (
+    record_handcraft_learning_outcome,
+)
 from app.handcraft_inheritance.points import record_duration_points
 from app.session_manager import utc_now_iso
 
@@ -137,6 +142,20 @@ def generate_ar_guidance(
             AI_UNAVAILABLE_MESSAGE,
             details=context,
         ) from error
+
+    created_at = utc_now_iso()
+    source_key = (
+        f"ar:{craft['craft_key']}:"
+        f"{normalized_event_id or uuid4().hex}"
+    )
+    with get_db():
+        record_handcraft_learning_outcome(
+            user_id,
+            "ar_usage",
+            source_key,
+            created_at,
+            f"{craft['name']} · {normalized_project_label}",
+        )
 
     if active_seconds is not None:
         try:

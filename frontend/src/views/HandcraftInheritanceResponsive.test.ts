@@ -14,7 +14,10 @@ import type {
   HandcraftVideo
 } from '@/api/types'
 import CourseLearningPanel from '@/components/CourseLearningPanel.vue'
+import appHeaderSource from '@/components/AppHeader.vue?raw'
 import handcraftCraftLearningSource from '@/components/HandcraftCraftLearning.vue?raw'
+import handcraftPointsSource from '@/components/HandcraftPointsPanel.vue?raw'
+import handcraftRewardsSource from '@/components/HandcraftRewardsPanel.vue?raw'
 
 import HandcraftCraftView from './HandcraftCraftView.vue'
 import handcraftCraftViewSource from './HandcraftCraftView.vue?raw'
@@ -491,7 +494,9 @@ describe('HandcraftInheritanceResponsive', () => {
     const sources = [
       handcraftCraftLearningSource,
       handcraftCraftViewSource,
-      handcraftCoursesViewSource
+      handcraftCoursesViewSource,
+      handcraftPointsSource,
+      handcraftRewardsSource
     ]
 
     expect(
@@ -525,6 +530,45 @@ describe('HandcraftInheritanceResponsive', () => {
     expect(
       cssRule(handcraftCoursesViewSource, '.handcraft-courses-page')
     ).toContain('overflow-x: clip')
+    expect(
+      cssRule(handcraftPointsSource, '.points-panel')
+    ).toContain('width: min(100%, 1180px)')
+    expect(
+      cssRule(handcraftPointsSource, '.points-panel')
+    ).toContain('min-width: 0')
+    expect(
+      cssRule(handcraftPointsSource, '.points-hero')
+    ).toContain('grid-template-columns: minmax(0, 1fr) minmax(280px, 0.72fr)')
+    expect(
+      cssRule(handcraftPointsSource, '.ledger-entry')
+    ).toContain('grid-template-columns: auto minmax(0, 1fr)')
+    expect(handcraftPointsSource).toContain(
+      '@media (max-width: 760px), (orientation: portrait)'
+    )
+    expect(
+      cssRule(handcraftRewardsSource, '.rewards-panel')
+    ).toContain('width: min(100%, 1180px)')
+    expect(
+      cssRule(handcraftRewardsSource, '.rewards-panel')
+    ).toContain('min-width: 0')
+    expect(
+      cssRule(handcraftRewardsSource, '.reward-grid')
+    ).toContain('minmax(min(100%, 280px), 1fr)')
+    expect(
+      cssRule(handcraftRewardsSource, '.fulfillment-record')
+    ).toContain('grid-template-columns: minmax(0, 1fr) auto auto')
+    expect(
+      cssRule(appHeaderSource, '.brand')
+    ).toContain('min-width: 0')
+    expect(
+      cssRule(appHeaderSource, '.brand-copy strong')
+    ).toContain('white-space: nowrap')
+    expect(
+      cssRule(handcraftRewardsSource, '.reward-card__state')
+    ).toContain('white-space: nowrap')
+    expect(handcraftRewardsSource).toContain(
+      '@media (max-width: 760px), (orientation: portrait)'
+    )
 
     viewports.forEach(viewport => {
       expect(
@@ -535,7 +579,6 @@ describe('HandcraftInheritanceResponsive', () => {
         )
       ).toBe(true)
     })
-    expect(sources.join('\n')).not.toMatch(/white-space:\s*nowrap/)
     expect(sources.join('\n')).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/i)
   })
 })

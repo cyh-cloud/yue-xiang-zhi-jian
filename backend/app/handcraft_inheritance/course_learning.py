@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+from app.db import get_db
 from app.agri_skills.course_learning import (
     get_course_progress,
     get_course_quiz,
@@ -14,6 +15,9 @@ from app.agri_skills.course_learning import (
 from app.handcraft_inheritance.points import (
     MAX_SEGMENT_SECONDS,
     record_duration_points,
+)
+from app.handcraft_inheritance.outcomes import (
+    record_handcraft_learning_outcome,
 )
 
 
@@ -50,6 +54,36 @@ def update_handcraft_course_progress(
         watched_delta_seconds,
         direction="handcraft",
     )
+    with get_db():
+        title_row = get_db().execute(
+            "SELECT title FROM courses WHERE id = ?",
+            (course_id,),
+        ).fetchone()
+        title = (
+            str(title_row["title"])
+            if title_row is not None
+            else f"手工课程 {course_id}"
+        )
+        viewed_at = str(
+            progress.get("last_viewed_at") or progress["updated_at"]
+        )
+        record_handcraft_learning_outcome(
+            user_id,
+            "course_view",
+            f"course:{course_id}:view",
+            viewed_at,
+            title,
+            source_id=course_id,
+        )
+        if progress.get("completed_at") is not None:
+            record_handcraft_learning_outcome(
+                user_id,
+                "course_completion",
+                f"course:{course_id}:completion",
+                str(progress["completed_at"]),
+                title,
+                source_id=course_id,
+            )
     effective_delta = max(
         0,
         int(progress["watched_seconds"]) - int(before["watched_seconds"]),
@@ -99,12 +133,33 @@ def submit_handcraft_course_quiz(
     course_id: int,
     answers: dict,
 ) -> dict:
-    return submit_course_quiz(
+    attempt = submit_course_quiz(
         user_id,
         course_id,
         answers,
         direction="handcraft",
     )
+    with get_db():
+        title_row = get_db().execute(
+            "SELECT title FROM courses WHERE id = ?",
+            (course_id,),
+        ).fetchone()
+        title = (
+            str(title_row["title"])
+            if title_row is not None
+            else f"手工课程 {course_id}"
+        )
+        record_handcraft_learning_outcome(
+            user_id,
+            "course_quiz",
+            f"course_quiz:{course_id}:{int(attempt['id'])}",
+            str(attempt["created_at"]),
+            title,
+            source_id=int(attempt["id"]),
+            score=int(attempt["score"]),
+            is_formal=bool(attempt["is_formal"]),
+        )
+    return attempt
 
 
 def list_handcraft_learning_outcomes(user_id: int) -> list[dict]:

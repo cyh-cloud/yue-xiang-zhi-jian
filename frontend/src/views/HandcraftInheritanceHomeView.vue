@@ -137,6 +137,7 @@ onMounted(() => {
               <RouterLink
                 v-if="isAvailable(craft.craft_key, craft.available, craft.source_available)"
                 class="craft-card__action"
+                data-test="craft-card-action"
                 :to="`/student/handcraft-inheritance/crafts/${craft.craft_key}`"
               >
                 进入学习
@@ -199,9 +200,9 @@ onMounted(() => {
   margin: 16px 0 0;
   color: var(--ark-muted);
   line-break: strict;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   text-wrap: pretty;
-  word-break: keep-all;
+  word-break: normal;
 }
 
 .handcraft-home__section-head {
@@ -241,6 +242,7 @@ onMounted(() => {
 .craft-card {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 14px;
   min-width: 0;
   min-height: 190px;
@@ -288,9 +290,9 @@ onMounted(() => {
   color: var(--ark-muted);
   font-size: 0.82rem;
   line-break: strict;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   text-wrap: pretty;
-  word-break: keep-all;
+  word-break: normal;
 }
 
 .craft-card__unavailable {
@@ -317,6 +319,7 @@ onMounted(() => {
 .craft-card__disabled {
   grid-column: 1 / -1;
   display: inline-flex;
+  align-self: end;
   align-items: center;
   justify-content: center;
   gap: 8px;

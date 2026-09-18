@@ -146,6 +146,7 @@ function closeMobileNav() {
 
 .brand {
   display: flex;
+  min-width: 0;
   align-items: center;
   gap: 10px;
   color: var(--ark-paper);
@@ -163,11 +164,13 @@ function closeMobileNav() {
 
 .brand-copy {
   display: grid;
+  min-width: 0;
 }
 
 .brand-copy strong {
   font-size: 1rem;
   line-height: 1.2;
+  white-space: nowrap;
 }
 
 .brand-copy small {

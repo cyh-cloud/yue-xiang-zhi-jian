@@ -1,5 +1,15 @@
 # Current Work
 
+## 005 Task 20 Browser Acceptance
+
+- Completed on 2026-09-18 in `.worktrees/005-heritage-craft`.
+- DOM geometry at 320, 375, and 1280 reported no horizontal overflow on the
+  handcraft home, craft/AR, points, or rewards flows.
+- The exact `AI 服务暂时不可用` copy remained visible after resizing, and the
+  points/redemption/cancellation flow preserved balance, stock, status, and
+  reward availability.
+- Residual visual risk: none found in the Task 20 browser pass.
+
 ## Goal
 
 Finish the post-review repair set for `004-ecommerce-training` after the feature's

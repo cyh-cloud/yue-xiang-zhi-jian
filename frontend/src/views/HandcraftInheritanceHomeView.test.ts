@@ -113,6 +113,40 @@ describe('HandcraftInheritanceHomeView', () => {
     expect(cards[3].text()).toContain('暂不可学习')
   })
 
+  it('keeps a visible learning action on all four available craft cards', async () => {
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      crafts: [
+        craft('guangxiu', '广绣'),
+        craft('chaoshan-woodcarving', '潮汕木雕'),
+        craft('shiwan-ceramics', '石湾陶艺'),
+        craft('yangjiang-lacquerware', '阳江漆器')
+      ]
+    } as never)
+
+    const wrapper = mount(HandcraftInheritanceHomeView, {
+      global: {
+        plugins: [createPinia(), testRouter()]
+      }
+    })
+    await flushPromises()
+
+    const actions = wrapper.findAll('[data-test="craft-card-action"]')
+    expect(actions).toHaveLength(4)
+    expect(actions.map(action => action.text())).toEqual([
+      '进入学习',
+      '进入学习',
+      '进入学习',
+      '进入学习'
+    ])
+    expect(cssRule(handcraftHomeSource, '.craft-card')).toContain(
+      'grid-template-rows: minmax(0, 1fr) auto'
+    )
+    expect(
+      cssRule(handcraftHomeSource, '.craft-card__action')
+    ).toContain('align-self: end')
+  })
+
   it('declares CJK-safe wrapping for the home introduction and craft copy', () => {
     const intro = cssRule(
       handcraftHomeSource,
@@ -124,11 +158,13 @@ describe('HandcraftInheritanceHomeView', () => {
     )
 
     expect(intro).toContain('line-break: strict')
-    expect(intro).toContain('overflow-wrap: anywhere')
+    expect(intro).toContain('overflow-wrap: break-word')
     expect(intro).toContain('text-wrap: pretty')
-    expect(intro).toContain('word-break: keep-all')
-    expect(cardCopy).toContain('overflow-wrap: anywhere')
-    expect(cardCopy).toContain('word-break: keep-all')
+    expect(intro).toContain('word-break: normal')
+    expect(intro).not.toContain('overflow-wrap: anywhere')
+    expect(cardCopy).toContain('overflow-wrap: break-word')
+    expect(cardCopy).toContain('word-break: normal')
+    expect(cardCopy).not.toContain('overflow-wrap: anywhere')
     expect(handcraftHomeSource).not.toContain('white-space: nowrap')
     expect(handcraftHomeSource).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/i)
   })

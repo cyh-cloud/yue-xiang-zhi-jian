@@ -364,12 +364,17 @@ describe('HandcraftRewardsPanel', () => {
 
   it('cancels a pending redemption through the store action once', async () => {
     const pending = redemption(11)
+    let rewardsLoads = 0
     mockedApiFetch.mockImplementation(async (path, options) => {
       if (
         path === '/api/handcraft-inheritance/rewards' &&
         !options?.method
       ) {
-        return { success: true, rewards: [] } as never
+        rewardsLoads += 1
+        return {
+          success: true,
+          rewards: rewardsLoads === 1 ? [] : [reward()]
+        } as never
       }
       if (
         path === '/api/handcraft-inheritance/redemptions' &&
@@ -417,6 +422,10 @@ describe('HandcraftRewardsPanel', () => {
     expect(wrapper.get('[data-test="redemption-status"]').text()).toBe(
       '已取消'
     )
+    expect(
+      wrapper.get('[data-test="redeem-reward-1"]').attributes('disabled')
+    ).toBeUndefined()
+    expect(rewardsLoads).toBe(2)
     expect(
       mockedApiFetch.mock.calls.filter(
         ([path, options]) =>
@@ -608,7 +617,6 @@ describe('HandcraftRewardsPanel', () => {
     expect(handcraftRewardsPanelSource).not.toMatch(
       /#[0-9a-f]{3,8}|rgba?\(|hsla?\(|rgb\(24\s+209\s+255/i
     )
-    expect(handcraftRewardsPanelSource).not.toContain('white-space: nowrap')
     expect(handcraftRewardsPanelSource).toContain(
       '@media (max-width: 760px), (orientation: portrait)'
     )
@@ -620,6 +628,9 @@ describe('HandcraftRewardsPanel', () => {
     ).toContain('outline: 2px solid var(--ark-focus)')
     expect(
       cssRule(handcraftRewardsPanelSource, '.reward-card__state')
-    ).toContain('overflow-wrap: anywhere')
+    ).toContain('white-space: nowrap')
+    expect(
+      cssRule(handcraftRewardsPanelSource, '.reward-card__state')
+    ).not.toContain('overflow-wrap: anywhere')
   })
 })

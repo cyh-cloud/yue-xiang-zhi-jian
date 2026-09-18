@@ -127,6 +127,7 @@ async function cancelPending(
   )
   if (canceled) {
     actionMessage.value = '兑换已取消，积分已回退'
+    await rewardsStore.loadRewards()
   }
 }
 
@@ -623,8 +624,8 @@ onMounted(() => {
   color: var(--ark-paper);
   font-size: 0.7rem;
   line-break: strict;
-  overflow-wrap: anywhere;
   text-align: right;
+  white-space: nowrap;
   word-break: keep-all;
 }
 

@@ -7,6 +7,9 @@ from app.agri_skills.errors import AgriValidationError
 from app.db import get_db
 from app.handcraft_inheritance.points import record_duration_points
 from app.handcraft_inheritance.providers import get_craft_preset_provider
+from app.handcraft_inheritance.outcomes import (
+    record_handcraft_learning_outcome,
+)
 from app.session_manager import utc_now_iso
 
 
@@ -436,6 +439,13 @@ def complete_craft_step(
             (user_id, craft["craft_key"]),
         ).fetchone()
         progress = _serialize_progress(user_id, craft, updated_row)
+        record_handcraft_learning_outcome(
+            user_id,
+            "craft_step",
+            f"craft:{craft['craft_key']}:{step_no}",
+            now,
+            f"{craft['name']} · 第 {step_no} 步",
+        )
         result = _progress_result(
             progress,
             accepted=True,

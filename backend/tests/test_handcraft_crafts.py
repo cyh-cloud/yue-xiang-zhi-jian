@@ -268,7 +268,7 @@ class TestHandcraftCrafts(unittest.TestCase):
         self.assertEqual(progress["completed_steps"], [])
         self.assertEqual(event_count, 0)
 
-    def test_each_legal_step_enqueues_one_stable_duration_event(self):
+    def test_each_legal_step_records_one_processed_duration_event(self):
         with self.app.app_context():
             first = complete_craft_step(
                 1,
@@ -303,8 +303,8 @@ class TestHandcraftCrafts(unittest.TestCase):
                 ).fetchall()
             ]
 
-        self.assertEqual(first["points_status"], "pending")
-        self.assertEqual(second["points_status"], "pending")
+        self.assertEqual(first["points_status"], "processed")
+        self.assertEqual(second["points_status"], "processed")
         self.assertEqual(
             [row["source_event_id"] for row in rows],
             [
@@ -320,7 +320,7 @@ class TestHandcraftCrafts(unittest.TestCase):
             all(row["source_module"] == "handcraft" for row in rows)
         )
         self.assertTrue(all(row["event_type"] == "duration" for row in rows))
-        self.assertTrue(all(row["status"] == "pending" for row in rows))
+        self.assertTrue(all(row["status"] == "processed" for row in rows))
         self.assertEqual(repeated["status"], "already_completed")
         self.assertEqual(repeated["points_status"], "not_enqueued")
         self.assertEqual(len(rows), 2)
@@ -458,10 +458,10 @@ class TestHandcraftCrafts(unittest.TestCase):
             guangxiu["material_guide"],
         )
 
-    def test_points_enqueue_failure_does_not_rollback_progress(self):
+    def test_points_recording_failure_does_not_rollback_progress(self):
         with self.app.app_context():
             with patch(
-                "app.handcraft_inheritance.crafts.enqueue_learning_event",
+                "app.handcraft_inheritance.crafts.record_duration_points",
                 side_effect=RuntimeError("points unavailable"),
             ):
                 result = complete_craft_step(
