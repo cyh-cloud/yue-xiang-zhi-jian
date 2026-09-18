@@ -81,6 +81,17 @@ class TestSharedCourseProvider(unittest.TestCase):
                 "ecommerce",
             )
 
+    def test_agriculture_recommendations_use_replacement_provider_catalog(self):
+        with self.app.app_context():
+            set_course_provider(self.app, DirectionProvider())
+
+            recommendations = list_recommendations(1, "agriculture")
+
+            self.assertEqual(
+                [course["id"] for course in recommendations],
+                [2],
+            )
+
     def test_direction_provider_serves_handcraft_without_new_registry(self):
         class RecordingDirectionProvider(DirectionProvider):
             def __init__(self) -> None:

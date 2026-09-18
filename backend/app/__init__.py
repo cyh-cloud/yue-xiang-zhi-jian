@@ -24,6 +24,7 @@ from app.onboarding.routes import onboarding_bp
 from app.profiles.routes import student_profile_bp
 from app.session_manager import load_session
 from app.tags.routes import interest_tags_bp
+from app.teacher_console import install_default_teacher_console_services
 
 
 PROTECTED_API_PREFIXES = (
@@ -50,6 +51,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
+    install_default_teacher_console_services(app)
     install_default_agri_services(app)
     install_default_handcraft_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
