@@ -10,6 +10,7 @@ from app.teacher_console.errors import (
     ProviderValidationError,
 )
 from app.teacher_console.media import validate_media_reference
+from app.teacher_console.review_adapter import CourseReviewAdapter
 from app.teacher_console.time_utils import (
     now_shanghai_iso,
     parse_provider_time,
@@ -18,6 +19,13 @@ from app.teacher_console.time_utils import (
 
 COURSE_DIRECTIONS = {"agriculture", "ecommerce", "handcraft"}
 COURSE_STATUSES = {"draft", "pending", "published", "offline"}
+REVIEWABLE_COURSE_STATUSES = {
+    "pending",
+    "published",
+    "rejected",
+    "offline",
+}
+SUBMITTABLE_COURSE_STATUSES = {"draft", "rejected"}
 MEDIA_SOURCE_TYPES = {"local_upload", "external_url"}
 REQUIRED_COURSE_FIELDS = {
     "title",
@@ -160,6 +168,21 @@ def _sync_catalog_tag_ids(
     if not content_tags:
         return []
 
+    tag_ids = _catalog_tag_ids(db, content_tags)
+    db.executemany(
+        """
+        INSERT INTO course_interest_tags (course_id, tag_id)
+        VALUES (?, ?)
+        """,
+        ((course_id, tag_id) for tag_id in tag_ids),
+    )
+    return tag_ids
+
+
+def _catalog_tag_ids(db, content_tags: list[str]) -> list[int]:
+    if not content_tags:
+        return []
+
     placeholders = ", ".join("?" for _ in content_tags)
     rows = db.execute(
         f"""
@@ -172,15 +195,7 @@ def _sync_catalog_tag_ids(
         """,
         tuple(content_tags),
     ).fetchall()
-    tag_ids = [int(row["id"]) for row in rows]
-    db.executemany(
-        """
-        INSERT INTO course_interest_tags (course_id, tag_id)
-        VALUES (?, ?)
-        """,
-        ((course_id, tag_id) for tag_id in tag_ids),
-    )
-    return tag_ids
+    return [int(row["id"]) for row in rows]
 
 
 def _course_dict(db, row) -> dict:
@@ -414,3 +429,629 @@ def list_teacher_courses(
         reverse=True,
     )
     return courses
+
+
+def resolve_teacher_visible_status(
+    course: dict,
+    review_status: str | None,
+) -> str:
+    if course.get("teacher_id") is None and course.get("status") == "published":
+        return "published"
+    if course.get("status") == "draft":
+        return "draft"
+    if course.get("status") == "offline":
+        return "offline"
+    if review_status == "approved":
+        return "published"
+    if review_status == "rejected":
+        return "rejected"
+    return "pending"
+
+
+def _review_status(course_id: int) -> str | None:
+    review = CourseReviewAdapter().read(course_id)
+    if review is None:
+        return None
+    if not isinstance(review, dict):
+        raise ProviderValidationError(
+            "审核服务返回无效数据",
+            code="review_response_invalid",
+            details={"course_id": course_id},
+        )
+    return review.get("review_status")
+
+
+def _parse_provider_result(
+    review_result: dict,
+    *,
+    course_id: int,
+) -> tuple[int, str]:
+    if not isinstance(review_result, dict):
+        raise ProviderValidationError(
+            "审核服务返回无效数据",
+            code="review_response_invalid",
+            details={"course_id": course_id},
+        )
+
+    version = review_result.get("version")
+    review_status = review_result.get("review_status")
+    if (
+        isinstance(version, bool)
+        or not isinstance(version, int)
+        or version <= 0
+        or review_status not in {"pending", "approved", "rejected", "offline"}
+    ):
+        raise ProviderValidationError(
+            "审核服务返回无效数据",
+            code="review_response_invalid",
+            details={"course_id": course_id},
+        )
+    return version, review_status
+
+
+def _require_pending_result(
+    review_result: dict,
+    *,
+    course: dict,
+) -> tuple[int, str]:
+    version, review_status = _parse_provider_result(
+        review_result,
+        course_id=int(course["id"]),
+    )
+    if review_status != "pending":
+        raise ProviderConflictError(
+            "审核服务未返回待审核状态",
+            code="course_review_status_conflict",
+            details={
+                "course_id": int(course["id"]),
+                "review_status": review_status,
+            },
+        )
+    if version < int(course["version"]):
+        raise ProviderConflictError(
+            "审核服务返回的版本已过期",
+            code="course_version_conflict",
+            details={
+                "course_id": int(course["id"]),
+                "expected_version": int(course["version"]),
+                "provider_version": version,
+            },
+        )
+    return version, review_status
+
+
+def _normalize_quiz_override(value) -> dict | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise _validation_error("quiz_override 必须为对象", field="quiz_override")
+
+    enabled = value.get("enabled", False)
+    scoring_rule = value.get("scoring_rule", "")
+    questions = value.get("questions", [])
+    if not isinstance(enabled, bool):
+        raise _validation_error(
+            "quiz_override.enabled 必须为布尔值",
+            field="quiz_override",
+        )
+    if not isinstance(scoring_rule, str):
+        raise _validation_error(
+            "quiz_override.scoring_rule 必须为文本",
+            field="quiz_override",
+        )
+    if not isinstance(questions, list):
+        raise _validation_error(
+            "quiz_override.questions 必须为列表",
+            field="quiz_override",
+        )
+    return {
+        "enabled": enabled,
+        "scoring_rule": scoring_rule,
+        "questions": questions,
+    }
+
+
+def _load_quiz_config(course: dict) -> dict:
+    override = course.get("quiz_config")
+    if isinstance(override, dict):
+        return {
+            "enabled": bool(override.get("enabled", False)),
+            "scoring_rule": str(override.get("scoring_rule", "")),
+            "questions": (
+                override.get("questions", [])
+                if isinstance(override.get("questions", []), list)
+                else []
+            ),
+        }
+
+    course_id = _require_positive_int(course.get("id"), field="id")
+    row = get_db().execute(
+        """
+        SELECT enabled, scoring_rule, questions_json
+        FROM course_quizzes
+        WHERE course_id = ?
+        """,
+        (course_id,),
+    ).fetchone()
+    if row is None:
+        return {
+            "enabled": False,
+            "scoring_rule": "",
+            "questions": [],
+        }
+
+    try:
+        questions = json.loads(row["questions_json"] or "[]")
+    except (TypeError, ValueError):
+        questions = []
+    if not isinstance(questions, list):
+        questions = []
+    return {
+        "enabled": bool(row["enabled"]),
+        "scoring_rule": str(row["scoring_rule"] or ""),
+        "questions": questions,
+    }
+
+
+def review_payload(course: dict) -> dict:
+    course_id = _require_positive_int(course.get("id"), field="id")
+    tag_ids = course.get("tag_ids")
+    if not isinstance(tag_ids, list):
+        tag_ids = [
+            int(row["tag_id"])
+            for row in get_db().execute(
+                """
+                SELECT tag_id
+                FROM course_interest_tags
+                WHERE course_id = ?
+                ORDER BY tag_id
+                """,
+                (course_id,),
+            ).fetchall()
+        ]
+
+    return {
+        "title": _require_text(course.get("title"), field="title"),
+        "direction": _normalize_direction(course.get("direction")),
+        "summary": _require_text(course.get("summary"), field="summary"),
+        "tag_ids": [int(tag_id) for tag_id in tag_ids],
+        "duration_seconds": _normalize_duration(
+            course.get("duration_seconds")
+        ),
+        "media_url": _require_text(course.get("media_url"), field="media_url"),
+        "quiz_config": _load_quiz_config(course),
+    }
+
+
+def _review_payload_for_values(
+    db,
+    course: dict,
+    values: dict,
+    quiz_override: dict | None,
+) -> dict:
+    payload_course = {
+        **course,
+        **values,
+        "tag_ids": _catalog_tag_ids(db, values["content_tags"]),
+    }
+    if quiz_override is not None:
+        payload_course["quiz_config"] = quiz_override
+    return review_payload(payload_course)
+
+
+def _write_quiz_override(
+    db,
+    course_id: int,
+    quiz_override: dict,
+    now: str,
+) -> None:
+    db.execute(
+        """
+        INSERT INTO course_quizzes (
+            course_id, enabled, scoring_rule, questions_json, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(course_id) DO UPDATE SET
+            enabled = excluded.enabled,
+            scoring_rule = excluded.scoring_rule,
+            questions_json = excluded.questions_json,
+            updated_at = excluded.updated_at
+        """,
+        (
+            course_id,
+            1 if quiz_override["enabled"] else 0,
+            quiz_override["scoring_rule"],
+            json.dumps(
+                quiz_override["questions"],
+                ensure_ascii=False,
+            ),
+            now,
+        ),
+    )
+
+
+def _apply_pending_transition(
+    db,
+    course: dict,
+    values: dict,
+    provider_version: int,
+    quiz_override: dict | None,
+    *,
+    from_status: str,
+    actor_id: int,
+) -> None:
+    now = now_shanghai_iso()
+    cursor = db.execute(
+        """
+        UPDATE courses
+        SET title = ?,
+            direction = ?,
+            status = 'pending',
+            duration_seconds = ?,
+            media_url = ?,
+            published_at = NULL,
+            summary = ?,
+            media_source_type = ?,
+            content_tags_json = ?,
+            version = ?,
+            rejection_opinion = NULL,
+            submitted_at = ?,
+            updated_at = ?
+        WHERE id = ?
+          AND version = ?
+          AND status = ?
+        """,
+        (
+            values["title"],
+            values["direction"],
+            values["duration_seconds"],
+            values["media_url"],
+            values["summary"],
+            values["media_source_type"],
+            json.dumps(values["content_tags"], ensure_ascii=False),
+            provider_version,
+            now,
+            now,
+            int(course["id"]),
+            int(course["version"]),
+            course["status"],
+        ),
+    )
+    if cursor.rowcount != 1:
+        raise ProviderConflictError(
+            "课程版本或状态已变化",
+            code="course_version_conflict",
+            details={"course_id": int(course["id"])},
+        )
+
+    _sync_catalog_tag_ids(db, int(course["id"]), values["content_tags"])
+    if quiz_override is not None:
+        _write_quiz_override(
+            db,
+            int(course["id"]),
+            quiz_override,
+            now,
+        )
+    db.execute(
+        """
+        INSERT INTO teacher_course_status_history (
+            course_id, from_status, to_status, actor_id,
+            opinion, version, created_at
+        )
+        VALUES (?, ?, 'pending', ?, NULL, ?, ?)
+        """,
+        (
+            int(course["id"]),
+            from_status,
+            actor_id,
+            provider_version,
+            now,
+        ),
+    )
+
+
+def submit_course_for_review(
+    teacher_id: int,
+    course_id: int,
+    expected_version: int,
+) -> dict:
+    normalized_teacher_id = _require_positive_int(
+        teacher_id,
+        field="teacher_id",
+    )
+    normalized_course_id = _require_positive_int(course_id, field="course_id")
+    normalized_expected_version = _require_positive_int(
+        expected_version,
+        field="expected_version",
+    )
+    course = get_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
+    if int(course["version"]) != normalized_expected_version:
+        raise ProviderConflictError(
+            "课程版本已变化",
+            code="course_version_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "expected_version": normalized_expected_version,
+                "actual_version": int(course["version"]),
+            },
+        )
+    visible_status = resolve_teacher_visible_status(
+        course,
+        _review_status(normalized_course_id),
+    )
+    if visible_status not in SUBMITTABLE_COURSE_STATUSES:
+        raise ProviderConflictError(
+            "当前课程状态不能提交审核",
+            code="course_status_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "status": visible_status,
+            },
+        )
+
+    values = _validate_course_payload(course)
+    validate_media_reference(
+        values["media_source_type"],
+        values["media_url"],
+        check_remote=True,
+    )
+    db = get_db()
+    payload = _review_payload_for_values(db, course, values, None)
+    adapter = CourseReviewAdapter()
+    with db:
+        result = adapter.submit(course, payload)
+        provider_version, _ = _require_pending_result(
+            result,
+            course=course,
+        )
+        _apply_pending_transition(
+            db,
+            course,
+            values,
+            provider_version,
+            None,
+            from_status=visible_status,
+            actor_id=normalized_teacher_id,
+        )
+
+    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+
+
+def edit_course(
+    teacher_id: int,
+    course_id: int,
+    expected_version: int,
+    payload: dict,
+    *,
+    quiz_override=None,
+) -> dict:
+    normalized_teacher_id = _require_positive_int(
+        teacher_id,
+        field="teacher_id",
+    )
+    normalized_course_id = _require_positive_int(course_id, field="course_id")
+    normalized_expected_version = _require_positive_int(
+        expected_version,
+        field="expected_version",
+    )
+    course = get_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
+    if int(course["version"]) != normalized_expected_version:
+        raise ProviderConflictError(
+            "课程版本已变化",
+            code="course_version_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "expected_version": normalized_expected_version,
+                "actual_version": int(course["version"]),
+            },
+        )
+    visible_status = resolve_teacher_visible_status(
+        course,
+        _review_status(normalized_course_id),
+    )
+    if visible_status not in REVIEWABLE_COURSE_STATUSES:
+        raise ProviderConflictError(
+            "当前课程状态不能编辑重审",
+            code="course_status_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "status": visible_status,
+            },
+        )
+
+    changes = _validate_course_payload(payload, partial=True)
+    values = _validate_course_payload({**course, **changes})
+    normalized_quiz_override = _normalize_quiz_override(quiz_override)
+    validate_media_reference(
+        values["media_source_type"],
+        values["media_url"],
+        check_remote=True,
+    )
+    db = get_db()
+    review_payload_value = _review_payload_for_values(
+        db,
+        course,
+        values,
+        normalized_quiz_override,
+    )
+    adapter = CourseReviewAdapter()
+    with db:
+        result = adapter.edit(course, review_payload_value)
+        provider_version, _ = _require_pending_result(
+            result,
+            course=course,
+        )
+        _apply_pending_transition(
+            db,
+            course,
+            values,
+            provider_version,
+            normalized_quiz_override,
+            from_status=visible_status,
+            actor_id=normalized_teacher_id,
+        )
+
+    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+
+
+def set_course_offline(
+    teacher_id: int,
+    course_id: int,
+    expected_version: int,
+) -> dict:
+    normalized_teacher_id = _require_positive_int(
+        teacher_id,
+        field="teacher_id",
+    )
+    normalized_course_id = _require_positive_int(course_id, field="course_id")
+    normalized_expected_version = _require_positive_int(
+        expected_version,
+        field="expected_version",
+    )
+    course = get_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
+    if int(course["version"]) != normalized_expected_version:
+        raise ProviderConflictError(
+            "课程版本已变化",
+            code="course_version_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "expected_version": normalized_expected_version,
+                "actual_version": int(course["version"]),
+            },
+        )
+    visible_status = resolve_teacher_visible_status(
+        course,
+        _review_status(normalized_course_id),
+    )
+    if visible_status != "published":
+        raise ProviderConflictError(
+            "仅已上架课程可以下架",
+            code="course_status_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "status": visible_status,
+            },
+        )
+
+    now = now_shanghai_iso()
+    db = get_db()
+    with db:
+        cursor = db.execute(
+            """
+            UPDATE courses
+            SET status = 'offline',
+                published_at = NULL,
+                updated_at = ?
+            WHERE id = ?
+              AND version = ?
+              AND status = ?
+            """,
+            (
+                now,
+                normalized_course_id,
+                normalized_expected_version,
+                course["status"],
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "课程版本或状态已变化",
+                code="course_version_conflict",
+                details={"course_id": normalized_course_id},
+            )
+        db.execute(
+            """
+            INSERT INTO teacher_course_status_history (
+                course_id, from_status, to_status, actor_id,
+                opinion, version, created_at
+            )
+            VALUES (?, 'published', 'offline', ?, NULL, ?, ?)
+            """,
+            (
+                normalized_course_id,
+                normalized_teacher_id,
+                normalized_expected_version,
+                now,
+            ),
+        )
+
+    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+
+
+def request_course_relist(
+    teacher_id: int,
+    course_id: int,
+    expected_version: int,
+) -> dict:
+    normalized_teacher_id = _require_positive_int(
+        teacher_id,
+        field="teacher_id",
+    )
+    normalized_course_id = _require_positive_int(course_id, field="course_id")
+    normalized_expected_version = _require_positive_int(
+        expected_version,
+        field="expected_version",
+    )
+    course = get_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
+    if int(course["version"]) != normalized_expected_version:
+        raise ProviderConflictError(
+            "课程版本已变化",
+            code="course_version_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "expected_version": normalized_expected_version,
+                "actual_version": int(course["version"]),
+            },
+        )
+    visible_status = resolve_teacher_visible_status(
+        course,
+        _review_status(normalized_course_id),
+    )
+    if visible_status != "offline":
+        raise ProviderConflictError(
+            "仅已下架课程可以重新上架审核",
+            code="course_status_conflict",
+            details={
+                "course_id": normalized_course_id,
+                "status": visible_status,
+            },
+        )
+
+    values = _validate_course_payload(course)
+    validate_media_reference(
+        values["media_source_type"],
+        values["media_url"],
+        check_remote=True,
+    )
+    db = get_db()
+    payload = _review_payload_for_values(db, course, values, None)
+    adapter = CourseReviewAdapter()
+    with db:
+        result = adapter.submit(course, payload)
+        provider_version, _ = _require_pending_result(
+            result,
+            course=course,
+        )
+        _apply_pending_transition(
+            db,
+            course,
+            values,
+            provider_version,
+            None,
+            from_status="offline",
+            actor_id=normalized_teacher_id,
+        )
+
+    return get_teacher_course(normalized_teacher_id, normalized_course_id)
