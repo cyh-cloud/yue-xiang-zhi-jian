@@ -75,6 +75,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         title: '电商运营实训',
         description: '直播、模拟、文案、店铺装修、客服与电商课程。',
         href: '/student/ecommerce-training'
+      },
+      {
+        id: 'student-handcraft-inheritance',
+        title: '手工传承',
+        description: '非遗技艺、学习积分、奖品兑换与手工课程。',
+        href: '/student/handcraft-inheritance'
       }
     ],
     steps: [
@@ -97,6 +103,11 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         selector: '#student-ecommerce-training',
         title: '电商运营实训',
         description: '从电商运营实训入口进入直播、文案、客服和课程训练。'
+      },
+      {
+        selector: '#student-handcraft-inheritance',
+        title: '手工传承',
+        description: '从手工传承入口进入非遗技艺、积分、奖品和课程。'
       }
     ]
   },

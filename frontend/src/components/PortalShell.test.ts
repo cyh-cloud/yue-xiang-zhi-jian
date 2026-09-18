@@ -36,11 +36,17 @@ describe('PortalShell', () => {
         { path: '/', component: { template: '<div />' } },
         { path: '/login', component: { template: '<div />' } },
         { path: '/register', component: { template: '<div />' } },
+        { path: '/messages', component: { template: '<div />' } },
         { path: '/student', component: { template: '<div />' } },
         { path: '/student/courses', component: { template: '<div />' } },
         { path: '/student/profile', component: { template: '<div />' } },
+        { path: '/student/agri-skills', component: { template: '<div />' } },
         {
           path: '/student/ecommerce-training',
+          component: { template: '<div />' }
+        },
+        {
+          path: '/student/handcraft-inheritance',
           component: { template: '<div />' }
         }
       ]
@@ -61,6 +67,9 @@ describe('PortalShell', () => {
     expect(wrapper.get('#student-ecommerce-training a').attributes('href')).toBe(
       '/student/ecommerce-training'
     )
+    expect(
+      wrapper.get('#student-handcraft-inheritance a').attributes('href')
+    ).toBe('/student/handcraft-inheritance')
     expect(wrapper.find('#student-learning-direction a').exists()).toBe(false)
     expect(wrapper.get('#student-learning-direction').text()).toContain(
       '后续开放'

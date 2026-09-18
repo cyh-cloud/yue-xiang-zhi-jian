@@ -17,6 +17,11 @@ import EcommerceStoreGuidanceView from '@/views/EcommerceStoreGuidanceView.vue'
 import EcommerceTrainingHomeView from '@/views/EcommerceTrainingHomeView.vue'
 import EnterprisePortalView from '@/views/EnterprisePortalView.vue'
 import GovernmentPortalView from '@/views/GovernmentPortalView.vue'
+import HandcraftCoursesView from '@/views/HandcraftCoursesView.vue'
+import HandcraftCraftView from '@/views/HandcraftCraftView.vue'
+import HandcraftInheritanceHomeView from '@/views/HandcraftInheritanceHomeView.vue'
+import HandcraftPointsView from '@/views/HandcraftPointsView.vue'
+import HandcraftRewardsView from '@/views/HandcraftRewardsView.vue'
 import HomeView from '@/views/HomeView.vue'
 import InterestTagsView from '@/views/InterestTagsView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -145,6 +150,36 @@ const router = createRouter({
       path: '/student/ecommerce-training/courses',
       name: 'student-ecommerce-courses',
       component: EcommerceCoursesView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/handcraft-inheritance',
+      name: 'student-handcraft-inheritance',
+      component: HandcraftInheritanceHomeView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/handcraft-inheritance/crafts/:craftKey',
+      name: 'student-handcraft-craft',
+      component: HandcraftCraftView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/handcraft-inheritance/points',
+      name: 'student-handcraft-points',
+      component: HandcraftPointsView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/handcraft-inheritance/rewards',
+      name: 'student-handcraft-rewards',
+      component: HandcraftRewardsView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/handcraft-inheritance/courses',
+      name: 'student-handcraft-courses',
+      component: HandcraftCoursesView,
       meta: { requiresAuth: true, roles: ['student'] }
     },
     {
