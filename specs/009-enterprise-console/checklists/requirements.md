@@ -33,5 +33,6 @@
 
 - Provider method signatures are deliberately included because the frozen producer-provider contract requires this spec to define the concrete 09-to-07 read boundary; table names, routes, storage schemas and framework-specific implementation remain in the planning phase.
 - The 2026-09-18 clarification session resolves deletion history, logical deletion, date filtering and sorting, private-message scope, skill-profile fallback, category matching, and provider ownership.
+- The follow-up clarification formalizes 09-owned `JobApplicationIntakeProvider`, one replaceable `content_review_provider` slot, and read-only application history after position closure.
 - No `[NEEDS CLARIFICATION]`, `TODO`, `TBD`, `TKTK`, or placeholder markers remain.
 - Validation result: 16/16 items pass.

@@ -4,7 +4,7 @@
 
 **Goal:** 交付 09-企业工作台，包括职位审核状态机、申请筛选与改标、简历/技能档案快照展示、投递学员私信边界、企业数据看板，以及供 07 消费的稳定岗位 provider。
 
-**Architecture:** 后端新增 `backend/app/enterprise_console/` 领域包，职位、申请、状态历史和通知发件箱使用同一 SQLite 数据库。09 通过唯一 `job_position_provider` 槽实现岗位生产者，通过可替换的 `content_review_provider` 槽接入 11；所有审核动作仍由 11 负责。前端在 `frontend/src/` 增加企业 store、导航、职位与申请视图，并把 `/enterprise` 从占位门户升级为可用看板。
+**Architecture:** 后端新增 `backend/app/enterprise_console/` 领域包，职位、申请、状态历史和通知发件箱使用同一 SQLite 数据库。09 通过唯一 `job_position_provider` 槽实现岗位生产者，通过唯一 `job_application_intake_provider` 槽向 07 提供申请接收契约，并通过唯一 `content_review_provider` 槽接入 11；所有审核动作仍由 11 负责。前端在 `frontend/src/` 增加企业 store、导航、职位与申请视图，并把 `/enterprise` 从占位门户升级为可用看板。
 
 **Tech Stack:** Python 3.12、Flask、sqlite3、uv、unittest、Vue 3、Vite、Pinia、Vue Router、Vitest、Vue Test Utils、lucide-vue-next。
 
@@ -20,8 +20,9 @@
 - 所有企业接口只允许 `active` 的 `enterprise` 会话，企业身份必须取自 01 会话；客户端传入的企业 ID 一律忽略。
 - 09 只通过 02 的 `emit_application_submitted`、`emit_application_status_changed`、`emit_position_closed` 和 `register_messaging_source_provider` 复用消息能力，不创建第二套消息、通知或未读表。
 - 09 是岗位 provider 的生产实现，07 是最终签名所有者；冻结签名为 `list_published_positions()` 和 `get_published_position(job_id: str)`，只能通过 `set_job_position_provider` / `get_job_position_provider` 替换。
-- 09 只消费 11 的 `ContentReviewProvider`，调用 `submit_for_review`、`get_review_status`、`edit`；不实现 `approve`、`reject`、视频专用 `apply` 或审核通知。
-- 职位删除是可审计逻辑删除，不提供恢复或物理清除；未处理申请冻结为“岗位已关闭”，已处理申请保留最新状态并附加关闭标识。
+- 09 是 `JobApplicationIntakeProvider` 的签名与实现所有者，07 只通过 `submit_application()` 写入投递；唯一注册入口为 `set_job_application_intake_provider` / `get_job_application_intake_provider`。
+- 09 只消费 11 的 `ContentReviewProvider`，调用 `submit_for_review`、`get_review_status`、`edit`；不实现 `approve`、`reject`、视频专用 `apply` 或审核通知。`content_review_provider` 只能有一个注册槽，11 替换 09 安装的不可用占位实现。
+- 职位删除是可审计逻辑删除，不提供恢复或物理清除；未处理申请冻结为“岗位已关闭”，已处理申请保留最新状态并附加关闭标识；职位关闭后全部申请只读。
 - 申请筛选日期按 `Asia/Shanghai` 自然日闭区间；默认按投递时间倒序，再按稳定申请 ID 正序。
 - 职位类别只引用 01 的 `job` 兴趣标签稳定 ID；09 不创建类别目录，07 只以稳定类别 ID 匹配推荐。
 - 09 无任何 AI 调用；不得导入 `get_ai_client`、`complete_json`、`stream_chat`、`transcribe` 或 AI 错误类型。
@@ -32,7 +33,7 @@
 - 每个任务必须列出精确 Files、Interfaces、测试命令和预期结果。
 - 不允许未决标记、空实现、含糊延后或跨任务简写。
 - 11 未实现时只能注入完整协议相符的审核 fake/adapter；09 业务代码不得判断 provider 是否为占位实现。
-- 07 未实现时测试可调用 09 的 `record_application_submission()` 形成投递记录；生产应用创建仍由 07 持有，09 不新增学员投递页面或重复投递 API。
+- 07 未实现时测试通过完整 `JobApplicationIntakeProvider` 形成投递记录；生产投递由 07 通过该签名发起，09 不新增学员投递页面或公共投递 API。
 - 每个任务至少完成一次 TDD 红绿循环；最终任务运行完整后端、前端、类型检查、构建和浏览器验收。
 
 ## AI 调用点与降级矩阵
@@ -87,6 +88,7 @@ def configure_enterprise_providers(
     app: Flask,
     *,
     job_position_provider: JobPositionProvider | None = None,
+    job_application_intake_provider: JobApplicationIntakeProvider | None = None,
     content_review_provider: ContentReviewProvider | None = None,
 ) -> None: ...
 ```
@@ -185,20 +187,33 @@ class ContentReviewProvider(Protocol):
 
 ## 与 07 的应用写入边界
 
-07 spec 尚未冻结应用写入 provider。09 本期先在 `applications.py` 提供稳定领域函数：
+09 冻结并实现 `JobApplicationIntakeProvider`，07 只依赖该签名：
 
 ```python
-def record_application_submission(
-    *,
-    job_id: str,
-    student_id: int,
-    resume_snapshot: dict,
-    skill_profile_snapshot: dict | None,
-    idempotency_key: str,
-) -> dict: ...
+class JobApplicationIntakeProvider(Protocol):
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict: ...
 ```
 
-该函数是 09 的应用接收边界，测试可调用，后续 07 spec 落地时只允许用适配器包装，不得让 07 直接写 09 表。函数只接受已上架岗位，强制 `(student_id, job_id)` 唯一和 `idempotency_key` 幂等，并保存投递时快照。
+注册入口：
+
+```python
+def set_job_application_intake_provider(
+    app: Flask,
+    provider: JobApplicationIntakeProvider,
+) -> None: ...
+
+def get_job_application_intake_provider() -> JobApplicationIntakeProvider: ...
+```
+
+默认数据库实现只接受已上架未删除职位，强制 `(student_id, job_id)` 唯一和 `(enterprise_id, idempotency_key)` 幂等，保存投递时快照并返回稳定申请记录。07 不得直接写 09 表或导入内部服务。
 
 ## Shared File Changes
 
@@ -220,7 +235,7 @@ def record_application_submission(
 | Path | Responsibility |
 | --- | --- |
 | `backend/app/enterprise_console/errors.py` | 领域和 provider 错误层级 |
-| `backend/app/enterprise_console/providers.py` | `JobPositionProvider`、数据库实现、set/get/configure |
+| `backend/app/enterprise_console/providers.py` | `JobPositionProvider`、`JobApplicationIntakeProvider`、数据库实现、set/get/configure |
 | `backend/app/enterprise_console/review.py` | 11 通用审核 protocol、不可用占位和注册槽 |
 | `backend/app/enterprise_console/notifications.py` | 企业通知发件箱、投递和重试 |
 | `backend/app/enterprise_console/jobs.py` | 职位校验、状态机、审核投影、逻辑删除 |
@@ -234,6 +249,7 @@ def record_application_submission(
 | `backend/tests/test_enterprise_notifications.py` | 发件箱幂等、失败和重试测试 |
 | `backend/tests/test_enterprise_jobs.py` | 职位状态机、审核接入和持久化测试 |
 | `backend/tests/test_enterprise_job_provider.py` | 07 provider 契约替换测试 |
+| `backend/tests/test_enterprise_application_provider.py` | 09-owned 申请接收 provider 的签名、幂等和替换测试 |
 | `backend/tests/test_enterprise_applications.py` | 投递、筛选、详情和改标测试 |
 | `backend/tests/test_enterprise_deletion.py` | 删除三分支、历史冻结测试 |
 | `backend/tests/test_enterprise_messaging_dashboard.py` | 私信范围和看板隔离测试 |
@@ -270,7 +286,7 @@ def record_application_submission(
 
 **Interfaces:**
 - Consumes: `Flask`, `current_app`, `get_db()`, existing `SCHEMA_SQL`, existing session manager.
-- Produces: `install_default_enterprise_services(app)`, `set_job_position_provider(app, provider)`, `get_job_position_provider()`, `set_content_review_provider(app, provider)`, `get_content_review_provider()`, `configure_enterprise_providers(...)`.
+- Produces: `install_default_enterprise_services(app)`, `set_job_position_provider(app, provider)`, `get_job_position_provider()`, `set_job_application_intake_provider(app, provider)`, `get_job_application_intake_provider()`, `set_content_review_provider(app, provider)`, `get_content_review_provider()`, `configure_enterprise_providers(...)`.
 - Produces tables: `job_positions`, `job_applications`, `job_application_status_history`, `enterprise_notification_outbox`.
 
 - [ ] **Step 1: Write failing foundation tests**
@@ -286,7 +302,10 @@ from app import create_app
 from app.db import get_db
 from app.enterprise_console.providers import (
     EmptyJobPositionProvider,
+    EmptyJobApplicationIntakeProvider,
+    get_job_application_intake_provider,
     get_job_position_provider,
+    set_job_application_intake_provider,
     set_job_position_provider,
 )
 from app.enterprise_console.review import (
@@ -319,6 +338,11 @@ class ReplacementReviewProvider:
 
     def edit(self, **kwargs):
         return {"review_status": "pending", "version": 2}
+
+
+class ReplacementApplicationProvider:
+    def submit_application(self, **kwargs):
+        return {"application_id": "application-1", **kwargs}
 
 
 class TestEnterpriseFoundation(unittest.TestCase):
@@ -356,18 +380,31 @@ class TestEnterpriseFoundation(unittest.TestCase):
                 EmptyJobPositionProvider,
             )
             self.assertIsInstance(
+                get_job_application_intake_provider(),
+                EmptyJobApplicationIntakeProvider,
+            )
+            self.assertIsInstance(
                 get_content_review_provider(),
                 UnavailableContentReviewProvider,
             )
 
     def test_providers_are_replaceable(self):
         job_provider = ReplacementJobProvider()
+        application_provider = ReplacementApplicationProvider()
         review_provider = ReplacementReviewProvider()
         set_job_position_provider(self.app, job_provider)
+        set_job_application_intake_provider(
+            self.app,
+            application_provider,
+        )
         set_content_review_provider(self.app, review_provider)
 
         with self.app.app_context():
             self.assertIs(get_job_position_provider(), job_provider)
+            self.assertIs(
+                get_job_application_intake_provider(),
+                application_provider,
+            )
             self.assertIs(get_content_review_provider(), review_provider)
 
 
@@ -458,6 +495,33 @@ class EmptyJobPositionProvider:
         return None
 
 
+class JobApplicationIntakeProvider(Protocol):
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict: ...
+
+
+class EmptyJobApplicationIntakeProvider:
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict:
+        from app.enterprise_console.errors import ProviderUnavailableError
+
+        raise ProviderUnavailableError("申请接收服务暂不可用")
+
+
 def set_job_position_provider(
     app: Flask,
     provider: JobPositionProvider,
@@ -472,14 +536,34 @@ def get_job_position_provider() -> JobPositionProvider:
     )
 
 
+def set_job_application_intake_provider(
+    app: Flask,
+    provider: JobApplicationIntakeProvider,
+) -> None:
+    app.extensions["job_application_intake_provider"] = provider
+
+
+def get_job_application_intake_provider() -> JobApplicationIntakeProvider:
+    return current_app.extensions.get(
+        "job_application_intake_provider",
+        EmptyJobApplicationIntakeProvider(),
+    )
+
+
 def configure_enterprise_providers(
     app: Flask,
     *,
     job_position_provider: JobPositionProvider | None = None,
+    job_application_intake_provider: JobApplicationIntakeProvider | None = None,
     content_review_provider=None,
 ) -> None:
     if job_position_provider is not None:
         set_job_position_provider(app, job_position_provider)
+    if job_application_intake_provider is not None:
+        set_job_application_intake_provider(
+            app,
+            job_application_intake_provider,
+        )
     if content_review_provider is not None:
         from app.enterprise_console.review import set_content_review_provider
 
@@ -580,8 +664,11 @@ from __future__ import annotations
 from flask import Flask
 
 from app.enterprise_console.providers import (
+    EmptyJobApplicationIntakeProvider,
     EmptyJobPositionProvider,
+    get_job_application_intake_provider,
     get_job_position_provider,
+    set_job_application_intake_provider,
     set_job_position_provider,
 )
 from app.enterprise_console.review import (
@@ -594,14 +681,21 @@ from app.enterprise_console.review import (
 def install_default_enterprise_services(app: Flask) -> None:
     if "job_position_provider" not in app.extensions:
         set_job_position_provider(app, EmptyJobPositionProvider())
+    if "job_application_intake_provider" not in app.extensions:
+        set_job_application_intake_provider(
+            app,
+            EmptyJobApplicationIntakeProvider(),
+        )
     if "content_review_provider" not in app.extensions:
         set_content_review_provider(app, UnavailableContentReviewProvider())
 
 
 __all__ = [
     "get_content_review_provider",
+    "get_job_application_intake_provider",
     "get_job_position_provider",
     "install_default_enterprise_services",
+    "set_job_application_intake_provider",
     "set_content_review_provider",
     "set_job_position_provider",
 ]
@@ -1294,12 +1388,15 @@ git commit -m "后端：实现岗位生产者 provider"
 
 **Files:**
 - Create: `backend/app/enterprise_console/applications.py`
+- Create: `backend/tests/test_enterprise_application_provider.py`
 - Create: `backend/tests/test_enterprise_applications.py`
+- Modify: `backend/app/enterprise_console/providers.py`
 - Modify: `backend/app/enterprise_console/__init__.py`
+- Modify: `backend/tests/test_enterprise_foundation.py`
 
 **Interfaces:**
 - Consumes: approved `job_positions`, `users`, enterprise notification outbox, 02 event signatures.
-- Produces: `record_application_submission(...)`, `list_applications(enterprise_id, filters)`, `get_application(enterprise_id, application_id)`, `change_application_status(...)`, `serialize_application(row)`.
+- Produces: `record_application_submission(...)`, `DatabaseJobApplicationIntakeProvider`, `list_applications(enterprise_id, filters)`, `get_application(enterprise_id, application_id)`, `change_application_status(...)`, `serialize_application(row)`.
 
 - [ ] **Step 1: Write failing application tests**
 
@@ -1333,6 +1430,33 @@ self.assertEqual(
 self.assertEqual(len(notices), 1)
 ```
 
+Add `test_enterprise_application_provider.py` to prove signature replacement and delegation:
+
+```python
+class ReplacementIntakeProvider:
+    def __init__(self):
+        self.calls = []
+
+    def submit_application(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"application_id": "application-replacement", **kwargs}
+
+
+def test_application_intake_provider_is_replaceable(self):
+    replacement = ReplacementIntakeProvider()
+    set_job_application_intake_provider(self.app, replacement)
+    with self.app.app_context():
+        result = get_job_application_intake_provider().submit_application(
+            job_id="job-1",
+            student_id=self.student_id,
+            resume_snapshot={"education": ["A"]},
+            skill_profile_snapshot=None,
+            idempotency_key="07-request-1",
+        )
+    self.assertEqual(result["application_id"], "application-replacement")
+    self.assertEqual(replacement.calls[0]["job_id"], "job-1")
+```
+
 Test 2: pending/rejected/deleted jobs reject submission; duplicate student-job submission returns the existing record without a second notification.
 
 Test 3: list filtering by job, status and inclusive Shanghai date range; default sort is submission time descending and application ID ascending.
@@ -1356,7 +1480,7 @@ Test 6: `pending` is rejected as a manual target; after `position_closed_at` is 
 
 - [ ] **Step 2: Run the test and verify it fails**
 
-Run: `uv run --directory backend python -m unittest tests.test_enterprise_applications -v`
+Run: `uv run --directory backend python -m unittest tests.test_enterprise_applications tests.test_enterprise_application_provider -v`
 
 Expected: FAIL because `applications.py` does not exist.
 
@@ -1454,6 +1578,36 @@ with db:
 deliver_after_commit(outbox_id)
 return application
 ```
+
+Add the producer adapter to `providers.py`:
+
+```python
+class DatabaseJobApplicationIntakeProvider:
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict:
+        from app.enterprise_console.applications import (
+            record_application_submission,
+        )
+
+        return record_application_submission(
+            job_id=job_id,
+            student_id=student_id,
+            resume_snapshot=resume_snapshot,
+            skill_profile_snapshot=skill_profile_snapshot,
+            idempotency_key=idempotency_key,
+        )
+```
+
+Change `install_default_enterprise_services()` to install `DatabaseJobApplicationIntakeProvider()` in the `job_application_intake_provider` slot. Keep `EmptyJobApplicationIntakeProvider` only as the explicit unavailable test seam.
+
+Update `test_default_providers_are_installed()` to import and assert `DatabaseJobApplicationIntakeProvider` for the running application; keep a separate explicit test proving `EmptyJobApplicationIntakeProvider` raises `ProviderUnavailableError` when selected.
 
 - [ ] **Step 4: Implement filtering, detail and status transitions**
 
@@ -1556,7 +1710,7 @@ Run: `uv run --directory backend python -m unittest tests.test_enterprise_applic
 Expected: PASS with exactly one notification per real status change.
 
 ```bash
-git add backend/app/enterprise_console/applications.py backend/app/enterprise_console/__init__.py backend/tests/test_enterprise_applications.py
+git add backend/app/enterprise_console/applications.py backend/app/enterprise_console/providers.py backend/app/enterprise_console/__init__.py backend/tests/test_enterprise_applications.py backend/tests/test_enterprise_application_provider.py backend/tests/test_enterprise_foundation.py
 git commit -m "后端：实现投递处理与状态改标"
 ```
 
@@ -2744,6 +2898,8 @@ Backend integration tests:
 5. Delete the position and assert pending closure, handled history, dashboard count and messaging relationship.
 6. Replace `job_position_provider` with a fake and assert consumer-facing field shape is unchanged.
 7. Patch `emit_review_result` and assert 09 never calls it.
+8. Replace `job_application_intake_provider` with a 07-compatible fake and assert `submit_application()` signature, idempotency and return fields remain stable without direct table access.
+9. Replace `UnavailableContentReviewProvider` with a fake through the same `content_review_provider` slot and assert no second slot or 09 branch change exists.
 
 Performance test:
 
@@ -2919,11 +3075,13 @@ git commit -m "测试：完成企业工作台端到端验收"
 | FR-061..066 ContentReviewProvider integration and no duplicate review notice | 1, 3, 13 |
 | FR-067..072 01/02/11 reuse and application notification boundaries | 1, 2, 5, 7, 8 |
 | FR-073..075 no AI, no talent search and no 11 review actions | 8, 9, 12, 13 |
+| FR-076..083 JobApplicationIntakeProvider and single review-provider slot | 1, 5, 8, 13 |
 | SC-001..004 job state and deletion matrix | 3, 4, 6, 13 |
 | SC-005..007 filters, status notifications and profile fallback | 5, 9, 12, 13 |
 | SC-008..010 tenant isolation, dashboard and provider replacement | 4, 7, 8, 13 |
 | SC-011..012 review integration and notification retry | 2, 3, 13 |
 | SC-013..015 performance, no AI and application submission notice | 2, 5, 8, 13 |
+| SC-016..017 application-intake replacement and single review-provider slot | 1, 5, 13 |
 
 ## Plan Self-Review
 

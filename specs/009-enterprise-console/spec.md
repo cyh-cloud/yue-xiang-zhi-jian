@@ -19,6 +19,9 @@
 - Q: 学员未附带技能档案时如何展示？ → A: 仅展示结构化简历，不推断、不读取当前技能档案补造快照；若附带快照但学员没有可见成果，也按未附带处理。
 - Q: 职位类别与 07 的推荐匹配使用什么维度？ → A: 职位类别选用 01 已维护的 `job` 兴趣标签稳定 ID；07 以该稳定 ID 与学员岗位类别标签做精确匹配，不以名称或自由文本匹配。
 - Q: 岗位 provider 的签名归属与实现归属如何划分？ → A: 根据冻结登记表，07 是最终签名所有者，09 负责生产实现和注册；09 spec 中冻结的具体形状是本期实现承诺，07 spec 落地时必须原样确认或将差异通过适配器化处理，07 只依赖协议签名，不读取 09 的表、内部类或数据库。
+- Q: 07 向 09 写入求职申请时依赖什么契约？ → A: 新增 09-owned 的 `JobApplicationIntakeProvider`，签名由 09 spec 冻结，09 负责实现和注册；07 只通过 `submit_application` 签名提交投递，不直接写 09 的表或内部服务。
+- Q: 11 尚未实现时，09 的审核 provider 注册如何处理？ → A: 只保留一个 `content_review_provider` 注册槽。09 可安装协议完整的不可用占位实现供独立开发与测试，11 落地后替换同一槽；任何其他模块都不得建立第二个审核注册表。
+- Q: 职位关闭后，“可随时改标”是否仍适用于已处理申请？ → A: 不适用。职位删除后，未处理申请转为“岗位已关闭”，已处理申请保留最新状态并冻结为只读历史；“可随时改标”只适用于职位关闭前。
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -186,7 +189,7 @@ any active state -> deleted  # 企业确认逻辑删除
 - **FR-025**: 申请 MUST 支持按职位筛选、按待处理、已查看、意向沟通、不合适筛选，以及按投递日期区间筛选；职位筛选项必须包含仍有历史申请的逻辑删除职位，并使用投递时职位标题快照。
 - **FR-026**: 投递日期筛选 MUST 使用 `Asia/Shanghai` 自然日，起始日和结束日均包含；非法或倒置日期范围必须拒绝。
 - **FR-027**: 申请 MUST 支持按投递时间升序或降序排序；默认倒序，时间相同时按申请稳定标识正序作为确定性 tie-breaker。
-- **FR-028**: 申请列表和详情 MUST 显示职位关闭可用性标识；职位关闭后，历史状态仍可见，但改标入口和直接改标请求必须被拒绝。
+- **FR-028**: 申请列表和详情 MUST 显示职位关闭可用性标识；职位关闭后，历史状态仍可见，但改标入口、旧版本请求和直接改标请求必须全部拒绝，且不得改变状态或追加状态历史。
 - **FR-029**: 申请详情 MUST 使用投递时冻结的结构化简历快照，不得读取并替换为学员当前简历。
 - **FR-030**: 申请详情 MUST 只展示投递时附带且学员当时允许企业查看的技能档案快照；未附带或可见项为空时仅展示简历。
 - **FR-031**: 09 MUST NOT 搜索人才库、按条件发现未投递学员、主动邀约、导出全量人才数据或建立第二套简历/技能档案存储。
@@ -194,7 +197,7 @@ any active state -> deleted  # 企业确认逻辑删除
 **申请状态与通知**
 
 - **FR-032**: 新申请的业务状态 MUST 为 `pending`；企业查看申请详情本身 MUST NOT 自动改标。
-- **FR-033**: 企业 MUST 可把 `pending` 申请标记为 `viewed`、`intent` 或 `unsuitable`，并在这些已处理状态之间随时改标。
+- **FR-033**: 在职位关闭前，企业 MUST 可把 `pending` 申请标记为 `viewed`、`intent` 或 `unsuitable`，并在这些已处理状态之间随时改标；职位关闭后，全部申请状态 MUST 冻结为只读。
 - **FR-034**: `pending` MUST NOT 作为人工二次改标目标；显示为已查看、意向沟通或不合适的申请不得由企业改回待处理。
 - **FR-035**: 每次业务状态真实变化 MUST 以最新状态为准、立即在学员端生效，并通过 02 的 `emit_application_status_changed` 生成一条通知；相同值重复提交不通知。
 - **FR-036**: 状态更新与通知触发 MUST 使用稳定事件 ID 和幂等边界；业务提交成功后通知投递失败不得回滚状态，后续重试不得重复通知。
@@ -221,7 +224,7 @@ any active state -> deleted  # 企业确认逻辑删除
 
 - **FR-049**: 09 MUST 作为岗位生产者实现只读 `JobPositionProvider`，通过唯一注册槽 `job_position_provider` 暴露给 07；07 是协议签名所有者，09 是实现与注册所有者。
 - **FR-050**: 09 MUST 提供 `set_job_position_provider(app, provider) -> None` 和 `get_job_position_provider() -> JobPositionProvider`，未注册时返回完整协议相符的默认数据库 provider。
-- **FR-051**: 09 MAY 提供 `configure_enterprise_providers(app, *, job_position_provider=None) -> None` 作为启动期便利层；该函数只能委托唯一 setter，不得建立第二注册表。
+- **FR-051**: 09 MUST 提供 `configure_enterprise_providers(app, *, job_position_provider=None, job_application_intake_provider=None, content_review_provider=None) -> None` 作为启动期便利层；该函数只能委托唯一 setter，不得建立第二注册表。
 - **FR-052**: Provider MUST 至少实现以下只读签名：
 
 ```python
@@ -281,11 +284,37 @@ updated_at              # 带时区的 ISO 8601 时间
 - **FR-074**: 09 MUST NOT implement talent search, proactive invitations, interviews, offers, electronic contracts, onboarding, employee management, or purchase-information management.
 - **FR-075**: 09 MUST NOT expose review decisions, review queues, platform-wide job management, comment moderation, or super-admin data-management capabilities; those remain owned by 11.
 
+### JobApplicationIntakeProvider 对外契约
+
+- **FR-076**: 09 MUST own and implement the `JobApplicationIntakeProvider` signature, expose it to 07, and provide `set_job_application_intake_provider(app, provider) -> None` and `get_job_application_intake_provider() -> JobApplicationIntakeProvider`; 07 MUST consume only this signature and MUST NOT write 09 tables or import 09 internal services.
+- **FR-077**: `configure_enterprise_providers(...)` MUST accept the optional `job_application_intake_provider` and `content_review_provider` parameters and delegate only to the corresponding unique setters.
+- **FR-078**: The frozen protocol MUST be:
+
+```python
+class JobApplicationIntakeProvider(Protocol):
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict: ...
+```
+
+- **FR-079**: `submit_application` MUST accept only a currently approved, non-deleted job; validate the student, required job ID and idempotency key, resume snapshot and optional visible skill-profile snapshot; and reject invalid input with provider validation errors.
+- **FR-080**: `submit_application` MUST enforce `(student_id, job_id)` uniqueness and `(enterprise_id, idempotency_key)` idempotency. A repeated compatible call MUST return the original application without creating a second application or notification; a conflicting reuse MUST raise `ProviderConflictError`.
+- **FR-081**: Successful submission MUST persist immutable resume and optional skill-profile snapshots, create the application in `pending`, enqueue exactly one application-submitted notification for the receiving enterprise, and return the stable application record required by 07.
+- **FR-082**: The provider return record MUST include `application_id`, `job_id`, `enterprise_id`, `student_id`, `student_name`, `job_title`, `resume_snapshot`, `skill_profile`, `skill_profile_attached`, `status`, `status_version`, `position_closed`, `effective_status` and `submitted_at`.
+- **FR-083**: The `content_review_provider` key MUST remain a single registration slot accessed through `set_content_review_provider(app, provider)` and `get_content_review_provider()`. 09 MAY install the protocol-complete `UnavailableContentReviewProvider` before 11 exists, but 11 MUST replace that same slot after implementation; 09 and 11 MUST NOT maintain separate registries or make business branches depend on which implementation is installed.
+
 ### Key Entities
 
 - **Job Position**: 企业拥有的职位记录，包含稳定岗位 ID、企业归属、标题、薪资、地点、类别稳定 ID 与名称快照、描述、审核状态、版本、发布时间、逻辑删除时间和时间戳；其状态决定学员可见性和投递资格。
 - **Job Review Record**: 由 11 通用审核 provider 拥有的职位审核状态快照，与职位稳定 ID 一对一关联，包含审核状态、版本、驳回意见、发布时间和提交者。
 - **Job Application**: 学员向某一职位提交的一次申请，包含非空字符串稳定申请 ID、企业、职位、学员、投递快照、业务状态、职位关闭状态、当前版本和投递时间。
+- **Job Application Intake Provider**: 09 提供给 07 的稳定写入契约，负责校验并幂等创建申请、冻结简历与技能档案快照、触发申请投递通知；07 不依赖其数据库或内部实现。
 - **Resume Snapshot**: 投递时冻结的结构化简历内容，后续简历编辑不得改写历史申请。
 - **Skill Profile Snapshot**: 可选附带且已按学员可见范围过滤的技能档案快照；缺失时为空，不表示申请无效。
 - **Application Status History**: 每次真实状态改标的前后状态、操作企业、事件 ID、版本和时间；当前状态取最新成功记录。
@@ -312,12 +341,14 @@ updated_at              # 带时区的 ISO 8601 时间
 - **SC-013**: 500 个职位和 5,000 个申请的目标测试规模下，企业列表、筛选和看板操作在常规演示环境 2 秒内给出结果，不加载其他企业明细。
 - **SC-014**: 该功能自动化验证中，AI 调用次数为零；人才库搜索、主动邀约、面试、签约和入职功能入口数量为零。
 - **SC-015**: 每次成功创建申请都为对应企业产生恰好一条投递通知；重复提交、重试或同一幂等请求产生的通知增量为零。
+- **SC-016**: 替换 `JobApplicationIntakeProvider` 后，07 兼容消费者的调用签名、返回字段和幂等行为保持不变；07 直接写 09 表的次数为零。
+- **SC-017**: 在 11 接入前后，`content_review_provider` 始终只有一个注册槽，09 业务分支不因占位实现替换为 11 实现而改变。
 
 ## Scope Boundaries
 
 - 01 owns enterprise account creation, login, session validity, disabled-account handling, role routing, and the authoritative `job` interest-tag catalog.
 - 02 owns private conversations, message retention, notification delivery, unread state, clear-read behavior, and deduplication. 09 owns only job and application business state plus event triggers.
-- 07 owns job browsing and recommendation for students, structured resume editing, skill-profile aggregation and visibility, application creation, application snapshots, favorites, and student-facing “我的投递”.
+- 07 owns job browsing and recommendation for students, structured resume editing, skill-profile aggregation and visibility, application initiation, application snapshots, favorites, and student-facing “我的投递”; application writes MUST enter 09 through `JobApplicationIntakeProvider`.
 - 11 owns the generic content-review provider, review decisions, review queues, review notifications, and platform-wide overrides. 09 never performs an approval or rejection itself.
 - This feature does not implement a student-facing job list, recommendation ranking, resume editing UI, skill-profile maintenance, favorites, or application submission UI; those remain with 07.
 - This feature does not implement agriculture purchase requests, interviews, electronic contracts, onboarding, employment records, or any post-application recruitment workflow.
@@ -327,8 +358,8 @@ updated_at              # 带时区的 ISO 8601 时间
 ## Assumptions
 
 - Enterprise accounts and enterprise profile display names are created or maintained by 11 and authenticated by 01; enterprise self-registration remains outside this feature.
-- Until 07 is implemented, application records required to prove 09 behavior may be supplied through a replaceable test fixture or intake adapter that preserves the specified snapshots; 07 remains the production producer of applications.
-- Until 11 is implemented, a complete `ContentReviewProvider` test adapter can drive submit, approve, reject, edit and conflict outcomes; the production registration is replaced once without changing 09 business branches.
+- Until 07 is implemented, tests use a complete `JobApplicationIntakeProvider` implementation to prove intake, snapshot, idempotency and notification behavior; 07 remains the business initiator and production consumer of that signature.
+- Until 11 is implemented, 09 installs a complete `UnavailableContentReviewProvider` in the single `content_review_provider` slot, and tests may replace it with an adapter that drives submit, approve, reject, edit and conflict outcomes; 11 replaces the same slot without changing 09 business branches.
 - A stable job identifier is a non-empty string and is independent from any internal SQLite primary key.
 - A stable application identifier is a non-empty string and is independent from any internal SQLite primary key.
 - All new timestamps are stored and returned as timezone-aware values; natural-day filters and display boundaries use `Asia/Shanghai`.

@@ -391,12 +391,52 @@ consumer 按相同 `code/message/details` 识别的兼容子类。
 - 旧 provider 由 consumer 适配器映射到目标形状。
 - 是否创建共享错误基类属于后续建议，不在本次契约中实施。
 
+### 4.6 09 岗位申请接收
+
+09 是求职申请接收契约的签名所有者和生产实现，07 是唯一消费者。
+注册入口固定为：
+
+```python
+def set_job_application_intake_provider(
+    app: Flask,
+    provider: JobApplicationIntakeProvider,
+) -> None: ...
+
+def get_job_application_intake_provider() -> JobApplicationIntakeProvider: ...
+```
+
+最终签名：
+
+```python
+class JobApplicationIntakeProvider(Protocol):
+    def submit_application(
+        self,
+        *,
+        job_id: str,
+        student_id: int,
+        resume_snapshot: dict,
+        skill_profile_snapshot: dict | None,
+        idempotency_key: str,
+    ) -> dict: ...
+```
+
+规则：
+
+- 只允许对当前已通过且未删除职位创建申请。
+- `(student_id, job_id)` 唯一；`(enterprise_id, idempotency_key)` 幂等。
+- 简历快照必填；技能档案快照可选，空对象按未附带处理。
+- 成功返回稳定申请记录；重复兼容请求返回原记录，不重复通知。
+- 冲突、非法状态或来源不可用分别抛出本文件第 4.5 节的标准错误。
+- 07 不得直接写 `job_applications`，不得导入 09 的 `applications.py`
+  或其他内部实现。
+
 ## 5. 生产者到消费者接口登记表
 
 | 生产者 → 消费者 | 接口 | 契约现状 | 签名所有者 | 实现/接入归属 |
 | --- | --- | --- | --- | --- |
 | 08 → 03/04/05 | 方向感知课程 | 已存在 | 03 spec 冻结的 `CourseProvider` | 08 实现真 provider；03/04/05 继续消费 |
-| 09 → 07 | 岗位 | 未定义 | 07 spec | 09 实现 producer，07 接入 |
+| 09 → 07 | 岗位 | 09 spec 已冻结实现形状；待 07 spec 最终确认 | 07 spec | 09 实现 producer，07 接入 |
+| 09 → 07 | 求职申请接收 | 新定义 | 09 spec 冻结 `JobApplicationIntakeProvider` | 09 实现 producer，07 只依赖签名提交 |
 | 10 → 06 | 政策 / 新闻 | 未定义 | 06 spec | 10 实现 producer，06 接入 |
 | 11 → 08/09/05 | 内容审核 | 05 视频专用形状已存在；通用契约新定义 | 11 spec | 08/09 直接接通用 facade；11 为 05 提供适配器 |
 | 11 → 05 | 奖品库 | 已存在 | 11 spec | 11 实现生产来源；05 现行 `RewardCatalogProvider` 是消费契约 |
@@ -458,8 +498,14 @@ consumer 按相同 `code/message/details` 识别的兼容子类。
 
 - 08 按 03 已存在的方向感知课程签名实现真 provider，不新建课程注册表。
 - 08、09 直接接入 11 的通用内容审核 facade，不复制视频专用 action。
-- 09 的岗位 provider、10 的政策/新闻 provider 由各自 producer spec 定义
+- 09 按 09 spec 冻结的实现形状提供岗位 `set/get`，07 为最终签名所有者
+  并在自身 spec 中确认；10 的政策/新闻 provider 按 10 producer spec 定义
   `set/get`，consumer 只依赖签名。
+- 09 拥有 `JobApplicationIntakeProvider.submit_application()` 签名和实现；
+  07 只通过该 provider 创建投递，不得直接写 09 的表或导入内部服务。
+- 09 可在 11 尚未实现时通过 `set_content_review_provider()` 向唯一
+  `content_review_provider` 槽安装协议完整的不可用占位实现；11 落地后
+  用同一 `set/get` 槽替换，不得建立第二审核注册表。
 - 11 是内容审核、奖品库、履约管理、积分规则、预置内容、功能知识库和
   全平台统计的生产者。
 - 07 拥有技能档案聚合契约，09 只消费，03/04/05 不新造第二套档案结构。
