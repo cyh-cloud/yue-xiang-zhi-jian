@@ -43,6 +43,7 @@ const categoryCode = ref<PolicyCategoryCode>('subsidy')
 const categoryFilter = ref<'all' | PolicyCategoryCode>('all')
 const statusFilter = ref<'all' | PolicyStatus>('all')
 const deleteCandidateId = ref<string | null>(null)
+const pendingRequestId = ref<string | null>(null)
 const actionMessage = ref('')
 const initialLoading = ref(true)
 
@@ -110,6 +111,13 @@ async function loadPolicyList() {
   }
 }
 
+function publicationRequestId(): string {
+  if (!pendingRequestId.value) {
+    pendingRequestId.value = globalThis.crypto.randomUUID()
+  }
+  return pendingRequestId.value
+}
+
 async function submitPolicy() {
   if (!title.value.trim() || !content.value.trim()) {
     return
@@ -117,7 +125,7 @@ async function submitPolicy() {
 
   actionMessage.value = ''
   const published = await store.publishPolicy({
-    request_id: globalThis.crypto.randomUUID(),
+    request_id: publicationRequestId(),
     title: title.value.trim(),
     content: content.value.trim(),
     category_code: categoryCode.value
@@ -127,6 +135,7 @@ async function submitPolicy() {
     return
   }
 
+  pendingRequestId.value = null
   title.value = ''
   content.value = ''
   categoryCode.value = 'subsidy'
@@ -883,6 +892,7 @@ onMounted(() => {
   font-size: 0.82rem;
   line-break: strict;
   overflow-wrap: anywhere;
+  text-wrap: pretty;
   word-break: keep-all;
 }
 

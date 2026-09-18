@@ -82,14 +82,12 @@ async function mountView(policies: GovernmentPolicy[] = []) {
 }
 
 function cssRule(css: string, selector: string): string {
-  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = css.match(
-    new RegExp(
-      `(?:^|\\n)\\s*${escaped}\\s*\\{([\\s\\S]*?)\\}`
-    )
-  )
-  expect(match).not.toBeNull()
-  return (match?.[1] ?? '').replace(/\s+/g, ' ').trim()
+  const matches = Array.from(
+    css.matchAll(/(?:^|\n)\s*([^{}\n]+?)\s*\{([\s\S]*?)\}/g)
+  ).filter(candidate => candidate[1].trim() === selector)
+  const match = matches[matches.length - 1]
+  expect(match).not.toBeUndefined()
+  return (match?.[2] ?? '').replace(/\s+/g, ' ').trim()
 }
 
 function mediaBlock(source: string, maxWidth: number): string {
@@ -133,6 +131,62 @@ describe('GovernmentPolicyView', () => {
       category_code: 'entrepreneurship'
     })
     expect(randomUUID).toHaveBeenCalledOnce()
+  })
+
+  it('reuses the request id when publication succeeds but refresh fails', async () => {
+    const { wrapper, store } = await mountView()
+    const randomUUID = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000001')
+      .mockReturnValueOnce('00000000-0000-4000-8000-000000000002')
+    vi.mocked(store.publishPolicy)
+      .mockReset()
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+
+    await wrapper.get('[data-test="policy-title"]').setValue('创业补贴')
+    await wrapper.get('[data-test="policy-content"]').setValue('正文')
+    await wrapper
+      .get('[data-test="policy-category"]')
+      .setValue('entrepreneurship')
+    await wrapper.get('[data-test="policy-form"]').trigger('submit')
+
+    expect(store.publishPolicy).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        request_id: '00000000-0000-4000-8000-000000000001'
+      })
+    )
+    expect(
+      (wrapper.get('[data-test="policy-title"]')
+        .element as HTMLInputElement).value
+    ).toBe('创业补贴')
+
+    await wrapper.get('[data-test="policy-form"]').trigger('submit')
+
+    expect(store.publishPolicy).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        request_id: '00000000-0000-4000-8000-000000000001'
+      })
+    )
+    expect(randomUUID).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('[data-test="policy-title"]').setValue('创业补贴')
+    await wrapper.get('[data-test="policy-content"]').setValue('正文')
+    await wrapper
+      .get('[data-test="policy-category"]')
+      .setValue('entrepreneurship')
+    await wrapper.get('[data-test="policy-form"]').trigger('submit')
+
+    expect(store.publishPolicy).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({
+        request_id: '00000000-0000-4000-8000-000000000002'
+      })
+    )
+    expect(randomUUID).toHaveBeenCalledTimes(2)
   })
 
   it('filters the registry by category and active or unpublished status', async () => {
@@ -264,56 +318,102 @@ describe('GovernmentPolicyView', () => {
     expect(wrapper.find('[data-test="policy-export"]').exists()).toBe(false)
   })
 
-  it('locks typography and layout contracts for 320, 375 and 1280 widths', () => {
-    const viewports = [320, 375, 1280]
-    const sources = [governmentPolicyViewSource, governmentConsoleNavSource]
+  it.each([
+    {
+      width: 320,
+      layout: 'mobile',
+      composeGrid: 'grid-template-columns: minmax(0, 1fr)',
+      tableBody: 'display: grid',
+      actions: 'grid-template-columns: minmax(0, 1fr)'
+    },
+    {
+      width: 375,
+      layout: 'mobile',
+      composeGrid: 'grid-template-columns: minmax(0, 1fr)',
+      tableBody: 'display: grid',
+      actions: 'grid-template-columns: minmax(0, 1fr)'
+    },
+    {
+      width: 1280,
+      layout: 'desktop',
+      composeGrid:
+        'grid-template-columns: minmax(0, 1.55fr) minmax(190px, 0.75fr)',
+      table: 'table-layout: fixed',
+      actions: 'display: flex'
+    }
+  ] as const)(
+    'binds typography and layout contracts at $width px',
+    ({ width, layout, composeGrid, actions, ...expected }) => {
+      const sources = [
+        governmentPolicyViewSource,
+        governmentConsoleNavSource
+      ]
+      const mobileCss = mediaBlock(governmentPolicyViewSource, 760)
+      const narrowCss = mediaBlock(governmentPolicyViewSource, 420)
+      const desktopCss = governmentPolicyViewSource.slice(
+        0,
+        governmentPolicyViewSource.indexOf('@media')
+      )
 
-    expect(
-      cssRule(governmentPolicyViewSource, '.government-policy-page')
-    ).toContain('overflow-x: clip')
-    expect(
-      cssRule(governmentPolicyViewSource, '.government-policy')
-    ).toContain('width: min(100%, 1180px)')
-    expect(
-      cssRule(governmentPolicyViewSource, '.government-policy')
-    ).toContain('min-width: 0')
-    expect(
-      cssRule(governmentPolicyViewSource, '.policy-table')
-    ).toContain('table-layout: fixed')
-    expect(governmentPolicyViewSource).toContain('line-break: strict')
-    expect(governmentPolicyViewSource).toContain('word-break: keep-all')
-    expect(governmentPolicyViewSource).toContain('text-wrap: pretty')
-    expect(
-      cssRule(
-        mediaBlock(governmentPolicyViewSource, 760),
-        '.policy-compose__grid'
-      )
-    ).toContain('grid-template-columns: minmax(0, 1fr)')
-    expect(
-      cssRule(
-        mediaBlock(governmentPolicyViewSource, 760),
-        '.policy-table tbody'
-      )
-    ).toContain('display: grid')
-    expect(
-      cssRule(
-        mediaBlock(governmentPolicyViewSource, 420),
-        '.policy-actions'
-      )
-    ).toContain('grid-template-columns: minmax(0, 1fr)')
-    expect(governmentConsoleNavSource).toContain(
-      '@media (max-width: 640px)'
-    )
+      expect(
+        cssRule(desktopCss, '.government-policy-page')
+      ).toContain('overflow-x: clip')
+      expect(
+        cssRule(desktopCss, '.government-policy')
+      ).toContain('width: min(100%, 1180px)')
+      expect(
+        cssRule(desktopCss, '.government-policy')
+      ).toContain('min-width: 0')
 
-    viewports.forEach(viewport => {
+      const typographyRules = [
+        cssRule(desktopCss, '.policy-hero__identity p'),
+        cssRule(desktopCss, '.policy-table td'),
+        cssRule(
+          desktopCss,
+          '.policy-delete-confirmation p'
+        )
+      ]
+      typographyRules.forEach(rule => {
+        expect(rule).toContain('line-break: strict')
+        expect(rule).toContain('word-break: keep-all')
+        expect(rule).toContain('text-wrap: pretty')
+      })
+
+      if (layout === 'mobile') {
+        expect(width).toBeLessThanOrEqual(760)
+        expect(
+          cssRule(mobileCss, '.policy-compose__grid')
+        ).toContain(composeGrid)
+        expect(
+          cssRule(mobileCss, '.policy-table tbody')
+        ).toContain(expected.tableBody)
+        expect(cssRule(narrowCss, '.policy-actions')).toContain(
+          actions
+        )
+        expect(governmentConsoleNavSource).toContain(
+          '@media (max-width: 640px)'
+        )
+      } else {
+        expect(width).toBeGreaterThan(760)
+        expect(
+          cssRule(desktopCss, '.policy-compose__grid')
+        ).toContain(composeGrid)
+        expect(
+          cssRule(desktopCss, '.policy-table')
+        ).toContain(expected.table)
+        expect(
+          cssRule(desktopCss, '.policy-actions')
+        ).toContain(actions)
+      }
+
       expect(
         sources.every(
           source =>
-            !source.includes(`min-width: ${viewport}px`) &&
-            !source.includes(`width: ${viewport}px`)
+            !source.includes(`min-width: ${width}px`) &&
+            !source.includes(`width: ${width}px`)
         )
       ).toBe(true)
-    })
-    expect(sources.join('\n')).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/i)
-  })
+      expect(sources.join('\n')).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/i)
+    }
+  )
 })
