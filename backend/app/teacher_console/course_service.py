@@ -520,30 +520,101 @@ def _require_pending_result(
     return version, review_status
 
 
-def _normalize_quiz_override(value) -> dict | None:
-    if value is None:
-        return None
+def _validate_quiz_config(value, *, field: str) -> dict:
     if not isinstance(value, dict):
-        raise _validation_error("quiz_override 必须为对象", field="quiz_override")
-
+        raise _validation_error(f"{field} 必须为对象", field=field)
     enabled = value.get("enabled", False)
     scoring_rule = value.get("scoring_rule", "")
     questions = value.get("questions", [])
     if not isinstance(enabled, bool):
         raise _validation_error(
-            "quiz_override.enabled 必须为布尔值",
-            field="quiz_override",
+            f"{field}.enabled 必须为布尔值",
+            field=field,
         )
     if not isinstance(scoring_rule, str):
         raise _validation_error(
-            "quiz_override.scoring_rule 必须为文本",
-            field="quiz_override",
+            f"{field}.scoring_rule 必须为文本",
+            field=field,
         )
     if not isinstance(questions, list):
         raise _validation_error(
-            "quiz_override.questions 必须为列表",
-            field="quiz_override",
+            f"{field}.questions 必须为列表",
+            field=field,
         )
+
+    if enabled:
+        if not scoring_rule.strip():
+            raise _validation_error(
+                "启用测验时必须填写评分规则",
+                field=field,
+            )
+        if not 3 <= len(questions) <= 5:
+            raise _validation_error(
+                "启用测验时必须包含 3 到 5 道题",
+                field=field,
+            )
+
+        question_ids: set[str] = set()
+        for question in questions:
+            if not isinstance(question, dict):
+                raise _validation_error(
+                    "测验题目必须为对象",
+                    field=field,
+                )
+            question_id = question.get("id")
+            if (
+                not isinstance(question_id, str)
+                or not question_id.strip()
+            ):
+                raise _validation_error(
+                    "测验题目 ID 必须为非空文本",
+                    field=field,
+                )
+            normalized_question_id = question_id.strip()
+            if normalized_question_id in question_ids:
+                raise _validation_error(
+                    "测验题目 ID 不能重复",
+                    field=field,
+                )
+            question_ids.add(normalized_question_id)
+
+            question_type = question.get("type")
+            if (
+                not isinstance(question_type, str)
+                or question_type not in {"single_choice", "true_false"}
+            ):
+                raise _validation_error(
+                    "测验题型无效",
+                    field=field,
+                )
+
+            prompt = question.get("prompt")
+            if not isinstance(prompt, str) or not prompt.strip():
+                raise _validation_error(
+                    "测验题干不能为空",
+                    field=field,
+                )
+
+            options = question.get("options")
+            if not isinstance(options, list) or not options:
+                raise _validation_error(
+                    "测验选项不能为空",
+                    field=field,
+                )
+            for option in options:
+                if not isinstance(option, str) or not option.strip():
+                    raise _validation_error(
+                        "测验选项必须为非空文本",
+                        field=field,
+                    )
+
+            answer = question.get("answer")
+            if not isinstance(answer, str) or answer not in options:
+                raise _validation_error(
+                    "测验答案必须存在于选项中",
+                    field=field,
+                )
+
     return {
         "enabled": enabled,
         "scoring_rule": scoring_rule,
@@ -551,18 +622,16 @@ def _normalize_quiz_override(value) -> dict | None:
     }
 
 
+def _normalize_quiz_override(value) -> dict | None:
+    if value is None:
+        return None
+    return _validate_quiz_config(value, field="quiz_override")
+
+
 def _load_quiz_config(course: dict) -> dict:
     override = course.get("quiz_config")
     if isinstance(override, dict):
-        return {
-            "enabled": bool(override.get("enabled", False)),
-            "scoring_rule": str(override.get("scoring_rule", "")),
-            "questions": (
-                override.get("questions", [])
-                if isinstance(override.get("questions", []), list)
-                else []
-            ),
-        }
+        return _validate_quiz_config(override, field="quiz_config")
 
     course_id = _require_positive_int(course.get("id"), field="id")
     row = get_db().execute(
@@ -574,11 +643,14 @@ def _load_quiz_config(course: dict) -> dict:
         (course_id,),
     ).fetchone()
     if row is None:
-        return {
-            "enabled": False,
-            "scoring_rule": "",
-            "questions": [],
-        }
+        return _validate_quiz_config(
+            {
+                "enabled": False,
+                "scoring_rule": "",
+                "questions": [],
+            },
+            field="quiz_config",
+        )
 
     try:
         questions = json.loads(row["questions_json"] or "[]")
@@ -586,11 +658,14 @@ def _load_quiz_config(course: dict) -> dict:
         questions = []
     if not isinstance(questions, list):
         questions = []
-    return {
-        "enabled": bool(row["enabled"]),
-        "scoring_rule": str(row["scoring_rule"] or ""),
-        "questions": questions,
-    }
+    return _validate_quiz_config(
+        {
+            "enabled": bool(row["enabled"]),
+            "scoring_rule": str(row["scoring_rule"] or ""),
+            "questions": questions,
+        },
+        field="quiz_config",
+    )
 
 
 def review_payload(course: dict) -> dict:
@@ -778,6 +853,7 @@ def submit_course_for_review(
                 "actual_version": int(course["version"]),
             },
         )
+    _load_quiz_config(course)
     visible_status = resolve_teacher_visible_status(
         course,
         _review_status(normalized_course_id),
@@ -851,6 +927,9 @@ def edit_course(
                 "actual_version": int(course["version"]),
             },
         )
+    normalized_quiz_override = _normalize_quiz_override(quiz_override)
+    if normalized_quiz_override is None:
+        _load_quiz_config(course)
     visible_status = resolve_teacher_visible_status(
         course,
         _review_status(normalized_course_id),
@@ -867,7 +946,6 @@ def edit_course(
 
     changes = _validate_course_payload(payload, partial=True)
     values = _validate_course_payload({**course, **changes})
-    normalized_quiz_override = _normalize_quiz_override(quiz_override)
     validate_media_reference(
         values["media_source_type"],
         values["media_url"],
@@ -1015,6 +1093,7 @@ def request_course_relist(
                 "actual_version": int(course["version"]),
             },
         )
+    _load_quiz_config(course)
     visible_status = resolve_teacher_visible_status(
         course,
         _review_status(normalized_course_id),

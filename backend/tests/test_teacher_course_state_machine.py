@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -19,9 +20,44 @@ from app.teacher_console.course_service import (
 from app.teacher_console.errors import (
     ProviderConflictError,
     ProviderUnavailableError,
+    ProviderValidationError,
 )
 from app.teacher_console.review_adapter import CourseReviewAdapter
 from app.teacher_console.time_utils import now_shanghai_iso
+
+
+def valid_questions():
+    return [
+        {
+            "id": "q1",
+            "type": "single_choice",
+            "prompt": "荔枝保果的关键时期是？",
+            "options": ["花期", "果期"],
+            "answer": "果期",
+        },
+        {
+            "id": "q2",
+            "type": "true_false",
+            "prompt": "保果期间需要关注水分管理。",
+            "options": ["正确", "错误"],
+            "answer": "正确",
+        },
+        {
+            "id": "q3",
+            "type": "single_choice",
+            "prompt": "以下哪项属于保果措施？",
+            "options": ["疏果", "停止施肥"],
+            "answer": "疏果",
+        },
+    ]
+
+
+def valid_quiz():
+    return {
+        "enabled": True,
+        "scoring_rule": "all_correct",
+        "questions": valid_questions(),
+    }
 
 
 class FakeReviewProvider:
@@ -480,6 +516,7 @@ class TestTeacherCourseStateMachine(unittest.TestCase):
 
     def test_review_payload_uses_contract_fields_and_quiz_config(self):
         now = now_shanghai_iso()
+        questions = valid_questions()
         get_db().execute(
             """
             INSERT INTO course_quizzes (
@@ -489,7 +526,7 @@ class TestTeacherCourseStateMachine(unittest.TestCase):
             """,
             (
                 self.course_id,
-                '[{"id": "q1", "type": "true_false"}]',
+                json.dumps(questions, ensure_ascii=False),
                 now,
             ),
         )
@@ -515,7 +552,7 @@ class TestTeacherCourseStateMachine(unittest.TestCase):
         self.assertEqual(payload["quiz_config"]["enabled"], True)
         self.assertEqual(
             payload["quiz_config"]["questions"],
-            [{"id": "q1", "type": "true_false"}],
+            questions,
         )
 
     def test_edit_course_persists_quiz_override_with_course_transition(self):
@@ -525,11 +562,7 @@ class TestTeacherCourseStateMachine(unittest.TestCase):
             str(self.course_id),
             "approved",
         )
-        quiz = {
-            "enabled": True,
-            "scoring_rule": "all_correct",
-            "questions": [{"id": "q1", "type": "true_false"}],
-        }
+        quiz = valid_quiz()
 
         edit_course(
             7,
@@ -555,8 +588,180 @@ class TestTeacherCourseStateMachine(unittest.TestCase):
         self.assertEqual(row["scoring_rule"], "all_correct")
         self.assertEqual(
             row["questions_json"],
-            '[{"id": "q1", "type": "true_false"}]',
+            json.dumps(quiz["questions"], ensure_ascii=False),
         )
+
+    def test_invalid_enabled_quiz_override_is_rejected_before_provider(self):
+        self.submit_initial_course()
+        self.review.set_status(
+            "course_video",
+            str(self.course_id),
+            "approved",
+        )
+        questions = valid_questions()
+        invalid_quizzes = (
+            {**valid_quiz(), "scoring_rule": " "},
+            {**valid_quiz(), "questions": questions[:2]},
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "id": ""},
+                ],
+            },
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "id": "q1"},
+                ],
+            },
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "type": "multiple_choice"},
+                ],
+            },
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "type": None},
+                ],
+            },
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "prompt": " "},
+                ],
+            },
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "options": ["疏果", ""]},
+                ],
+            },
+            {
+                **valid_quiz(),
+                "questions": [
+                    questions[0],
+                    questions[1],
+                    {**questions[2], "answer": "不存在"},
+                ],
+            },
+        )
+
+        for quiz in invalid_quizzes:
+            with self.subTest(quiz=quiz):
+                calls_before = list(self.review.calls)
+                with self.assertRaises(ProviderValidationError):
+                    edit_course(
+                        7,
+                        self.course_id,
+                        expected_version=1,
+                        payload={"title": "无效测验不应保存"},
+                        quiz_override=quiz,
+                    )
+
+                self.assertEqual(self.review.calls, calls_before)
+                self.assertIsNone(
+                    get_db().execute(
+                        """
+                        SELECT course_id
+                        FROM course_quizzes
+                        WHERE course_id = ?
+                        """,
+                        (self.course_id,),
+                    ).fetchone()
+                )
+                unchanged = get_teacher_course(7, self.course_id)
+                self.assertEqual(unchanged["title"], "荔枝保果")
+                self.assertEqual(unchanged["version"], 1)
+
+    def test_invalid_persisted_quiz_blocks_submit_before_provider(self):
+        now = now_shanghai_iso()
+        get_db().execute(
+            """
+            INSERT INTO course_quizzes (
+                course_id, enabled, scoring_rule, questions_json, updated_at
+            )
+            VALUES (?, 1, 'all_correct', ?, ?)
+            """,
+            (
+                self.course_id,
+                json.dumps(valid_questions()[:2], ensure_ascii=False),
+                now,
+            ),
+        )
+        get_db().commit()
+
+        with self.assertRaises(ProviderValidationError):
+            submit_course_for_review(
+                7,
+                self.course_id,
+                expected_version=1,
+            )
+
+        self.assertEqual(self.review.calls, [])
+        unchanged = get_teacher_course(7, self.course_id)
+        self.assertEqual(unchanged["status"], "draft")
+        self.assertEqual(unchanged["version"], 1)
+        self.assertEqual(self.history_rows(), [])
+
+    def test_invalid_persisted_quiz_blocks_relist_before_provider(self):
+        now = now_shanghai_iso()
+        get_db().execute(
+            """
+            INSERT INTO course_quizzes (
+                course_id, enabled, scoring_rule, questions_json, updated_at
+            )
+            VALUES (?, 1, 'all_correct', ?, ?)
+            """,
+            (
+                self.course_id,
+                json.dumps(valid_questions(), ensure_ascii=False),
+                now,
+            ),
+        )
+        get_db().commit()
+        self.submit_initial_course()
+        self.review.set_status(
+            "course_video",
+            str(self.course_id),
+            "approved",
+        )
+        set_course_offline(7, self.course_id, expected_version=1)
+        get_db().execute(
+            """
+            UPDATE course_quizzes
+            SET scoring_rule = ''
+            WHERE course_id = ?
+            """,
+            (self.course_id,),
+        )
+        get_db().commit()
+        calls_before = list(self.review.calls)
+
+        with self.assertRaises(ProviderValidationError):
+            request_course_relist(
+                7,
+                self.course_id,
+                expected_version=1,
+            )
+
+        self.assertEqual(self.review.calls, calls_before)
+        unchanged = get_teacher_course(7, self.course_id)
+        self.assertEqual(unchanged["status"], "offline")
+        self.assertEqual(unchanged["version"], 1)
 
     def test_visible_status_matrix_preserves_legacy_published_courses(self):
         self.assertEqual(
