@@ -8,6 +8,11 @@ from app.government_console.errors import (
     ProviderError,
     ProviderValidationError,
 )
+from app.government_console.news import (
+    delete_news,
+    list_news,
+    publish_news,
+)
 from app.government_console.policy import (
     delete_policy,
     list_policies,
@@ -115,6 +120,42 @@ def delete_policy_route(policy_id: str):
     payload = _json_object_payload()
     delete_policy(
         policy_id,
+        expected_version=payload.get("expected_version"),
+    )
+    return jsonify(success=True)
+
+
+@government_bp.get("/news")
+def list_news_route():
+    _government_session()
+    return jsonify(
+        success=True,
+        news=list_news(
+            category_code=request.args.get("category") or None,
+        ),
+    )
+
+
+@government_bp.post("/news")
+def publish_news_route():
+    session = _government_session()
+    payload = _json_object_payload()
+    news = publish_news(
+        actor_id=int(session["id"]),
+        request_id=payload.get("request_id"),
+        title=payload.get("title"),
+        content=payload.get("content"),
+        category_code=payload.get("category_code"),
+    )
+    return jsonify(success=True, news=news), 201
+
+
+@government_bp.delete("/news/<news_id>")
+def delete_news_route(news_id: str):
+    _government_session()
+    payload = _json_object_payload()
+    delete_news(
+        news_id,
         expected_version=payload.get("expected_version"),
     )
     return jsonify(success=True)
