@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
+from app.government_console.dashboard import (
+    assert_dashboard_boundary,
+    get_government_dashboard,
+)
 from app.government_console.errors import (
     ProviderAccessDeniedError,
     ProviderConflictError,
@@ -58,6 +62,14 @@ def handle_provider_error(error: ProviderError):
         message=error.message,
         details=error.details,
     ), status
+
+
+@government_bp.get("/dashboard")
+def government_dashboard_route():
+    _government_session()
+    dashboard = get_government_dashboard()
+    assert_dashboard_boundary(dashboard)
+    return jsonify(success=True, dashboard=dashboard)
 
 
 @government_bp.get("/policies")
