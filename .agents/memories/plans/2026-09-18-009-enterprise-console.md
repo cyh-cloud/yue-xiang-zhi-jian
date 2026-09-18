@@ -235,12 +235,12 @@ def get_job_application_intake_provider() -> JobApplicationIntakeProvider: ...
 | Path | Responsibility |
 | --- | --- |
 | `backend/app/enterprise_console/errors.py` | 领域和 provider 错误层级 |
-| `backend/app/enterprise_console/providers.py` | `JobPositionProvider`、`JobApplicationIntakeProvider`、数据库实现、set/get/configure |
+| `backend/app/enterprise_console/providers.py` | `JobPositionProvider`、`JobApplicationIntakeProvider`、`EmploymentStatisticsProvider`、数据库实现、set/get/configure |
 | `backend/app/enterprise_console/review.py` | 11 通用审核 protocol、不可用占位和注册槽 |
 | `backend/app/enterprise_console/notifications.py` | 企业通知发件箱、投递和重试 |
 | `backend/app/enterprise_console/jobs.py` | 职位校验、状态机、审核投影、逻辑删除 |
 | `backend/app/enterprise_console/applications.py` | 投递接收、筛选、详情、改标、状态历史 |
-| `backend/app/enterprise_console/dashboard.py` | 企业范围看板统计 |
+| `backend/app/enterprise_console/dashboard.py` | 企业范围看板统计和供 010 使用的全平台就业统计 |
 | `backend/app/enterprise_console/messaging_provider.py` | 02 私信关系桥接 |
 | `backend/app/enterprise_console/routes.py` | `/api/enterprise/*` HTTP 边界和错误映射 |
 | `backend/app/enterprise_console/seed.py` | 可选企业演示职位与申请 |
@@ -250,6 +250,7 @@ def get_job_application_intake_provider() -> JobApplicationIntakeProvider: ...
 | `backend/tests/test_enterprise_jobs.py` | 职位状态机、审核接入和持久化测试 |
 | `backend/tests/test_enterprise_job_provider.py` | 07 provider 契约替换测试 |
 | `backend/tests/test_enterprise_application_provider.py` | 09-owned 申请接收 provider 的签名、幂等和替换测试 |
+| `backend/tests/test_enterprise_employment_statistics.py` | 010 全平台就业统计 provider 的零值、聚合和不可用契约测试 |
 | `backend/tests/test_enterprise_applications.py` | 投递、筛选、详情和改标测试 |
 | `backend/tests/test_enterprise_deletion.py` | 删除三分支、历史冻结测试 |
 | `backend/tests/test_enterprise_messaging_dashboard.py` | 私信范围和看板隔离测试 |
@@ -1714,6 +1715,205 @@ git add backend/app/enterprise_console/applications.py backend/app/enterprise_co
 git commit -m "后端：实现投递处理与状态改标"
 ```
 
+### Task 5A: EmploymentStatisticsProvider (为 010 提供，前移)
+
+**Files:**
+- Modify: `backend/app/enterprise_console/providers.py`
+- Modify: `backend/app/enterprise_console/__init__.py`
+- Create: `backend/tests/test_enterprise_employment_statistics.py`
+
+**Interfaces:**
+- Consumes: `job_positions`, `job_applications`, the frozen 010 consumer protocol.
+- Produces: `DatabaseEmploymentStatisticsProvider`, `get_employment_statistics_snapshot()`, `set_employment_statistics_provider(app, provider)`, `get_employment_statistics_provider()`.
+- Does not consume or redefine 010 policy/news tables and does not alter 010's dashboard consumer.
+
+**Alignment with 010 Task 6:**
+
+```python
+class EmploymentStatisticsProvider(Protocol):
+    def get_active_job_count(self) -> int | None: ...
+    def get_cumulative_application_count(self) -> int | None: ...
+```
+
+010 derives:
+
+```python
+available = (
+    provider.get_active_job_count() is not None
+    and provider.get_cumulative_application_count() is not None
+)
+```
+
+The 010 placeholder remains responsible for returning `None` for both methods and therefore `available=False`. The 09 implementation is an available source and returns integer `0` when its authoritative tables contain no matching rows; it must never use `None` to represent an empty database.
+
+The `set_employment_statistics_provider` and `get_employment_statistics_provider` exports use the single `employment_statistics_provider` application-extension key. This is the same slot already frozen by 010; no second registry may be created. 010 may install the 09 implementation through its existing setter without changing its dashboard branch.
+
+- [ ] **Step 1: Write failing all-platform statistics tests**
+
+Create `backend/tests/test_enterprise_employment_statistics.py`:
+
+```python
+def test_empty_platform_reports_zero_counts_as_available_source(self):
+    with self.app.app_context():
+        provider = DatabaseEmploymentStatisticsProvider()
+        self.assertEqual(provider.get_active_job_count(), 0)
+        self.assertEqual(provider.get_cumulative_application_count(), 0)
+        self.assertEqual(
+            get_employment_statistics_snapshot(),
+            {
+                "active_job_count": 0,
+                "cumulative_application_count": 0,
+                "available": True,
+            },
+        )
+
+
+def test_counts_are_platform_wide_not_enterprise_scoped(self):
+    seed enterprise A with one approved job and 2 applications
+    seed enterprise B with two approved jobs and 3 applications
+    seed pending/rejected/deleted jobs that must not count
+    with self.app.app_context():
+        provider = DatabaseEmploymentStatisticsProvider()
+        self.assertEqual(provider.get_active_job_count(), 3)
+        self.assertEqual(provider.get_cumulative_application_count(), 5)
+        self.assertEqual(
+            get_employment_statistics_snapshot(),
+            {
+                "active_job_count": 3,
+                "cumulative_application_count": 5,
+                "available": True,
+            },
+        )
+
+
+def test_unavailable_provider_preserves_010_none_contract(self):
+    class UnavailableProvider:
+        def get_active_job_count(self):
+            return None
+
+        def get_cumulative_application_count(self):
+            return None
+
+    with self.app.app_context():
+        set_employment_statistics_provider(self.app, UnavailableProvider())
+        self.assertEqual(
+            get_employment_statistics_snapshot(),
+            {
+                "active_job_count": None,
+                "cumulative_application_count": None,
+                "available": False,
+            },
+        )
+```
+
+Also assert that no test calls `get_dashboard()` to derive these values; the platform helper must query the platform-wide tables directly and never reuse an enterprise dashboard result.
+
+- [ ] **Step 2: Run the test and verify it fails**
+
+Run: `uv run --directory backend python -m unittest tests.test_enterprise_employment_statistics -v`
+
+Expected: FAIL because the provider, setter/getter and snapshot helper do not exist.
+
+- [ ] **Step 3: Implement the provider and single registration slot**
+
+Add to `backend/app/enterprise_console/providers.py`:
+
+```python
+class EmploymentStatisticsProvider(Protocol):
+    def get_active_job_count(self) -> int | None: ...
+    def get_cumulative_application_count(self) -> int | None: ...
+
+
+class DatabaseEmploymentStatisticsProvider:
+    def get_active_job_count(self) -> int | None:
+        from app.enterprise_console.dashboard import (
+            get_platform_active_job_count,
+        )
+        return get_platform_active_job_count()
+
+    def get_cumulative_application_count(self) -> int | None:
+        from app.enterprise_console.dashboard import (
+            get_platform_cumulative_application_count,
+        )
+        return get_platform_cumulative_application_count()
+
+
+def set_employment_statistics_provider(
+    app: Flask,
+    provider: EmploymentStatisticsProvider,
+) -> None:
+    app.extensions["employment_statistics_provider"] = provider
+
+
+def get_employment_statistics_provider() -> EmploymentStatisticsProvider:
+    return current_app.extensions.get(
+        "employment_statistics_provider",
+        DatabaseEmploymentStatisticsProvider(),
+    )
+```
+
+Add the all-platform helpers to `backend/app/enterprise_console/dashboard.py`:
+
+```python
+def get_platform_active_job_count() -> int:
+    row = get_db().execute(
+        """
+        SELECT COUNT(*) AS total
+        FROM job_positions
+        WHERE review_status = 'approved'
+          AND deleted_at IS NULL
+          AND published_at IS NOT NULL
+          AND trim(published_at) <> ''
+        """
+    ).fetchone()
+    return int(row["total"])
+
+
+def get_platform_cumulative_application_count() -> int:
+    row = get_db().execute(
+        "SELECT COUNT(*) AS total FROM job_applications"
+    ).fetchone()
+    return int(row["total"])
+
+
+def get_employment_statistics_snapshot() -> dict:
+    provider = get_employment_statistics_provider()
+    active = provider.get_active_job_count()
+    applications = provider.get_cumulative_application_count()
+    return {
+        "active_job_count": active,
+        "cumulative_application_count": applications,
+        "available": active is not None and applications is not None,
+    }
+```
+
+Install `DatabaseEmploymentStatisticsProvider()` in `install_default_enterprise_services()`, export the class and functions from `enterprise_console/__init__.py`, and extend `configure_enterprise_providers(..., employment_statistics_provider=None)` only by delegating to the single setter.
+
+- [ ] **Step 4: Run the focused tests and 010 compatibility check**
+
+Run:
+
+```bash
+uv run --directory backend python -m unittest tests.test_enterprise_employment_statistics tests.test_enterprise_foundation -v
+```
+
+Expected: PASS. Verify the returned provider object exposes exactly the two 010 methods, while `get_employment_statistics_snapshot()` exposes the three-key dict with the derived availability marker.
+
+Cross-check the 010 consumer contract without editing the 010 worktree:
+
+```bash
+Select-String -Path 'E:\Project\skipped_work\粤乡智匠项目\.worktrees\010-government-console\.agents\memories\plans\2026-09-18-010-government-console.md' -Pattern 'get_active_job_count|get_cumulative_application_count|set_employment_statistics_provider'
+```
+
+Expected: the three method/function names match exactly.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add backend/app/enterprise_console/providers.py backend/app/enterprise_console/dashboard.py backend/app/enterprise_console/__init__.py backend/tests/test_enterprise_employment_statistics.py
+git commit -m "后端：为 010 提供全平台就业统计 provider"
+```
+
 ### Task 6: Job Deletion and Application History Matrix
 
 **Files:**
@@ -3082,6 +3282,7 @@ git commit -m "测试：完成企业工作台端到端验收"
 | SC-011..012 review integration and notification retry | 2, 3, 13 |
 | SC-013..015 performance, no AI and application submission notice | 2, 5, 8, 13 |
 | SC-016..017 application-intake replacement and single review-provider slot | 1, 5, 13 |
+| 010 FR-053..056 EmploymentStatisticsProvider consumer boundary | 5A, 13 |
 
 ## Plan Self-Review
 

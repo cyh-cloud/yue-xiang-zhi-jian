@@ -430,6 +430,24 @@ class JobApplicationIntakeProvider(Protocol):
 - 07 不得直接写 `job_applications`，不得导入 09 的 `applications.py`
   或其他内部实现。
 
+### 4.7 09 全平台就业统计
+
+09 为 010 提供全平台只读就业统计，010 spec 已冻结消费者形状：
+
+```python
+class EmploymentStatisticsProvider(Protocol):
+    def get_active_job_count(self) -> int | None: ...
+    def get_cumulative_application_count(self) -> int | None: ...
+```
+
+- 注册槽固定为 `employment_statistics_provider`，入口为
+  `set_employment_statistics_provider` / `get_employment_statistics_provider`。
+- 09 实现返回全平台已上架职位数和全平台累计投递量；无匹配数据返回整数
+  `0`，不得返回 `None` 冒充不可用。
+- `None` + `available=False` 只属于 010 在 09 未接入时的完整占位实现。
+- 010 的 dashboard 继续用“两个值均非 None”派生 `available`，不得改为
+  分支判断 09 实现类型或读取 09 表。
+
 ## 5. 生产者到消费者接口登记表
 
 | 生产者 → 消费者 | 接口 | 契约现状 | 签名所有者 | 实现/接入归属 |
@@ -437,6 +455,7 @@ class JobApplicationIntakeProvider(Protocol):
 | 08 → 03/04/05 | 方向感知课程 | 已存在 | 03 spec 冻结的 `CourseProvider` | 08 实现真 provider；03/04/05 继续消费 |
 | 09 → 07 | 岗位 | 09 spec 已冻结实现形状；待 07 spec 最终确认 | 07 spec | 09 实现 producer，07 接入 |
 | 09 → 07 | 求职申请接收 | 新定义 | 09 spec 冻结 `JobApplicationIntakeProvider` | 09 实现 producer，07 只依赖签名提交 |
+| 09 → 10 | 全平台就业统计 | 010 已冻结消费者协议、09 补实现 | 010 spec 冻结 `EmploymentStatisticsProvider` | 09 实现 producer，010 通过单一注册槽消费 |
 | 10 → 06 | 政策 / 新闻 | 未定义 | 06 spec | 10 实现 producer，06 接入 |
 | 11 → 08/09/05 | 内容审核 | 05 视频专用形状已存在；通用契约新定义 | 11 spec | 08/09 直接接通用 facade；11 为 05 提供适配器 |
 | 11 → 05 | 奖品库 | 已存在 | 11 spec | 11 实现生产来源；05 现行 `RewardCatalogProvider` 是消费契约 |
@@ -506,6 +525,9 @@ class JobApplicationIntakeProvider(Protocol):
 - 09 可在 11 尚未实现时通过 `set_content_review_provider()` 向唯一
   `content_review_provider` 槽安装协议完整的不可用占位实现；11 落地后
   用同一 `set/get` 槽替换，不得建立第二审核注册表。
+- 09 为 010 实现全平台就业统计，并在 `employment_statistics_provider`
+  单一槽提供 `EmploymentStatisticsProvider`；010 的 `None` 占位和
+  `available=False` 行为保持不变。
 - 11 是内容审核、奖品库、履约管理、积分规则、预置内容、功能知识库和
   全平台统计的生产者。
 - 07 拥有技能档案聚合契约，09 只消费，03/04/05 不新造第二套档案结构。
