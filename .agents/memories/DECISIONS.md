@@ -37,3 +37,9 @@
 
 - `frontend/tsconfig.node.json` may reference only files that actually exist.
 - `npx tsc -b` and `npm run build` have different validation scopes; run both for frontend changes.
+
+## Producer Provider Contracts
+
+- Cross-feature producer provider shapes, registration, review state contracts,
+  errors, alignment rules, and consumer ownership are frozen in
+  `.agents/memories/guides/provider-contract.md`.
