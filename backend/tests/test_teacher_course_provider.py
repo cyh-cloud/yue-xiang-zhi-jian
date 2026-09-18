@@ -14,6 +14,21 @@ from app.teacher_console.course_service import create_teacher_course
 from app.teacher_console.providers import DatabaseTeacherCourseProvider
 
 
+PUBLIC_COURSE_FIELDS = {
+    "id",
+    "title",
+    "direction",
+    "status",
+    "summary",
+    "teacher_name",
+    "published_at",
+    "duration_seconds",
+    "media_url",
+    "tag_ids",
+    "content_tags",
+}
+
+
 class FakeReviewProvider:
     def __init__(self):
         self.records = {}
@@ -223,6 +238,45 @@ class TestTeacherCourseProvider(unittest.TestCase):
             ["荔枝", "保果", "自定义标签"],
         )
         self.assertEqual(course["tag_ids"], [self.lychee_tag_id])
+
+    def test_public_course_dto_excludes_internal_fields(self):
+        self._set_local_status(self.course_id, "pending")
+        self._set_review(
+            self.course_id,
+            "approved",
+            published_at="2026-09-19T10:00:00+08:00",
+        )
+
+        with self.app.app_context():
+            provider = DatabaseTeacherCourseProvider()
+            listed_course = next(
+                item
+                for item in provider.list_published_courses(
+                    8,
+                    "agriculture",
+                )
+                if item["id"] == self.course_id
+            )
+            detail_course = provider.get_course(self.course_id)
+
+        response = self.client.get(
+            "/api/student/courses?direction=agriculture"
+        )
+        api_course = next(
+            item
+            for item in response.get_json()["courses"]
+            if item["id"] == self.course_id
+        )
+
+        self.assertEqual(
+            set(listed_course),
+            PUBLIC_COURSE_FIELDS | {"interest_match"},
+        )
+        self.assertEqual(set(detail_course), PUBLIC_COURSE_FIELDS)
+        self.assertEqual(
+            set(api_course),
+            PUBLIC_COURSE_FIELDS | {"interest_match"},
+        )
 
     def test_unresolved_courses_are_hidden_from_all_three_surfaces(self):
         published_at = "2026-09-19T10:00:00+08:00"

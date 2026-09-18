@@ -12,6 +12,21 @@ from app.teacher_console.review_adapter import CourseReviewAdapter
 from app.teacher_console.time_utils import parse_provider_time
 
 
+_PUBLIC_COURSE_FIELDS = (
+    "id",
+    "title",
+    "direction",
+    "status",
+    "summary",
+    "teacher_name",
+    "published_at",
+    "duration_seconds",
+    "media_url",
+    "tag_ids",
+    "content_tags",
+)
+
+
 class DatabaseTeacherCourseProvider:
     def list_published_courses(
         self,
@@ -19,7 +34,7 @@ class DatabaseTeacherCourseProvider:
         direction: str,
     ) -> list[dict]:
         return [
-            course
+            _public_course(course, include_interest_match=True)
             for course in self._list_direction(student_id, direction)
             if course["status"] == "published"
         ]
@@ -32,7 +47,9 @@ class DatabaseTeacherCourseProvider:
         if row is None:
             return None
         course = self._hydrate(dict(row))
-        return course if course["status"] == "published" else None
+        if course["status"] != "published":
+            return None
+        return _public_course(course)
 
     def get_quiz(self, course_id: int) -> dict | None:
         if self.get_course(course_id) is None:
@@ -143,6 +160,22 @@ def _content_tags(course: dict) -> list[str]:
     if not isinstance(content_tags, list):
         return []
     return [str(tag) for tag in content_tags if isinstance(tag, str)]
+
+
+def _public_course(
+    course: dict,
+    *,
+    include_interest_match: bool = False,
+) -> dict:
+    public_course = {
+        field: course.get(field)
+        for field in _PUBLIC_COURSE_FIELDS
+    }
+    if include_interest_match:
+        public_course["interest_match"] = bool(
+            course.get("interest_match", False)
+        )
+    return public_course
 
 
 def _tag_ids(db, course_id: int, content_tags: list[str]) -> list[int]:

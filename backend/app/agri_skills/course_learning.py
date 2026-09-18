@@ -140,9 +140,7 @@ def _list_provider_recommendations(
 ) -> list[dict]:
     courses = list_courses(student_id, direction)
     provider = get_course_provider()
-    if direction == "agriculture" and callable(
-        getattr(provider, "list_published_agriculture_courses", None)
-    ):
+    if direction == "agriculture" and _is_legacy_course_provider(provider):
         from app.teacher_console.providers import (
             DatabaseTeacherCourseProvider,
         )
@@ -153,12 +151,12 @@ def _list_provider_recommendations(
         )
         by_id = {
             int(course["id"]): course
-            for course in courses
+            for course in legacy_courses
         }
         by_id.update(
             {
                 int(course["id"]): course
-                for course in legacy_courses
+                for course in courses
             }
         )
         courses = list(by_id.values())
