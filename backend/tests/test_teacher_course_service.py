@@ -254,6 +254,37 @@ class TestTeacherCourseService(unittest.TestCase):
             )
             self.assertEqual(list_teacher_courses(8), [])
 
+    def test_list_orders_parsed_timestamps_across_timezone_forms(self):
+        with self.app.app_context():
+            earliest = self._create_course(
+                {**self.base_payload, "title": "最早更新"}
+            )
+            tied_second = self._create_course(
+                {**self.base_payload, "title": "并列更新"}
+            )
+            tied_first = self._create_course(
+                {**self.base_payload, "title": "并列更新二"}
+            )
+            db = get_db()
+            db.execute(
+                "UPDATE courses SET updated_at = ? WHERE id = ?",
+                ("2026-09-19T01:00:00+08:00", earliest["id"]),
+            )
+            db.execute(
+                "UPDATE courses SET updated_at = ? WHERE id = ?",
+                ("2026-09-18T20:00:00+00:00", tied_second["id"]),
+            )
+            db.execute(
+                "UPDATE courses SET updated_at = ? WHERE id = ?",
+                ("2026-09-19T04:00:00+08:00", tied_first["id"]),
+            )
+            db.commit()
+
+            self.assertEqual(
+                [item["id"] for item in list_teacher_courses(7)],
+                [tied_first["id"], tied_second["id"], earliest["id"]],
+            )
+
 
 class TestTeacherCourseMediaValidation(unittest.TestCase):
     def setUp(self):
@@ -357,6 +388,45 @@ class TestTeacherCourseMediaValidation(unittest.TestCase):
             ),
             "/media/teacher-courses/example.mp4",
         )
+
+    def test_local_upload_rejects_windows_traversal_before_resolution(self):
+        invalid_urls = (
+            r"/media/teacher-courses/C:\foo.mp4",
+            r"/media/teacher-courses/\foo.mp4",
+            r"/media/teacher-courses/..\foo.mp4",
+            "/media/teacher-courses/../foo.mp4",
+            "/media/teacher-courses/./foo.mp4",
+            "/media/teacher-courses/sub/foo.mp4",
+            r"/media/teacher-courses/C:foo.mp4",
+            r"/media/teacher-courses/\\server\share\foo.mp4",
+        )
+
+        with self.app.app_context():
+            self.app.config["COURSE_MEDIA_ROOT"] = str(
+                Path(self.temp_dir.name) / "media-root"
+            )
+            for media_url in invalid_urls:
+                with self.subTest(media_url=media_url):
+                    with self.assertRaises(ProviderValidationError):
+                        validate_media_reference(
+                            "local_upload",
+                            media_url,
+                        )
+
+    def test_local_upload_cannot_read_outside_course_media_root(self):
+        media_root = Path(self.temp_dir.name) / "media-root"
+        media_root.mkdir()
+        outside_file = Path(self.temp_dir.name) / "outside.mp4"
+        outside_file.write_bytes(b"video")
+
+        with self.app.app_context():
+            self.app.config["COURSE_MEDIA_ROOT"] = str(media_root)
+            with self.assertRaises(ProviderValidationError):
+                validate_media_reference(
+                    "local_upload",
+                    r"/media/teacher-courses/..\outside.mp4",
+                    check_remote=True,
+                )
 
 
 if __name__ == "__main__":

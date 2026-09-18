@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from urllib.parse import urlsplit
 
 import httpx
@@ -37,6 +37,7 @@ def _validate_external_url(media_url: str) -> None:
 def _validate_local_media_url(media_url: str) -> str:
     parsed = urlsplit(media_url)
     filename = parsed.path.removeprefix(LOCAL_MEDIA_URL_PREFIX)
+    windows_path = PureWindowsPath(filename)
     if (
         parsed.scheme
         or parsed.netloc
@@ -45,6 +46,14 @@ def _validate_local_media_url(media_url: str) -> str:
         or not parsed.path.startswith(LOCAL_MEDIA_URL_PREFIX)
         or not filename
         or "/" in filename
+        or "\\" in filename
+        or ":" in filename
+        or filename in {".", ".."}
+        or windows_path.drive
+        or windows_path.root
+        or windows_path.is_absolute()
+        or len(windows_path.parts) != 1
+        or windows_path.name != filename
         or Path(filename).suffix.lower() not in ALLOWED_VIDEO_SUFFIXES
     ):
         raise _media_error(

@@ -10,7 +10,10 @@ from app.teacher_console.errors import (
     ProviderValidationError,
 )
 from app.teacher_console.media import validate_media_reference
-from app.teacher_console.time_utils import now_shanghai_iso
+from app.teacher_console.time_utils import (
+    now_shanghai_iso,
+    parse_provider_time,
+)
 
 
 COURSE_DIRECTIONS = {"agriculture", "ecommerce", "handcraft"}
@@ -399,8 +402,15 @@ def list_teacher_courses(
         SELECT *
         FROM courses
         WHERE {" AND ".join(conditions)}
-        ORDER BY updated_at DESC, id DESC
         """,
         tuple(parameters),
     ).fetchall()
-    return [_course_dict(db, row) for row in rows]
+    courses = [_course_dict(db, row) for row in rows]
+    courses.sort(
+        key=lambda course: (
+            parse_provider_time(course["updated_at"]),
+            int(course["id"]),
+        ),
+        reverse=True,
+    )
+    return courses
