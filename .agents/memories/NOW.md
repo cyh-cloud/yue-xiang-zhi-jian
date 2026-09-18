@@ -1,5 +1,26 @@
 # Current Work
 
+## 010 Government Console Specification and Plan
+
+- 2026-09-18: Created branch `v2/lixKRT/010-government-console` in
+  `.worktrees/010-government-console`, based on `v2/lixKRT/dev` at `01fff52`.
+- Specification: `specs/010-government-console/spec.md`.
+- Implementation plan:
+  `.agents/memories/plans/2026-09-18-010-government-console.md`.
+- Clarified policy three-state/news two-state behavior, immediate 02 policy
+  push, no re-push on re-list, hard delete, idempotent view events, and
+  non-deduplicated cumulative application counts.
+- Frozen 09 employment placeholder as unavailable `None` values with
+  `set_employment_statistics_provider` as the replacement point.
+- Frozen 06 policy/news producer registration and read/view contract; 06
+  remains the final signature owner.
+- User confirmed all four recommended decisions on 2026-09-18: strong
+  consistency between policy publication and 02 push, no re-push on re-list,
+  no published-content editing in this release, and repeated views counted per
+  distinct view event.
+- No implementation has started. The 010 spec, plan, checklist, and
+  `.specify/feature.json` are local uncommitted artifacts in the 010 worktree.
+
 ## Integration Branch
 
 - 2026-09-18: `v2/lixKRT/dev` fast-forwarded `e527d34 -> 8e27da8`,
