@@ -1,6 +1,13 @@
 <script setup lang="ts">
+import type { HandcraftCourse } from '@/api/types'
 import CourseLearningPanel from '@/components/CourseLearningPanel.vue'
+import HandcraftCoursePlayer from '@/components/HandcraftCoursePlayer.vue'
+import type { CourseLearningCourse } from '@/stores/courseLearning'
 import HandcraftInheritanceNav from '@/components/HandcraftInheritanceNav.vue'
+
+function asHandcraftCourse(course: CourseLearningCourse): HandcraftCourse {
+  return course as HandcraftCourse
+}
 </script>
 
 <template>
@@ -19,6 +26,9 @@ import HandcraftInheritanceNav from '@/components/HandcraftInheritanceNav.vue'
     >
       <template #nav>
         <HandcraftInheritanceNav />
+      </template>
+      <template #course-media="{ course }">
+        <HandcraftCoursePlayer :course="asHandcraftCourse(course)" />
       </template>
     </CourseLearningPanel>
   </div>

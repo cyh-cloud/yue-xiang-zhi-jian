@@ -21,6 +21,7 @@ from app.handcraft_inheritance import (
     set_points_policy_provider,
     set_reward_catalog_provider,
 )
+from app.handcraft_inheritance.active_learning import heartbeat
 from app.handcraft_inheritance.ar_guidance import generate_ar_guidance
 from app.handcraft_inheritance.course_learning import (
     list_handcraft_learning_outcomes,
@@ -299,7 +300,7 @@ class HandcraftIntegrationAcceptance(unittest.TestCase):
 
     def _redeem(self, user_id=1, request_id="integration-redemption"):
         with self.app.app_context(), patch(
-            "app.handcraft_inheritance.rewards.emit_redemption_succeeded"
+            "app.handcraft_inheritance.outbox.emit_redemption_succeeded"
         ):
             return redeem_reward(
                 user_id,
@@ -690,6 +691,13 @@ class HandcraftIntegrationAcceptance(unittest.TestCase):
             QUIZ_GRADE,
         ]
         with self.app.app_context():
+            ar_segment = heartbeat(
+                self.student_id,
+                "ar",
+                "guangxiu",
+                heartbeat_seq=0,
+                now_epoch=1000,
+            )
             complete_craft_step(
                 self.student_id,
                 "guangxiu",
@@ -701,15 +709,13 @@ class HandcraftIntegrationAcceptance(unittest.TestCase):
                 self.student_id,
                 "guangxiu",
                 "绣制花瓣",
-                active_seconds=600,
-                event_id="outcome-ar",
+                str(ar_segment["segment_id"]),
             )
             generate_ar_guidance(
                 self.student_id,
                 "guangxiu",
                 "绣制花瓣",
-                active_seconds=300,
-                event_id="outcome-ar",
+                str(ar_segment["segment_id"]),
             )
             update_handcraft_course_progress(
                 self.student_id,
@@ -1011,7 +1017,7 @@ class HandcraftIntegrationAcceptance(unittest.TestCase):
             "app.handcraft_inheritance.presets.PLACEHOLDER_REWARDS",
             one_stock_rewards,
         ), patch(
-            "app.handcraft_inheritance.rewards."
+            "app.handcraft_inheritance.outbox."
             "emit_redemption_succeeded"
         ):
             provider = PlaceholderRewardCatalogProvider()

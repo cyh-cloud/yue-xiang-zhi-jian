@@ -12,6 +12,7 @@ from app.agri_skills.course_learning import (
     submit_course_quiz,
     update_course_progress,
 )
+from app.handcraft_inheritance.active_learning import claim_active_seconds
 from app.handcraft_inheritance.points import (
     MAX_SEGMENT_SECONDS,
     record_duration_points,
@@ -44,14 +45,25 @@ def update_handcraft_course_progress(
     user_id: int,
     course_id: int,
     position_seconds: int,
-    watched_delta_seconds: int,
+    watched_delta_seconds: object = None,
+    *,
+    segment_id: object = None,
 ) -> dict:
-    before = get_handcraft_course_progress(user_id, course_id)
+    if segment_id is None and isinstance(watched_delta_seconds, str):
+        segment_id = watched_delta_seconds
+    # Legacy duration arguments are intentionally ignored.
+    active_seconds = claim_active_seconds(
+        user_id,
+        "course",
+        f"handcraft-course:{course_id}",
+        segment_id,
+        close_segment=False,
+    )
     progress = update_course_progress(
         user_id,
         course_id,
         position_seconds,
-        watched_delta_seconds,
+        active_seconds,
         direction="handcraft",
     )
     with get_db():
@@ -84,19 +96,19 @@ def update_handcraft_course_progress(
                 title,
                 source_id=course_id,
             )
-    effective_delta = max(
-        0,
-        int(progress["watched_seconds"]) - int(before["watched_seconds"]),
-    )
-    if effective_delta > 0:
+    if active_seconds > 0:
         try:
+            normalized_segment_id = str(segment_id).strip()
             record_duration_points(
                 user_id,
                 "handcraft",
                 f"handcraft-course:{course_id}",
-                min(effective_delta, MAX_SEGMENT_SECONDS),
+                min(active_seconds, MAX_SEGMENT_SECONDS),
                 str(progress["updated_at"]),
-                str(progress["watched_seconds"]),
+                (
+                    f"segment-{normalized_segment_id}:"
+                    f"settled-{progress['watched_seconds']}"
+                ),
             )
         except Exception as error:
             LOGGER.warning(

@@ -11,6 +11,10 @@ from app.handcraft_inheritance.fulfillment import (
     issue_fulfillment,
     manual_verify_fulfillment,
 )
+from app.handcraft_inheritance.outbox import (
+    deliver_after_commit,
+    enqueue_handcraft_notification,
+)
 from app.handcraft_inheritance.providers import (
     get_fulfillment_action_provider,
     get_video_review_action_provider,
@@ -133,6 +137,7 @@ class DatabaseTeachingVideoReviewActionProvider:
             current_status = str(row["review_status"])
             now = _utc_now_iso()
             notification = None
+            outbox_id = None
             if operation == "approve":
                 if current_status != "pending":
                     raise AgriValidationError("当前视频状态不可审核通过")
@@ -169,6 +174,11 @@ class DatabaseTeachingVideoReviewActionProvider:
                     "approved": True,
                     "opinion": None,
                 }
+                outbox_id = enqueue_handcraft_notification(
+                    db,
+                    event_type="review_approved",
+                    payload=notification,
+                )
             elif operation == "reject":
                 if current_status != "pending":
                     raise AgriValidationError("当前视频状态不可驳回")
@@ -208,6 +218,11 @@ class DatabaseTeachingVideoReviewActionProvider:
                     "approved": False,
                     "opinion": opinion,
                 }
+                outbox_id = enqueue_handcraft_notification(
+                    db,
+                    event_type="review_rejected",
+                    payload=notification,
+                )
             else:
                 if current_status not in {"pending", "approved"}:
                     raise AgriValidationError("当前视频状态不可编辑")
@@ -228,6 +243,7 @@ class DatabaseTeachingVideoReviewActionProvider:
                         "status": result_status,
                         "version": version,
                         "notification": notification,
+                        "outbox_id": outbox_id,
                     }
                 next_version = version + 1
                 cursor = db.execute(
@@ -263,6 +279,7 @@ class DatabaseTeachingVideoReviewActionProvider:
             "status": result_status,
             "version": version,
             "notification": notification,
+            "outbox_id": outbox_id,
         }
 
 
@@ -316,13 +333,13 @@ class DatabaseFulfillmentAdminActionProvider:
 
 def apply_video_review(action: dict) -> dict:
     result = get_video_review_action_provider().apply(action)
-    notification = result.get("notification")
-    if notification is not None:
-        emit_review_result(**notification)
+    outbox_id = result.get("outbox_id")
+    if outbox_id is not None:
+        deliver_after_commit(int(outbox_id))
     return {
         key: value
         for key, value in result.items()
-        if key != "notification"
+        if key not in {"notification", "outbox_id"}
     }
 
 

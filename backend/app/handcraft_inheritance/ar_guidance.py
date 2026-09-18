@@ -7,6 +7,7 @@ from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
 from app.agri_skills.errors import AgriValidationError, AiUnavailableError
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import claim_active_seconds
 from app.handcraft_inheritance.crafts import get_craft
 from app.handcraft_inheritance.outcomes import (
     record_handcraft_learning_outcome,
@@ -94,9 +95,15 @@ def generate_ar_guidance(
     user_id: int,
     craft_key: str,
     project_label: str,
-    active_seconds: int | None = None,
-    event_id: str | None = None,
+    active_seconds: object = None,
+    event_id: object = None,
+    *,
+    segment_id: object = None,
 ) -> dict:
+    if segment_id is None and isinstance(active_seconds, str):
+        segment_id = active_seconds
+    # Legacy duration/event arguments are intentionally ignored.
+    del active_seconds, event_id
     if (
         not isinstance(user_id, int)
         or isinstance(user_id, bool)
@@ -111,20 +118,6 @@ def generate_ar_guidance(
     normalized_project_label = _required_text(project_label)
     if normalized_project_label is None:
         raise AgriValidationError("手工项目不能为空")
-
-    normalized_event_id = None
-    if active_seconds is not None:
-        if (
-            not isinstance(active_seconds, int)
-            or isinstance(active_seconds, bool)
-            or active_seconds < 0
-        ):
-            raise AgriValidationError("学习时长必须是非负整数")
-        if active_seconds > 7200:
-            raise AgriValidationError("单次学习段不能超过 120 分钟")
-        normalized_event_id = _required_text(event_id)
-        if normalized_event_id is None:
-            raise AgriValidationError("学习事件标识不能为空")
 
     context = {
         "craft_key": craft["craft_key"],
@@ -144,9 +137,15 @@ def generate_ar_guidance(
         ) from error
 
     created_at = utc_now_iso()
+    normalized_segment_id = (
+        str(segment_id).strip()
+        if segment_id is not None and str(segment_id).strip()
+        else None
+    )
     source_key = (
-        f"ar:{craft['craft_key']}:"
-        f"{normalized_event_id or uuid4().hex}"
+        f"ar:{craft['craft_key']}:segment:{normalized_segment_id}"
+        if normalized_segment_id is not None
+        else f"ar:{craft['craft_key']}:{uuid4().hex}"
     )
     with get_db():
         record_handcraft_learning_outcome(
@@ -157,7 +156,14 @@ def generate_ar_guidance(
             f"{craft['name']} · {normalized_project_label}",
         )
 
-    if active_seconds is not None:
+    active_seconds = claim_active_seconds(
+        user_id,
+        "ar",
+        craft["craft_key"],
+        segment_id,
+        close_segment=True,
+    )
+    if active_seconds > 0:
         try:
             points_result = record_duration_points(
                 user_id,
@@ -165,7 +171,7 @@ def generate_ar_guidance(
                 craft["craft_key"],
                 active_seconds,
                 utc_now_iso(),
-                normalized_event_id,
+                f"ar:segment-{normalized_segment_id}",
             )
         except Exception as error:
             LOGGER.warning(

@@ -185,6 +185,7 @@ def _list_provider_recommendations(
                 "teacher_name": str(course["teacher_name"]),
                 "published_at": str(course["published_at"]),
                 "duration_seconds": int(course["duration_seconds"]),
+                "media_url": course.get("media_url"),
                 "tag_ids": tag_ids,
                 "tag_match_count": len(
                     set(tag_ids).intersection(student_tag_ids)
@@ -253,6 +254,7 @@ def list_recommendations(
                 c.teacher_name,
                 c.published_at,
                 {duration_projection} AS duration_seconds,
+                c.media_url,
                 (
                     SELECT COUNT(DISTINCT cit.tag_id)
                     FROM course_interest_tags cit
@@ -295,6 +297,7 @@ def list_recommendations(
             "teacher_name": str(row["teacher_name"]),
             "published_at": row["published_at"],
             "duration_seconds": row["duration_seconds"],
+            "media_url": row["media_url"],
             "tag_ids": [
                 int(tag_row["tag_id"])
                 for tag_row in get_db().execute(

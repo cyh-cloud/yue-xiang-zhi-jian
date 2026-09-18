@@ -176,7 +176,7 @@ class TestHandcraftRewards(unittest.TestCase):
         with self.app.app_context():
             reward = list_rewards(1)[0]
             with patch(
-                "app.handcraft_inheritance.rewards."
+                "app.handcraft_inheritance.outbox."
                 "emit_redemption_succeeded"
             ) as emit:
                 first = redeem_reward(
@@ -240,7 +240,7 @@ class TestHandcraftRewards(unittest.TestCase):
         self.assertEqual(len(spend_rows), 1)
         self.assertEqual(balance, 970)
         self.assertEqual(redemptions[0]["id"], first["id"])
-        self.assertEqual(emit.call_count, 2)
+        self.assertEqual(emit.call_count, 1)
         self.assertEqual(
             {
                 call.kwargs["event_id"]
@@ -272,7 +272,7 @@ class TestHandcraftRewards(unittest.TestCase):
                 StaticPolicyProvider({"invalid": True}),
             )
             with patch(
-                "app.handcraft_inheritance.rewards."
+                "app.handcraft_inheritance.outbox."
                 "emit_redemption_succeeded"
             ) as emit:
                 repeated = redeem_reward(
@@ -282,13 +282,7 @@ class TestHandcraftRewards(unittest.TestCase):
                 )
 
         self.assertEqual(repeated["id"], first["id"])
-        emit.assert_called_once_with(
-            event_id=f"handcraft-redemption:{first['id']}:succeeded",
-            student_id=1,
-            redemption_id=str(first["id"]),
-            points_spent=30,
-            prize_name=reward["name"],
-        )
+        emit.assert_not_called()
 
     def test_notification_failure_does_not_rollback_and_can_retry(self):
         self.use_points_policy()
@@ -296,15 +290,15 @@ class TestHandcraftRewards(unittest.TestCase):
         with self.app.app_context():
             reward = list_rewards(1)[0]
             with patch(
-                "app.handcraft_inheritance.rewards."
+                "app.handcraft_inheritance.outbox."
                 "emit_redemption_succeeded",
                 side_effect=RuntimeError("notification offline"),
             ):
-                with self.assertRaisesRegex(
-                    RuntimeError,
-                    "notification offline",
-                ):
-                    redeem_reward(1, reward["reward_id"], "retry-request")
+                redemption = redeem_reward(
+                    1,
+                    reward["reward_id"],
+                    "retry-request",
+                )
 
             redemption_count = get_db().execute(
                 "SELECT COUNT(*) AS count FROM redemptions"
@@ -316,15 +310,15 @@ class TestHandcraftRewards(unittest.TestCase):
                 WHERE transaction_type = 'spend'
                 """
             ).fetchone()["count"]
+            from app.handcraft_inheritance.outbox import (
+                retry_pending_handcraft_notifications,
+            )
+
             with patch(
-                "app.handcraft_inheritance.rewards."
+                "app.handcraft_inheritance.outbox."
                 "emit_redemption_succeeded"
             ) as emit:
-                retried = redeem_reward(
-                    1,
-                    reward["reward_id"],
-                    "retry-request",
-                )
+                retry = retry_pending_handcraft_notifications()
             retry_spend_count = get_db().execute(
                 """
                 SELECT COUNT(*) AS count
@@ -336,7 +330,8 @@ class TestHandcraftRewards(unittest.TestCase):
         self.assertEqual(redemption_count, 1)
         self.assertEqual(spend_count, 1)
         self.assertEqual(retry_spend_count, 1)
-        self.assertEqual(retried["status"], "pending")
+        self.assertEqual(redemption["status"], "pending")
+        self.assertEqual(retry["sent"], 1)
         emit.assert_called_once()
 
     def test_concurrent_redeem_of_last_stock_conflict_is_atomic(self):
@@ -369,7 +364,7 @@ class TestHandcraftRewards(unittest.TestCase):
             "app.handcraft_inheritance.presets.PLACEHOLDER_REWARDS",
             one_stock_rewards,
         ), patch(
-            "app.handcraft_inheritance.rewards."
+            "app.handcraft_inheritance.outbox."
             "emit_redemption_succeeded"
         ):
             with ThreadPoolExecutor(max_workers=2) as executor:

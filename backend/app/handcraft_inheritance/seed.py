@@ -3,6 +3,9 @@ from __future__ import annotations
 import sqlite3
 
 from app.handcraft_inheritance.presets import PLACEHOLDER_VIDEOS
+from app.handcraft_inheritance.providers import (
+    normalize_video_review_status,
+)
 
 
 def seed_handcraft_fixtures(connection: sqlite3.Connection) -> None:
@@ -22,7 +25,7 @@ def seed_handcraft_fixtures(connection: sqlite3.Connection) -> None:
                 video["video_id"],
                 video["craft_key"],
                 video["title"],
-                video["review_status"],
+                normalize_video_review_status(video["review_status"]),
                 1 if video["source_available"] else 0,
                 video["media_url"],
                 video["version"],

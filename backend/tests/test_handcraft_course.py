@@ -13,6 +13,7 @@ from app.agri_skills.errors import (
 )
 from app.agri_skills.providers import set_course_provider
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import heartbeat
 from app.handcraft_inheritance.course_learning import (
     list_handcraft_course_quiz_attempts,
     list_handcraft_courses,
@@ -21,6 +22,37 @@ from app.handcraft_inheritance.course_learning import (
     submit_handcraft_course_quiz,
     update_handcraft_course_progress,
 )
+
+
+def active_course_segment(
+    user_id: int,
+    course_id: int,
+    seconds: int,
+    *,
+    start_epoch: float = 1000,
+) -> str:
+    source_key = f"handcraft-course:{course_id}"
+    current = heartbeat(
+        user_id,
+        "course",
+        source_key,
+        heartbeat_seq=0,
+        now_epoch=start_epoch,
+    )
+    elapsed = 0
+    sequence = 1
+    while elapsed < seconds:
+        elapsed += min(30, seconds - elapsed)
+        current = heartbeat(
+            user_id,
+            "course",
+            source_key,
+            segment_id=current["segment_id"],
+            heartbeat_seq=sequence,
+            now_epoch=start_epoch + elapsed,
+        )
+        sequence += 1
+    return str(current["segment_id"])
 
 
 class DirectionAwareCourseProvider:
@@ -396,11 +428,16 @@ class TestHandcraftCourseLearning(unittest.TestCase):
 
     def test_lower_duplicate_and_out_of_order_do_not_regress(self):
         with self.app.app_context():
+            segment_id = active_course_segment(
+                self.student_id,
+                201,
+                80,
+            )
             first = update_handcraft_course_progress(
                 self.student_id,
                 201,
                 80,
-                80,
+                segment_id,
             )
             lower = update_handcraft_course_progress(
                 self.student_id,
@@ -437,13 +474,13 @@ class TestHandcraftCourseLearning(unittest.TestCase):
         self.assertEqual(out_of_order["watched_seconds"], 80)
         self.assertEqual(out_of_order["completed_at"], first["completed_at"])
 
-    def test_invalid_progress_is_rejected_without_mutation(self):
+    def test_invalid_position_is_rejected_and_client_duration_is_ignored(self):
         with self.app.app_context():
             update_handcraft_course_progress(
                 self.student_id,
                 201,
                 60,
-                30,
+                0,
             )
             before = get_db().execute(
                 """
@@ -457,9 +494,7 @@ class TestHandcraftCourseLearning(unittest.TestCase):
             invalid_cases = (
                 (-1, 0),
                 (101, 0),
-                (50, -1),
                 (True, 0),
-                (50, True),
             )
             for position, watched_delta in invalid_cases:
                 with self.subTest(
@@ -474,6 +509,20 @@ class TestHandcraftCourseLearning(unittest.TestCase):
                             watched_delta,
                         )
 
+            for watched_delta in (-1, True):
+                with self.subTest(watched_delta=watched_delta):
+                    spoofed = update_handcraft_course_progress(
+                        self.student_id,
+                        201,
+                        50,
+                        watched_delta,
+                    )
+                    self.assertEqual(
+                        spoofed["resume_position_seconds"],
+                        50,
+                    )
+                    self.assertEqual(spoofed["watched_seconds"], 0)
+
             after = get_db().execute(
                 """
                 SELECT *
@@ -483,7 +532,10 @@ class TestHandcraftCourseLearning(unittest.TestCase):
                 (self.student_id, 201),
             ).fetchone()
 
-        self.assertEqual(dict(after), dict(before))
+        self.assertEqual(after["furthest_position_seconds"], 60)
+        self.assertEqual(after["resume_position_seconds"], 50)
+        self.assertEqual(after["watched_seconds"], 0)
+        self.assertEqual(after["progress_percent"], 60)
 
     def test_quiz_requires_completion_and_valid_enabled_provider_config(self):
         invalid_quizzes = (

@@ -5,6 +5,7 @@ from copy import deepcopy
 
 from app.agri_skills.errors import AgriValidationError
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import claim_active_seconds
 from app.handcraft_inheritance.points import record_duration_points
 from app.handcraft_inheritance.providers import get_craft_preset_provider
 from app.handcraft_inheritance.outcomes import (
@@ -342,9 +343,15 @@ def complete_craft_step(
     user_id: int,
     craft_key: str,
     step_no: int,
-    active_seconds: int,
-    event_id: str,
+    active_seconds: object = None,
+    event_id: object = None,
+    *,
+    segment_id: object = None,
 ) -> dict:
+    if segment_id is None and isinstance(active_seconds, str):
+        segment_id = active_seconds
+    # Legacy duration/event arguments are intentionally ignored.
+    del event_id
     user_id = _require_positive_int(user_id, "学员标识必须是正整数")
     if (
         not isinstance(step_no, int)
@@ -352,17 +359,6 @@ def complete_craft_step(
         or not 1 <= step_no <= REQUIRED_STEP_COUNT
     ):
         raise AgriValidationError("步骤编号必须是 1 到 6 的整数")
-    if (
-        not isinstance(active_seconds, int)
-        or isinstance(active_seconds, bool)
-        or active_seconds < 0
-    ):
-        raise AgriValidationError("学习时长必须是非负整数")
-    if active_seconds > 7200:
-        raise AgriValidationError("单次学习段不能超过 120 分钟")
-    if not isinstance(event_id, str) or not event_id.strip():
-        raise AgriValidationError("学习事件标识不能为空")
-
     craft = get_craft(craft_key)
     if not craft["available"]:
         return _progress_result(
@@ -454,10 +450,21 @@ def complete_craft_step(
             step_no=step_no,
         )
 
+    active_seconds = claim_active_seconds(
+        user_id,
+        "craft",
+        craft["craft_key"],
+        segment_id,
+        close_segment=True,
+    )
+    if active_seconds <= 0:
+        return result
+
+    normalized_segment_id = str(segment_id).strip()
     source_event_id = _points_source_event_id(
         craft["craft_key"],
         step_no,
-        event_id,
+        f"segment-{normalized_segment_id}",
     )
     result["points_source_event_id"] = source_event_id
     try:
@@ -467,7 +474,7 @@ def complete_craft_step(
             craft["craft_key"],
             active_seconds,
             now,
-            f"{step_no}:{event_id.strip()}",
+            f"{step_no}:segment-{normalized_segment_id}",
         )
         result["points_event"] = points_event
         result["points_status"] = points_event["status"]

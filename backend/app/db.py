@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS courses (
     ),
     status TEXT NOT NULL CHECK (status IN ('draft', 'pending', 'published', 'offline')),
     duration_seconds INTEGER,
+    media_url TEXT,
     published_at TEXT,
     summary TEXT NOT NULL DEFAULT '',
     teacher_name TEXT NOT NULL DEFAULT '',
@@ -404,6 +405,37 @@ CREATE TABLE IF NOT EXISTS heritage_craft_progress (
     PRIMARY KEY (user_id, craft_key)
 );
 
+CREATE TABLE IF NOT EXISTS handcraft_active_learning_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    source_type TEXT NOT NULL CHECK (
+        source_type IN ('craft', 'ar', 'course')
+    ),
+    source_key TEXT NOT NULL,
+    segment_no INTEGER NOT NULL CHECK (segment_no > 0),
+    started_at TEXT NOT NULL,
+    last_heartbeat_at TEXT NOT NULL,
+    last_heartbeat_epoch REAL NOT NULL,
+    last_heartbeat_seq INTEGER NOT NULL DEFAULT 0 CHECK (
+        last_heartbeat_seq >= 0
+    ),
+    accumulated_seconds INTEGER NOT NULL DEFAULT 0 CHECK (
+        accumulated_seconds BETWEEN 0 AND 7200
+    ),
+    settled_seconds INTEGER NOT NULL DEFAULT 0 CHECK (
+        settled_seconds BETWEEN 0 AND accumulated_seconds
+    ),
+    closed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (user_id, source_type, source_key, segment_no)
+);
+
+CREATE INDEX IF NOT EXISTS idx_active_learning_source
+    ON handcraft_active_learning_sessions(
+        user_id, source_type, source_key, id DESC
+    );
+
 CREATE TABLE IF NOT EXISTS heritage_videos (
     video_id TEXT PRIMARY KEY,
     craft_key TEXT NOT NULL,
@@ -635,6 +667,28 @@ CREATE TABLE IF NOT EXISTS fulfillment_notification_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_fulfillment_outbox_pending
     ON fulfillment_notification_outbox(status, created_at, id);
+
+CREATE TABLE IF NOT EXISTS handcraft_notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL CHECK (
+        event_type IN (
+            'redemption_succeeded', 'review_approved', 'review_rejected'
+        )
+    ),
+    event_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'sent')
+    ),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    sent_at TEXT,
+    UNIQUE (event_type, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_handcraft_notification_outbox_pending
+    ON handcraft_notification_outbox(status, created_at, id);
 """
 
 
@@ -660,6 +714,12 @@ def _ensure_course_duration_column(db: sqlite3.Connection) -> None:
             WHERE duration_seconds IS NULL
             """
         )
+
+
+def _ensure_course_media_url_column(db: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(courses)")}
+    if "media_url" not in columns:
+        db.execute("ALTER TABLE courses ADD COLUMN media_url TEXT")
 
 
 def _ensure_points_consumed_units_column(
@@ -691,6 +751,7 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
     _ensure_course_duration_column(db)
+    _ensure_course_media_url_column(db)
     _ensure_points_consumed_units_column(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)

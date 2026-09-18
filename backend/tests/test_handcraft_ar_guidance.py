@@ -8,6 +8,36 @@ from app import create_app
 from app.agri_skills.ai_client import set_ai_client
 from app.agri_skills.errors import AgriValidationError, AiUnavailableError
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import heartbeat
+
+
+def active_ar_segment(
+    user_id: int,
+    seconds: int,
+    *,
+    start_epoch: float = 1000,
+) -> str:
+    current = heartbeat(
+        user_id,
+        "ar",
+        "guangxiu",
+        heartbeat_seq=0,
+        now_epoch=start_epoch,
+    )
+    elapsed = 0
+    sequence = 1
+    while elapsed < seconds:
+        elapsed += min(30, seconds - elapsed)
+        current = heartbeat(
+            user_id,
+            "ar",
+            "guangxiu",
+            segment_id=current["segment_id"],
+            heartbeat_seq=sequence,
+            now_epoch=start_epoch + elapsed,
+        )
+        sequence += 1
+    return str(current["segment_id"])
 
 
 class FakeAiClient:
@@ -315,12 +345,12 @@ class TestHandcraftArGuidance(unittest.TestCase):
                 "record_duration_points",
                 return_value={"status": "processed"},
             ) as record:
+                segment_id = active_ar_segment(1, 600)
                 generate_ar_guidance(
                     1,
                     "guangxiu",
                     "绣制花瓣",
-                    active_seconds=600,
-                    event_id="ar-session-1",
+                    segment_id,
                 )
 
         record.assert_called_once()
@@ -328,7 +358,7 @@ class TestHandcraftArGuidance(unittest.TestCase):
         self.assertEqual(args[:4], (1, "handcraft", "guangxiu", 600))
         self.assertIsInstance(args[4], str)
         self.assertTrue(args[4].strip())
-        self.assertEqual(args[5], "ar-session-1")
+        self.assertEqual(args[5], f"ar:segment-{segment_id}")
 
     def test_success_persists_one_points_event_and_failure_writes_none(self):
         valid_response = {
@@ -351,12 +381,12 @@ class TestHandcraftArGuidance(unittest.TestCase):
             )
 
             set_ai_client(self.app, FakeAiClient(valid_response))
+            segment_id = active_ar_segment(1, 600)
             generate_ar_guidance(
                 1,
                 "guangxiu",
                 "绣制花瓣",
-                active_seconds=600,
-                event_id="ar-session-1",
+                segment_id,
             )
             rows = [
                 dict(row)
@@ -376,8 +406,8 @@ class TestHandcraftArGuidance(unittest.TestCase):
                     1,
                     "guangxiu",
                     "绣制花瓣",
-                    active_seconds=600,
-                    event_id="failed-generation",
+                    7200,
+                    "spoofed-failed-generation",
                 )
             event_count = get_db().execute(
                 "SELECT COUNT(*) AS count FROM points_event_inbox"
@@ -386,7 +416,10 @@ class TestHandcraftArGuidance(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["source_module"], "handcraft")
         self.assertEqual(rows[0]["event_type"], "duration")
-        self.assertEqual(rows[0]["source_event_id"], "guangxiu|ar-session-1")
+        self.assertEqual(
+            rows[0]["source_event_id"],
+            f"guangxiu|ar:segment-{segment_id}",
+        )
         self.assertEqual(rows[0]["duration_seconds"], 600)
         self.assertEqual(rows[0]["status"], "processed")
         self.assertEqual(event_count, 1)
@@ -412,13 +445,13 @@ class TestHandcraftArGuidance(unittest.TestCase):
                 generate_ar_guidance,
             )
 
+            segment_id = active_ar_segment(1, 600)
             for _ in range(2):
                 generate_ar_guidance(
                     1,
                     "guangxiu",
                     "绣制花瓣",
-                    active_seconds=600,
-                    event_id="same-ar-session",
+                    segment_id,
                 )
             rows = [
                 dict(row)
@@ -435,14 +468,27 @@ class TestHandcraftArGuidance(unittest.TestCase):
             [
                 {
                     "event_type": "duration",
-                    "source_event_id": "guangxiu|same-ar-session",
+                    "source_event_id": f"guangxiu|ar:segment-{segment_id}",
                     "duration_seconds": 600,
                 }
             ],
         )
 
-    def test_invalid_active_time_arguments_do_not_call_ai_or_record_points(self):
-        client = FakeAiClient({"craft_key": "guangxiu"})
+    def test_client_duration_is_ignored_without_a_server_segment(self):
+        response = {
+            "craft_key": "guangxiu",
+            "tool_preparation": ["绣线"],
+            "operating_points": ["先定位"],
+            "common_errors": ["针脚不匀"],
+            "steps": [
+                {
+                    "step_no": 1,
+                    "title": "起针",
+                    "instruction": "从背面起针",
+                }
+            ],
+        }
+        client = FakeAiClient(response)
         set_ai_client(self.app, client)
 
         with self.app.app_context():
@@ -468,17 +514,17 @@ class TestHandcraftArGuidance(unittest.TestCase):
                         "app.handcraft_inheritance.ar_guidance."
                         "record_duration_points"
                     ) as record:
-                        with self.assertRaises(AgriValidationError):
-                            generate_ar_guidance(
-                                1,
-                                "guangxiu",
-                                "绣制花瓣",
-                                active_seconds=active_seconds,
-                                event_id=event_id,
-                            )
+                        result = generate_ar_guidance(
+                            1,
+                            "guangxiu",
+                            "绣制花瓣",
+                            active_seconds=active_seconds,
+                            event_id=event_id,
+                        )
+                        self.assertEqual(result["craft_key"], "guangxiu")
                         record.assert_not_called()
 
-        self.assertEqual(client.calls, [])
+        self.assertEqual(len(client.calls), len(cases))
 
     def test_points_record_failure_warns_without_blocking_or_leaking_context(self):
         response = {
@@ -501,6 +547,7 @@ class TestHandcraftArGuidance(unittest.TestCase):
                 generate_ar_guidance,
             )
 
+            segment_id = active_ar_segment(1, 600)
             with patch(
                 "app.handcraft_inheritance.ar_guidance."
                 "record_duration_points",
@@ -515,8 +562,7 @@ class TestHandcraftArGuidance(unittest.TestCase):
                     1,
                     "guangxiu",
                     "绣制花瓣",
-                    active_seconds=600,
-                    event_id="ar-sensitive",
+                    segment_id,
                 )
 
         self.assertEqual(result["craft_key"], "guangxiu")
@@ -553,6 +599,7 @@ class TestHandcraftArGuidance(unittest.TestCase):
                 generate_ar_guidance,
             )
 
+            segment_id = active_ar_segment(1, 600)
             with patch(
                 "app.handcraft_inheritance.ar_guidance."
                 "record_duration_points",
@@ -568,8 +615,7 @@ class TestHandcraftArGuidance(unittest.TestCase):
                     1,
                     "guangxiu",
                     "绣制花瓣",
-                    active_seconds=600,
-                    event_id="ar-sensitive",
+                    segment_id,
                 )
 
         self.assertEqual(result["craft_key"], "guangxiu")

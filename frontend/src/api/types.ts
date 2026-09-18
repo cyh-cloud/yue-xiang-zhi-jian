@@ -306,9 +306,20 @@ export interface AgriculturalCourse {
   published_at: string
   tag_ids: number[]
   duration_seconds: number | null
+  media_url?: string | null
   direction?: string
   status?: string | null
   interest_match?: boolean
+}
+
+export interface ActiveLearningHeartbeat {
+  segment_id: string
+  heartbeat_seq: number
+  active_seconds: number
+  settled_seconds?: number
+  closed?: boolean
+  restarted: boolean
+  duplicate?: boolean
 }
 
 export interface CourseProgress {

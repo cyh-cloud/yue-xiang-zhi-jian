@@ -316,7 +316,9 @@ describe('HandcraftInheritanceResponsive', () => {
       .filter(([path]) => path === '/api/handcraft-inheritance/ar-guidance')
       .map(([, options]) => JSON.parse(String(options?.body)))
     expect(guidanceRequests).toBe(2)
-    expect(guidanceBodies[1].event_id).toBe(guidanceBodies[0].event_id)
+    expect(guidanceBodies[1].segment_id).toBe(
+      guidanceBodies[0].segment_id
+    )
     expect(guidanceBodies[1].project_label).toBe('绣制花瓣')
     expect(wrapper.get('[data-test="ar-output"]').text()).toContain('起针')
     expect(projectLabel.element.value).toBe('绣制花瓣')

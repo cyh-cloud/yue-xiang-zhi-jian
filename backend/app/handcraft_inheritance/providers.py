@@ -84,6 +84,11 @@ class UnavailablePointsPolicyProvider:
         return None
 
 
+def normalize_video_review_status(value: object) -> str:
+    normalized = str(value or "").strip()
+    return "approved" if normalized == "published" else normalized
+
+
 def set_craft_preset_provider(
     app: Flask,
     provider: CraftPresetProvider,

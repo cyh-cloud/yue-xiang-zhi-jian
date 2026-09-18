@@ -7,6 +7,7 @@ from unittest.mock import patch
 from app import create_app
 from app.agri_skills.errors import AgriValidationError
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import heartbeat
 from app.handcraft_inheritance.crafts import (
     complete_craft_step,
     get_craft,
@@ -19,6 +20,36 @@ from app.handcraft_inheritance.providers import (
     EmptyCraftPresetProvider,
     set_craft_preset_provider,
 )
+
+
+def active_segment(
+    user_id: int,
+    source_key: str,
+    seconds: int,
+    *,
+    start_epoch: float = 1000,
+) -> str:
+    current = heartbeat(
+        user_id,
+        "craft",
+        source_key,
+        heartbeat_seq=0,
+        now_epoch=start_epoch,
+    )
+    elapsed = 0
+    sequence = 1
+    while elapsed < seconds:
+        elapsed += min(30, seconds - elapsed)
+        current = heartbeat(
+            user_id,
+            "craft",
+            source_key,
+            segment_id=current["segment_id"],
+            heartbeat_seq=sequence,
+            now_epoch=start_epoch + elapsed,
+        )
+        sequence += 1
+    return str(current["segment_id"])
 
 
 class StaticCraftPresetProvider:
@@ -238,18 +269,17 @@ class TestHandcraftCrafts(unittest.TestCase):
         self.assertIsNone(final["resume_step_no"])
         self.assertTrue(final["is_completed"])
 
-    def test_invalid_step_and_active_duration_do_not_change_progress(self):
+    def test_invalid_step_does_not_change_progress_and_client_duration_is_ignored(self):
         with self.app.app_context():
-            for active_seconds in (-1, True, 7201):
-                with self.subTest(active_seconds=active_seconds):
-                    with self.assertRaises(AgriValidationError):
-                        complete_craft_step(
-                            1,
-                            "guangxiu",
-                            1,
-                            active_seconds,
-                            f"invalid-duration-{active_seconds}",
-                        )
+            ignored = complete_craft_step(
+                1,
+                "guangxiu",
+                1,
+                7201,
+                "spoof-duration",
+            )
+            self.assertTrue(ignored["accepted"])
+            self.assertEqual(ignored["points_status"], "not_enqueued")
             for step_no in (0, 7, True):
                 with self.subTest(step_no=step_no):
                     with self.assertRaises(AgriValidationError):
@@ -265,31 +295,30 @@ class TestHandcraftCrafts(unittest.TestCase):
                 "SELECT COUNT(*) AS count FROM points_event_inbox"
             ).fetchone()["count"]
 
-        self.assertEqual(progress["completed_steps"], [])
+        self.assertEqual(progress["completed_steps"], [1])
         self.assertEqual(event_count, 0)
 
     def test_each_legal_step_records_one_processed_duration_event(self):
         with self.app.app_context():
+            first_segment = active_segment(1, "guangxiu", 600)
             first = complete_craft_step(
                 1,
                 "guangxiu",
                 1,
-                600,
-                "craft-event-1",
+                first_segment,
             )
+            second_segment = active_segment(1, "guangxiu", 300, start_epoch=3000)
             second = complete_craft_step(
                 1,
                 "guangxiu",
                 2,
-                300,
-                "craft-event-2",
+                second_segment,
             )
             repeated = complete_craft_step(
                 1,
                 "guangxiu",
                 1,
-                600,
-                "craft-event-1-repeat",
+                first_segment,
             )
             rows = [
                 dict(row)
@@ -308,8 +337,8 @@ class TestHandcraftCrafts(unittest.TestCase):
         self.assertEqual(
             [row["source_event_id"] for row in rows],
             [
-                "guangxiu|1:craft-event-1",
-                "guangxiu|2:craft-event-2",
+                f"guangxiu|1:segment-{first_segment}",
+                f"guangxiu|2:segment-{second_segment}",
             ],
         )
         self.assertEqual(
@@ -327,33 +356,42 @@ class TestHandcraftCrafts(unittest.TestCase):
 
     def test_event_id_is_scoped_by_craft_and_step(self):
         with self.app.app_context():
+            guangxiu_first_segment = active_segment(1, "guangxiu", 600)
             guangxiu_first = complete_craft_step(
                 1,
                 "guangxiu",
                 1,
-                600,
-                "shared-event",
+                guangxiu_first_segment,
+            )
+            woodcarving_segment = active_segment(
+                1,
+                "chaoshan-woodcarving",
+                300,
+                start_epoch=3000,
             )
             woodcarving_first = complete_craft_step(
                 1,
                 "chaoshan-woodcarving",
                 1,
+                woodcarving_segment,
+            )
+            guangxiu_second_segment = active_segment(
+                1,
+                "guangxiu",
                 300,
-                "shared-event",
+                start_epoch=6000,
             )
             guangxiu_second = complete_craft_step(
                 1,
                 "guangxiu",
                 2,
-                300,
-                "shared-event",
+                guangxiu_second_segment,
             )
             repeated = complete_craft_step(
                 1,
                 "guangxiu",
                 1,
-                600,
-                "shared-event",
+                guangxiu_first_segment,
             )
             source_event_ids = [
                 row["source_event_id"]
@@ -369,22 +407,25 @@ class TestHandcraftCrafts(unittest.TestCase):
         self.assertEqual(
             source_event_ids,
             [
-                "guangxiu|1:shared-event",
-                "chaoshan-woodcarving|1:shared-event",
-                "guangxiu|2:shared-event",
+                f"guangxiu|1:segment-{guangxiu_first_segment}",
+                (
+                    "chaoshan-woodcarving|1:"
+                    f"segment-{woodcarving_segment}"
+                ),
+                f"guangxiu|2:segment-{guangxiu_second_segment}",
             ],
         )
         self.assertEqual(
             guangxiu_first["points_source_event_id"],
-            "guangxiu|1:shared-event",
+            f"guangxiu|1:segment-{guangxiu_first_segment}",
         )
         self.assertEqual(
             woodcarving_first["points_source_event_id"],
-            "chaoshan-woodcarving|1:shared-event",
+            f"chaoshan-woodcarving|1:segment-{woodcarving_segment}",
         )
         self.assertEqual(
             guangxiu_second["points_source_event_id"],
-            "guangxiu|2:shared-event",
+            f"guangxiu|2:segment-{guangxiu_second_segment}",
         )
         self.assertEqual(repeated["status"], "already_completed")
         self.assertEqual(len(source_event_ids), 3)
@@ -460,6 +501,7 @@ class TestHandcraftCrafts(unittest.TestCase):
 
     def test_points_recording_failure_does_not_rollback_progress(self):
         with self.app.app_context():
+            segment_id = active_segment(1, "guangxiu", 600)
             with patch(
                 "app.handcraft_inheritance.crafts.record_duration_points",
                 side_effect=RuntimeError("points unavailable"),
@@ -468,8 +510,7 @@ class TestHandcraftCrafts(unittest.TestCase):
                     1,
                     "guangxiu",
                     1,
-                    600,
-                    "craft-event-failure",
+                    segment_id,
                 )
             progress = get_craft_progress(1, "guangxiu")
             event_count = get_db().execute(

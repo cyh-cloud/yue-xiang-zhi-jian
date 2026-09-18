@@ -28,6 +28,7 @@ from app.ecommerce_training.simulation import (
     score_simulation,
     start_simulation,
 )
+from app.handcraft_inheritance.active_learning import heartbeat
 from app.handcraft_inheritance.ar_guidance import generate_ar_guidance
 from app.handcraft_inheritance.course_learning import (
     update_handcraft_course_progress,
@@ -40,6 +41,37 @@ from app.handcraft_inheritance.points import (
 from app.handcraft_inheritance.presets import PlaceholderPointsPolicyProvider
 from app.handcraft_inheritance.providers import set_points_policy_provider
 from app.session_manager import utc_now_iso
+
+
+def active_segment(
+    user_id: int,
+    source_type: str,
+    source_key: str,
+    seconds: int,
+    *,
+    start_epoch: float = 1000,
+) -> str:
+    current = heartbeat(
+        user_id,
+        source_type,
+        source_key,
+        heartbeat_seq=0,
+        now_epoch=start_epoch,
+    )
+    elapsed = 0
+    sequence = 1
+    while elapsed < seconds:
+        elapsed += min(30, seconds - elapsed)
+        current = heartbeat(
+            user_id,
+            source_type,
+            source_key,
+            segment_id=current["segment_id"],
+            heartbeat_seq=sequence,
+            now_epoch=start_epoch + elapsed,
+        )
+        sequence += 1
+    return str(current["segment_id"])
 
 
 AR_GUIDANCE = {
@@ -383,28 +415,46 @@ class TestHandcraftPointsIntegration(unittest.TestCase):
 
     def test_successful_005_and_004_records_are_written_then_credited(self):
         with self.app.app_context():
+            craft_segment = active_segment(
+                self.student_id,
+                "craft",
+                "guangxiu",
+                600,
+            )
             complete_craft_step(
                 self.student_id,
                 "guangxiu",
                 1,
-                600,
-                "craft-success",
+                craft_segment,
             )
 
             self.ai.complete_json.return_value = AR_GUIDANCE
+            ar_segment = active_segment(
+                self.student_id,
+                "ar",
+                "guangxiu",
+                600,
+                start_epoch=3000,
+            )
             generate_ar_guidance(
                 self.student_id,
                 "guangxiu",
                 "practice",
-                active_seconds=600,
-                event_id="ar-session-1",
+                ar_segment,
             )
 
+            course_segment = active_segment(
+                self.student_id,
+                "course",
+                "handcraft-course:201",
+                600,
+                start_epoch=6000,
+            )
             update_handcraft_course_progress(
                 self.student_id,
                 201,
                 600,
-                600,
+                course_segment,
             )
 
             self.ai.complete_json.return_value = LIVE_SCRIPT
@@ -440,9 +490,24 @@ class TestHandcraftPointsIntegration(unittest.TestCase):
                 for row in inbox
             },
             {
-                ("handcraft", "duration", "guangxiu|1:craft-success"),
-                ("handcraft", "duration", "guangxiu|ar-session-1"),
-                ("handcraft", "duration", "handcraft-course:201|600"),
+                (
+                    "handcraft",
+                    "duration",
+                    f"guangxiu|1:segment-{craft_segment}",
+                ),
+                (
+                    "handcraft",
+                    "duration",
+                    f"guangxiu|ar:segment-{ar_segment}",
+                ),
+                (
+                    "handcraft",
+                    "duration",
+                    (
+                        f"handcraft-course:201|segment-{course_segment}:"
+                        "settled-600"
+                    ),
+                ),
                 (
                     "ecommerce",
                     "live_script",
@@ -724,15 +789,21 @@ class TestHandcraftPointsIntegration(unittest.TestCase):
         set_course_provider(self.app, provider)
 
         with self.app.app_context():
+            segment_id = active_segment(
+                self.student_id,
+                "course",
+                "handcraft-course:201",
+                7200,
+            )
             progress = update_handcraft_course_progress(
                 self.student_id,
                 201,
                 9000,
-                9000,
+                segment_id,
             )
             inbox, ledger, account = self._points_state()
 
-        self.assertEqual(progress["watched_seconds"], 9000)
+        self.assertEqual(progress["watched_seconds"], 7200)
         self.assertEqual(len(inbox), 1)
         self.assertEqual(inbox[0]["status"], "processed")
         self.assertEqual(inbox[0]["duration_seconds"], 7200)

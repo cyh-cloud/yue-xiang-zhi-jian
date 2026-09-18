@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type {
+  ActiveLearningHeartbeat,
   HandcraftArGuidance,
   HandcraftCraft,
   HandcraftProgress,
@@ -108,8 +109,7 @@ export const useHandcraftInheritanceStore = defineStore(
       async completeStep(
         craftKey: string,
         stepNo: number,
-        activeSeconds: number,
-        eventId: string
+        segmentId: string | null
       ): Promise<boolean> {
         this.completingStep = true
         this.error = ''
@@ -123,8 +123,7 @@ export const useHandcraftInheritanceStore = defineStore(
             {
               method: 'POST',
               body: JSON.stringify({
-                active_seconds: activeSeconds,
-                event_id: eventId
+                segment_id: segmentId
               })
             }
           )
@@ -181,25 +180,20 @@ export const useHandcraftInheritanceStore = defineStore(
       async generateArGuidance(
         craftKey: string,
         projectLabel: string,
-        activeSeconds?: number,
-        eventId?: string
+        segmentId?: string | null
       ): Promise<boolean> {
         this.generatingGuidance = true
         this.error = ''
         const body: {
           craft_key: string
           project_label: string
-          active_seconds?: number
-          event_id?: string
+          segment_id?: string | null
         } = {
           craft_key: craftKey,
           project_label: projectLabel
         }
-        if (activeSeconds !== undefined) {
-          body.active_seconds = activeSeconds
-        }
-        if (eventId !== undefined) {
-          body.event_id = eventId
+        if (segmentId !== undefined) {
+          body.segment_id = segmentId
         }
         try {
           const response = await apiFetch<{
@@ -217,6 +211,44 @@ export const useHandcraftInheritanceStore = defineStore(
         } finally {
           this.generatingGuidance = false
         }
+      },
+      async heartbeatCraft(
+        craftKey: string,
+        payload: {
+          segment_id: string | null
+          heartbeat_seq: number
+        }
+      ): Promise<ActiveLearningHeartbeat> {
+        const response = await apiFetch<{
+          success: true
+          session: ActiveLearningHeartbeat
+        }>(
+          `${API_PREFIX}/crafts/${encodeURIComponent(craftKey)}/heartbeat`,
+          {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          }
+        )
+        return response.session
+      },
+      async heartbeatAr(
+        craftKey: string,
+        payload: {
+          segment_id: string | null
+          heartbeat_seq: number
+        }
+      ): Promise<ActiveLearningHeartbeat> {
+        const response = await apiFetch<{
+          success: true
+          session: ActiveLearningHeartbeat
+        }>(`${API_PREFIX}/ar-guidance/heartbeat`, {
+          method: 'POST',
+          body: JSON.stringify({
+            craft_key: craftKey,
+            ...payload
+          })
+        })
+        return response.session
       }
     }
   }

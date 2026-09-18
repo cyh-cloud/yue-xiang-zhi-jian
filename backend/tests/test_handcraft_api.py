@@ -11,6 +11,7 @@ from app.agri_skills.ai_client import set_ai_client
 from app.agri_skills.errors import AgriValidationError, AiUnavailableError
 from app.agri_skills.providers import set_course_provider
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import heartbeat
 from app.handcraft_inheritance import (
     record_training_points,
     set_points_policy_provider,
@@ -34,6 +35,11 @@ LEARNER_ROUTES = (
         {"active_seconds": 600, "event_id": "step-1"},
     ),
     (
+        "POST",
+        "/api/handcraft-inheritance/crafts/guangxiu/heartbeat",
+        {"heartbeat_seq": 0},
+    ),
+    (
         "GET",
         "/api/handcraft-inheritance/videos?craft_key=guangxiu",
         None,
@@ -47,6 +53,11 @@ LEARNER_ROUTES = (
             "active_seconds": 600,
             "event_id": "ar-1",
         },
+    ),
+    (
+        "POST",
+        "/api/handcraft-inheritance/ar-guidance/heartbeat",
+        {"craft_key": "guangxiu", "heartbeat_seq": 0},
     ),
     ("GET", "/api/handcraft-inheritance/points", None),
     ("GET", "/api/handcraft-inheritance/points/ledger", None),
@@ -78,6 +89,11 @@ LEARNER_ROUTES = (
         "PUT",
         "/api/handcraft-inheritance/courses/501/progress",
         {"position_seconds": 80, "watched_delta_seconds": 80},
+    ),
+    (
+        "POST",
+        "/api/handcraft-inheritance/courses/501/heartbeat",
+        {"heartbeat_seq": 0},
     ),
     (
         "GET",
@@ -300,6 +316,36 @@ class TestHandcraftApi(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         return client
 
+    def _active_segment(
+        self,
+        source_type: str,
+        source_key: str,
+        seconds: int,
+        *,
+        start_epoch: float = 1000,
+    ) -> int:
+        current = heartbeat(
+            self.student_id,
+            source_type,
+            source_key,
+            heartbeat_seq=0,
+            now_epoch=start_epoch,
+        )
+        elapsed = 0
+        sequence = 1
+        while elapsed < seconds:
+            elapsed += min(30, seconds - elapsed)
+            current = heartbeat(
+                self.student_id,
+                source_type,
+                source_key,
+                segment_id=current["segment_id"],
+                heartbeat_seq=sequence,
+                now_epoch=start_epoch + elapsed,
+            )
+            sequence += 1
+        return int(current["segment_id"])
+
     def _fund_student(
         self,
         user_id=None,
@@ -351,8 +397,15 @@ class TestHandcraftApi(unittest.TestCase):
                 "/api/handcraft-inheritance/crafts/<craft_key>/"
                 "steps/<int:step_no>/complete"
             ): {"POST"},
+            (
+                "/api/handcraft-inheritance/"
+                "crafts/<craft_key>/heartbeat"
+            ): {"POST"},
             "/api/handcraft-inheritance/videos": {"GET"},
             "/api/handcraft-inheritance/ar-guidance": {"POST"},
+            (
+                "/api/handcraft-inheritance/ar-guidance/heartbeat"
+            ): {"POST"},
             "/api/handcraft-inheritance/points": {"GET"},
             "/api/handcraft-inheritance/points/ledger": {"GET"},
             "/api/handcraft-inheritance/rewards": {"GET"},
@@ -370,6 +423,9 @@ class TestHandcraftApi(unittest.TestCase):
             (
                 "/api/handcraft-inheritance/courses/<int:course_id>/progress"
             ): {"GET", "PUT"},
+            (
+                "/api/handcraft-inheritance/courses/<int:course_id>/heartbeat"
+            ): {"POST"},
             (
                 "/api/handcraft-inheritance/courses/<int:course_id>/quiz"
             ): {"GET", "POST"},
@@ -412,6 +468,12 @@ class TestHandcraftApi(unittest.TestCase):
         initial = self.student_client.get(
             "/api/handcraft-inheritance/crafts/guangxiu/progress"
         )
+        with self.app.app_context():
+            segment_id = self._active_segment(
+                "craft",
+                "guangxiu",
+                600,
+            )
         completed = self.student_client.post(
             (
                 "/api/handcraft-inheritance/crafts/guangxiu/"
@@ -419,8 +481,7 @@ class TestHandcraftApi(unittest.TestCase):
             ),
             json={
                 "user_id": self.other_student_id,
-                "active_seconds": 600,
-                "event_id": "api-step-1",
+                "segment_id": segment_id,
             },
         )
 
@@ -500,7 +561,7 @@ class TestHandcraftApi(unittest.TestCase):
             dict(inbox),
             {
                 "user_id": self.student_id,
-                "source_event_id": "guangxiu|1:api-step-1",
+                "source_event_id": f"guangxiu|1:segment-{segment_id}",
                 "duration_seconds": 600,
             },
         )
@@ -508,14 +569,19 @@ class TestHandcraftApi(unittest.TestCase):
 
     def test_ar_route_records_server_duration_and_exact_ai_failure(self):
         self.ai.complete_json.return_value = AR_GUIDANCE
+        with self.app.app_context():
+            segment_id = self._active_segment(
+                "ar",
+                "guangxiu",
+                600,
+            )
         success = self.student_client.post(
             "/api/handcraft-inheritance/ar-guidance",
             json={
                 "user_id": self.other_student_id,
                 "craft_key": "guangxiu",
                 "project_label": "绣制花瓣",
-                "active_seconds": 600,
-                "event_id": "api-ar-1",
+                "segment_id": segment_id,
             },
         )
 
@@ -558,7 +624,7 @@ class TestHandcraftApi(unittest.TestCase):
             dict(inbox),
             {
                 "user_id": self.student_id,
-                "source_event_id": "guangxiu|api-ar-1",
+                "source_event_id": f"guangxiu|ar:segment-{segment_id}",
                 "duration_seconds": 600,
             },
         )
@@ -767,12 +833,18 @@ class TestHandcraftApi(unittest.TestCase):
         recommendations = self.student_client.get(
             "/api/handcraft-inheritance/recommendations"
         )
+        with self.app.app_context():
+            segment_id = self._active_segment(
+                "course",
+                "handcraft-course:501",
+                80,
+            )
         progress = self.student_client.put(
             "/api/handcraft-inheritance/courses/501/progress",
             json={
                 "user_id": self.other_student_id,
                 "position_seconds": 80,
-                "watched_delta_seconds": 80,
+                "segment_id": segment_id,
             },
         )
         quiz = self.student_client.get(
@@ -829,7 +901,9 @@ class TestHandcraftApi(unittest.TestCase):
             dict(inbox),
             {
                 "user_id": self.student_id,
-                "source_event_id": "handcraft-course:501|80",
+                "source_event_id": (
+                    f"handcraft-course:501|segment-{segment_id}:settled-80"
+                ),
             },
         )
         self.assertEqual(course_progress["user_id"], self.student_id)
@@ -933,9 +1007,9 @@ class TestHandcraftApi(unittest.TestCase):
         invalid = self.student_client.post(
             (
                 "/api/handcraft-inheritance/crafts/guangxiu/"
-                "steps/1/complete"
+                "steps/0/complete"
             ),
-            json={"active_seconds": -1, "event_id": "invalid"},
+            json={"segment_id": "invalid-step"},
         )
         self.assertEqual(invalid.status_code, 400)
         self.assertEqual(invalid.get_json()["success"], False)

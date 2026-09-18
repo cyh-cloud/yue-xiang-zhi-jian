@@ -14,6 +14,10 @@ from app.handcraft_inheritance.points import (
     get_points_account,
     spend_points_in_transaction,
 )
+from app.handcraft_inheritance.outbox import (
+    deliver_after_commit,
+    enqueue_handcraft_notification,
+)
 from app.handcraft_inheritance.providers import get_reward_catalog_provider
 
 
@@ -207,6 +211,18 @@ def _notification_payload(user_id: int, redemption: dict) -> dict:
     }
 
 
+def _enqueue_redemption_notification(
+    db,
+    user_id: int,
+    redemption: dict,
+) -> int:
+    return enqueue_handcraft_notification(
+        db,
+        event_type="redemption_succeeded",
+        payload=_notification_payload(user_id, redemption),
+    )
+
+
 def redeem_reward(
     user_id: int,
     reward_id: str,
@@ -218,7 +234,15 @@ def redeem_reward(
     db = _get_db()
     existing = _existing_redemption(db, user_id, request_id)
     if existing is not None:
-        emit_redemption_succeeded(**_notification_payload(user_id, existing))
+        with db:
+            db.execute("BEGIN IMMEDIATE")
+            existing = _existing_redemption(db, user_id, request_id)
+            outbox_id = _enqueue_redemption_notification(
+                db,
+                user_id,
+                existing,
+            )
+        deliver_after_commit(outbox_id)
         return existing
 
     get_effective_policy()
@@ -326,7 +350,11 @@ def redeem_reward(
                     REDEMPTION_CONFLICT_MESSAGE
                 ) from error
 
-        notification = _notification_payload(user_id, redemption)
+        outbox_id = _enqueue_redemption_notification(
+            db,
+            user_id,
+            redemption,
+        )
 
-    emit_redemption_succeeded(**notification)
+    deliver_after_commit(outbox_id)
     return redemption

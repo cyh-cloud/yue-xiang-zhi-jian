@@ -11,6 +11,7 @@ from app.agri_skills.errors import (
     AiUnavailableError,
 )
 from app.db import get_db
+from app.handcraft_inheritance.active_learning import heartbeat as _heartbeat
 from app.handcraft_inheritance.ar_guidance import (
     generate_ar_guidance as _generate_ar_guidance,
 )
@@ -43,6 +44,10 @@ from app.handcraft_inheritance.points import (
     get_points_ledger as _get_points_ledger,
     process_pending_events as _process_pending_events,
     run_expiry_settlement as _run_expiry_settlement,
+)
+from app.handcraft_inheritance.outbox import (
+    retry_pending_handcraft_notifications as
+    _retry_pending_handcraft_notifications,
 )
 from app.handcraft_inheritance.rewards import (
     REDEMPTION_CONFLICT_MESSAGE,
@@ -89,6 +94,17 @@ def _json_object_payload() -> dict:
             details={"body": "请求体必须是 JSON 对象"},
         )
     return payload
+
+
+def _heartbeat_session(source_type: str, source_key: str) -> dict:
+    payload = _json_object_payload()
+    return _heartbeat(
+        int(_student_session()["id"]),
+        source_type,
+        source_key,
+        segment_id=payload.get("segment_id"),
+        heartbeat_seq=payload.get("heartbeat_seq", 0),
+    )
 
 
 def _handle_validation(error: AgriValidationError):
@@ -154,9 +170,19 @@ def complete_craft_step_route(craft_key: str, step_no: int):
             int(session["id"]),
             craft_key,
             step_no,
-            payload.get("active_seconds"),
-            payload.get("event_id"),
+            segment_id=payload.get("segment_id"),
         ),
+    )
+
+
+@handcraft_inheritance_bp.post("/crafts/<craft_key>/heartbeat")
+def craft_heartbeat_route(craft_key: str):
+    craft = _get_craft(craft_key)
+    if not craft["available"]:
+        raise AgriValidationError("请选择有效技艺")
+    return jsonify(
+        success=True,
+        session=_heartbeat_session("craft", craft["craft_key"]),
     )
 
 
@@ -176,15 +202,29 @@ def list_student_videos_route():
 def generate_ar_guidance_route():
     session = _student_session()
     payload = _json_object_payload()
+    craft = _get_craft(payload.get("craft_key"))
+    if not craft["available"]:
+        raise AgriValidationError("请选择有效技艺")
     return jsonify(
         success=True,
         guidance=_generate_ar_guidance(
             int(session["id"]),
-            payload.get("craft_key"),
+            craft["craft_key"],
             payload.get("project_label"),
-            payload.get("active_seconds"),
-            payload.get("event_id"),
+            segment_id=payload.get("segment_id"),
         ),
+    )
+
+
+@handcraft_inheritance_bp.post("/ar-guidance/heartbeat")
+def ar_heartbeat_route():
+    payload = _json_object_payload()
+    craft = _get_craft(payload.get("craft_key"))
+    if not craft["available"]:
+        raise AgriValidationError("请选择有效技艺")
+    return jsonify(
+        success=True,
+        session=_heartbeat_session("ar", craft["craft_key"]),
     )
 
 
@@ -337,7 +377,22 @@ def update_handcraft_course_progress_route(course_id: int):
             int(session["id"]),
             course_id,
             payload.get("position_seconds"),
-            payload.get("watched_delta_seconds", 0),
+            segment_id=payload.get("segment_id"),
+        ),
+    )
+
+
+@handcraft_inheritance_bp.post("/courses/<int:course_id>/heartbeat")
+def course_heartbeat_route(course_id: int):
+    _get_handcraft_course_progress(
+        int(_student_session()["id"]),
+        course_id,
+    )
+    return jsonify(
+        success=True,
+        session=_heartbeat_session(
+            "course",
+            f"handcraft-course:{course_id}",
         ),
     )
 
@@ -396,7 +451,13 @@ def _internal_expiry_token() -> str:
 def run_points_expiry_settlement_route():
     expected = str(current_app.config.get("POINTS_EXPIRY_TOKEN", ""))
     provided = _internal_expiry_token()
-    if not expected or not hmac.compare_digest(provided, expected):
+    if (
+        not expected
+        or not hmac.compare_digest(
+            provided.encode("utf-8"),
+            expected.encode("utf-8"),
+        )
+    ):
         return jsonify(success=False, message="未授权"), 401
 
     batch_size = int(
@@ -406,8 +467,12 @@ def run_points_expiry_settlement_route():
     fulfillment_notifications = (
         _retry_pending_fulfillment_notifications(limit=batch_size)
     )
+    handcraft_notifications = _retry_pending_handcraft_notifications(
+        limit=batch_size
+    )
     return jsonify(
         success=True,
         **settlement,
         fulfillment_notifications=fulfillment_notifications,
+        handcraft_notifications=handcraft_notifications,
     )

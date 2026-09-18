@@ -485,6 +485,12 @@ onMounted(() => {
               正在读取学习进度
             </div>
 
+            <slot
+              name="course-media"
+              :course="course"
+              :progress="progressFor(course.id)"
+            />
+
             <div class="course-card__actions">
               <a
                 v-if="commentReturnTo(course)"
@@ -731,7 +737,8 @@ onMounted(() => {
   gap: 14px;
   margin-top: 18px;
   padding: 12px 14px;
-  border-left: 3px solid var(--ark-signal);
+  border: 1px solid var(--ark-line-strong);
+  border-top-color: var(--ark-signal);
   background: var(--ark-surface-0);
 }
 

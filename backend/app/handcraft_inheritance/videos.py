@@ -6,6 +6,7 @@ from app.agri_skills.errors import AgriValidationError
 from app.db import get_db
 from app.handcraft_inheritance.providers import (
     get_teaching_video_provider,
+    normalize_video_review_status,
     set_video_review_provider,
 )
 
@@ -45,7 +46,11 @@ def _provider_video(video_id: str) -> dict | None:
         return None
     if not isinstance(video, dict):
         return None
-    return deepcopy(video)
+    normalized = deepcopy(video)
+    normalized["review_status"] = normalize_video_review_status(
+        normalized.get("review_status")
+    )
+    return normalized
 
 
 def _provider_source_available(provider_video: dict) -> bool | None:

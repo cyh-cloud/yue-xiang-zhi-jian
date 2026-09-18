@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type {
+  ActiveLearningHeartbeat,
   CourseDirection,
   CourseProgress,
   CourseQuiz,
@@ -275,22 +276,33 @@ export const useCourseLearningStore = defineStore('courseLearning', {
     async saveProgress(
       courseId: number,
       positionSeconds: number,
-      watchedDeltaSeconds: number
+      watchedDeltaSeconds: number,
+      segmentId: string | null = null
     ): Promise<boolean> {
       const epoch = this.requestEpoch
       this.loading = true
       this.error = ''
 
       try {
+        const handcraftRequest =
+          this.direction === 'handcraft' ||
+          this.apiPrefix === '/api/handcraft-inheritance'
         const response = await apiFetch<{
           success: true
           progress: CourseProgress
         }>(`${this.apiPrefix}/courses/${courseId}/progress`, {
           method: 'PUT',
-          body: JSON.stringify({
-            position_seconds: positionSeconds,
-            watched_delta_seconds: watchedDeltaSeconds
-          })
+          body: JSON.stringify(
+            handcraftRequest
+              ? {
+                  position_seconds: positionSeconds,
+                  segment_id: segmentId
+                }
+              : {
+                  position_seconds: positionSeconds,
+                  watched_delta_seconds: watchedDeltaSeconds
+                }
+          )
         })
         if (this.requestEpoch !== epoch) return false
         this.progressByCourse[courseId] = response.progress
@@ -315,6 +327,22 @@ export const useCourseLearningStore = defineStore('courseLearning', {
           this.loading = false
         }
       }
+    },
+    async heartbeatCourse(
+      courseId: number,
+      payload: {
+        segment_id: string | null
+        heartbeat_seq: number
+      }
+    ): Promise<ActiveLearningHeartbeat> {
+      const response = await apiFetch<{
+        success: true
+        session: ActiveLearningHeartbeat
+      }>(`${this.apiPrefix}/courses/${courseId}/heartbeat`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
+      return response.session
     },
     async loadQuiz(courseId: number): Promise<boolean> {
       const epoch = this.requestEpoch

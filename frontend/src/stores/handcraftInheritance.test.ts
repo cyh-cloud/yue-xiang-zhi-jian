@@ -68,17 +68,14 @@ describe('handcraftInheritance store', () => {
     )
     expect(store.progressByCraft.guangxiu.completed_steps).toEqual([])
 
-    expect(await store.completeStep('guangxiu', 1, 600, 'step-1')).toBe(
-      true
-    )
+    expect(await store.completeStep('guangxiu', 1, 'segment-1')).toBe(true)
     expect(mockedApiFetch).toHaveBeenNthCalledWith(
       2,
       '/api/handcraft-inheritance/crafts/guangxiu/steps/1/complete',
       {
         method: 'POST',
         body: JSON.stringify({
-          active_seconds: 600,
-          event_id: 'step-1'
+          segment_id: 'segment-1'
         })
       }
     )
@@ -155,8 +152,7 @@ describe('handcraftInheritance store', () => {
       await store.generateArGuidance(
         'guangxiu',
         '绣制花瓣',
-        600,
-        'ar-1'
+        'segment-2'
       )
     ).toBe(true)
     expect(mockedApiFetch).toHaveBeenNthCalledWith(
@@ -167,8 +163,7 @@ describe('handcraftInheritance store', () => {
         body: JSON.stringify({
           craft_key: 'guangxiu',
           project_label: '绣制花瓣',
-          active_seconds: 600,
-          event_id: 'ar-1'
+          segment_id: 'segment-2'
         })
       }
     )

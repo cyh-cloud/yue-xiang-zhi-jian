@@ -10,6 +10,7 @@ import {
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
+import { useActiveLearningHeartbeat } from '@/composables/activeLearningHeartbeat'
 import {
   useHandcraftInheritanceStore
 } from '@/stores/handcraftInheritance'
@@ -25,9 +26,13 @@ const stepError = ref('')
 const stepCompletionErrors = ref<Record<number, string>>({})
 const arError = ref('')
 const projectLabel = ref('')
-const arEventId = ref('')
-const arProjectKey = ref('')
-const activeStartedAt = ref(Date.now())
+
+const craftHeartbeat = useActiveLearningHeartbeat(
+  payload => store.heartbeatCraft(props.craftKey, payload)
+)
+const arHeartbeat = useActiveLearningHeartbeat(
+  payload => store.heartbeatAr(props.craftKey, payload)
+)
 
 const craft = computed(() =>
   store.activeCraft?.craft_key === props.craftKey
@@ -132,13 +137,6 @@ function stepIsDisabled(stepNo: number) {
   )
 }
 
-function currentActiveSeconds() {
-  return Math.min(
-    7200,
-    Math.max(0, Math.floor((Date.now() - activeStartedAt.value) / 1000))
-  )
-}
-
 function completionFeedback(reason: string | null) {
   const normalizedReason = reason?.trim() ?? ''
   const safeReason =
@@ -155,12 +153,11 @@ async function completeStep(stepNo: number) {
   }
   stepError.value = ''
   delete stepCompletionErrors.value[stepNo]
-  const eventId = `${currentCraft.craft_key}-step-${stepNo}-${Date.now()}`
+  const segmentId = await craftHeartbeat.flush()
   const completed = await store.completeStep(
     currentCraft.craft_key,
     stepNo,
-    currentActiveSeconds(),
-    eventId
+    segmentId
   )
   if (!completed) {
     stepError.value = store.error || '步骤完成状态保存失败'
@@ -177,6 +174,8 @@ async function completeStep(stepNo: number) {
       ...stepCompletionErrors.value,
       [stepNo]: completionFeedback(completion.reason)
     }
+  } else {
+    craftHeartbeat.reset()
   }
 }
 
@@ -186,23 +185,17 @@ async function requestArGuidance() {
   if (!currentCraft?.craft_key || !normalizedLabel) {
     return
   }
-  if (arProjectKey.value !== normalizedLabel || !arEventId.value) {
-    arProjectKey.value = normalizedLabel
-    arEventId.value = [
-      currentCraft.craft_key,
-      Date.now(),
-      Math.random().toString(36).slice(2)
-    ].join('-')
-  }
   arError.value = ''
+  const segmentId = await arHeartbeat.flush()
   const generated = await store.generateArGuidance(
     currentCraft.craft_key,
     normalizedLabel,
-    currentActiveSeconds(),
-    arEventId.value
+    segmentId
   )
   if (!generated) {
     arError.value = 'AI 服务暂时不可用'
+  } else {
+    arHeartbeat.reset()
   }
 }
 
@@ -221,8 +214,8 @@ async function loadContent() {
   stepError.value = ''
   stepCompletionErrors.value = {}
   arError.value = ''
-  arEventId.value = ''
-  arProjectKey.value = ''
+  arHeartbeat.reset()
+  craftHeartbeat.reset()
   store.arGuidance = null
 
   const [craftLoaded, progressLoaded, videosLoaded] = await Promise.all([
@@ -241,7 +234,6 @@ watch(
   () => props.craftKey,
   () => {
     projectLabel.value = ''
-    activeStartedAt.value = Date.now()
     void loadContent()
   }
 )
@@ -256,6 +248,9 @@ onMounted(() => {
     class="craft-learning"
     data-test="craft-learning"
     :aria-busy="viewLoading"
+    @pointerdown="craftHeartbeat.touch"
+    @keydown="craftHeartbeat.touch"
+    @scroll.passive="craftHeartbeat.touch"
   >
     <header class="craft-learning__heading">
       <span class="craft-learning__code ark-data">
@@ -497,7 +492,12 @@ onMounted(() => {
           <Sparkles :size="21" aria-hidden="true" />
         </div>
 
-        <div class="ar-workspace">
+        <div
+          class="ar-workspace"
+          @pointerdown.stop="arHeartbeat.touch"
+          @keydown.stop="arHeartbeat.touch"
+          @scroll.passive.stop="arHeartbeat.touch"
+        >
           <form
             class="ar-form"
             data-test="ar-form"

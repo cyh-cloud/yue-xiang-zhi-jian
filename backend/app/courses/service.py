@@ -17,6 +17,7 @@ def list_published_courses(user_id: int, direction: str) -> list[dict]:
             c.summary,
             c.teacher_name,
             c.duration_seconds,
+            c.media_url,
             c.published_at,
             CASE WHEN EXISTS (
                 SELECT 1
@@ -42,6 +43,7 @@ def list_published_courses(user_id: int, direction: str) -> list[dict]:
             "summary": str(row["summary"]),
             "teacher_name": str(row["teacher_name"]),
             "duration_seconds": row["duration_seconds"],
+            "media_url": row["media_url"],
             "published_at": row["published_at"],
             "interest_match": bool(row["interest_match"]),
         }

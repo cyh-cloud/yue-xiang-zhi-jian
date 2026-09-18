@@ -181,7 +181,7 @@ class TestHandcraftAdminActions(unittest.TestCase):
                     return "error", str(error)
 
         with patch(
-            "app.handcraft_inheritance.admin_actions.emit_review_result"
+            "app.handcraft_inheritance.outbox.emit_review_result"
         ):
             with ThreadPoolExecutor(max_workers=len(actions)) as executor:
                 return list(executor.map(perform, actions))
@@ -244,7 +244,7 @@ class TestHandcraftAdminActions(unittest.TestCase):
                 )
             }
             with patch(
-                "app.handcraft_inheritance.admin_actions.emit_review_result"
+                "app.handcraft_inheritance.outbox.emit_review_result"
             ) as emit:
                 result = apply_video_review(
                     {
@@ -288,7 +288,7 @@ class TestHandcraftAdminActions(unittest.TestCase):
         with self.app.app_context():
             self._insert_video()
             with patch(
-                "app.handcraft_inheritance.admin_actions.emit_review_result"
+                "app.handcraft_inheritance.outbox.emit_review_result"
             ) as emit:
                 with self.assertRaisesRegex(
                     AgriValidationError,
@@ -413,7 +413,7 @@ class TestHandcraftAdminActions(unittest.TestCase):
         with self.app.app_context():
             self._insert_video(status="approved")
             with patch(
-                "app.handcraft_inheritance.admin_actions.emit_review_result"
+                "app.handcraft_inheritance.outbox.emit_review_result"
             ) as emit:
                 result = apply_video_review(
                     {
@@ -560,7 +560,7 @@ class TestHandcraftAdminActions(unittest.TestCase):
                     return "error", str(error)
 
         with patch(
-            "app.handcraft_inheritance.admin_actions.emit_review_result"
+            "app.handcraft_inheritance.outbox.emit_review_result"
         ) as emit:
             with ThreadPoolExecutor(max_workers=2) as executor:
                 results = list(
@@ -1087,22 +1087,18 @@ class TestHandcraftAdminActions(unittest.TestCase):
         with self.app.app_context():
             self._insert_video()
             with patch(
-                "app.handcraft_inheritance.admin_actions.emit_review_result",
+                "app.handcraft_inheritance.outbox.emit_review_result",
                 side_effect=RuntimeError("notification offline"),
             ):
-                with self.assertRaisesRegex(
-                    RuntimeError,
-                    "notification offline",
-                ):
-                    apply_video_review(
-                        {
-                            "video_id": "review-video",
-                            "action": "approve",
-                            "reviewer_role": "admin",
-                            "submitter_id": 1,
-                            "version": 1,
-                        }
-                    )
+                result = apply_video_review(
+                    {
+                        "video_id": "review-video",
+                        "action": "approve",
+                        "reviewer_role": "admin",
+                        "submitter_id": 1,
+                        "version": 1,
+                    }
+                )
             video = get_db().execute(
                 """
                 SELECT review_status
@@ -1110,7 +1106,18 @@ class TestHandcraftAdminActions(unittest.TestCase):
                 WHERE video_id = 'review-video'
                 """
             ).fetchone()
+            outbox = get_db().execute(
+                """
+                SELECT status
+                FROM handcraft_notification_outbox
+                WHERE event_id = (
+                    'handcraft-video-review:review-video:v1:approve'
+                )
+                """
+            ).fetchone()
+            self.assertEqual(result["status"], "approved")
             self.assertEqual(video["review_status"], "approved")
+            self.assertEqual(outbox["status"], "pending")
 
             self._insert_fulfillment(status="pending")
             with patch(
