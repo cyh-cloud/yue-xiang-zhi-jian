@@ -762,3 +762,80 @@ export interface CustomerSession {
   updated_at: string
   completed_at: string | null
 }
+
+export type JobReviewStatus = 'pending' | 'approved' | 'rejected'
+
+export type ApplicationStatus =
+  | 'pending'
+  | 'viewed'
+  | 'intent'
+  | 'unsuitable'
+
+export type EffectiveApplicationStatus = ApplicationStatus | 'closed'
+
+export interface EnterpriseDashboard {
+  active_job_count: number
+  received_resume_count: number
+}
+
+export interface EnterpriseJobPayload {
+  title: string
+  salary: string
+  location: string
+  category_id: number
+  description: string
+}
+
+export interface EnterpriseJob extends EnterpriseJobPayload {
+  job_id: string
+  enterprise_id: number
+  category_name: string
+  review_status: JobReviewStatus
+  version: number
+  rejection_opinion: string | null
+  published_at: string | null
+  deleted_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface EnterpriseApplicationSummary {
+  application_id: string
+  student_id: number
+  student_name: string
+  job_id: string
+  job_title: string
+  submitted_at: string
+  status: ApplicationStatus
+  status_label: string
+  status_version: number
+  position_closed: boolean
+  position_closed_at: string | null
+  effective_status: EffectiveApplicationStatus
+  effective_status_label: string
+}
+
+export interface ApplicationStatusHistory {
+  sequence_no: number
+  previous_status: ApplicationStatus
+  new_status: ApplicationStatus
+  actor_enterprise_id: number
+  event_id: string
+  created_at: string
+}
+
+export interface EnterpriseApplicationDetail
+  extends EnterpriseApplicationSummary {
+  resume_snapshot: Record<string, unknown>
+  skill_profile: Record<string, unknown> | null
+  skill_profile_attached: boolean
+  status_history: ApplicationStatusHistory[]
+}
+
+export interface EnterpriseApplicationFilters {
+  job_id?: string
+  status?: ApplicationStatus
+  submitted_from?: string
+  submitted_to?: string
+  sort?: 'submitted_desc' | 'submitted_asc'
+}
