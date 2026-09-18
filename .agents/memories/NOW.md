@@ -1,5 +1,13 @@
 # Current Work
 
+## Integration Branch
+
+- 2026-09-18: `v2/lixKRT/dev` fast-forwarded `e527d34 -> 8e27da8`,
+  integrating `v2/lixKRT/005-heritage-craft`.
+- Feature ancestry on `v2/lixKRT/dev`: 001, 003, 004, and 005 are merged.
+- No `002` feature branch exists locally or on the fetched remotes; only
+  002 specification/plan commits are present.
+
 ## 005 Task 20 Browser Acceptance
 
 - Completed on 2026-09-18 in `.worktrees/005-heritage-craft`.
