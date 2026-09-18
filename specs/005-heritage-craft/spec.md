@@ -49,7 +49,7 @@
 
 ### User Story 2 - 获取并管理平台积分 (Priority: P1)
 
-学员通过有效学习行为获得积分，包括手工学习、课程观看以及 004 已完成的直播话术、模拟、文案和客服训练；系统查看当前余额和获取、消耗、过期流水，按照超级管理员配置的行为折算规则和每日上限累计积分，并按配置的永久或自然年有效期规则处理到期积分。
+学员通过有效学习行为获得积分，包括手工学习、课程观看以及 004 已完成的直播话术、模拟、文案和客服训练；系统查看当前余额和获取、消耗、退款和过期流水，按照超级管理员配置的行为折算规则和每日上限累计积分，并按配置的永久或自然年有效期规则处理到期积分。
 
 **Why this priority**: 积分账户和流水是平台级共享基础设施，兑换商城依赖其余额、流水和有效期正确性。
 
@@ -60,7 +60,7 @@
 1. **Given** 学员开始任一技艺步骤或 AR 指引并产生有效学习时长，**When** 学习时长达到积分折算条件，**Then** 系统生成获取流水并更新余额。
 2. **Given** 学员当日已达到每日获取上限，**When** 继续产生有效学习时长，**Then** 超出部分不再折算积分，已获得积分和既有流水不变。
 3. **Given** 同一学习事件因重试或重复上报被提交多次，**When** 系统处理，**Then** 只产生一次积分获取流水。
-4. **Given** 学员查看积分页，**When** 加载账户与流水，**Then** 显示余额及按时间倒序排列的获取、消耗和过期记录。
+4. **Given** 学员查看积分页，**When** 加载账户与流水，**Then** 显示余额及按时间倒序排列的获取、消耗、退款和过期记录。
 5. **Given** 积分规则配置为默认永久，**When** 学员获得积分，**Then** 该积分不自动过期。
 6. **Given** 积分规则配置为按自然年过期，**When** 到达配置年度边界，**Then** 定时结算自动清零到期积分；若定时结算未执行，学员下次访问时补偿清零；余额同步减少，并只通过 02 发送一条含清零积分数量的通知。
 7. **Given** 超级管理员修改有效期规则，**When** 规则保存，**Then** 只影响此后的到期计算，不追溯重算或扣减已发积分。
@@ -217,7 +217,7 @@
 **平台积分服务**
 
 - **FR-039**: 005 MUST own the platform-level points account, immutable ledger, rule evaluation, daily-cap enforcement, expiry processing, spend, refund and balance calculation.
-- **FR-040**: 11 MUST remain the authoritative source and entry for super-admin configuration of conversion ratio, daily earning limit and expiry policy; 005 MUST read the latest effective rule before each affected operation and MUST NOT own a second editable rule configuration.
+- **FR-040**: 11 MUST remain the authoritative source and entry for super-admin configuration of conversion ratio, discrete training weights, daily earning limit and expiry policy; 005 MUST read the latest effective rule before each affected operation and MUST NOT own a second editable rule configuration.
 - **FR-041**: The points-service boundary MUST accept a valid learning event containing student identity, source module, source event identifier, event type and event time. Duration-based events MUST additionally contain server-validated active duration; discrete training events MUST additionally contain the validated training type. The boundary MUST return whether points were awarded and the resulting balance. Client-reported wall-clock duration alone MUST NOT be accepted.
 - **FR-042**: A source event identifier MUST be idempotent per student and event type so retries cannot award duplicate points.
 - **FR-043**: The platform earning policy MUST recognize craft-step active learning, AR-guidance active use, course-video viewing in any learning direction, and successful 004 live-script, simulation, copy-training and customer-service training records. In this release, craft learning, AR guidance, handcraft-course viewing and all four 004 training record types are integrated; other course directions remain pending integration.
@@ -234,7 +234,7 @@
 - **FR-054**: Expiry MUST use a platform-scheduled idempotent batch settlement plus a lazy compensation check before account balance display or mutation. If scheduled settlement has not completed, the next account access MUST settle overdue amounts before continuing.
 - **FR-055**: Expiry retries and lazy compensation MUST be idempotent. A successful expiry MUST create one expiration ledger entry per affected account and send exactly one 02 notification per affected student containing the cleared point amount; it MUST NOT create a batch summary notification.
 - **FR-056**: Changing the expiry policy MUST apply only to future expiry calculations and MUST NOT alter or retroactively expire already awarded points.
-- **FR-057**: Students MUST NOT be able to configure conversion ratio, daily limit or expiry policy through the student experience.
+- **FR-057**: Students MUST NOT be able to configure conversion ratio, discrete training weights, daily limit or expiry policy through the student experience.
 - **FR-058**: If the authoritative points-rule source is unavailable, placeholder mode MUST use a clearly identified demo policy of 1 point per 10 valid minutes, 10 points per unique successful training record and a daily cap of 60 points. In production, 005 MUST use the last valid read-only rule when available; if no valid rule exists, it MUST pause point accrual, spending, redemption and expiry, preserve learning progress and existing balances, and show “积分规则暂不可用，请稍后重试”.
 
 **奖品、兑换与履约**
@@ -253,7 +253,7 @@
 - **FR-070**: Repeated issue, cancel or verify requests MUST be idempotent and MUST NOT create duplicate ledger or notification events.
 - **FR-071**: A student MUST be able to view their own redemption and fulfillment history with current status.
 - **FR-072**: A normal administrator MUST be able to view user details and the complete redemption/fulfillment record from redemption-management contexts, including contact details and point flow. This visibility supersedes the earlier business-only fulfillment view.
-- **FR-073**: A normal administrator MUST NOT configure points rules or perform account management; those capabilities remain outside the normal-administrator role.
+- **FR-073**: A normal administrator MUST NOT configure points rules or perform account management, including user list, account status and password operations; those capabilities remain outside the normal-administrator role.
 - **FR-074**: A super administrator MAY view complete redemption records and access all platform data permitted by the 01 role model.
 - **FR-075**: Fulfillment cancellation, issuance and verification authorization MUST distinguish normal administrator and super administrator without redefining the two roles owned by 01.
 
@@ -310,7 +310,7 @@
 - **Teaching Video Review Result**: 11 产生的通过、驳回或重审结果，包含审核意见和影响学员可见性的状态。
 - **Learning Progress**: 学员对某个技艺步骤或手工课程的有效学习进度、断点、有效时长和完成状态。
 - **Points Account**: 学员的平台级积分余额，所有模块获得、消耗、回退和过期均汇总到此账户。
-- **Points Policy**: 11 权威维护、005 读取的折算比率、每日获取上限和有效期规则。
+- **Points Policy**: 11 权威维护、005 读取的折算比率、离散训练权重、每日获取上限和有效期规则。
 - **Points Transaction**: 不可变的获取、消耗、回退或过期流水，包含来源模块、来源事件、数量、时间和余额影响。
 - **Points Earn Event**: 其他模块向平台积分服务提交的有效学习事件，以稳定事件标识实现幂等。
 - **Reward**: 11 维护的奖品目录项，包含名称、所需积分、库存、上架状态和来源状态。

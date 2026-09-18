@@ -703,6 +703,7 @@ class TestHandcraftFulfillment(unittest.TestCase):
             normal_record["capabilities"]["configure_points_rules"]
         )
         self.assertFalse(normal_record["capabilities"]["manage_accounts"])
+        self.assertTrue(normal_record["capabilities"]["manage_rewards"])
         self.assertTrue(
             normal_record["capabilities"]["view_user_details"]
         )
@@ -714,6 +715,7 @@ class TestHandcraftFulfillment(unittest.TestCase):
             super_record["capabilities"]["configure_points_rules"]
         )
         self.assertTrue(super_record["capabilities"]["manage_accounts"])
+        self.assertTrue(super_record["capabilities"]["manage_rewards"])
 
     def test_untrusted_roles_and_invalid_transitions_are_rejected(self):
         _, fulfillment = self._redeem()

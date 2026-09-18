@@ -792,7 +792,7 @@ def _capabilities(role: str) -> dict:
         "manual_verify_fulfillment": True,
         "configure_points_rules": is_super_admin,
         "manage_accounts": is_super_admin,
-        "manage_rewards": is_super_admin,
+        "manage_rewards": True,
     }
 
 

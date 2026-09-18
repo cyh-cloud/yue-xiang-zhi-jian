@@ -483,6 +483,58 @@ class TestHandcraftPoints(unittest.TestCase):
             ["refund", "spend", "award"],
         )
 
+    def test_training_weights_and_transaction_types_are_discrete(self):
+        weights = {
+            "live_script": 3,
+            "simulation": 5,
+            "copy_training": 7,
+            "customer_service": 11,
+        }
+        self.use_policy(
+            seconds_per_point=1,
+            daily_limit=100,
+            training_weights={"default": 1, **weights},
+            expiry_mode="natural_year",
+        )
+        with self.app.app_context():
+            for index, (event_type, expected_weight) in enumerate(
+                weights.items()
+            ):
+                result = record_training_points(
+                    1,
+                    "ecommerce",
+                    event_type,
+                    f"weight-{event_type}",
+                    f"2025-09-17T09:0{index}:00+08:00",
+                )
+                self.assertEqual(result["awarded"], expected_weight)
+
+            spend = spend_points(
+                1,
+                4,
+                "handcraft",
+                "weight-spend",
+                "2025-09-17T10:00:00+08:00",
+            )
+            refund_points(
+                1,
+                4,
+                "handcraft",
+                "weight-refund",
+                spend["id"],
+                "2025-09-17T11:00:00+08:00",
+            )
+            settle_user_expiry(
+                1,
+                "2026-01-01T00:00:00+08:00",
+            )
+            ledger = get_points_ledger(1)
+
+        self.assertEqual(
+            {entry["transaction_type"] for entry in ledger},
+            {"award", "spend", "refund", "expire"},
+        )
+
     def test_refund_of_expired_lot_creates_new_usable_lot(self):
         self.use_policy(
             seconds_per_point=1,
