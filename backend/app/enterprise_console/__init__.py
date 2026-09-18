@@ -15,8 +15,8 @@ from app.enterprise_console.jobs import (
     sync_job_review_projection,
 )
 from app.enterprise_console.providers import (
+    DatabaseJobPositionProvider,
     EmptyJobApplicationIntakeProvider,
-    EmptyJobPositionProvider,
     get_job_application_intake_provider,
     get_job_position_provider,
     set_job_application_intake_provider,
@@ -32,7 +32,7 @@ from app.enterprise_console.review import (
 
 def install_default_enterprise_services(app: Flask) -> None:
     if "job_position_provider" not in app.extensions:
-        set_job_position_provider(app, EmptyJobPositionProvider())
+        set_job_position_provider(app, DatabaseJobPositionProvider())
     if "job_application_intake_provider" not in app.extensions:
         set_job_application_intake_provider(
             app,

@@ -49,6 +49,33 @@ _JOB_SERIALIZED_FIELDS = (
     "created_at",
     "updated_at",
 )
+_PUBLIC_POSITION_FIELDS = (
+    "job_id",
+    "enterprise_id",
+    "enterprise_name",
+    "title",
+    "salary",
+    "location",
+    "category_id",
+    "category_name",
+    "description",
+    "review_status",
+    "version",
+    "published_at",
+    "updated_at",
+)
+_PUBLIC_POSITION_TEXT_FIELDS = (
+    "job_id",
+    "enterprise_name",
+    "title",
+    "salary",
+    "location",
+    "category_name",
+    "description",
+    "review_status",
+    "published_at",
+    "updated_at",
+)
 _PLATFORM_TIMEZONE = ZoneInfo("Asia/Shanghai")
 
 
@@ -319,6 +346,113 @@ def serialize_job(row) -> dict:
     }
 
 
+def _positive_int(value) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized > 0 else None
+
+
+def _visible_position_payload(row) -> dict | None:
+    if row is None:
+        return None
+
+    data = dict(row)
+    if data.get("review_status") != "approved":
+        return None
+    enterprise_id = _positive_int(data.get("enterprise_id"))
+    category_id = _positive_int(data.get("category_id"))
+    version = _positive_int(data.get("version"))
+    if enterprise_id is None or category_id is None or version is None:
+        return None
+    if any(
+        not isinstance(data.get(field), str)
+        or not data[field].strip()
+        for field in _PUBLIC_POSITION_TEXT_FIELDS
+    ):
+        return None
+
+    payload = {
+        field: data.get(field)
+        for field in _PUBLIC_POSITION_FIELDS
+    }
+    payload["enterprise_id"] = enterprise_id
+    payload["category_id"] = category_id
+    payload["version"] = version
+    return payload
+
+
+def list_published_position_records() -> list[dict]:
+    rows = get_db().execute(
+        """
+        SELECT
+            jp.job_id,
+            jp.enterprise_id,
+            u.name AS enterprise_name,
+            jp.title,
+            jp.salary,
+            jp.location,
+            jp.category_id,
+            jp.category_name,
+            jp.description,
+            jp.review_status,
+            jp.version,
+            jp.published_at,
+            jp.updated_at
+        FROM job_positions jp
+        JOIN users u ON u.id = jp.enterprise_id
+        WHERE jp.review_status = 'approved'
+          AND jp.deleted_at IS NULL
+          AND jp.published_at IS NOT NULL
+          AND trim(jp.published_at) <> ''
+        ORDER BY jp.published_at DESC, jp.job_id ASC
+        """
+    ).fetchall()
+
+    records = []
+    for row in rows:
+        record = _visible_position_payload(row)
+        if record is not None:
+            records.append(record)
+    return records
+
+
+def get_published_position_record(job_id: str) -> dict | None:
+    normalized = str(job_id or "").strip()
+    if not normalized:
+        return None
+    row = get_db().execute(
+        """
+        SELECT
+            jp.job_id,
+            jp.enterprise_id,
+            u.name AS enterprise_name,
+            jp.title,
+            jp.salary,
+            jp.location,
+            jp.category_id,
+            jp.category_name,
+            jp.description,
+            jp.review_status,
+            jp.version,
+            jp.published_at,
+            jp.updated_at
+        FROM job_positions jp
+        JOIN users u ON u.id = jp.enterprise_id
+        WHERE jp.job_id = ?
+          AND jp.review_status = 'approved'
+          AND jp.deleted_at IS NULL
+          AND jp.published_at IS NOT NULL
+          AND trim(jp.published_at) <> ''
+        """,
+        (normalized,),
+    ).fetchone()
+    return _visible_position_payload(row)
+
+
 def create_job(enterprise_id: int, payload: dict) -> dict:
     normalized_enterprise_id = _normalize_enterprise_id(enterprise_id)
     db = get_db()
@@ -538,7 +672,9 @@ __all__ = [
     "create_job",
     "edit_job",
     "get_job",
+    "get_published_position_record",
     "list_jobs",
+    "list_published_position_records",
     "serialize_job",
     "sync_job_review_projection",
 ]

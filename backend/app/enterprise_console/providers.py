@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from typing import TYPE_CHECKING, Protocol
 
 from flask import Flask, current_app
@@ -20,6 +21,41 @@ class EmptyJobPositionProvider:
 
     def get_published_position(self, *, job_id: str) -> dict | None:
         return None
+
+
+class DatabaseJobPositionProvider(EmptyJobPositionProvider):
+    """Database-backed provider that preserves the placeholder contract."""
+
+    @staticmethod
+    def _database_call(operation):
+        try:
+            return operation()
+        except sqlite3.Error as error:
+            from app.enterprise_console.errors import ProviderUnavailableError
+
+            raise ProviderUnavailableError(
+                "Job position data is unavailable"
+            ) from error
+
+    def list_published_positions(self) -> list[dict]:
+        def load_records():
+            from app.enterprise_console.jobs import (
+                list_published_position_records,
+            )
+
+            return list_published_position_records()
+
+        return self._database_call(load_records)
+
+    def get_published_position(self, *, job_id: str) -> dict | None:
+        def load_record():
+            from app.enterprise_console.jobs import (
+                get_published_position_record,
+            )
+
+            return get_published_position_record(job_id)
+
+        return self._database_call(load_record)
 
 
 class JobApplicationIntakeProvider(Protocol):
