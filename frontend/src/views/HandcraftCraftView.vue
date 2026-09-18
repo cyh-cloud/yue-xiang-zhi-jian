@@ -19,7 +19,11 @@ async function logout() {
 </script>
 
 <template>
-  <div class="handcraft-craft-page">
+  <div
+    class="handcraft-craft-page"
+    data-ark-theme="ark"
+    data-ark-depth="maximal"
+  >
     <AppHeader
       source="live"
       :loading="false"
@@ -33,9 +37,16 @@ async function logout() {
 
 <style scoped>
 .handcraft-craft-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
   min-width: 0;
   min-height: 100svh;
   overflow-x: clip;
   background: var(--ark-ink);
+}
+
+.handcraft-craft-page > * {
+  min-width: 0;
 }
 </style>

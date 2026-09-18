@@ -25,6 +25,8 @@ const stepError = ref('')
 const stepCompletionErrors = ref<Record<number, string>>({})
 const arError = ref('')
 const projectLabel = ref('')
+const arEventId = ref('')
+const arProjectKey = ref('')
 const activeStartedAt = ref(Date.now())
 
 const craft = computed(() =>
@@ -184,10 +186,20 @@ async function requestArGuidance() {
   if (!currentCraft?.craft_key || !normalizedLabel) {
     return
   }
+  if (arProjectKey.value !== normalizedLabel || !arEventId.value) {
+    arProjectKey.value = normalizedLabel
+    arEventId.value = [
+      currentCraft.craft_key,
+      Date.now(),
+      Math.random().toString(36).slice(2)
+    ].join('-')
+  }
   arError.value = ''
   const generated = await store.generateArGuidance(
     currentCraft.craft_key,
-    normalizedLabel
+    normalizedLabel,
+    currentActiveSeconds(),
+    arEventId.value
   )
   if (!generated) {
     arError.value = 'AI 服务暂时不可用'
@@ -209,6 +221,8 @@ async function loadContent() {
   stepError.value = ''
   stepCompletionErrors.value = {}
   arError.value = ''
+  arEventId.value = ''
+  arProjectKey.value = ''
   store.arGuidance = null
 
   const [craftLoaded, progressLoaded, videosLoaded] = await Promise.all([
@@ -238,7 +252,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <main class="craft-learning" :aria-busy="viewLoading">
+  <main
+    class="craft-learning"
+    data-test="craft-learning"
+    :aria-busy="viewLoading"
+  >
     <header class="craft-learning__heading">
       <span class="craft-learning__code ark-data">
         05 / CRAFT LEARNING
@@ -447,6 +465,7 @@ onMounted(() => {
             :key="item.video_id"
             class="video-item"
             data-test="craft-video"
+            data-comment-capability="unavailable"
           >
             <header>
               <Video :size="18" aria-hidden="true" />
@@ -456,6 +475,7 @@ onMounted(() => {
               </div>
             </header>
             <video
+              data-test="craft-video-player"
               controls
               playsinline
               preload="metadata"
@@ -492,20 +512,52 @@ onMounted(() => {
                 required
                 autocomplete="off"
                 placeholder="例如：绣制花瓣"
+                :aria-invalid="Boolean(arError)"
+                :aria-describedby="arError ? 'ar-error-message' : undefined"
               >
             </label>
-            <button type="submit" :disabled="store.generatingGuidance">
+            <button
+              type="submit"
+              :disabled="store.generatingGuidance"
+              :aria-busy="store.generatingGuidance"
+            >
               <Sparkles :size="17" aria-hidden="true" />
-              {{ store.generatingGuidance ? '生成中' : '请求分步指引' }}
+              {{
+                store.generatingGuidance
+                  ? '生成中'
+                  : arError
+                    ? '重新请求'
+                    : '请求分步指引'
+              }}
             </button>
-            <p
+            <div
+              v-if="store.generatingGuidance"
+              class="ar-status"
+              data-test="ar-loading"
+              role="status"
+            >
+              <RefreshCw class="spinning" :size="16" aria-hidden="true" />
+              正在生成分步指引
+            </div>
+            <div
               v-if="arError"
-              class="inline-error"
-              data-test="ar-error"
+              class="inline-error ar-error"
               role="alert"
             >
-              {{ arError }}
-            </p>
+              <span id="ar-error-message" data-test="ar-error">
+                {{ arError }}
+              </span>
+              <button
+                type="button"
+                class="ar-retry"
+                data-test="ar-retry"
+                :disabled="store.generatingGuidance"
+                @click="requestArGuidance"
+              >
+                <RefreshCw :size="15" aria-hidden="true" />
+                重试
+              </button>
+            </div>
           </form>
 
           <div
@@ -575,6 +627,7 @@ onMounted(() => {
   min-width: 0;
   margin-inline: auto;
   padding: 40px 24px 72px;
+  overflow-x: clip;
 }
 
 .craft-learning__heading {
@@ -998,14 +1051,20 @@ onMounted(() => {
 .video-item video {
   display: block;
   width: 100%;
-  min-height: 180px;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 16 / 9;
   margin-top: 14px;
   background: var(--ark-surface-2);
+  object-fit: contain;
 }
 
 .ar-workspace {
   display: grid;
-  grid-template-columns: minmax(260px, 0.72fr) minmax(0, 1.28fr);
+  grid-template-columns:
+    minmax(min(100%, 260px), 0.72fr)
+    minmax(0, 1.28fr);
   gap: 10px;
   align-items: start;
 }
@@ -1067,6 +1126,37 @@ onMounted(() => {
 
 .ar-form .inline-error {
   margin: 0;
+}
+
+.ar-status,
+.ar-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ar-status {
+  color: var(--ark-muted);
+  font-size: 0.82rem;
+}
+
+.ar-status > svg {
+  flex: 0 0 auto;
+  color: var(--ark-signal);
+}
+
+.ar-error > span {
+  min-width: 0;
+}
+
+.ar-form .ar-retry {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding-inline: 10px;
+  border-color: var(--ark-line-strong);
+  background: transparent;
+  color: var(--ark-paper);
 }
 
 .ar-output {
@@ -1194,6 +1284,52 @@ onMounted(() => {
   .craft-learning__error {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .ar-error {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ar-form .ar-retry {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .craft-learning {
+    padding: 24px 12px 48px;
+  }
+
+  .craft-learning__heading h1 {
+    font-size: 2rem;
+  }
+
+  .progress-panel__head,
+  .section-heading {
+    gap: 9px;
+    padding-inline: 12px;
+  }
+
+  .step-item__body,
+  .material-item,
+  .video-item,
+  .ar-form,
+  .ar-output,
+  .ar-workspace > .section-empty {
+    padding-inline: 12px;
+  }
+
+  .resume-action,
+  .step-complete,
+  .ar-form button,
+  .craft-learning__error button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .course-entry {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
