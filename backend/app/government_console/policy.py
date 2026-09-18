@@ -126,6 +126,44 @@ def list_policies(
     ]
 
 
+def list_published_policies(
+    category_code: str | None = None,
+) -> list[dict]:
+    normalized_category = _validate_category_filter(category_code)
+    sql = """
+        SELECT
+            id, title, content, category_code, published_at, updated_at,
+            version
+        FROM government_policies
+        WHERE status = 'active'
+    """
+    params: list[object] = []
+    if normalized_category is not None:
+        sql += " AND category_code = ?"
+        params.append(normalized_category)
+    sql += " ORDER BY published_at DESC, id ASC"
+    return [
+        _published_policy_payload(row)
+        for row in get_db().execute(sql, params).fetchall()
+    ]
+
+
+def get_published_policy(policy_id: str) -> dict | None:
+    if not isinstance(policy_id, str) or not policy_id.strip():
+        return None
+    row = get_db().execute(
+        """
+        SELECT
+            id, title, content, category_code, published_at, updated_at,
+            version
+        FROM government_policies
+        WHERE id = ? AND status = 'active'
+        """,
+        (policy_id.strip(),),
+    ).fetchone()
+    return _published_policy_payload(row) if row is not None else None
+
+
 def unpublish_policy(policy_id: str, *, expected_version: int) -> dict:
     return _transition_policy(
         policy_id,
@@ -197,6 +235,13 @@ def get_policy(policy_id: str) -> dict | None:
 
 def shanghai_now_iso() -> str:
     return datetime.now(PLATFORM_TIMEZONE).isoformat(timespec="seconds")
+
+
+def normalize_shanghai_iso(value: object) -> str:
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=PLATFORM_TIMEZONE)
+    return parsed.astimezone(PLATFORM_TIMEZONE).isoformat(timespec="seconds")
 
 
 def _transition_policy(
@@ -391,4 +436,18 @@ def _policy_payload(row: sqlite3.Row) -> dict:
         "version": int(row["version"]),
         "published_at": str(row["published_at"]),
         "updated_at": str(row["updated_at"]),
+    }
+
+
+def _published_policy_payload(row: sqlite3.Row) -> dict:
+    category_code = str(row["category_code"])
+    return {
+        "id": str(row["id"]),
+        "title": str(row["title"]),
+        "content": str(row["content"]),
+        "category_code": category_code,
+        "category_label": POLICY_CATEGORIES[category_code],
+        "published_at": normalize_shanghai_iso(row["published_at"]),
+        "updated_at": normalize_shanghai_iso(row["updated_at"]),
+        "version": int(row["version"]),
     }
