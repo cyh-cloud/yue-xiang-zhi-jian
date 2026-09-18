@@ -102,6 +102,14 @@ describe('GovernmentPolicyView', () => {
     vi.restoreAllMocks()
   })
 
+  it('uses concise hero copy that wraps cleanly at narrow widths', async () => {
+    const { wrapper } = await mountView()
+
+    expect(wrapper.get('.policy-hero__identity p').text()).toBe(
+      '发布七类政策并维护生命周期状态。'
+    )
+  })
+
   it('publishes the seven-category policy form with a generated request id', async () => {
     const { wrapper, store } = await mountView()
     const randomUUID = vi

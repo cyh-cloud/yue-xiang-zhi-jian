@@ -199,10 +199,7 @@ onMounted(() => {
           <div>
             <span class="ark-data">POLICY REGISTRY</span>
             <h1>政策管理</h1>
-            <p>
-              发布七类政策并维护在架、下架和删除状态。
-              已发布内容本期仅维护生命周期状态。
-            </p>
+            <p>发布七类政策并维护生命周期状态。</p>
           </div>
         </div>
 
