@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { apiFetch } from '@/api/client'
 import type {
+  HandcraftVerification,
   HandcraftRedemption,
   HandcraftRedemptionHistory
 } from '@/api/types'
@@ -74,6 +75,22 @@ const fulfillment = {
   },
   status: 'pending',
   restored_points: 0
+} satisfies HandcraftRedemptionHistory
+
+const issuedFulfillment = {
+  ...fulfillment,
+  fulfillment: {
+    ...fulfillment.fulfillment,
+    status: 'issued',
+    issued_at: '2026-09-18T10:00:00+08:00',
+    updated_at: '2026-09-18T10:00:00+08:00'
+  },
+  redemption: {
+    ...fulfillment.redemption,
+    status: 'issued',
+    updated_at: '2026-09-18T10:00:00+08:00'
+  },
+  status: 'issued'
 } satisfies HandcraftRedemptionHistory
 
 describe('handcraftRewards store', () => {
@@ -166,5 +183,54 @@ describe('handcraftRewards store', () => {
     expect(store.redemptions[0].status).toBe('canceled')
     expect(store.fulfillments[0].status).toBe('canceled')
     expect(store.fulfillments[0].restored_points).toBe(30)
+  })
+
+  it('verifies an issued fulfillment and replaces both state projections', async () => {
+    const verification = {
+      fulfillment_id: 5,
+      redemption_id: 12,
+      user_id: 1,
+      status: 'verified',
+      changed: true,
+      issued_at: '2026-09-18T10:00:00+08:00',
+      verified_at: '2026-09-18T11:00:00+08:00',
+      canceled_at: null,
+      points_cost: 30,
+      restored_points: 0,
+      outbox_id: null,
+      notification_type: null,
+      notification: null
+    } satisfies HandcraftVerification
+    mockedApiFetch.mockResolvedValueOnce({
+      success: true,
+      verification
+    } as never)
+    const store = useHandcraftRewardsStore()
+    store.redemptions = [
+      { ...redemption, status: 'issued' }
+    ]
+    store.fulfillments = [issuedFulfillment]
+
+    expect(await store.verifyRedemption(12)).toBe(true)
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/handcraft-inheritance/redemptions/12/verify',
+      { method: 'POST' }
+    )
+    expect(store.redemptions[0].status).toBe('verified')
+    expect(store.fulfillments[0].status).toBe('verified')
+    expect(store.fulfillments[0].fulfillment.verified_at).toBe(
+      '2026-09-18T11:00:00+08:00'
+    )
+  })
+
+  it('keeps history errors separate from action errors', async () => {
+    mockedApiFetch.mockRejectedValueOnce(
+      new Error('history unavailable')
+    )
+    const store = useHandcraftRewardsStore()
+
+    expect(await store.loadRedemptions()).toBe(false)
+    expect(store.historyError).toBe('history unavailable')
+    expect(store.error).toBe('')
   })
 })

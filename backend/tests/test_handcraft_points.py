@@ -12,6 +12,7 @@ from app.handcraft_inheritance import (
     PointsPolicyUnavailable,
     enqueue_learning_event,
     get_effective_policy,
+    get_points_daily_status,
     get_points_account,
     get_points_ledger,
     process_pending_events,
@@ -193,6 +194,82 @@ class TestHandcraftPoints(unittest.TestCase):
         self.assertEqual(same_day_balance, 2)
         self.assertEqual(next_day_balance, 3)
         self.assertEqual(len(daily_awards), 3)
+
+    def test_daily_points_status_reports_below_reached_and_next_day(self):
+        self.use_policy(
+            seconds_per_point=1,
+            daily_limit=2,
+            training_weights={"default": 1},
+        )
+        with self.app.app_context():
+            below = get_points_daily_status(
+                1,
+                at="2026-09-18T09:00:00+08:00",
+            )
+            record_duration_points(
+                1,
+                "handcraft",
+                "guangxiu:step-1",
+                1,
+                "2026-09-18T09:01:00+08:00",
+                "daily-status-1",
+            )
+            record_duration_points(
+                1,
+                "handcraft",
+                "guangxiu:step-1",
+                1,
+                "2026-09-18T09:02:00+08:00",
+                "daily-status-2",
+            )
+            reached = get_points_daily_status(
+                1,
+                at="2026-09-18T09:03:00+08:00",
+            )
+            next_day = get_points_daily_status(
+                1,
+                at="2026-09-19T09:00:00+08:00",
+            )
+
+        self.assertEqual(
+            below,
+            {
+                "awarded_today": 0,
+                "daily_limit": 2,
+                "daily_limit_reached": False,
+            },
+        )
+        self.assertEqual(
+            reached,
+            {
+                "awarded_today": 2,
+                "daily_limit": 2,
+                "daily_limit_reached": True,
+            },
+        )
+        self.assertEqual(
+            next_day,
+            {
+                "awarded_today": 0,
+                "daily_limit": 2,
+                "daily_limit_reached": False,
+            },
+        )
+
+    def test_daily_points_status_requires_an_effective_policy(self):
+        with self.app.app_context():
+            get_db().execute("DELETE FROM points_policy_snapshots")
+            get_db().commit()
+            set_points_policy_provider(self.app, FailingPolicyProvider())
+
+            with self.assertRaisesRegex(
+                PointsPolicyUnavailable,
+                "积分规则暂不可用，请稍后重试",
+            ):
+                get_points_daily_status(
+                    1,
+                    at="2026-09-18T09:00:00+08:00",
+                )
 
     def test_partial_daily_cap_consumes_units_without_reissue(self):
         self.use_policy(

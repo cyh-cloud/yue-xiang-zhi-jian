@@ -80,7 +80,10 @@ const handcraftCraftFixture = {
 const handcraftAccountFixture = {
   user_id: 1,
   balance: 30,
-  updated_at: null
+  updated_at: null,
+  awarded_today: 0,
+  daily_limit: 60,
+  daily_limit_reached: false
 } satisfies HandcraftPointsAccount
 
 const handcraftLedgerFixture = {
@@ -272,6 +275,8 @@ describe('004 wire DTOs', () => {
   it('matches handcraft source, points, redemption and outcome fields', () => {
     expect(handcraftCraftFixture.source_available).toBe(true)
     expect(handcraftAccountFixture.updated_at).toBeNull()
+    expect(handcraftAccountFixture.daily_limit).toBe(60)
+    expect(handcraftAccountFixture.daily_limit_reached).toBe(false)
     expect(handcraftLedgerFixture.delta).toBe(-30)
     expect(handcraftRewardFixture.source_available).toBe(true)
     expect(handcraftRedemptionFixture.request_id).toBe('request-1')

@@ -463,6 +463,9 @@ export interface HandcraftPointsAccount {
   user_id: number
   balance: number
   updated_at: string | null
+  awarded_today: number
+  daily_limit: number
+  daily_limit_reached: boolean
 }
 
 export interface HandcraftLedgerEntry {
@@ -554,6 +557,22 @@ export interface HandcraftRedemptionHistory {
 }
 
 export interface HandcraftCancellation {
+  fulfillment_id: number
+  redemption_id: number
+  user_id: number
+  status: HandcraftFulfillmentStatus
+  changed: boolean
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  points_cost: number
+  restored_points: number
+  outbox_id: number | null
+  notification_type: 'issued' | 'cancelled' | null
+  notification: Record<string, unknown> | null
+}
+
+export interface HandcraftVerification {
   fulfillment_id: number
   redemption_id: number
   user_id: number

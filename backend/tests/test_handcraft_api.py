@@ -17,7 +17,9 @@ from app.handcraft_inheritance import (
 )
 from app.handcraft_inheritance.fulfillment import (
     cancel_pending_fulfillment,
+    issue_fulfillment,
 )
+from app.handcraft_inheritance.points import _platform_now
 from app.handcraft_inheritance.presets import PLACEHOLDER_POINTS_POLICY
 from app.handcraft_inheritance.rewards import REDEMPTION_CONFLICT_MESSAGE
 
@@ -58,6 +60,11 @@ LEARNER_ROUTES = (
     (
         "POST",
         "/api/handcraft-inheritance/redemptions/1/cancel",
+        None,
+    ),
+    (
+        "POST",
+        "/api/handcraft-inheritance/redemptions/1/verify",
         None,
     ),
     ("GET", "/api/handcraft-inheritance/courses", None),
@@ -121,6 +128,11 @@ class StaticPolicyProvider:
 
     def get_policy(self):
         return copy.deepcopy(self.policy)
+
+
+class FailingPolicyProvider:
+    def get_policy(self):
+        raise RuntimeError("policy source unavailable")
 
 
 class StaticHandcraftCourseProvider:
@@ -349,6 +361,10 @@ class TestHandcraftApi(unittest.TestCase):
                 "/api/handcraft-inheritance/redemptions/"
                 "<int:redemption_id>/cancel"
             ): {"POST"},
+            (
+                "/api/handcraft-inheritance/redemptions/"
+                "<int:redemption_id>/verify"
+            ): {"POST"},
             "/api/handcraft-inheritance/courses": {"GET"},
             "/api/handcraft-inheritance/recommendations": {"GET"},
             (
@@ -548,7 +564,9 @@ class TestHandcraftApi(unittest.TestCase):
         )
 
     def test_points_rewards_redemption_and_cancellation_are_owner_scoped(self):
-        self._fund_student()
+        self._fund_student(
+            occurred_at=_platform_now().isoformat(timespec="seconds")
+        )
 
         account = self.student_client.get(
             "/api/handcraft-inheritance/points"
@@ -569,7 +587,11 @@ class TestHandcraftApi(unittest.TestCase):
         )
 
         self.assertEqual(account.status_code, 200)
-        self.assertEqual(account.get_json()["account"]["balance"], 1000)
+        account_payload = account.get_json()["account"]
+        self.assertEqual(account_payload["balance"], 1000)
+        self.assertEqual(account_payload["awarded_today"], 1000)
+        self.assertEqual(account_payload["daily_limit"], 10000)
+        self.assertFalse(account_payload["daily_limit_reached"])
         self.assertEqual(ledger.status_code, 200)
         self.assertTrue(ledger.get_json()["ledger"])
         self.assertEqual(rewards.status_code, 200)
@@ -616,6 +638,126 @@ class TestHandcraftApi(unittest.TestCase):
         self.assertEqual(
             canceled.get_json()["cancellation"]["status"],
             "canceled",
+        )
+
+    def test_points_daily_status_reports_reached_and_policy_failure(self):
+        policy = copy.deepcopy(PLACEHOLDER_POINTS_POLICY)
+        policy.update(
+            {
+                "seconds_per_point": 1,
+                "training_weights": {"default": 1000},
+                "daily_limit": 1000,
+            }
+        )
+        set_points_policy_provider(
+            self.app,
+            StaticPolicyProvider(policy),
+        )
+        self._fund_student(
+            occurred_at=_platform_now().isoformat(timespec="seconds")
+        )
+
+        reached = self.student_client.get(
+            "/api/handcraft-inheritance/points"
+        )
+
+        self.assertEqual(reached.status_code, 200)
+        self.assertEqual(
+            reached.get_json()["account"]["awarded_today"],
+            1000,
+        )
+        self.assertEqual(
+            reached.get_json()["account"]["daily_limit"],
+            1000,
+        )
+        self.assertTrue(
+            reached.get_json()["account"]["daily_limit_reached"]
+        )
+
+        with self.app.app_context():
+            get_db().execute("DELETE FROM points_policy_snapshots")
+            get_db().commit()
+        set_points_policy_provider(self.app, FailingPolicyProvider())
+
+        unavailable = self.student_client.get(
+            "/api/handcraft-inheritance/points"
+        )
+
+        self.assertEqual(unavailable.status_code, 400)
+        self.assertEqual(
+            unavailable.get_json(),
+            {
+                "success": False,
+                "message": "积分规则暂不可用，请稍后重试",
+                "errors": {},
+            },
+        )
+
+    def test_student_verification_is_owner_scoped_and_requires_issued_state(self):
+        self._fund_student(source_id="verification-funding")
+        redeemed = self.student_client.post(
+            "/api/handcraft-inheritance/redemptions",
+            json={
+                "reward_id": "reward-guangxiu-bookmark",
+                "request_id": "verification-redemption",
+            },
+        )
+        redemption_id = redeemed.get_json()["redemption"]["id"]
+        history = self.student_client.get(
+            "/api/handcraft-inheritance/redemptions"
+        )
+        fulfillment_id = history.get_json()["fulfillments"][0][
+            "fulfillment"
+        ]["id"]
+        verify_path = (
+            "/api/handcraft-inheritance/redemptions/"
+            f"{redemption_id}/verify"
+        )
+
+        foreign = self.other_student_client.post(verify_path)
+        missing = self.student_client.post(
+            "/api/handcraft-inheritance/redemptions/999999/verify"
+        )
+        pending = self.student_client.post(verify_path)
+
+        with self.app.app_context():
+            issue_fulfillment(
+                fulfillment_id,
+                role="admin",
+                emit_notification=False,
+            )
+
+        verified = self.student_client.post(verify_path)
+        repeated = self.student_client.post(verify_path)
+        refreshed = self.student_client.get(
+            "/api/handcraft-inheritance/redemptions"
+        )
+
+        self.assertEqual(foreign.status_code, 404)
+        self.assertEqual(missing.status_code, 404)
+        self.assertEqual(pending.status_code, 400)
+        self.assertEqual(
+            pending.get_json()["message"],
+            "当前履约状态不可核销",
+        )
+        self.assertEqual(verified.status_code, 200)
+        self.assertEqual(
+            verified.get_json()["verification"]["status"],
+            "verified",
+        )
+        self.assertTrue(
+            verified.get_json()["verification"]["changed"]
+        )
+        self.assertIsNotNone(
+            verified.get_json()["verification"]["verified_at"]
+        )
+        self.assertEqual(repeated.status_code, 200)
+        self.assertFalse(
+            repeated.get_json()["verification"]["changed"]
+        )
+        self.assertEqual(
+            refreshed.get_json()["fulfillments"][0]["status"],
+            "verified",
         )
 
     def test_course_routes_filter_hidden_courses_and_preserve_stable_event_id(self):

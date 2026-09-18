@@ -52,7 +52,10 @@ describe('handcraftPoints store', () => {
         account: {
           user_id: 1,
           balance: 40,
-          updated_at: null
+          updated_at: null,
+          awarded_today: 40,
+          daily_limit: 60,
+          daily_limit_reached: false
         }
       } as never)
       .mockResolvedValueOnce({ success: true, ledger } as never)
@@ -65,6 +68,9 @@ describe('handcraftPoints store', () => {
     )
     expect(store.account?.balance).toBe(40)
     expect(store.account?.updated_at).toBeNull()
+    expect(store.account?.awarded_today).toBe(40)
+    expect(store.account?.daily_limit).toBe(60)
+    expect(store.account?.daily_limit_reached).toBe(false)
 
     expect(await store.loadLedger()).toBe(true)
     expect(mockedApiFetch).toHaveBeenNthCalledWith(

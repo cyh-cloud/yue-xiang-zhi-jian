@@ -35,9 +35,11 @@ from app.handcraft_inheritance.fulfillment import (
     list_student_fulfillments as _list_student_fulfillments,
     retry_pending_fulfillment_notifications as
     _retry_pending_fulfillment_notifications,
+    student_verify_fulfillment as _student_verify_fulfillment,
 )
 from app.handcraft_inheritance.points import (
     get_points_account as _get_points_account,
+    get_points_daily_status as _get_points_daily_status,
     get_points_ledger as _get_points_ledger,
     process_pending_events as _process_pending_events,
     run_expiry_settlement as _run_expiry_settlement,
@@ -191,9 +193,11 @@ def get_points_account_route():
     session = _student_session()
     user_id = int(session["id"])
     _process_pending_events(user_id)
+    account = _get_points_account(user_id)
+    account.update(_get_points_daily_status(user_id))
     return jsonify(
         success=True,
-        account=_get_points_account(user_id),
+        account=account,
     )
 
 
@@ -248,14 +252,7 @@ def redeem_reward_route():
 def cancel_redemption_route(redemption_id: int):
     session = _student_session()
     user_id = int(session["id"])
-    fulfillment = next(
-        (
-            item["fulfillment"]["id"]
-            for item in _list_student_fulfillments(user_id)
-            if item["redemption"]["id"] == redemption_id
-        ),
-        None,
-    )
+    fulfillment = _student_fulfillment_id(user_id, redemption_id)
     if fulfillment is None:
         raise AgriNotFoundError("兑换记录不存在")
     return jsonify(
@@ -265,6 +262,38 @@ def cancel_redemption_route(redemption_id: int):
             role="student",
             actor_user_id=user_id,
         ),
+    )
+
+
+@handcraft_inheritance_bp.post(
+    "/redemptions/<int:redemption_id>/verify"
+)
+def verify_redemption_route(redemption_id: int):
+    session = _student_session()
+    user_id = int(session["id"])
+    fulfillment = _student_fulfillment_id(user_id, redemption_id)
+    if fulfillment is None:
+        raise AgriNotFoundError("兑换记录不存在")
+    return jsonify(
+        success=True,
+        verification=_student_verify_fulfillment(
+            fulfillment,
+            user_id,
+        ),
+    )
+
+
+def _student_fulfillment_id(
+    user_id: int,
+    redemption_id: int,
+) -> int | None:
+    return next(
+        (
+            item["fulfillment"]["id"]
+            for item in _list_student_fulfillments(user_id)
+            if item["redemption"]["id"] == redemption_id
+        ),
+        None,
     )
 
 

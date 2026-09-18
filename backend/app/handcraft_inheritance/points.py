@@ -393,6 +393,27 @@ def get_points_account(user_id: int, *, settle: bool = True) -> dict:
     }
 
 
+def get_points_daily_status(
+    user_id: int,
+    *,
+    at: str | datetime | None = None,
+) -> dict:
+    user_id = _require_positive_int(user_id, "学员标识必须是正整数")
+    policy = get_effective_policy()
+    observed_at = _parse_platform_time(at or _platform_now())
+    awarded_today = _daily_awarded_points(
+        _get_db(),
+        user_id,
+        observed_at.isoformat(timespec="seconds"),
+    )
+    daily_limit = int(policy["daily_limit"])
+    return {
+        "awarded_today": awarded_today,
+        "daily_limit": daily_limit,
+        "daily_limit_reached": awarded_today >= daily_limit,
+    }
+
+
 def get_points_ledger(user_id: int) -> list[dict]:
     user_id = _require_positive_int(user_id, "学员标识必须是正整数")
     rows = _get_db().execute(
