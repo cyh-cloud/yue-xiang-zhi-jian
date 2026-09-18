@@ -79,3 +79,11 @@ def get_content_review_provider() -> ContentReviewProvider:
         "content_review_provider",
         UnavailableContentReviewProvider(),
     )
+
+
+__all__ = [
+    "ContentReviewProvider",
+    "UnavailableContentReviewProvider",
+    "get_content_review_provider",
+    "set_content_review_provider",
+]
