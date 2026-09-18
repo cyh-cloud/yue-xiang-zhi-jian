@@ -732,6 +732,69 @@ def change_application_status(
     return result
 
 
+def close_applications_for_deleted_job(db, job_row, now: str) -> dict:
+    rows = db.execute(
+        """
+        SELECT *
+        FROM job_applications
+        WHERE job_id = ?
+        ORDER BY id
+        """,
+        (str(job_row["job_id"]),),
+    ).fetchall()
+    closed = 0
+    historical = 0
+    notification_count = 0
+    outbox_ids = []
+    for row in rows:
+        if row["position_closed_at"] is not None:
+            continue
+        next_version = int(row["status_version"]) + 1
+        db.execute(
+            """
+            UPDATE job_applications
+            SET position_closed_at = ?,
+                close_reason = 'position_deleted',
+                status_version = ?,
+                updated_at = ?
+            WHERE application_id = ? AND position_closed_at IS NULL
+            """,
+            (
+                now,
+                next_version,
+                now,
+                str(row["application_id"]),
+            ),
+        )
+        if row["status"] == "pending":
+            closed += 1
+            event_id = (
+                f"position_closed:{job_row['job_id']}:"
+                f"{row['application_id']}"
+            )
+            outbox_ids.append(
+                enqueue_enterprise_notification(
+                    db,
+                    event_type="position_closed",
+                    event_id=event_id,
+                    payload={
+                        "student_ids": [int(row["student_id"])],
+                        "position_id": str(job_row["job_id"]),
+                        "job_title": str(row["job_title_snapshot"]),
+                    },
+                )
+            )
+            notification_count += 1
+        else:
+            historical += 1
+    return {
+        "closed_application_count": closed,
+        "historical_application_count": historical,
+        "notification_count": notification_count,
+        "outbox_ids": outbox_ids,
+    }
+
+
 __all__ = [
     "APPLICATION_STATUSES",
     "APPLICATION_SORTS",
@@ -740,6 +803,7 @@ __all__ = [
     "PLATFORM_TIMEZONE",
     "STATUS_LABELS",
     "change_application_status",
+    "close_applications_for_deleted_job",
     "get_application",
     "list_applications",
     "record_application_submission",

@@ -320,6 +320,31 @@ def _get_job_row(db, enterprise_id: int, job_id: str):
     ).fetchone()
 
 
+def _owned_job(
+    db,
+    enterprise_id: int,
+    job_id: str,
+    *,
+    include_deleted: bool = False,
+):
+    deleted_clause = "" if include_deleted else " AND deleted_at IS NULL"
+    return db.execute(
+        f"""
+        SELECT *
+        FROM job_positions
+        WHERE job_id = ?
+          AND enterprise_id = ?
+          {deleted_clause}
+        """,
+        (job_id, enterprise_id),
+    ).fetchone()
+
+
+def _require_version(row, expected_version: int) -> None:
+    if int(row["version"]) != expected_version:
+        raise ProviderConflictError("Job version conflict")
+
+
 def _get_job_row_by_id(db, job_id: str):
     return db.execute(
         """
@@ -664,12 +689,93 @@ def get_job(enterprise_id: int, job_id: str) -> dict:
     return serialize_job(row)
 
 
+def delete_job(
+    enterprise_id: int,
+    job_id: str,
+    expected_version: int | None = None,
+) -> dict:
+    normalized_enterprise_id = _normalize_enterprise_id(enterprise_id)
+    normalized_job_id = _normalize_job_id(job_id)
+    if expected_version is not None and (
+        isinstance(expected_version, bool)
+        or not isinstance(expected_version, int)
+        or expected_version <= 0
+    ):
+        raise _validation_error(
+            "expected_version",
+            "expected_version must be a positive integer",
+        )
+
+    from app.enterprise_console.applications import (
+        close_applications_for_deleted_job,
+    )
+    from app.enterprise_console.notifications import deliver_after_commit
+
+    db = get_db()
+    with db:
+        db.execute("BEGIN IMMEDIATE")
+        row = _owned_job(
+            db,
+            normalized_enterprise_id,
+            normalized_job_id,
+            include_deleted=True,
+        )
+        if row is None:
+            raise EnterpriseNotFoundError("Job was not found")
+        if row["deleted_at"] is not None:
+            return {
+                "deleted": True,
+                "changed": False,
+                "closed_application_count": 0,
+                "historical_application_count": 0,
+                "notification_count": 0,
+            }
+        if expected_version is not None:
+            _require_version(row, expected_version)
+
+        now = _now_iso()
+        closure = close_applications_for_deleted_job(db, row, now)
+        cursor = db.execute(
+            """
+            UPDATE job_positions
+            SET deleted_at = ?, updated_at = ?
+            WHERE job_id = ?
+              AND enterprise_id = ?
+              AND deleted_at IS NULL
+            """,
+            (
+                now,
+                now,
+                normalized_job_id,
+                normalized_enterprise_id,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError("职位状态已变化")
+        result = {
+            "deleted": True,
+            "changed": True,
+            "closed_application_count": (
+                closure["closed_application_count"]
+            ),
+            "historical_application_count": (
+                closure["historical_application_count"]
+            ),
+            "notification_count": closure["notification_count"],
+        }
+
+    for outbox_id in closure["outbox_ids"]:
+        deliver_after_commit(outbox_id)
+    return result
+
+
 __all__ = [
     "JOB_REVIEW_CONTENT_TYPE",
     "JOB_REVIEW_STATUSES",
     "JOB_TEXT_LIMITS",
     "JOB_TRANSITIONS",
     "create_job",
+    "delete_job",
     "edit_job",
     "get_job",
     "get_published_position_record",
