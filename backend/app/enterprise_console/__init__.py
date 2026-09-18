@@ -15,6 +15,7 @@ from app.enterprise_console.applications import (
     serialize_application,
 )
 from app.enterprise_console.dashboard import (
+    get_dashboard,
     get_employment_statistics_snapshot,
 )
 from app.enterprise_console.jobs import (
@@ -28,6 +29,9 @@ from app.enterprise_console.jobs import (
     list_jobs,
     serialize_job,
     sync_job_review_projection,
+)
+from app.enterprise_console.messaging_provider import (
+    EnterpriseMessagingProvider,
 )
 from app.enterprise_console.providers import (
     DatabaseJobApplicationIntakeProvider,
@@ -74,6 +78,7 @@ __all__ = [
     "DatabaseJobApplicationIntakeProvider",
     "DatabaseEmploymentStatisticsProvider",
     "EmploymentStatisticsProvider",
+    "EnterpriseMessagingProvider",
     "JOB_REVIEW_CONTENT_TYPE",
     "JOB_REVIEW_STATUSES",
     "JOB_TEXT_LIMITS",
@@ -85,6 +90,7 @@ __all__ = [
     "edit_job",
     "get_application",
     "get_content_review_provider",
+    "get_dashboard",
     "get_employment_statistics_provider",
     "get_employment_statistics_snapshot",
     "get_job",

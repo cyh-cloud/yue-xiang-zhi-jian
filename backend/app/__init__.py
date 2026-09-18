@@ -14,6 +14,9 @@ from app.ecommerce_training.routes import (
     register_ecommerce_training_error_handlers,
 )
 from app.enterprise_console import install_default_enterprise_services
+from app.enterprise_console.messaging_provider import (
+    EnterpriseMessagingProvider,
+)
 from app.handcraft_inheritance import install_default_handcraft_services
 from app.handcraft_inheritance.routes import (
     handcraft_inheritance_bp,
@@ -58,6 +61,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_messaging_source_provider(
         app,
         AgriMessagingProvider(existing_messaging_provider),
+    )
+    register_messaging_source_provider(
+        app,
+        EnterpriseMessagingProvider(),
     )
     app.teardown_appcontext(close_db)
 
