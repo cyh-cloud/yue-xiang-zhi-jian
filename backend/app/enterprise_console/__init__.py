@@ -51,6 +51,10 @@ from app.enterprise_console.review import (
     get_content_review_provider,
     set_content_review_provider,
 )
+from app.enterprise_console.routes import (
+    enterprise_console_bp,
+    register_enterprise_console_error_handlers,
+)
 
 
 def install_default_enterprise_services(app: Flask) -> None:
@@ -88,6 +92,7 @@ __all__ = [
     "change_application_status",
     "create_job",
     "edit_job",
+    "enterprise_console_bp",
     "get_application",
     "get_content_review_provider",
     "get_dashboard",
@@ -100,6 +105,7 @@ __all__ = [
     "list_applications",
     "list_jobs",
     "record_application_submission",
+    "register_enterprise_console_error_handlers",
     "serialize_job",
     "serialize_application",
     "set_job_application_intake_provider",
