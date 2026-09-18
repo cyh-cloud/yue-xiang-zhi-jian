@@ -762,3 +762,47 @@ export interface CustomerSession {
   updated_at: string
   completed_at: string | null
 }
+
+export interface GovernmentPolicy {
+  id: string
+  title: string
+  content: string
+  category_code: 'subsidy' | 'ecommerce' | 'heritage' | 'training'
+    | 'certification' | 'general' | 'entrepreneurship'
+  category_label: string
+  status: 'active' | 'unpublished'
+  view_count: number
+  version: number
+  published_at: string
+  updated_at: string
+}
+
+export interface GovernmentNews {
+  id: string
+  title: string
+  content: string
+  category_code: 'news' | 'disaster_warning' | 'policy_update'
+  category_label: string
+  view_count: number
+  version: number
+  published_at: string
+  updated_at: string
+}
+
+export interface GovernmentDashboard {
+  employment: {
+    active_job_count: number | null
+    cumulative_application_count: number | null
+    available: boolean
+  }
+  policy: {
+    active_count: number
+    unpublished_count: number
+    total_count: number
+    view_count: number
+  }
+  news: {
+    total_count: number
+    view_count: number
+  }
+}
