@@ -10,7 +10,7 @@ from app.government_console.policy import (
     unpublish_policy,
 )
 from app.government_console.providers import (
-    NullPolicyNewsProvider,
+    DatabasePolicyNewsProvider,
     UnavailableEmploymentStatisticsProvider,
     set_employment_statistics_provider,
     set_policy_news_provider,
@@ -19,7 +19,7 @@ from app.government_console.providers import (
 
 def install_default_government_services(app: Flask) -> None:
     if "government_policy_news_provider" not in app.extensions:
-        set_policy_news_provider(app, NullPolicyNewsProvider())
+        set_policy_news_provider(app, DatabasePolicyNewsProvider())
     if "government_employment_statistics_provider" not in app.extensions:
         set_employment_statistics_provider(
             app, UnavailableEmploymentStatisticsProvider()

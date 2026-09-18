@@ -5,6 +5,10 @@ from typing import Protocol
 from flask import Flask, current_app
 
 from app.government_console.errors import ProviderUnavailableError
+from app.government_console.views import (
+    record_news_view as _record_news_view,
+    record_policy_view as _record_policy_view,
+)
 
 
 class PolicyNewsProvider(Protocol):
@@ -45,6 +49,14 @@ class NullPolicyNewsProvider:
 
     def record_news_view(self, news_id: str, view_event_id: str) -> int:
         raise ProviderUnavailableError("新闻浏览计数暂不可用")
+
+
+class DatabasePolicyNewsProvider(NullPolicyNewsProvider):
+    def record_policy_view(self, policy_id: str, view_event_id: str) -> int:
+        return _record_policy_view(policy_id, view_event_id)
+
+    def record_news_view(self, news_id: str, view_event_id: str) -> int:
+        return _record_news_view(news_id, view_event_id)
 
 
 class UnavailableEmploymentStatisticsProvider:
