@@ -8,6 +8,17 @@
 - No `002` feature branch exists locally or on the fetched remotes; only
   002 specification/plan commits are present.
 
+## 005 Role and Points Revision
+
+- 2026-09-18: `v2/lixKRT/dev` fast-forwarded `c8ecf0d -> 633b456`,
+  integrating `v2/lixKRT/005-fix-role-points`.
+- Project-defined weak convergence ran against
+  `specs/005-heritage-craft/spec.md`; zero actionable gaps were found.
+  No `tasks.md` authority was created, per project routing.
+- Independent review and scoped re-review approved the revision. Final
+  backend regression passed `507/507`.
+- No push was performed.
+
 ## 005 Task 20 Browser Acceptance
 
 - Completed on 2026-09-18 in `.worktrees/005-heritage-craft`.
