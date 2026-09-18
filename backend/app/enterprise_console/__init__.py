@@ -14,6 +14,9 @@ from app.enterprise_console.applications import (
     record_application_submission,
     serialize_application,
 )
+from app.enterprise_console.dashboard import (
+    get_employment_statistics_snapshot,
+)
 from app.enterprise_console.jobs import (
     JOB_REVIEW_CONTENT_TYPE,
     JOB_REVIEW_STATUSES,
@@ -29,8 +32,12 @@ from app.enterprise_console.jobs import (
 from app.enterprise_console.providers import (
     DatabaseJobApplicationIntakeProvider,
     DatabaseJobPositionProvider,
+    DatabaseEmploymentStatisticsProvider,
+    EmploymentStatisticsProvider,
+    get_employment_statistics_provider,
     get_job_application_intake_provider,
     get_job_position_provider,
+    set_employment_statistics_provider,
     set_job_application_intake_provider,
     set_job_position_provider,
 )
@@ -52,6 +59,11 @@ def install_default_enterprise_services(app: Flask) -> None:
         )
     if "content_review_provider" not in app.extensions:
         set_content_review_provider(app, UnavailableContentReviewProvider())
+    if "government_employment_statistics_provider" not in app.extensions:
+        set_employment_statistics_provider(
+            app,
+            DatabaseEmploymentStatisticsProvider(),
+        )
 
 
 __all__ = [
@@ -60,6 +72,8 @@ __all__ = [
     "CLOSED_STATUS_LABEL",
     "ContentReviewProvider",
     "DatabaseJobApplicationIntakeProvider",
+    "DatabaseEmploymentStatisticsProvider",
+    "EmploymentStatisticsProvider",
     "JOB_REVIEW_CONTENT_TYPE",
     "JOB_REVIEW_STATUSES",
     "JOB_TEXT_LIMITS",
@@ -71,6 +85,8 @@ __all__ = [
     "edit_job",
     "get_application",
     "get_content_review_provider",
+    "get_employment_statistics_provider",
+    "get_employment_statistics_snapshot",
     "get_job",
     "get_job_application_intake_provider",
     "get_job_position_provider",
@@ -82,6 +98,7 @@ __all__ = [
     "serialize_application",
     "set_job_application_intake_provider",
     "set_content_review_provider",
+    "set_employment_statistics_provider",
     "set_job_position_provider",
     "sync_job_review_projection",
 ]

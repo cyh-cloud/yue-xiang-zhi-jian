@@ -1746,7 +1746,7 @@ available = (
 
 The 010 placeholder remains responsible for returning `None` for both methods and therefore `available=False`. The 09 implementation is an available source and returns integer `0` when its authoritative tables contain no matching rows; it must never use `None` to represent an empty database.
 
-The `set_employment_statistics_provider` and `get_employment_statistics_provider` exports use the single `employment_statistics_provider` application-extension key. This is the same slot already frozen by 010; no second registry may be created. 010 may install the 09 implementation through its existing setter without changing its dashboard branch.
+The `set_employment_statistics_provider` and `get_employment_statistics_provider` exports must use the existing 010 application-extension key `government_employment_statistics_provider`; the 010 function names remain unchanged. This is the same slot already implemented by 010, so no second registry may be created. 010 may install the 09 implementation through its existing setter without changing its dashboard branch.
 
 - [ ] **Step 1: Write failing all-platform statistics tests**
 
@@ -1842,12 +1842,12 @@ def set_employment_statistics_provider(
     app: Flask,
     provider: EmploymentStatisticsProvider,
 ) -> None:
-    app.extensions["employment_statistics_provider"] = provider
+    app.extensions["government_employment_statistics_provider"] = provider
 
 
 def get_employment_statistics_provider() -> EmploymentStatisticsProvider:
     return current_app.extensions.get(
-        "employment_statistics_provider",
+        "government_employment_statistics_provider",
         DatabaseEmploymentStatisticsProvider(),
     )
 ```

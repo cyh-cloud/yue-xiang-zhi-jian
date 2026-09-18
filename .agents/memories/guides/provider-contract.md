@@ -440,7 +440,8 @@ class EmploymentStatisticsProvider(Protocol):
     def get_cumulative_application_count(self) -> int | None: ...
 ```
 
-- 注册槽固定为 `employment_statistics_provider`，入口为
+- 注册槽固定为 010 已实现的应用扩展 key
+  `government_employment_statistics_provider`，入口函数名为
   `set_employment_statistics_provider` / `get_employment_statistics_provider`。
 - 09 实现返回全平台已上架职位数和全平台累计投递量；无匹配数据返回整数
   `0`，不得返回 `None` 冒充不可用。
@@ -525,8 +526,9 @@ class EmploymentStatisticsProvider(Protocol):
 - 09 可在 11 尚未实现时通过 `set_content_review_provider()` 向唯一
   `content_review_provider` 槽安装协议完整的不可用占位实现；11 落地后
   用同一 `set/get` 槽替换，不得建立第二审核注册表。
-- 09 为 010 实现全平台就业统计，并在 `employment_statistics_provider`
-  单一槽提供 `EmploymentStatisticsProvider`；010 的 `None` 占位和
+- 09 为 010 实现全平台就业统计，并在 010 的
+  `government_employment_statistics_provider` 单一槽提供
+  `EmploymentStatisticsProvider`；010 的 `None` 占位和
   `available=False` 行为保持不变。
 - 11 是内容审核、奖品库、履约管理、积分规则、预置内容、功能知识库和
   全平台统计的生产者。

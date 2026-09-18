@@ -124,6 +124,28 @@ class DatabaseJobApplicationIntakeProvider:
         return self._database_call(record)
 
 
+class EmploymentStatisticsProvider(Protocol):
+    def get_active_job_count(self) -> int | None: ...
+
+    def get_cumulative_application_count(self) -> int | None: ...
+
+
+class DatabaseEmploymentStatisticsProvider:
+    def get_active_job_count(self) -> int | None:
+        from app.enterprise_console.dashboard import (
+            get_platform_active_job_count,
+        )
+
+        return get_platform_active_job_count()
+
+    def get_cumulative_application_count(self) -> int | None:
+        from app.enterprise_console.dashboard import (
+            get_platform_cumulative_application_count,
+        )
+
+        return get_platform_cumulative_application_count()
+
+
 def set_job_position_provider(
     app: Flask,
     provider: JobPositionProvider,
@@ -152,12 +174,27 @@ def get_job_application_intake_provider() -> JobApplicationIntakeProvider:
     )
 
 
+def set_employment_statistics_provider(
+    app: Flask,
+    provider: EmploymentStatisticsProvider,
+) -> None:
+    app.extensions["government_employment_statistics_provider"] = provider
+
+
+def get_employment_statistics_provider() -> EmploymentStatisticsProvider:
+    return current_app.extensions.get(
+        "government_employment_statistics_provider",
+        DatabaseEmploymentStatisticsProvider(),
+    )
+
+
 def configure_enterprise_providers(
     app: Flask,
     *,
     job_position_provider: JobPositionProvider | None = None,
     job_application_intake_provider: JobApplicationIntakeProvider | None = None,
     content_review_provider: ContentReviewProvider | None = None,
+    employment_statistics_provider: EmploymentStatisticsProvider | None = None,
 ) -> None:
     if job_position_provider is not None:
         set_job_position_provider(app, job_position_provider)
@@ -170,3 +207,8 @@ def configure_enterprise_providers(
         from app.enterprise_console.review import set_content_review_provider
 
         set_content_review_provider(app, content_review_provider)
+    if employment_statistics_provider is not None:
+        set_employment_statistics_provider(
+            app,
+            employment_statistics_provider,
+        )
