@@ -206,17 +206,20 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
       {
         id: 'government-policy-publish',
         title: '政策发布',
-        description: '发布与维护面向乡村人才的扶持政策。'
+        description: '发布与维护面向乡村人才的扶持政策。',
+        href: '/government/policies'
       },
       {
         id: 'government-news-publish',
         title: '新闻发布',
-        description: '发布地区动态与政务新闻。'
+        description: '发布地区动态与政务新闻。',
+        href: '/government/news'
       },
       {
         id: 'government-dashboard',
         title: '政务看板',
-        description: '查看政策、新闻与区域服务数据概览。'
+        description: '查看政策、新闻与区域服务数据概览。',
+        href: '/government/dashboard'
       },
       {
         id: 'government-messages',

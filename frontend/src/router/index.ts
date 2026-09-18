@@ -16,6 +16,9 @@ import EcommerceSimulationView from '@/views/EcommerceSimulationView.vue'
 import EcommerceStoreGuidanceView from '@/views/EcommerceStoreGuidanceView.vue'
 import EcommerceTrainingHomeView from '@/views/EcommerceTrainingHomeView.vue'
 import EnterprisePortalView from '@/views/EnterprisePortalView.vue'
+import GovernmentDashboardView from '@/views/GovernmentDashboardView.vue'
+import GovernmentNewsView from '@/views/GovernmentNewsView.vue'
+import GovernmentPolicyView from '@/views/GovernmentPolicyView.vue'
 import GovernmentPortalView from '@/views/GovernmentPortalView.vue'
 import HandcraftCoursesView from '@/views/HandcraftCoursesView.vue'
 import HandcraftCraftView from '@/views/HandcraftCraftView.vue'
@@ -198,6 +201,24 @@ const router = createRouter({
       path: '/government',
       name: 'government-portal',
       component: GovernmentPortalView,
+      meta: { requiresAuth: true, roles: ['government'] }
+    },
+    {
+      path: '/government/policies',
+      name: 'government-policies',
+      component: GovernmentPolicyView,
+      meta: { requiresAuth: true, roles: ['government'] }
+    },
+    {
+      path: '/government/news',
+      name: 'government-news',
+      component: GovernmentNewsView,
+      meta: { requiresAuth: true, roles: ['government'] }
+    },
+    {
+      path: '/government/dashboard',
+      name: 'government-dashboard',
+      component: GovernmentDashboardView,
       meta: { requiresAuth: true, roles: ['government'] }
     },
     {
