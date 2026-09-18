@@ -14,6 +14,7 @@ from app.ecommerce_training.routes import (
     register_ecommerce_training_error_handlers,
 )
 from app.government_console import install_default_government_services
+from app.government_console.routes import government_bp
 from app.handcraft_inheritance import install_default_handcraft_services
 from app.handcraft_inheritance.routes import (
     handcraft_inheritance_bp,
@@ -88,6 +89,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(agri_skills_bp)
     app.register_blueprint(ecommerce_training_bp)
     app.register_blueprint(handcraft_inheritance_bp)
+    app.register_blueprint(government_bp)
     register_ecommerce_training_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
 
