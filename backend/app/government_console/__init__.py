@@ -2,6 +2,13 @@ from __future__ import annotations
 
 from flask import Flask
 
+from app.government_console.policy import (
+    delete_policy,
+    list_policies,
+    publish_policy,
+    relist_policy,
+    unpublish_policy,
+)
 from app.government_console.providers import (
     NullPolicyNewsProvider,
     UnavailableEmploymentStatisticsProvider,
