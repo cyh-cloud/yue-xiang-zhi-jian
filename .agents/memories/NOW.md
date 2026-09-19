@@ -1,5 +1,39 @@
 # Current Work
 
+## 008 Teacher Console Task 19
+
+- Worktree: `.worktrees/008-teacher-console` on
+  `v2/lixKRT/008-teacher-console`, base `6b97652`.
+- Task commits 1-18: `c116d3e`, `f571467`, `b5ca1d0`, `bb327a4`,
+  `b3a0b85`, `2041cf8`, `e9c78c4`, `ce6c01a`, `d1a953e`, `a5e5e77`,
+  `e08dba6`, `867dc43`, `87e52a1`, `65eef00`, `35fc277`, `cb34e1f`,
+  `5839d77`, `e1276a9`, `6b97652`.
+- Review status: Tasks 1-18 are complete with clean task review at `6b97652`.
+  Task 19 is the cross-module acceptance/regression task and does not perform
+  the final whole-branch review.
+- Verified commands:
+  - `uv run --directory backend python -m unittest discover -s tests -v`:
+    `613` tests ran, `612` passed, `1` failed.
+  - `cd frontend && npm test`: `69` files and `365` tests passed.
+  - `cd frontend && npx tsc -b --noEmit`: passed with no output.
+  - `cd frontend && npm run build`: passed; `1761` modules transformed.
+  - Browser geometry at `320`, `375`, and `1280` for the teacher shell,
+    course editor, quiz editor, announcement view, comment view, and
+    dashboard: `clientWidth == scrollWidth`, no horizontal overflow.
+- Provider replacement status: the replacement `ContentReviewProvider`
+  acceptance test passes through `set_content_review_provider` and
+  `CourseReviewAdapter` without consumer changes.
+- Residual risk: `get_teacher_course()` does not merge provider-authoritative
+  `rejected` status, rejection opinion, or review update time. The exact Task
+  19 acceptance assertion currently fails with local `pending` instead of
+  provider `rejected`; no production fix was made because Task 19 scope is
+  limited to the three test files and this memory file.
+- Browser screenshots are stored under
+  `.superpowers/sdd/2026-09-18-008-teacher-console/task-19-screenshots/`.
+  Visual content is `待人工复核` because image inspection was not delegated.
+- Task 19 report:
+  `.superpowers/sdd/2026-09-18-008-teacher-console/task-19-report.md`.
+
 ## Integration Branch
 
 - 2026-09-18: `v2/lixKRT/dev` fast-forwarded `e527d34 -> 8e27da8`,
