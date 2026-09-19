@@ -1101,6 +1101,9 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
+    from app.local_resources.cases import seed_local_resource_cases
+
+    seed_local_resource_cases(db)
     db.commit()
 
 

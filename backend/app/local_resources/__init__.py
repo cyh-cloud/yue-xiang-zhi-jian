@@ -7,6 +7,13 @@ from app.local_resources.constants import (
     POLICY_LABELS,
     RECOMMENDATION_TAGS,
 )
+from app.local_resources.cases import (
+    DatabaseLocalResourceCaseProvider,
+    LocalResourceCaseProvider,
+    UnavailableLocalResourceCaseProvider,
+    get_local_resource_case_provider,
+    set_local_resource_case_provider,
+)
 from app.local_resources.errors import (
     LocalResourceAccessDeniedError,
     LocalResourceAiUnavailableError,
@@ -25,6 +32,11 @@ __all__ = [
     "NEWS_CATEGORIES",
     "NEWS_LABELS",
     "RECOMMENDATION_TAGS",
+    "LocalResourceCaseProvider",
+    "DatabaseLocalResourceCaseProvider",
+    "UnavailableLocalResourceCaseProvider",
+    "get_local_resource_case_provider",
+    "set_local_resource_case_provider",
     "LocalResourceError",
     "LocalResourceValidationError",
     "LocalResourceNotFoundError",
