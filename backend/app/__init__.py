@@ -31,6 +31,7 @@ from app.handcraft_inheritance.routes import (
 from app.job_matching import (
     install_default_job_matching_services,
     job_matching_bp,
+    register_job_matching_error_handlers,
 )
 from app.messaging.routes import messages_bp
 from app.messaging.source_provider import register_messaging_source_provider
@@ -138,6 +139,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_ecommerce_training_error_handlers(app)
     register_enterprise_console_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
+    register_job_matching_error_handlers(app)
     register_teacher_console_error_handlers(app)
 
     with app.app_context():
