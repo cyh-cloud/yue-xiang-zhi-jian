@@ -50,6 +50,11 @@ AI_FIELD_ALLOWLISTS = {
     "customer_message_generate": {"scenario", "goal_criteria", "prior_turns", "turn_no"},
     "customer_reply_analyze": {"scenario", "goal_criteria", "customer_message", "student_reply"},
     "customer_summary": {"scenario", "goal_criteria", "turns"},
+    "resume_optimize": {
+        "education_experiences",
+        "work_experiences",
+        "skills",
+    },
 }
 
 ECOMMERCE_AI_CALL_POINTS = {
@@ -69,6 +74,10 @@ HANDCRAFT_AI_CALL_POINTS = {
     "handcraft_ar_guidance_generate",
 }
 
+JOB_MATCHING_AI_CALL_POINTS = {
+    "resume_optimize",
+}
+
 AI_CALL_DOMAINS = {
     call_point: (
         "电商运营实训任务"
@@ -76,7 +85,11 @@ AI_CALL_DOMAINS = {
         else (
             "手工传承任务"
             if call_point in HANDCRAFT_AI_CALL_POINTS
-            else "农业技能任务"
+            else (
+                "就业对接任务"
+                if call_point in JOB_MATCHING_AI_CALL_POINTS
+                else "农业技能任务"
+            )
         )
     )
     for call_point in AI_FIELD_ALLOWLISTS
