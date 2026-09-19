@@ -1173,3 +1173,66 @@ export interface TeacherReport {
   stats_snapshot: TeacherReportStatsSnapshot
   sections: TeacherReportSections
 }
+
+export type LocalDialectCode = 'yue' | 'hak' | 'nan'
+export type PolicyCategoryCode =
+  | 'subsidy'
+  | 'ecommerce'
+  | 'heritage'
+  | 'training'
+  | 'certification'
+  | 'general'
+  | 'entrepreneurship'
+export type NewsCategoryCode =
+  | 'news'
+  | 'disaster_warning'
+  | 'policy_update'
+
+export interface LocalResourceCase {
+  id: string
+  title: string
+  summary: string
+  published_at: string
+  updated_at: string
+  is_demo: boolean
+}
+
+export interface LocalResourceCaseDetail extends LocalResourceCase {
+  background: string
+  journey: string
+  lessons: string
+}
+
+export interface LocalResourcePolicy {
+  id: string
+  title: string
+  content: string
+  category_code: PolicyCategoryCode
+  category_label: string
+  published_at: string
+  updated_at: string
+  version: number
+}
+
+export interface LocalResourceNews {
+  id: string
+  title: string
+  content: string
+  category_code: NewsCategoryCode
+  category_label: string
+  published_at: string
+  updated_at: string
+  version: number
+}
+
+export interface PolicyCategorySubscription {
+  code: PolicyCategoryCode
+  label: string
+  subscribed: boolean
+  recommended: boolean
+}
+
+export interface PolicySubscriptionState {
+  categories: PolicyCategorySubscription[]
+  recommended_category_codes: PolicyCategoryCode[]
+}
