@@ -14,6 +14,12 @@ from app.local_resources.cases import (
     get_local_resource_case_provider,
     set_local_resource_case_provider,
 )
+from app.local_resources.catalog import (
+    get_news,
+    get_policy,
+    list_news,
+    list_policies,
+)
 from app.local_resources.errors import (
     LocalResourceAccessDeniedError,
     LocalResourceAiUnavailableError,
@@ -37,6 +43,10 @@ __all__ = [
     "UnavailableLocalResourceCaseProvider",
     "get_local_resource_case_provider",
     "set_local_resource_case_provider",
+    "list_policies",
+    "get_policy",
+    "list_news",
+    "get_news",
     "LocalResourceError",
     "LocalResourceValidationError",
     "LocalResourceNotFoundError",
