@@ -30,9 +30,16 @@ import HandcraftPointsView from '@/views/HandcraftPointsView.vue'
 import HandcraftRewardsView from '@/views/HandcraftRewardsView.vue'
 import HomeView from '@/views/HomeView.vue'
 import InterestTagsView from '@/views/InterestTagsView.vue'
+import JobDetailView from '@/views/JobDetailView.vue'
+import JobFavoritesView from '@/views/JobFavoritesView.vue'
+import JobMatchingHomeView from '@/views/JobMatchingHomeView.vue'
+import JobsView from '@/views/JobsView.vue'
 import LoginView from '@/views/LoginView.vue'
 import MessageCenterView from '@/views/MessageCenterView.vue'
+import MyApplicationsView from '@/views/MyApplicationsView.vue'
 import RegisterView from '@/views/RegisterView.vue'
+import ResumeEditorView from '@/views/ResumeEditorView.vue'
+import SkillProfileView from '@/views/SkillProfileView.vue'
 import StudentPortalView from '@/views/StudentPortalView.vue'
 import StudentProfileView from '@/views/StudentProfileView.vue'
 import TeacherAnnouncementsView from '@/views/TeacherAnnouncementsView.vue'
@@ -192,6 +199,48 @@ const router = createRouter({
       path: '/student/handcraft-inheritance/courses',
       name: 'student-handcraft-courses',
       component: HandcraftCoursesView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment',
+      name: 'student-employment',
+      component: JobMatchingHomeView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment/resume',
+      name: 'student-employment-resume',
+      component: ResumeEditorView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment/skills',
+      name: 'student-employment-skills',
+      component: SkillProfileView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment/jobs',
+      name: 'student-employment-jobs',
+      component: JobsView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment/jobs/:jobId',
+      name: 'student-employment-job-detail',
+      component: JobDetailView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment/applications',
+      name: 'student-employment-applications',
+      component: MyApplicationsView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/employment/favorites',
+      name: 'student-employment-favorites',
+      component: JobFavoritesView,
       meta: { requiresAuth: true, roles: ['student'] }
     },
     {
