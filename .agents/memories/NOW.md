@@ -2,7 +2,8 @@
 
 ## 009 Enterprise Console
 
-- 2026-09-19: Feature source `0f5950c` merged into `v2/lixKRT/dev` before 010.
+- 2026-09-19: Feature source `0f5950c` merged into `v2/lixKRT/dev` as
+  `dbeadb2` before 010.
 - `backend/app/enterprise_console/providers.py` now owns
   `DatabaseEmploymentStatisticsProvider` for all-platform active-job and
   cumulative-application counts.
@@ -45,6 +46,15 @@
 - 009 is merged first so the 010 dashboard consumes the real
   `EmploymentStatisticsProvider`; the post-merge dashboard integration check is
   part of the 010 merge verification.
+- 2026-09-19: 010 source `4045c41` merged as `850b345`; compatibility test
+  isolation committed as `a00e061`.
+- Post-merge verification: backend `644/644`, frontend `406/406`, TypeScript
+  check and production build passed; 009 targeted `83/83` and 010 targeted
+  `54/54` passed.
+- Real application dashboard check returned
+  `{"active_job_count":1,"cumulative_application_count":5,"available":true}`
+  after government login, confirming the 009 provider is registered in the
+  shared extension slot.
 
 ## Integration Branch
 
