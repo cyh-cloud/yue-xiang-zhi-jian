@@ -3,6 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.db import get_db
 from app.job_matching import (
@@ -42,6 +44,28 @@ class JobMatchingFoundationTests(unittest.TestCase):
             }
         )
 
+    def _create_active_user(self, username: str, role: str) -> int:
+        with self.app.app_context():
+            cursor = get_db().execute(
+                """
+                INSERT INTO users (
+                    username, password_hash, name, role, is_enabled,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    username,
+                    generate_password_hash("password8"),
+                    username,
+                    role,
+                    "2026-09-19T10:00:00+08:00",
+                    "2026-09-19T10:00:00+08:00",
+                ),
+            )
+            get_db().commit()
+        return int(cursor.lastrowid)
+
     def test_tables_and_resume_columns_exist(self):
         with self.app.app_context():
             tables = {
@@ -75,6 +99,23 @@ class JobMatchingFoundationTests(unittest.TestCase):
     def test_job_matching_prefix_requires_session(self):
         response = self.app.test_client().get("/api/job-matching/jobs")
         self.assertEqual(response.status_code, 401)
+
+    def test_job_matching_prefix_rejects_active_non_student(self):
+        self._create_active_user("teacher-session", "teacher")
+        client = self.app.test_client()
+        login = client.post(
+            "/api/auth/login",
+            json={"username": "teacher-session", "password": "password8"},
+        )
+        self.assertEqual(login.status_code, 200)
+
+        response = client.get("/api/job-matching/jobs")
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(
+            response.get_json()["message"],
+            "未登录或会话已过期",
+        )
 
     def test_existing_resume_table_is_migrated(self):
         legacy_path = Path(self.temp_dir.name) / "legacy.db"

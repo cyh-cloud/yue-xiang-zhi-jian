@@ -36,7 +36,7 @@ from app.messaging.routes import messages_bp
 from app.messaging.source_provider import register_messaging_source_provider
 from app.onboarding.routes import onboarding_bp
 from app.profiles.routes import student_profile_bp
-from app.session_manager import load_session
+from app.session_manager import abort_session_required, load_session
 from app.tags.routes import interest_tags_bp
 from app.teacher_console import (
     install_default_teacher_console_services,
@@ -59,6 +59,10 @@ PROTECTED_API_PREFIXES = (
     "/api/ecommerce-training",
     "/api/handcraft-inheritance",
 )
+
+PROTECTED_API_ROLES = {
+    "/api/job-matching": "student",
+}
 
 INTERNAL_API_PREFIXES = (
     "/api/handcraft-inheritance/internal/",
@@ -100,11 +104,22 @@ def create_app(test_config: dict | None = None) -> Flask:
             for prefix in INTERNAL_API_PREFIXES
         ):
             return None
-        if any(
-            path == prefix or path.startswith(f"{prefix}/")
-            for prefix in PROTECTED_API_PREFIXES
-        ):
-            load_session(required=True, allowed_states={"active"})
+        matched_prefix = next(
+            (
+                prefix
+                for prefix in PROTECTED_API_PREFIXES
+                if path == prefix or path.startswith(f"{prefix}/")
+            ),
+            None,
+        )
+        if matched_prefix is not None:
+            session = load_session(
+                required=True,
+                allowed_states={"active"},
+            )
+            required_role = PROTECTED_API_ROLES.get(matched_prefix)
+            if required_role is not None and session["role"] != required_role:
+                abort_session_required()
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(student_courses_bp)
