@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, Flask, jsonify, request
 
 from app.agri_skills.errors import AiUnavailableError
+from app.db import get_db
 from app.enterprise_console.errors import ProviderUnavailableError
 from app.job_matching.applications import (
     get_my_application,
@@ -56,6 +57,9 @@ def _student_session() -> dict:
     session = load_session(required=True, allowed_states={"active"})
     if session["role"] != "student":
         abort_session_required()
+    db = get_db()
+    if db.in_transaction:
+        db.commit()
     return session
 
 
