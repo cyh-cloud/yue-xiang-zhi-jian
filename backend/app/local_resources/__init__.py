@@ -37,6 +37,14 @@ from app.local_resources.subscriptions import (
     recommend_policy_categories,
     set_policy_subscription,
 )
+from app.local_resources.tts import (
+    OpenAiCompatibleTtsClient,
+    TtsAudio,
+    TtsClient,
+    get_local_tts_client,
+    set_local_tts_client,
+    synthesize_dialect,
+)
 from app.local_resources.views import (
     record_news_view,
     record_policy_view,
@@ -65,6 +73,12 @@ __all__ = [
     "LocalResourcesMessagingProvider",
     "record_policy_view",
     "record_news_view",
+    "TtsAudio",
+    "TtsClient",
+    "OpenAiCompatibleTtsClient",
+    "get_local_tts_client",
+    "set_local_tts_client",
+    "synthesize_dialect",
     "LocalResourceError",
     "LocalResourceValidationError",
     "LocalResourceNotFoundError",
