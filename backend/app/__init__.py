@@ -24,7 +24,12 @@ from app.onboarding.routes import onboarding_bp
 from app.profiles.routes import student_profile_bp
 from app.session_manager import load_session
 from app.tags.routes import interest_tags_bp
-from app.teacher_console import install_default_teacher_console_services
+from app.teacher_console import (
+    install_default_teacher_console_services,
+    register_teacher_console_error_handlers,
+    teacher_console_bp,
+    teacher_media_bp,
+)
 
 
 PROTECTED_API_PREFIXES = (
@@ -88,8 +93,11 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(agri_skills_bp)
     app.register_blueprint(ecommerce_training_bp)
     app.register_blueprint(handcraft_inheritance_bp)
+    app.register_blueprint(teacher_console_bp)
+    app.register_blueprint(teacher_media_bp)
     register_ecommerce_training_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
+    register_teacher_console_error_handlers(app)
 
     with app.app_context():
         init_db()
