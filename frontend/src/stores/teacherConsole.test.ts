@@ -6,6 +6,7 @@ import type {
   TeacherAnnouncement,
   TeacherComment,
   TeacherCourse,
+  TeacherCourseFilters,
   TeacherDashboard,
   TeacherQuiz,
   TeacherReport
@@ -295,6 +296,20 @@ describe('useTeacherConsoleStore', () => {
       '/api/teacher/courses?direction=agriculture&status=draft'
     )
     expect(store.courses).toEqual([courseFixture])
+  })
+
+  it('keeps rejected display state separate from list filter input', () => {
+    const rejectedCourse = {
+      ...courseFixture,
+      status: 'rejected'
+    } satisfies TeacherCourse
+    const validFilters: TeacherCourseFilters = { status: 'draft' }
+    // @ts-expect-error The backend course list does not accept rejected.
+    const invalidFilters: TeacherCourseFilters = { status: 'rejected' }
+
+    expect(rejectedCourse.status).toBe('rejected')
+    expect(validFilters.status).toBe('draft')
+    expect(invalidFilters.status).toBe('rejected')
   })
 
   it('saves a course and replaces it with the returned server state', async () => {

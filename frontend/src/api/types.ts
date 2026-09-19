@@ -770,6 +770,11 @@ export type TeacherCourseStatus =
   | 'rejected'
   | 'offline'
 
+export type TeacherCourseFilterStatus = Exclude<
+  TeacherCourseStatus,
+  'rejected'
+>
+
 export type TeacherMediaSourceType = 'local_upload' | 'external_url'
 
 export interface TeacherCoursePayload {
@@ -807,7 +812,7 @@ export interface TeacherCourse {
 
 export interface TeacherCourseFilters {
   direction?: CourseDirection
-  status?: TeacherCourseStatus
+  status?: TeacherCourseFilterStatus
 }
 
 export type TeacherQuizQuestionType = 'single_choice' | 'true_false'
