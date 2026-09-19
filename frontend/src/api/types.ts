@@ -762,3 +762,191 @@ export interface CustomerSession {
   updated_at: string
   completed_at: string | null
 }
+
+export type TeacherCourseStatus =
+  | 'draft'
+  | 'pending'
+  | 'published'
+  | 'rejected'
+  | 'offline'
+
+export type TeacherMediaSourceType = 'local_upload' | 'external_url'
+
+export interface TeacherCoursePayload {
+  title: string
+  direction: CourseDirection
+  summary: string
+  content_tags: string[]
+  duration_seconds: number
+  media_source_type: TeacherMediaSourceType
+  media_url: string
+  expected_version?: number
+}
+
+export interface TeacherCourse {
+  id: number
+  title: string
+  direction: CourseDirection
+  status: TeacherCourseStatus
+  duration_seconds: number
+  media_url: string
+  published_at: string | null
+  summary: string
+  teacher_name: string
+  teacher_id: number
+  media_source_type: TeacherMediaSourceType
+  content_tags_json: string
+  version: number
+  rejection_opinion: string | null
+  submitted_at: string | null
+  created_at: string
+  updated_at: string
+  content_tags: string[]
+  tag_ids: number[]
+}
+
+export interface TeacherCourseFilters {
+  direction?: CourseDirection
+  status?: TeacherCourseStatus
+}
+
+export type TeacherQuizQuestionType = 'single_choice' | 'true_false'
+
+export interface TeacherQuizQuestion {
+  id: string
+  type: TeacherQuizQuestionType
+  prompt: string
+  options: string[]
+  answer: string
+}
+
+export interface TeacherQuiz {
+  enabled?: boolean
+  scoring_rule?: string
+  questions: TeacherQuizQuestion[]
+}
+
+export interface TeacherQuizGeneratePayload {
+  summary: string
+  direction: CourseDirection
+}
+
+export interface TeacherQuizSavePayload {
+  expected_version: number
+  enabled: boolean
+  scoring_rule: string
+  questions: TeacherQuizQuestion[]
+}
+
+export interface TeacherMedia {
+  media_source_type: TeacherMediaSourceType
+  media_url: string
+  size_bytes: number
+}
+
+export type TeacherAnnouncementDeliveryStatus =
+  | 'pending'
+  | 'sent'
+  | 'failed'
+
+export interface TeacherAnnouncement {
+  announcement_id: string
+  teacher_id: number
+  title: string
+  body: string
+  event_id: string
+  delivery_status: TeacherAnnouncementDeliveryStatus
+  delivery_result: Record<string, unknown>
+  created_at: string
+}
+
+export interface TeacherAnnouncementPayload {
+  title: string
+  body: string
+}
+
+export type TeacherCommentContentType =
+  | 'course_video'
+  | 'handcraft_teaching_video'
+
+export interface TeacherComment {
+  comment_id: string
+  content_type: TeacherCommentContentType
+  content_id: string
+  author_id: number
+  parent_comment_id: string | null
+  body: string
+  is_teacher_reply: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface TeacherCommentFilters {
+  content_type?: TeacherCommentContentType
+  content_id?: string
+}
+
+export type TeacherLearningDirection =
+  | CourseDirection
+  | 'comprehensive'
+
+export interface TeacherDirectionStats {
+  student_count: number
+  average_progress: number
+}
+
+export interface TeacherDashboard {
+  student_total: number
+  average_progress: number
+  completion_rate: number
+  quiz_attempt_count: number
+  quiz_average_score: number
+  directions: Record<TeacherLearningDirection, TeacherDirectionStats>
+}
+
+export interface TeacherReportAggregateStats {
+  student_total: number
+  average_progress: number
+  completion_rate: number
+  quiz_attempt_count: number
+  quiz_average_score: number
+}
+
+export interface TeacherRiskDirectionStats {
+  student_count: number
+  at_risk_count: number
+  at_risk_ratio: number
+}
+
+export interface TeacherReportRiskSummary {
+  student_count: number
+  at_risk_count: number
+  at_risk_ratio: number
+  directions: Record<
+    TeacherLearningDirection,
+    TeacherRiskDirectionStats
+  >
+}
+
+export interface TeacherReportStatsSnapshot {
+  aggregate_stats: TeacherReportAggregateStats
+  direction_comparison: Record<
+    TeacherLearningDirection,
+    TeacherDirectionStats
+  >
+  risk_summary: TeacherReportRiskSummary
+}
+
+export interface TeacherReportSections {
+  progress_analysis: string
+  direction_comparison: string
+  risk_warning: string
+}
+
+export interface TeacherReport {
+  report_id: string
+  teacher_id: number
+  created_at: string
+  stats_snapshot: TeacherReportStatsSnapshot
+  sections: TeacherReportSections
+}

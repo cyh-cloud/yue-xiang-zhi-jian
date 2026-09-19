@@ -42,7 +42,10 @@ interface RequestOptions extends Omit<RequestInit, 'headers'> {
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL ?? ''
   const headers = new Headers(options.headers)
-  if (options.body && !headers.has('Content-Type')) {
+  if (
+    typeof options.body === 'string' &&
+    !headers.has('Content-Type')
+  ) {
     headers.set('Content-Type', 'application/json')
   }
 
