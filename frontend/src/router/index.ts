@@ -15,6 +15,9 @@ import EcommerceLiveScriptView from '@/views/EcommerceLiveScriptView.vue'
 import EcommerceSimulationView from '@/views/EcommerceSimulationView.vue'
 import EcommerceStoreGuidanceView from '@/views/EcommerceStoreGuidanceView.vue'
 import EcommerceTrainingHomeView from '@/views/EcommerceTrainingHomeView.vue'
+import EnterpriseApplicationDetailView from '@/views/EnterpriseApplicationDetailView.vue'
+import EnterpriseApplicationsView from '@/views/EnterpriseApplicationsView.vue'
+import EnterpriseJobsView from '@/views/EnterpriseJobsView.vue'
 import EnterprisePortalView from '@/views/EnterprisePortalView.vue'
 import GovernmentPortalView from '@/views/GovernmentPortalView.vue'
 import HandcraftCoursesView from '@/views/HandcraftCoursesView.vue'
@@ -192,6 +195,24 @@ const router = createRouter({
       path: '/enterprise',
       name: 'enterprise-portal',
       component: EnterprisePortalView,
+      meta: { requiresAuth: true, roles: ['enterprise'] }
+    },
+    {
+      path: '/enterprise/jobs',
+      name: 'enterprise-jobs',
+      component: EnterpriseJobsView,
+      meta: { requiresAuth: true, roles: ['enterprise'] }
+    },
+    {
+      path: '/enterprise/applications',
+      name: 'enterprise-applications',
+      component: EnterpriseApplicationsView,
+      meta: { requiresAuth: true, roles: ['enterprise'] }
+    },
+    {
+      path: '/enterprise/applications/:applicationId',
+      name: 'enterprise-application-detail',
+      component: EnterpriseApplicationDetailView,
       meta: { requiresAuth: true, roles: ['enterprise'] }
     },
     {

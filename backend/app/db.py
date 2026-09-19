@@ -689,6 +689,103 @@ CREATE TABLE IF NOT EXISTS handcraft_notification_outbox (
 
 CREATE INDEX IF NOT EXISTS idx_handcraft_notification_outbox_pending
     ON handcraft_notification_outbox(status, created_at, id);
+
+CREATE TABLE IF NOT EXISTS job_positions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    job_id TEXT NOT NULL UNIQUE,
+    enterprise_id INTEGER NOT NULL REFERENCES users(id),
+    title TEXT NOT NULL,
+    salary TEXT NOT NULL,
+    location TEXT NOT NULL,
+    category_id INTEGER NOT NULL REFERENCES interest_tags(id),
+    category_name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    review_status TEXT NOT NULL CHECK (
+        review_status IN ('pending', 'approved', 'rejected')
+    ),
+    version INTEGER NOT NULL CHECK (version > 0),
+    rejection_opinion TEXT,
+    published_at TEXT,
+    deleted_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_positions_enterprise_status
+    ON job_positions(enterprise_id, deleted_at, review_status, updated_at DESC, id DESC);
+
+CREATE INDEX IF NOT EXISTS idx_job_positions_public
+    ON job_positions(deleted_at, review_status, published_at DESC, job_id);
+
+CREATE TABLE IF NOT EXISTS job_applications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id TEXT NOT NULL UNIQUE,
+    job_id TEXT NOT NULL REFERENCES job_positions(job_id),
+    enterprise_id INTEGER NOT NULL REFERENCES users(id),
+    student_id INTEGER NOT NULL REFERENCES users(id),
+    student_name TEXT NOT NULL,
+    job_title_snapshot TEXT NOT NULL,
+    resume_snapshot_json TEXT NOT NULL,
+    skill_profile_snapshot_json TEXT,
+    skill_profile_attached INTEGER NOT NULL DEFAULT 0 CHECK (
+        skill_profile_attached IN (0, 1)
+    ),
+    status TEXT NOT NULL CHECK (
+        status IN ('pending', 'viewed', 'intent', 'unsuitable')
+    ),
+    status_version INTEGER NOT NULL DEFAULT 1 CHECK (status_version > 0),
+    position_closed_at TEXT,
+    close_reason TEXT,
+    idempotency_key TEXT NOT NULL,
+    submitted_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (student_id, job_id),
+    UNIQUE (enterprise_id, idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_job_applications_enterprise
+    ON job_applications(
+        enterprise_id, submitted_at DESC, application_id
+    );
+
+CREATE INDEX IF NOT EXISTS idx_job_applications_job_status
+    ON job_applications(job_id, status, submitted_at DESC, application_id);
+
+CREATE TABLE IF NOT EXISTS job_application_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id TEXT NOT NULL REFERENCES job_applications(application_id),
+    sequence_no INTEGER NOT NULL CHECK (sequence_no > 0),
+    previous_status TEXT NOT NULL,
+    new_status TEXT NOT NULL,
+    actor_enterprise_id INTEGER NOT NULL REFERENCES users(id),
+    event_id TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    UNIQUE (application_id, sequence_no)
+);
+
+CREATE TABLE IF NOT EXISTS enterprise_notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL CHECK (
+        event_type IN (
+            'application_submitted',
+            'application_status',
+            'position_closed'
+        )
+    ),
+    event_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'sent')
+    ),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    sent_at TEXT,
+    UNIQUE (event_type, event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_enterprise_outbox_pending
+    ON enterprise_notification_outbox(status, created_at, id);
 """
 
 
