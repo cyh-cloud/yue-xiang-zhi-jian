@@ -8,12 +8,14 @@
   `b3a0b85`, `2041cf8`, `e9c78c4`, `ce6c01a`, `d1a953e`, `a5e5e77`,
   `e08dba6`, `867dc43`, `87e52a1`, `65eef00`, `35fc277`, `cb34e1f`,
   `5839d77`, `e1276a9`, `6b97652`.
+- Task 19 commits: `75f2dcc` for acceptance tests and `75075c6` for the
+  provider-authoritative teacher course read fix.
 - Review status: Tasks 1-18 are complete with clean task review at `6b97652`.
   Task 19 is the cross-module acceptance/regression task and does not perform
   the final whole-branch review.
 - Verified commands:
   - `uv run --directory backend python -m unittest discover -s tests -v`:
-    `613` tests ran, `612` passed, `1` failed.
+    `613` tests ran, `613` passed.
   - `cd frontend && npm test`: `69` files and `365` tests passed.
   - `cd frontend && npx tsc -b --noEmit`: passed with no output.
   - `cd frontend && npm run build`: passed; `1761` modules transformed.
@@ -23,11 +25,10 @@
 - Provider replacement status: the replacement `ContentReviewProvider`
   acceptance test passes through `set_content_review_provider` and
   `CourseReviewAdapter` without consumer changes.
-- Residual risk: `get_teacher_course()` does not merge provider-authoritative
-  `rejected` status, rejection opinion, or review update time. The exact Task
-  19 acceptance assertion currently fails with local `pending` instead of
-  provider `rejected`; no production fix was made because Task 19 scope is
-  limited to the three test files and this memory file.
+- Resolved provider-authority defect: `get_teacher_course()` now reads
+  `review_status`, rejection opinion, and review update time from the
+  `ContentReviewProvider`; the exact Task 19 acceptance assertion passes.
+  Internal mutation paths intentionally continue to use local state.
 - Browser screenshots are stored under
   `.superpowers/sdd/2026-09-18-008-teacher-console/task-19-screenshots/`.
   Visual content is `待人工复核` because image inspection was not delegated.
