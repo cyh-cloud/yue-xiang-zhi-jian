@@ -137,8 +137,14 @@ class LocalResourceDialectTests(unittest.TestCase):
         self.assertEqual(count, 0)
 
     def test_tts_failure_has_no_turn(self):
-        def fail_synthesis(**kwargs):
-            del kwargs
+        def fail_synthesis(
+            text,
+            language_code,
+            voice_code,
+            *,
+            call_point,
+        ):
+            del text, language_code, voice_code, call_point
             raise LocalResourceAiUnavailableError()
 
         self.tts.synthesize = fail_synthesis
