@@ -41,4 +41,45 @@ describe('StudentPortalView', () => {
 
     wrapper.unmount()
   })
+
+  it('links to the local resources module', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/student', component: StudentPortalView },
+        { path: '/student/courses', component: { template: '<div />' } },
+        { path: '/student/profile', component: { template: '<div />' } },
+        { path: '/student/agri-skills', component: { template: '<div />' } },
+        {
+          path: '/student/ecommerce-training',
+          component: { template: '<div />' }
+        },
+        {
+          path: '/student/handcraft-inheritance',
+          component: { template: '<div />' }
+        },
+        {
+          path: '/student/local-resources',
+          component: { template: '<div />' }
+        }
+      ]
+    })
+    await router.push('/student')
+    await router.isReady()
+
+    const wrapper = mount(StudentPortalView, {
+      global: {
+        plugins: [router],
+        stubs: {
+          PortalShell: { template: '<div />' }
+        }
+      }
+    })
+    const link = wrapper.get('a[href="/student/local-resources"]')
+
+    expect(link.text()).toContain('进入本土资源')
+    expect(link.text()).toContain('方言助手、案例、政策与新闻')
+
+    wrapper.unmount()
+  })
 })

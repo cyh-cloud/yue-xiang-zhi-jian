@@ -2,6 +2,7 @@
 import {
   BookOpen,
   BriefcaseBusiness,
+  Landmark,
   Radio,
   Scissors,
   Sprout,
@@ -57,6 +58,13 @@ import PortalShell from '@/components/PortalShell.vue'
         <span>
           <strong>进入就业对接</strong>
           <small>简历、技能档案、岗位与投递</small>
+        </span>
+      </RouterLink>
+      <RouterLink to="/student/local-resources">
+        <Landmark :size="18" aria-hidden="true" />
+        <span>
+          <strong>进入本土资源</strong>
+          <small>方言助手、案例、政策与新闻</small>
         </span>
       </RouterLink>
     </nav>

@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import type { RouteComponent } from 'vue-router'
 
 import { useAuthStore } from '@/stores/auth'
 import AgriCalendarView from '@/views/AgriCalendarView.vue'
@@ -51,6 +52,29 @@ import TeacherPortalView from '@/views/TeacherPortalView.vue'
 import { authGuard } from './roleRoutes'
 
 const teacherMeta = { requiresAuth: true, roles: ['teacher'] as const }
+
+const localResourceViewLoaders = import.meta.glob<{
+  default: RouteComponent
+}>([
+  '../views/LocalResourcesHomeView.vue',
+  '../views/DialectAssistantView.vue',
+  '../views/LocalResourceCasesView.vue',
+  '../views/LocalResourceCaseDetailView.vue',
+  '../views/LocalResourcePoliciesView.vue',
+  '../views/LocalResourcePolicyDetailView.vue',
+  '../views/LocalResourceNewsView.vue',
+  '../views/LocalResourceNewsDetailView.vue'
+])
+
+function lazyLocalResourceView(path: string) {
+  return async (): Promise<RouteComponent> => {
+    const loader = localResourceViewLoaders[path]
+    if (!loader) {
+      throw new Error(`Local resource view not available: ${path}`)
+    }
+    return (await loader()).default
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -241,6 +265,60 @@ const router = createRouter({
       path: '/student/employment/favorites',
       name: 'student-employment-favorites',
       component: JobFavoritesView,
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources',
+      name: 'local-resources-home',
+      component: lazyLocalResourceView('../views/LocalResourcesHomeView.vue'),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/dialect',
+      name: 'local-resources-dialect',
+      component: lazyLocalResourceView('../views/DialectAssistantView.vue'),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/cases',
+      name: 'local-resources-cases',
+      component: lazyLocalResourceView('../views/LocalResourceCasesView.vue'),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/cases/:caseId',
+      name: 'local-resources-case-detail',
+      component: lazyLocalResourceView(
+        '../views/LocalResourceCaseDetailView.vue'
+      ),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/policies',
+      name: 'local-resources-policies',
+      component: lazyLocalResourceView('../views/LocalResourcePoliciesView.vue'),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/policies/:policyId',
+      name: 'local-resources-policy-detail',
+      component: lazyLocalResourceView(
+        '../views/LocalResourcePolicyDetailView.vue'
+      ),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/news',
+      name: 'local-resources-news',
+      component: lazyLocalResourceView('../views/LocalResourceNewsView.vue'),
+      meta: { requiresAuth: true, roles: ['student'] }
+    },
+    {
+      path: '/student/local-resources/news/:newsId',
+      name: 'local-resources-news-detail',
+      component: lazyLocalResourceView(
+        '../views/LocalResourceNewsDetailView.vue'
+      ),
       meta: { requiresAuth: true, roles: ['student'] }
     },
     {
