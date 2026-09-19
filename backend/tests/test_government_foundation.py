@@ -5,8 +5,10 @@ from unittest import TestCase
 from app import create_app
 from app.db import get_db
 from app.government_console.providers import (
+    UnavailableEmploymentStatisticsProvider,
     get_employment_statistics_provider,
     get_policy_news_provider,
+    set_employment_statistics_provider,
 )
 
 
@@ -41,6 +43,10 @@ class GovernmentFoundationTests(TestCase):
         )
 
     def test_default_employment_provider_returns_unavailable(self):
+        set_employment_statistics_provider(
+            self.app,
+            UnavailableEmploymentStatisticsProvider(),
+        )
         with self.app.app_context():
             provider = get_employment_statistics_provider()
             self.assertIsNone(provider.get_active_job_count())

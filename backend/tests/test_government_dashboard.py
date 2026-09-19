@@ -17,6 +17,7 @@ from app.government_console.policy import (
     unpublish_policy,
 )
 from app.government_console.providers import (
+    UnavailableEmploymentStatisticsProvider,
     set_employment_statistics_provider,
 )
 from app.government_console.views import (
@@ -170,6 +171,10 @@ class GovernmentDashboardTests(TestCase):
         self.assertFalse(FORBIDDEN_KEYS.intersection(_walk_keys(dashboard)))
 
     def test_employment_placeholder_is_unavailable_not_zero(self):
+        set_employment_statistics_provider(
+            self.app,
+            UnavailableEmploymentStatisticsProvider(),
+        )
         with self.app.app_context():
             dashboard = get_government_dashboard()
 

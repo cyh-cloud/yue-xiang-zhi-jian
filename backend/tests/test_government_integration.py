@@ -244,7 +244,7 @@ class GovernmentIntegrationTests(TestCase):
             self.assertIsNone(provider.get_published_news(news["id"]))
             self.assertEqual(provider.list_published_news(), [])
 
-    def test_employment_placeholder_and_provider_replacement(self):
+    def test_employment_provider_uses_enterprise_default_and_replacement(self):
         self.login_government()
         initial = self.client.get(
             "/api/government/dashboard"
@@ -252,9 +252,9 @@ class GovernmentIntegrationTests(TestCase):
         self.assertEqual(
             initial,
             {
-                "active_job_count": None,
-                "cumulative_application_count": None,
-                "available": False,
+                "active_job_count": 0,
+                "cumulative_application_count": 0,
+                "available": True,
             },
         )
 
