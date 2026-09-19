@@ -20,6 +20,10 @@ from app.local_resources.catalog import (
     list_news,
     list_policies,
 )
+from app.local_resources.dialect_assistant import (
+    complete_dialect_turn,
+    generate_dialect_answer,
+)
 from app.local_resources.errors import (
     LocalResourceAccessDeniedError,
     LocalResourceAiUnavailableError,
@@ -67,6 +71,8 @@ __all__ = [
     "get_policy",
     "list_news",
     "get_news",
+    "generate_dialect_answer",
+    "complete_dialect_turn",
     "list_policy_subscriptions",
     "set_policy_subscription",
     "recommend_policy_categories",
