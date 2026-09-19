@@ -148,7 +148,7 @@
 #### 结构化简历
 
 - **FR-007**: 学员 MUST 能查看、创建和编辑一份与账户一对一关联的结构化简历，至少包含教育经历、工作经历和技能特长三个有序区块。
-- **FR-008**: 教育经历、工作经历中的每个条目 MUST 使用结构化字段保存，不得只保存不可编辑的整段自由文本；技能特长 MUST 支持多个去重非空条目。
+- **FR-008**: 教育经历、工作经历中的每个条目 MUST 使用结构化字段保存，不得只保存不可编辑的整段自由文本；教育经历至少要求学校、专业和开始时间，工作经历至少要求公司、职位和开始时间，结束时间可为空以表示在读或在职，学位、工作描述可为空；技能特长 MUST 支持多个去重非空条目。
 - **FR-009**: 系统 MUST 区分未保存草稿、最后一次成功保存版本和 AI 优化预览；未保存内容不得被投递使用。
 - **FR-010**: 学员手动保存时，系统 MUST 校验并持久化当前完整表单；保存成功后返回版本号和保存时间。
 - **FR-011**: 至少一个结构化区块去除空白后非空时，简历才算“已保存且可投递”；01 建立的空关系记录、全空表单和未保存草稿均不算。
@@ -207,7 +207,7 @@ app.handcraft_inheritance.outcomes.list_handcraft_learning_outcomes(
 ) -> list[dict]
 ```
 
-- **FR-029**: 07 MUST 把来源成果归一为以下四类：
+- **FR-029**: 07 MUST 把来源成果归一为以下四类，并按同一底层成果去重：
 
 | Unified category | 03 source | 04 source | 05 source |
 | --- | --- | --- | --- |
@@ -232,7 +232,7 @@ occurred_at          # 带时区 ISO 8601
 source_available     # bool
 ```
 
-- **FR-032**: `item_id` MUST 在单一学员内稳定且可重复读取时去重，不得使用每次请求生成的随机 ID。
+- **FR-032**: `item_id` MUST 在单一学员内稳定且可重复读取时去重，不得使用每次请求生成的随机 ID；同一 `agri_course_quiz_attempts` 被 03/04/05 多个读取函数返回时 MUST 按底层 attempt 稳定 ID 去重一次，优先保留能判定课程方向的具体模块（电商或手工），无法由 04/05 判定时才归为农业。
 - **FR-033**: 技能档案列表 MUST 按 `occurred_at`、`category`、`item_id` 形成确定性排序；不得直接把 SQLite 行对象返回给前端或 09。
 - **FR-034**: 单个来源不可用、无记录或返回非法记录时，系统 MUST 保留其他来源可用性，并对该来源返回空列表或明确不可用状态。
 
@@ -345,7 +345,7 @@ class JobApplicationStatusProvider(Protocol):
     ) -> dict | None: ...
 ```
 
-- **FR-069**: 09 MUST 提供 `set_job_application_status_provider(app, provider) -> None` 与 `get_job_application_status_provider() -> JobApplicationStatusProvider`，并在 `configure_enterprise_providers()` 增加可选替换参数。
+- **FR-069**: 09 MUST 提供 `set_job_application_status_provider(app, provider) -> None` 与 `get_job_application_status_provider() -> JobApplicationStatusProvider`，在默认服务安装时注册数据库实现，并在 `configure_enterprise_providers()` 增加可选替换参数。
 - **FR-070**: `list_student_applications()` MUST 只返回指定学员的申请，完整返回当前规模列表，按 `submitted_at DESC, application_id ASC` 排序。
 - **FR-071**: 状态读取记录 MUST 至少包含：
 
@@ -386,7 +386,7 @@ closed        -> 岗位已关闭
 - **FR-077**: 学员 MUST 能收藏或取消任一当前可见岗位，同一学员与 `job_id` 只能有一条有效收藏。
 - **FR-078**: 收藏记录 MUST 保存收藏时间及收藏时的职位标题、公司、薪资、地点等展示快照，以便职位删除后仍可显示。
 - **FR-079**: 收藏列表 MUST 集中展示全部未手动移除的收藏；默认按收藏时间倒序、`job_id` 正序。
-- **FR-080**: 当职位仍由 `JobPositionProvider` 返回时，收藏列表 MUST 使用 provider 最新职位信息刷新展示快照并允许进入详情或投递。
+- **FR-080**: 当职位仍由 `JobPositionProvider` 返回时，收藏列表 MUST 使用 provider 最新标题、公司、薪资、地点和描述持久刷新收藏展示快照，并允许进入详情或投递；职位再次消失后 MUST 使用最后一次成功刷新的完整快照。
 - **FR-081**: 当收藏 `job_id` 不再由 provider 返回时，系统 MUST 标记“岗位已关闭”、禁用投递并保留收藏展示快照；若职位以后重新上架，下一次读取 MUST 恢复可用状态。
 - **FR-082**: 已关闭收藏 MUST 保留到学员手动移除，不得按时间自动删除；移除收藏 MUST NOT 影响历史申请或通知。
 - **FR-083**: 收藏和取消收藏 MUST 使用幂等结果；重复收藏不得产生重复项，重复取消不得报服务器错误。
