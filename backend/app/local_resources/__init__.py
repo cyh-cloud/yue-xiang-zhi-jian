@@ -29,6 +29,14 @@ from app.local_resources.errors import (
     LocalResourceUnavailableError,
     LocalResourceValidationError,
 )
+from app.local_resources.messaging_provider import (
+    LocalResourcesMessagingProvider,
+)
+from app.local_resources.subscriptions import (
+    list_policy_subscriptions,
+    recommend_policy_categories,
+    set_policy_subscription,
+)
 
 __all__ = [
     "DIALECTS",
@@ -47,6 +55,10 @@ __all__ = [
     "get_policy",
     "list_news",
     "get_news",
+    "list_policy_subscriptions",
+    "set_policy_subscription",
+    "recommend_policy_categories",
+    "LocalResourcesMessagingProvider",
     "LocalResourceError",
     "LocalResourceValidationError",
     "LocalResourceNotFoundError",
