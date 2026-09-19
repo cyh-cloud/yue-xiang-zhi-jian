@@ -23,6 +23,8 @@ import type {
 } from '@/api/types'
 import { useTeacherConsoleStore } from '@/stores/teacherConsole'
 
+import TeacherQuizEditor from './TeacherQuizEditor.vue'
+
 const props = defineProps<{
   courses?: TeacherCourse[]
 }>()
@@ -94,6 +96,7 @@ const selectedFile = ref<File | null>(null)
 const formError = ref('')
 const mediaError = ref('')
 const actionError = ref('')
+const quizDraftCourseId = ref<number | null>(null)
 
 const displayedCourses = computed(() => {
   const source = props.courses ?? store.courses
@@ -259,6 +262,7 @@ function resetForm() {
   formError.value = ''
   mediaError.value = ''
   actionError.value = ''
+  quizDraftCourseId.value = null
 }
 
 async function saveCourse() {
@@ -565,6 +569,26 @@ async function relistCourse(course: TeacherCourse) {
             <p class="field-hint">仅接受可访问的 HTTP(S) 视频地址。</p>
           </div>
         </fieldset>
+
+        <TeacherQuizEditor
+          v-if="form.id !== null"
+          :key="form.id"
+          :course-id="form.id"
+          :summary="form.summary"
+          :direction="form.direction"
+          :expected-version="form.version ?? 1"
+          :initial-questions="
+            quizDraftCourseId === form.id
+              ? store.quizDraft?.questions ?? []
+              : []
+          "
+          :initial-enabled="
+            quizDraftCourseId === form.id
+              ? store.quizDraft?.enabled
+              : undefined
+          "
+          @draft-change="quizDraftCourseId = form.id"
+        />
 
         <p v-if="formError" class="field-error" role="alert">
           {{ formError }}
