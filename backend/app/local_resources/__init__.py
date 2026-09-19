@@ -37,6 +37,10 @@ from app.local_resources.subscriptions import (
     recommend_policy_categories,
     set_policy_subscription,
 )
+from app.local_resources.views import (
+    record_news_view,
+    record_policy_view,
+)
 
 __all__ = [
     "DIALECTS",
@@ -59,6 +63,8 @@ __all__ = [
     "set_policy_subscription",
     "recommend_policy_categories",
     "LocalResourcesMessagingProvider",
+    "record_policy_view",
+    "record_news_view",
     "LocalResourceError",
     "LocalResourceValidationError",
     "LocalResourceNotFoundError",
