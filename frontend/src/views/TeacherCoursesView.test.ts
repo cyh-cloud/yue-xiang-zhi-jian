@@ -210,6 +210,44 @@ describe('TeacherCoursesView', () => {
     expect(apiFetch).not.toHaveBeenCalled()
   })
 
+  it('requires a selected file when an external course switches to local upload', async () => {
+    const existing = course(1, 'draft')
+    const { wrapper } = mountManager([existing])
+
+    await wrapper.get('[data-test="edit-draft"]').trigger('click')
+    await wrapper.get('[data-test="media-local"]').setValue('local_upload')
+    await wrapper.get('[data-test="save-course"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('请选择视频文件')
+    expect(apiFetch).not.toHaveBeenCalled()
+  })
+
+  it('clears the native file input after an invalid file selection', async () => {
+    const { wrapper } = mountManager()
+    await wrapper.get('[data-test="media-local"]').setValue('local_upload')
+    const input = wrapper.get('[data-test="course-video"]')
+    const inputElement = input.element as HTMLInputElement
+    const invalid = new File(['text'], 'notes.txt', {
+      type: 'text/plain'
+    })
+
+    Object.defineProperty(inputElement, 'files', {
+      configurable: true,
+      value: [invalid]
+    })
+    Object.defineProperty(inputElement, 'value', {
+      configurable: true,
+      writable: true,
+      value: 'C:\\fakepath\\notes.txt'
+    })
+    await input.trigger('change')
+
+    expect(wrapper.text()).toContain('仅支持 MP4 或 WebM 视频')
+    expect(inputElement.value).toBe('')
+    expect(wrapper.text()).not.toContain('notes.txt')
+  })
+
   it('uploads a local video before saving the course', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({

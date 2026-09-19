@@ -75,6 +75,7 @@ const form = reactive<{
   tagsText: string
   durationSeconds: number | ''
   mediaSourceType: TeacherMediaSourceType
+  originalMediaSourceType: TeacherMediaSourceType | null
   mediaUrl: string
 }>({
   id: null,
@@ -85,6 +86,7 @@ const form = reactive<{
   tagsText: '',
   durationSeconds: '',
   mediaSourceType: 'external_url',
+  originalMediaSourceType: null,
   mediaUrl: ''
 })
 
@@ -203,7 +205,10 @@ function validateForm(): boolean {
   if (
     form.mediaSourceType === 'local_upload' &&
     !selectedFile.value &&
-    !form.mediaUrl.trim()
+    !(
+      form.originalMediaSourceType === 'local_upload' &&
+      form.mediaUrl.trim()
+    )
   ) {
     mediaError.value = '请选择视频文件'
     return false
@@ -213,10 +218,12 @@ function validateForm(): boolean {
 
 function handleVideoChange(event: Event) {
   mediaError.value = ''
-  const file = (event.target as HTMLInputElement).files?.[0] ?? null
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0] ?? null
   selectedFile.value = file
   if (file && !validateVideo(file)) {
     selectedFile.value = null
+    input.value = ''
   }
 }
 
@@ -229,6 +236,7 @@ function startEdit(course: TeacherCourse) {
   form.tagsText = course.content_tags.join('，')
   form.durationSeconds = course.duration_seconds
   form.mediaSourceType = course.media_source_type
+  form.originalMediaSourceType = course.media_source_type
   form.mediaUrl = course.media_url
   selectedFile.value = null
   formError.value = ''
@@ -245,6 +253,7 @@ function resetForm() {
   form.tagsText = ''
   form.durationSeconds = ''
   form.mediaSourceType = 'external_url'
+  form.originalMediaSourceType = null
   form.mediaUrl = ''
   selectedFile.value = null
   formError.value = ''
