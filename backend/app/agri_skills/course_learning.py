@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
@@ -22,13 +23,6 @@ from app.session_manager import utc_now_iso
 AI_UNAVAILABLE_MESSAGE = "AI 服务暂时不可用"
 COURSE_QUIZ_QUESTION_TYPES = {"single_choice", "true_false"}
 PLACEHOLDER_COURSE_DURATION_SECONDS = 300
-
-
-def _course_table_columns() -> set[str]:
-    return {
-        str(row["name"])
-        for row in get_db().execute("PRAGMA table_info(courses)").fetchall()
-    }
 
 
 class DatabaseAgriCourseProvider:
@@ -145,6 +139,28 @@ def _list_provider_recommendations(
     direction: str,
 ) -> list[dict]:
     courses = list_courses(student_id, direction)
+    provider = get_course_provider()
+    if direction == "agriculture" and _is_legacy_course_provider(provider):
+        from app.teacher_console.providers import (
+            DatabaseTeacherCourseProvider,
+        )
+
+        legacy_courses = DatabaseTeacherCourseProvider().list_published_courses(
+            student_id,
+            direction,
+        )
+        by_id = {
+            int(course["id"]): course
+            for course in legacy_courses
+        }
+        by_id.update(
+            {
+                int(course["id"]): course
+                for course in courses
+            }
+        )
+        courses = list(by_id.values())
+
     student_tag_ids = {
         int(row["tag_id"])
         for row in get_db().execute(
@@ -180,13 +196,14 @@ def _list_provider_recommendations(
                 "id": course_id,
                 "title": str(course["title"]),
                 "direction": str(course["direction"]),
-                "status": str(course["status"]),
+                "status": str(course.get("status") or "published"),
                 "summary": str(course["summary"]),
                 "teacher_name": str(course["teacher_name"]),
                 "published_at": str(course["published_at"]),
                 "duration_seconds": int(course["duration_seconds"]),
                 "media_url": course.get("media_url"),
                 "tag_ids": tag_ids,
+                "content_tags": list(course.get("content_tags", [])),
                 "tag_match_count": len(
                     set(tag_ids).intersection(student_tag_ids)
                 ),
@@ -204,7 +221,7 @@ def _list_provider_recommendations(
 
     recommendations.sort(key=lambda item: int(item["id"]))
     recommendations.sort(
-        key=lambda item: str(item.get("published_at") or ""),
+        key=lambda item: _course_time(item.get("published_at")),
         reverse=True,
     )
     recommendations.sort(
@@ -226,102 +243,15 @@ def _list_provider_recommendations(
     return recommendations
 
 
+def _course_time(value: object) -> datetime:
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+
 def list_recommendations(
     student_id: int,
     direction: str = "agriculture",
 ) -> list[dict]:
-    if direction in {"ecommerce", "handcraft"}:
-        return _list_provider_recommendations(student_id, direction)
-
-    has_duration = "duration_seconds" in _course_table_columns()
-    duration_projection = (
-        "c.duration_seconds"
-        if has_duration
-        else str(PLACEHOLDER_COURSE_DURATION_SECONDS)
-    )
-    duration_filter = (
-        "\n              AND c.duration_seconds > 0" if has_duration else ""
-    )
-    rows = get_db().execute(
-        f"""
-        WITH ranked AS (
-            SELECT
-                c.id,
-                c.title,
-                c.direction,
-                c.status,
-                c.summary,
-                c.teacher_name,
-                c.published_at,
-                {duration_projection} AS duration_seconds,
-                c.media_url,
-                (
-                    SELECT COUNT(DISTINCT cit.tag_id)
-                    FROM course_interest_tags cit
-                    JOIN student_interest_tags sit
-                      ON sit.tag_id = cit.tag_id
-                     AND sit.user_id = :student_id
-                    WHERE cit.course_id = c.id
-                ) AS tag_match_count,
-                p.last_viewed_at,
-                p.progress_percent,
-                p.completed_at
-            FROM courses c
-            LEFT JOIN agri_course_progress p
-              ON p.course_id = c.id
-             AND p.user_id = :student_id
-            WHERE c.status = 'published'
-              AND c.direction = :direction
-              {duration_filter}
-              AND p.completed_at IS NULL
-        )
-        SELECT *
-        FROM ranked
-        ORDER BY
-            tag_match_count DESC,
-            CASE WHEN last_viewed_at IS NOT NULL THEN 1 ELSE 0 END DESC,
-            last_viewed_at DESC,
-            progress_percent DESC,
-            published_at DESC,
-            id ASC
-        """,
-        {"student_id": student_id, "direction": direction},
-    ).fetchall()
-    courses = [
-        {
-            "id": int(row["id"]),
-            "title": str(row["title"]),
-            "direction": str(row["direction"]),
-            "status": str(row["status"]),
-            "summary": str(row["summary"]),
-            "teacher_name": str(row["teacher_name"]),
-            "published_at": row["published_at"],
-            "duration_seconds": row["duration_seconds"],
-            "media_url": row["media_url"],
-            "tag_ids": [
-                int(tag_row["tag_id"])
-                for tag_row in get_db().execute(
-                    """
-                    SELECT tag_id
-                    FROM course_interest_tags
-                    WHERE course_id = ?
-                    ORDER BY tag_id
-                    """,
-                    (int(row["id"]),),
-                ).fetchall()
-            ],
-            "tag_match_count": int(row["tag_match_count"]),
-            "last_viewed_at": row["last_viewed_at"],
-            "progress_percent": int(row["progress_percent"] or 0),
-            "completed_at": row["completed_at"],
-        }
-        for row in rows
-    ]
-    return [
-        course
-        for course in courses
-        if is_eligible_course(course, direction)
-    ]
+    return _list_provider_recommendations(student_id, direction)
 
 
 def get_course_progress(

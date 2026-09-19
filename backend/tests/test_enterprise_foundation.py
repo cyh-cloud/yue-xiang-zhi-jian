@@ -6,6 +6,9 @@ from pathlib import Path
 from app import create_app
 from app.db import get_db
 from app.enterprise_console.errors import ProviderUnavailableError
+from app.teacher_console.errors import (
+    ProviderUnavailableError as SharedProviderUnavailableError,
+)
 from app.enterprise_console.providers import (
     DatabaseJobApplicationIntakeProvider,
     EmptyJobApplicationIntakeProvider,
@@ -636,8 +639,20 @@ class TestEnterpriseFoundation(unittest.TestCase):
                     skill_profile_snapshot=None,
                     idempotency_key="application-1",
                 )
-            with self.assertRaises(ProviderUnavailableError):
-                get_content_review_provider().get_review_status()
+            self.assertIsNone(
+                get_content_review_provider().get_review_status(
+                    content_type="job_position",
+                    content_id="job-1",
+                )
+            )
+            with self.assertRaises(SharedProviderUnavailableError):
+                get_content_review_provider().submit_for_review(
+                    content_type="job_position",
+                    content_id="job-1",
+                    submitter_id=1,
+                    expected_version=1,
+                    payload={},
+                )
 
     def test_providers_are_replaceable(self):
         job_provider = ReplacementJobProvider()

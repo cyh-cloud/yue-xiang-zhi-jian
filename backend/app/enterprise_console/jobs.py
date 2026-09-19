@@ -14,6 +14,18 @@ from app.enterprise_console.errors import (
     ProviderValidationError,
 )
 from app.enterprise_console.review import get_content_review_provider
+from app.teacher_console.errors import (
+    ProviderConflictError as SharedProviderConflictError,
+)
+from app.teacher_console.errors import (
+    ProviderError as SharedProviderError,
+)
+from app.teacher_console.errors import (
+    ProviderUnavailableError as SharedProviderUnavailableError,
+)
+from app.teacher_console.errors import (
+    ProviderValidationError as SharedProviderValidationError,
+)
 
 JOB_REVIEW_STATUSES = {"pending", "approved", "rejected"}
 JOB_REVIEW_CONTENT_TYPE = "job_position"
@@ -191,6 +203,25 @@ def _payload_has_changes(row, normalized: dict) -> bool:
 def _provider_call(callback):
     try:
         return callback()
+    except SharedProviderValidationError as error:
+        raise ProviderValidationError(
+            str(error),
+            details=error.details,
+        ) from error
+    except SharedProviderConflictError as error:
+        raise ProviderConflictError(
+            str(error),
+            details=error.details,
+        ) from error
+    except SharedProviderUnavailableError as error:
+        raise ProviderUnavailableError(
+            str(error),
+            details=error.details,
+        ) from error
+    except SharedProviderError as error:
+        raise ProviderUnavailableError(
+            "Content review service is unavailable",
+        ) from error
     except (
         ProviderValidationError,
         ProviderConflictError,

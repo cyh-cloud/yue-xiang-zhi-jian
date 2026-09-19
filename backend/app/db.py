@@ -88,6 +88,12 @@ CREATE TABLE IF NOT EXISTS courses (
     published_at TEXT,
     summary TEXT NOT NULL DEFAULT '',
     teacher_name TEXT NOT NULL DEFAULT '',
+    teacher_id INTEGER REFERENCES users(id),
+    version INTEGER NOT NULL DEFAULT 1,
+    media_source_type TEXT,
+    content_tags_json TEXT NOT NULL DEFAULT '[]',
+    rejection_opinion TEXT,
+    submitted_at TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -107,6 +113,67 @@ CREATE TABLE IF NOT EXISTS course_quizzes (
     scoring_rule TEXT NOT NULL DEFAULT '',
     questions_json TEXT NOT NULL DEFAULT '[]',
     updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS teacher_announcements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    announcement_id TEXT NOT NULL UNIQUE,
+    teacher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    event_id TEXT NOT NULL UNIQUE,
+    delivery_status TEXT NOT NULL CHECK (
+        delivery_status IN ('pending', 'sent', 'failed')
+    ),
+    delivery_result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS teacher_announcement_delivery_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    announcement_id TEXT NOT NULL
+        REFERENCES teacher_announcements(announcement_id) ON DELETE CASCADE,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'sent', 'failed')),
+    result_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS teacher_course_status_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    from_status TEXT NOT NULL,
+    to_status TEXT NOT NULL,
+    actor_id INTEGER NOT NULL REFERENCES users(id),
+    opinion TEXT,
+    version INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS content_comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    comment_id TEXT NOT NULL UNIQUE,
+    content_type TEXT NOT NULL CHECK (
+        content_type IN ('course_video', 'handcraft_teaching_video')
+    ),
+    content_id TEXT NOT NULL CHECK (length(trim(content_id)) > 0),
+    author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    parent_comment_id TEXT REFERENCES content_comments(comment_id),
+    body TEXT NOT NULL CHECK (length(trim(body)) > 0),
+    is_teacher_reply INTEGER NOT NULL DEFAULT 0 CHECK (
+        is_teacher_reply IN (0, 1)
+    ),
+    is_visible INTEGER NOT NULL DEFAULT 1 CHECK (is_visible IN (0, 1)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS teacher_learning_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id TEXT NOT NULL UNIQUE,
+    teacher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    sections_json TEXT NOT NULL,
+    stats_snapshot_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS message_conversations (
@@ -894,12 +961,28 @@ def _ensure_points_consumed_units_column(
         )
 
 
+def _ensure_teacher_console_columns(db: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(courses)")}
+    additions = {
+        "teacher_id": "INTEGER REFERENCES users(id)",
+        "version": "INTEGER NOT NULL DEFAULT 1",
+        "media_source_type": "TEXT",
+        "content_tags_json": "TEXT NOT NULL DEFAULT '[]'",
+        "rejection_opinion": "TEXT",
+        "submitted_at": "TEXT",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            db.execute(f"ALTER TABLE courses ADD COLUMN {name} {definition}")
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
     _ensure_course_duration_column(db)
     _ensure_course_media_url_column(db)
     _ensure_points_consumed_units_column(db)
+    _ensure_teacher_console_columns(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)

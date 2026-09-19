@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-from app.courses.service import COURSE_DIRECTIONS, list_published_courses
+from app.agri_skills.course_learning import list_courses
+from app.courses.service import COURSE_DIRECTIONS
 from app.session_manager import abort_session_required, load_session
 
 
@@ -28,5 +29,5 @@ def get_courses():
 
     return jsonify(
         success=True,
-        courses=list_published_courses(int(session["id"]), direction),
+        courses=list_courses(int(session["id"]), direction),
     )

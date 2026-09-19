@@ -59,6 +59,10 @@ from app.handcraft_inheritance.videos import (
     list_student_videos as _list_student_videos,
 )
 from app.session_manager import abort_session_required, load_session
+from app.teacher_console.comments import (
+    create_learner_comment,
+    list_content_comments,
+)
 
 
 handcraft_inheritance_bp = Blueprint(
@@ -196,6 +200,33 @@ def list_student_videos_route():
         success=True,
         videos=_list_student_videos(craft_key),
     )
+
+
+@handcraft_inheritance_bp.get("/videos/<video_id>/comments")
+def get_video_comments_route(video_id: str):
+    _student_session()
+    return jsonify(
+        success=True,
+        comments=list_content_comments(
+            "handcraft_teaching_video",
+            video_id,
+        ),
+    )
+
+
+@handcraft_inheritance_bp.post("/videos/<video_id>/comments")
+def post_video_comment_route(video_id: str):
+    session = _student_session()
+    payload = _json_object_payload()
+    return jsonify(
+        success=True,
+        comment=create_learner_comment(
+            int(session["id"]),
+            "handcraft_teaching_video",
+            video_id,
+            payload.get("body"),
+        ),
+    ), 201
 
 
 @handcraft_inheritance_bp.post("/ar-guidance")
@@ -404,6 +435,33 @@ def get_handcraft_course_quiz_route(course_id: int):
     if quiz is None:
         raise AgriNotFoundError("暂无可用测验")
     return jsonify(success=True, quiz=quiz)
+
+
+@handcraft_inheritance_bp.get("/courses/<int:course_id>/comments")
+def get_handcraft_course_comments_route(course_id: int):
+    _student_session()
+    return jsonify(
+        success=True,
+        comments=list_content_comments(
+            "course_video",
+            str(course_id),
+        ),
+    )
+
+
+@handcraft_inheritance_bp.post("/courses/<int:course_id>/comments")
+def post_handcraft_course_comment_route(course_id: int):
+    session = _student_session()
+    payload = _json_object_payload()
+    return jsonify(
+        success=True,
+        comment=create_learner_comment(
+            int(session["id"]),
+            "course_video",
+            str(course_id),
+            payload.get("body"),
+        ),
+    ), 201
 
 
 @handcraft_inheritance_bp.get(

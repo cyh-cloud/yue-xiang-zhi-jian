@@ -51,6 +51,29 @@ class DirectionProvider:
         return None
 
 
+class TransformingLegacyProvider:
+    def list_published_agriculture_courses(self, student_id):
+        return [
+            {
+                "id": 500,
+                "title": "provider-transformed-title",
+                "direction": "agriculture",
+                "status": "published",
+                "summary": "provider-transformed-summary",
+                "teacher_name": "Provider Teacher",
+                "published_at": "2026-09-01T00:00:00+00:00",
+                "duration_seconds": 111,
+                "tag_ids": [1],
+            }
+        ]
+
+    def get_course(self, course_id):
+        return None
+
+    def get_quiz(self, course_id):
+        return None
+
+
 class TestSharedCourseProvider(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -80,6 +103,54 @@ class TestSharedCourseProvider(unittest.TestCase):
                 list_courses(1, "ecommerce")[0]["direction"],
                 "ecommerce",
             )
+
+    def test_agriculture_recommendations_use_replacement_provider_catalog(self):
+        with self.app.app_context():
+            set_course_provider(self.app, DirectionProvider())
+
+            recommendations = list_recommendations(1, "agriculture")
+
+            self.assertEqual(
+                [course["id"] for course in recommendations],
+                [2],
+            )
+
+    def test_legacy_merge_does_not_override_registered_provider_course(self):
+        with self.app.app_context():
+            db = get_db()
+            db.execute(
+                """
+                INSERT INTO courses (
+                    id, title, direction, status, duration_seconds,
+                    published_at, summary, teacher_name, created_at, updated_at
+                )
+                VALUES (
+                    500, 'database-title', 'agriculture', 'published', 300,
+                    '2026-09-01T00:00:00+00:00', 'database-summary',
+                    'Database Teacher',
+                    '2026-09-01T00:00:00+00:00',
+                    '2026-09-01T00:00:00+00:00'
+                )
+                """
+            )
+            db.executemany(
+                """
+                INSERT INTO course_interest_tags (course_id, tag_id)
+                VALUES (500, ?)
+                """,
+                ((1,), (2,)),
+            )
+            db.commit()
+            set_course_provider(self.app, TransformingLegacyProvider())
+
+            recommendations = list_recommendations(1, "agriculture")
+            course = next(
+                item for item in recommendations if item["id"] == 500
+            )
+
+        self.assertEqual(course["title"], "provider-transformed-title")
+        self.assertEqual(course["summary"], "provider-transformed-summary")
+        self.assertEqual(course["tag_ids"], [1])
 
     def test_direction_provider_serves_handcraft_without_new_registry(self):
         class RecordingDirectionProvider(DirectionProvider):

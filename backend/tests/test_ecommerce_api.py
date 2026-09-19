@@ -111,6 +111,12 @@ ROUTES = [
         {"position_seconds": 240, "watched_delta_seconds": 240},
     ),
     ("GET", "/api/ecommerce-training/courses/1001/quiz", None),
+    ("GET", "/api/ecommerce-training/courses/1001/comments", None),
+    (
+        "POST",
+        "/api/ecommerce-training/courses/1001/comments",
+        {"body": "课程评论"},
+    ),
     ("GET", "/api/ecommerce-training/courses/1001/quiz/attempts", None),
     (
         "POST",
@@ -325,6 +331,10 @@ class TestEcommerceApi(unittest.TestCase):
             (
                 r"/courses/\d+/quiz$",
                 "/courses/<int:course_id>/quiz",
+            ),
+            (
+                r"/courses/\d+/comments$",
+                "/courses/<int:course_id>/comments",
             ),
             (
                 r"/courses/\d+/quiz/attempts$",

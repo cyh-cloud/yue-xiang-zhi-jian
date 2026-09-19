@@ -3,6 +3,7 @@ import {
   BookOpen,
   CheckCircle2,
   ExternalLink,
+  MessageSquare,
   RefreshCw,
   Sparkles,
   Trophy,
@@ -17,6 +18,7 @@ import type {
   CourseQuizAttempt
 } from '@/api/types'
 import AppHeader from '@/components/AppHeader.vue'
+import ContentCommentThread from '@/components/ContentCommentThread.vue'
 import {
   useCourseLearningStore,
   type CourseLearningCourse
@@ -36,6 +38,7 @@ const auth = useAuthStore()
 const router = useRouter()
 const quizAnswers = reactive<Record<string, string>>({})
 const retakingCourseId = ref<number | null>(null)
+const openCommentCourseIds = ref<number[]>([])
 const attemptTimestampFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
   year: 'numeric',
@@ -112,6 +115,12 @@ function commentReturnTo(course: CourseLearningCourse): string {
     course.comment_url ??
     ''
   )
+}
+
+function toggleComments(courseId: number) {
+  openCommentCourseIds.value = openCommentCourseIds.value.includes(courseId)
+    ? openCommentCourseIds.value.filter(id => id !== courseId)
+    : [...openCommentCourseIds.value, courseId]
 }
 
 function latestAttempt(courseId: number): CourseQuizAttempt | undefined {
@@ -491,7 +500,23 @@ onMounted(() => {
               :progress="progressFor(course.id)"
             />
 
+            <ContentCommentThread
+              v-if="openCommentCourseIds.includes(course.id)"
+              :endpoint="`${props.apiPrefix}/courses/${course.id}/comments`"
+              title="课程评论"
+            />
+
             <div class="course-card__actions">
+              <button
+                class="course-comments-toggle"
+                type="button"
+                :data-test="`course-comments-toggle-${course.id}`"
+                :disabled="coursesStore.loading"
+                @click="toggleComments(course.id)"
+              >
+                <MessageSquare :size="16" aria-hidden="true" />
+                课程评论
+              </button>
               <a
                 v-if="commentReturnTo(course)"
                 class="course-comments-link"

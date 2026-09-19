@@ -378,15 +378,8 @@ class TestAgriCourseProgress(unittest.TestCase):
                 item["id"] for item in list_recommendations(self.student_id)
             ]
 
-            self.assertEqual(
-                [
-                    course_id
-                    for course_id in ids
-                    if course_id not in ECOMMERCE_FIXTURE_IDS
-                ],
-                [3, 2, 1],
-            )
-            self.assertIn(1004, ids)
+            self.assertEqual(ids, [3, 2, 1])
+            self.assertNotIn(1004, ids)
 
     def test_database_provider_filters_and_hydrates_agriculture_courses(self):
         with self.app.app_context():

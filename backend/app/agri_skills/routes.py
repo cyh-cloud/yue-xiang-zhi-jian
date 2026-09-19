@@ -60,6 +60,10 @@ from app.agri_skills.qa import (
 )
 from app.agri_skills.self_test import generate_self_test, submit_self_test
 from app.session_manager import abort_session_required, load_session
+from app.teacher_console.comments import (
+    create_learner_comment,
+    list_content_comments,
+)
 
 
 agri_skills_bp = Blueprint(
@@ -312,6 +316,33 @@ def get_quiz_route(course_id: int):
     if quiz is None:
         return jsonify(success=False, message="暂无可用测验"), 404
     return jsonify(success=True, quiz=quiz)
+
+
+@agri_skills_bp.get("/courses/<int:course_id>/comments")
+def get_course_comments_route(course_id: int):
+    _student_session()
+    return jsonify(
+        success=True,
+        comments=list_content_comments(
+            "course_video",
+            str(course_id),
+        ),
+    )
+
+
+@agri_skills_bp.post("/courses/<int:course_id>/comments")
+def post_course_comment_route(course_id: int):
+    session = _student_session()
+    payload = _json_object_payload()
+    return jsonify(
+        success=True,
+        comment=create_learner_comment(
+            int(session["id"]),
+            "course_video",
+            str(course_id),
+            payload.get("body"),
+        ),
+    ), 201
 
 
 @agri_skills_bp.get("/courses/<int:course_id>/quiz/attempts")

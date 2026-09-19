@@ -52,6 +52,15 @@ class TestAgriAiContext(unittest.TestCase):
                 "answers",
                 "course_direction",
             },
+            "teacher_quiz_generate": {
+                "course_summary",
+                "course_direction",
+            },
+            "teacher_learning_report_generate": {
+                "aggregate_stats",
+                "direction_comparison",
+                "risk_summary",
+            },
             "handcraft_ar_guidance_generate": {
                 "craft_key",
                 "craft_name",
@@ -92,6 +101,62 @@ class TestAgriAiContext(unittest.TestCase):
         self.assertEqual(
             handcraft[0]["content"],
             "手工传承任务：course_quiz_grade",
+        )
+
+    def test_teacher_quiz_generation_uses_agriculture_fallback(self):
+        messages = build_ai_messages(
+            "teacher_quiz_generate",
+            {
+                "course_summary": "荔枝保果课程",
+                "course_direction": "agriculture",
+                "teacher_id": 7,
+                "course_id": 1,
+                "media_url": "https://media.example.test/course.mp4",
+            },
+        )
+
+        self.assertEqual(
+            messages[0]["content"],
+            "农业技能任务：teacher_quiz_generate",
+        )
+        self.assertEqual(
+            json.loads(messages[1]["content"]),
+            {
+                "course_summary": "荔枝保果课程",
+                "course_direction": "agriculture",
+            },
+        )
+
+    def test_teacher_learning_report_only_includes_aggregate_context(self):
+        messages = build_ai_messages(
+            "teacher_learning_report_generate",
+            {
+                "aggregate_stats": {"student_total": 12},
+                "direction_comparison": {
+                    "agriculture": {"student_count": 4},
+                },
+                "risk_summary": {"at_risk_count": 2},
+                "teacher_id": 7,
+                "student_id": 8,
+                "name": "姓名学员",
+                "contact": "13800000000",
+                "profile": {"user_id": 8},
+            },
+        )
+
+        self.assertEqual(
+            messages[0]["content"],
+            "农业技能任务：teacher_learning_report_generate",
+        )
+        self.assertEqual(
+            json.loads(messages[1]["content"]),
+            {
+                "aggregate_stats": {"student_total": 12},
+                "direction_comparison": {
+                    "agriculture": {"student_count": 4},
+                },
+                "risk_summary": {"at_risk_count": 2},
+            },
         )
 
     def test_handcraft_ar_guidance_uses_handcraft_domain(self):
