@@ -340,6 +340,97 @@ class SkillOutcomeAggregationTests(unittest.TestCase):
             ["agriculture", "ecommerce"],
         )
 
+    def test_skips_naive_timestamp_and_keeps_valid_records(self):
+        naive_agri = {
+            **AGRI_ROWS[1],
+            "source_id": 73,
+            "created_at": "2026-09-19T09:00:00",
+        }
+
+        with (
+            patch.object(
+                skill_profile,
+                "list_learning_outcomes",
+                return_value=[AGRI_ROWS[0], naive_agri],
+            ),
+            patch.object(
+                skill_profile,
+                "list_ecommerce_learning_outcomes",
+                return_value=[ECOMMERCE_ROWS[0]],
+            ),
+            patch.object(
+                skill_profile,
+                "list_handcraft_learning_outcomes",
+                return_value=[HANDCRAFT_ROWS[0]],
+            ),
+            self.assertLogs(
+                "app.job_matching.skill_profile",
+                level="WARNING",
+            ) as logs,
+        ):
+            outcomes = list_skill_outcomes(101)
+
+        self.assertEqual(
+            {item["item_id"] for item in outcomes},
+            {
+                "agriculture:diagnostic_self_test:7",
+                "ecommerce:live_script:21",
+                "handcraft:course_view:41",
+            },
+        )
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn(
+            "Invalid skill outcome timestamp",
+            logs.records[0].getMessage(),
+        )
+
+    def test_skips_malformed_timestamp_and_keeps_valid_records(self):
+        malformed_ecommerce = {
+            **ECOMMERCE_ROWS[1],
+            "source_id": 74,
+            "created_at": "not-an-iso-timestamp",
+        }
+
+        with (
+            patch.object(
+                skill_profile,
+                "list_learning_outcomes",
+                return_value=[AGRI_ROWS[0]],
+            ),
+            patch.object(
+                skill_profile,
+                "list_ecommerce_learning_outcomes",
+                return_value=[
+                    ECOMMERCE_ROWS[0],
+                    malformed_ecommerce,
+                ],
+            ),
+            patch.object(
+                skill_profile,
+                "list_handcraft_learning_outcomes",
+                return_value=[HANDCRAFT_ROWS[0]],
+            ),
+            self.assertLogs(
+                "app.job_matching.skill_profile",
+                level="WARNING",
+            ) as logs,
+        ):
+            outcomes = list_skill_outcomes(101)
+
+        self.assertEqual(
+            {item["item_id"] for item in outcomes},
+            {
+                "agriculture:diagnostic_self_test:7",
+                "ecommerce:live_script:21",
+                "handcraft:course_view:41",
+            },
+        )
+        self.assertEqual(len(logs.records), 1)
+        self.assertIn(
+            "Invalid skill outcome timestamp",
+            logs.records[0].getMessage(),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

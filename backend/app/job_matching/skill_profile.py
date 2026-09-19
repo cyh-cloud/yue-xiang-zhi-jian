@@ -169,12 +169,32 @@ def _source_precedence(item: dict) -> int:
 
 
 def _parse_iso(value: object) -> datetime:
-    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("occurred_at must include a timezone")
+    return parsed
 
 
 def _safe_source(reader, student_id: int) -> list[dict]:
     try:
-        return reader(student_id)
+        items = reader(student_id)
+        valid_items = []
+        for item in items:
+            try:
+                _parse_iso(item["occurred_at"])
+            except (KeyError, TypeError, ValueError):
+                item_id = (
+                    item.get("item_id", "unknown")
+                    if isinstance(item, dict)
+                    else "unknown"
+                )
+                LOGGER.warning(
+                    "Invalid skill outcome timestamp for %s",
+                    item_id,
+                )
+                continue
+            valid_items.append(item)
+        return valid_items
     except Exception:
         LOGGER.exception("Skill outcome source failed")
         return []
