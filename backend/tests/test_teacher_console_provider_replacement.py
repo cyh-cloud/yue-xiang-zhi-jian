@@ -125,22 +125,29 @@ class TestTeacherConsoleProviderReplacement(unittest.TestCase):
             )
 
         self.assertEqual(submitted["status"], "pending")
+        submit_calls = [
+            call
+            for call in replacement.calls
+            if call["method"] == "submit_for_review"
+        ]
+        self.assertTrue(submit_calls)
+        submit_call = submit_calls[-1]
         self.assertEqual(
-            replacement.calls[-1]["method"],
+            submit_call["method"],
             "submit_for_review",
         )
         self.assertEqual(
-            replacement.calls[-1]["content_type"],
+            submit_call["content_type"],
             "course_video",
         )
         self.assertEqual(
-            replacement.calls[-1]["content_id"],
+            submit_call["content_id"],
             str(self.course_id),
         )
-        self.assertEqual(replacement.calls[-1]["submitter_id"], 7)
-        self.assertEqual(replacement.calls[-1]["expected_version"], 1)
+        self.assertEqual(submit_call["submitter_id"], 7)
+        self.assertEqual(submit_call["expected_version"], 1)
         self.assertEqual(
-            replacement.calls[-1]["payload"]["title"],
+            submit_call["payload"]["title"],
             "Provider replacement course",
         )
 

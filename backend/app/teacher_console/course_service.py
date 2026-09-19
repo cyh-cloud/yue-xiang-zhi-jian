@@ -269,7 +269,7 @@ def create_teacher_course(teacher_id: int, payload: dict) -> dict:
         course_id = int(cursor.lastrowid)
         _sync_catalog_tag_ids(db, course_id, values["content_tags"])
 
-    return get_teacher_course(normalized_teacher_id, course_id)
+    return _get_local_teacher_course(normalized_teacher_id, course_id)
 
 
 def update_teacher_course_draft(
@@ -288,7 +288,7 @@ def update_teacher_course_draft(
         field="expected_version",
     )
     changes = _validate_course_payload(payload, partial=True)
-    current = get_teacher_course(
+    current = _get_local_teacher_course(
         normalized_teacher_id,
         normalized_course_id,
     )
@@ -360,10 +360,13 @@ def update_teacher_course_draft(
             values["content_tags"],
         )
 
-    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+    return _get_local_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
 
 
-def get_teacher_course(teacher_id: int, course_id: int) -> dict:
+def _get_local_teacher_course(teacher_id: int, course_id: int) -> dict:
     normalized_teacher_id = _require_positive_int(
         teacher_id,
         field="teacher_id",
@@ -387,6 +390,28 @@ def get_teacher_course(teacher_id: int, course_id: int) -> dict:
             details={"course_id": normalized_course_id},
         )
     return _course_dict(db, row)
+
+
+def get_teacher_course(teacher_id: int, course_id: int) -> dict:
+    course = _get_local_teacher_course(teacher_id, course_id)
+    review = _review_record(int(course["id"]))
+    course["review_status"] = (
+        review.get("review_status") if review is not None else None
+    )
+    course["review_updated_at"] = (
+        review.get("updated_at") if review is not None else None
+    )
+    if review is not None:
+        course["status"] = resolve_teacher_visible_status(
+            course,
+            course["review_status"],
+        )
+        course["rejection_opinion"] = (
+            review.get("opinion")
+            if course["review_status"] == "rejected"
+            else None
+        )
+    return course
 
 
 def list_teacher_courses(
@@ -449,16 +474,19 @@ def resolve_teacher_visible_status(
 
 
 def _review_status(course_id: int) -> str | None:
+    review = _review_record(course_id)
+    return review.get("review_status") if review is not None else None
+
+
+def _review_record(course_id: int) -> dict | None:
     review = CourseReviewAdapter().read(course_id)
-    if review is None:
-        return None
-    if not isinstance(review, dict):
+    if review is not None and not isinstance(review, dict):
         raise ProviderValidationError(
             "审核服务返回无效数据",
             code="review_response_invalid",
             details={"course_id": course_id},
         )
-    return review.get("review_status")
+    return review
 
 
 def _parse_provider_result(
@@ -839,7 +867,7 @@ def submit_course_for_review(
         expected_version,
         field="expected_version",
     )
-    course = get_teacher_course(
+    course = _get_local_teacher_course(
         normalized_teacher_id,
         normalized_course_id,
     )
@@ -893,7 +921,10 @@ def submit_course_for_review(
             actor_id=normalized_teacher_id,
         )
 
-    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+    return _get_local_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
 
 
 def edit_course(
@@ -913,7 +944,7 @@ def edit_course(
         expected_version,
         field="expected_version",
     )
-    course = get_teacher_course(
+    course = _get_local_teacher_course(
         normalized_teacher_id,
         normalized_course_id,
     )
@@ -975,7 +1006,10 @@ def edit_course(
             actor_id=normalized_teacher_id,
         )
 
-    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+    return _get_local_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
 
 
 def set_course_offline(
@@ -992,7 +1026,7 @@ def set_course_offline(
         expected_version,
         field="expected_version",
     )
-    course = get_teacher_course(
+    course = _get_local_teacher_course(
         normalized_teacher_id,
         normalized_course_id,
     )
@@ -1062,7 +1096,10 @@ def set_course_offline(
             ),
         )
 
-    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+    return _get_local_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )
 
 
 def request_course_relist(
@@ -1079,7 +1116,7 @@ def request_course_relist(
         expected_version,
         field="expected_version",
     )
-    course = get_teacher_course(
+    course = _get_local_teacher_course(
         normalized_teacher_id,
         normalized_course_id,
     )
@@ -1133,4 +1170,7 @@ def request_course_relist(
             actor_id=normalized_teacher_id,
         )
 
-    return get_teacher_course(normalized_teacher_id, normalized_course_id)
+    return _get_local_teacher_course(
+        normalized_teacher_id,
+        normalized_course_id,
+    )

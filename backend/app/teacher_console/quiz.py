@@ -6,6 +6,7 @@ from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
 from app.db import get_db
 from app.teacher_console.course_service import (
+    _get_local_teacher_course,
     edit_course,
     get_teacher_course,
     resolve_teacher_visible_status,
@@ -142,7 +143,7 @@ def get_teacher_course_quiz(
     teacher_id: int,
     course_id: int,
 ) -> dict | None:
-    get_teacher_course(teacher_id, course_id)
+    _get_local_teacher_course(teacher_id, course_id)
     row = get_db().execute(
         """
         SELECT enabled, scoring_rule, questions_json

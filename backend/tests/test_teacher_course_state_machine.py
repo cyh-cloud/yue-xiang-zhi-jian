@@ -489,8 +489,13 @@ class TestTeacherCourseStateMachine(unittest.TestCase):
 
         unchanged = get_teacher_course(7, self.course_id)
         self.assertEqual(unchanged["title"], "荔枝保果")
-        self.assertEqual(unchanged["status"], "pending")
+        self.assertEqual(unchanged["status"], "published")
         self.assertEqual(unchanged["version"], 1)
+        local_status = get_db().execute(
+            "SELECT status FROM courses WHERE id = ?",
+            (self.course_id,),
+        ).fetchone()["status"]
+        self.assertEqual(local_status, "pending")
         self.assertEqual(len(self.history_rows()), 1)
 
     def test_relist_rejects_non_pending_provider_result(self):
