@@ -317,6 +317,45 @@ describe('jobMatching store', () => {
     expect(store.applications).toEqual([applicationFixture])
   })
 
+  it('loads an encoded application detail into activeApplication', async () => {
+    mockedApiFetch.mockResolvedValueOnce({
+      success: true,
+      application: applicationFixture
+    } as never)
+
+    const store = useJobMatchingStore()
+
+    expect(await store.loadApplication('application /一')).toEqual(
+      applicationFixture
+    )
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/job-matching/applications/application%20%2F%E4%B8%80'
+    )
+    expect(store.activeApplication).toEqual(applicationFixture)
+  })
+
+  it('preserves application detail branch codes and clears stale detail', async () => {
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError(
+        '申请不存在',
+        404,
+        { application_id: 'application-hidden' },
+        undefined,
+        'application_not_found'
+      )
+    )
+    const store = useJobMatchingStore()
+    store.activeApplication = applicationFixture
+
+    expect(await store.loadApplication('application-hidden')).toBeNull()
+    expect(store.activeApplication).toBeNull()
+    expect(store.error).toBe('申请不存在')
+    expect(store.errorCode).toBe('application_not_found')
+    expect(store.fieldErrors).toEqual({
+      application_id: 'application-hidden'
+    })
+  })
+
   it('submits an application with the exact attachment flag', async () => {
     mockedApiFetch.mockResolvedValueOnce({
       success: true,

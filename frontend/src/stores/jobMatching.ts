@@ -31,6 +31,7 @@ interface JobMatchingState {
   recommendedJobs: JobMatchingJob[]
   activeJob: JobMatchingJob | null
   applications: StudentApplication[]
+  activeApplication: StudentApplication | null
   favorites: JobFavorite[]
   loading: boolean
   saving: boolean
@@ -48,6 +49,7 @@ export const useJobMatchingStore = defineStore('jobMatching', {
     recommendedJobs: [],
     activeJob: null,
     applications: [],
+    activeApplication: null,
     favorites: [],
     loading: false,
     saving: false,
@@ -326,6 +328,34 @@ export const useJobMatchingStore = defineStore('jobMatching', {
       } catch (error) {
         this.captureError(error)
         return false
+      } finally {
+        this.loading = false
+      }
+    },
+    async loadApplication(applicationId: string) {
+      if (
+        this.activeApplication?.application_id !== applicationId
+      ) {
+        this.activeApplication = null
+      }
+      this.loading = true
+      this.error = ''
+      this.errorCode = ''
+      this.fieldErrors = {}
+      try {
+        const response = await apiFetch<{
+          success: true
+          application: StudentApplication
+        }>(
+          `${API_PREFIX}/applications/${encodeURIComponent(
+            applicationId
+          )}`
+        )
+        this.activeApplication = response.application
+        return this.activeApplication
+      } catch (error) {
+        this.captureError(error)
+        return null
       } finally {
         this.loading = false
       }
