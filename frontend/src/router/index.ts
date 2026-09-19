@@ -29,9 +29,15 @@ import MessageCenterView from '@/views/MessageCenterView.vue'
 import RegisterView from '@/views/RegisterView.vue'
 import StudentPortalView from '@/views/StudentPortalView.vue'
 import StudentProfileView from '@/views/StudentProfileView.vue'
+import TeacherAnnouncementsView from '@/views/TeacherAnnouncementsView.vue'
+import TeacherCoursesView from '@/views/TeacherCoursesView.vue'
+import TeacherDashboardView from '@/views/TeacherDashboardView.vue'
+import TeacherInteractionsView from '@/views/TeacherInteractionsView.vue'
 import TeacherPortalView from '@/views/TeacherPortalView.vue'
 
 import { authGuard } from './roleRoutes'
+
+const teacherMeta = { requiresAuth: true, roles: ['teacher'] as const }
 
 const router = createRouter({
   history: createWebHistory(),
@@ -184,9 +190,35 @@ const router = createRouter({
     },
     {
       path: '/teacher',
-      name: 'teacher-portal',
       component: TeacherPortalView,
-      meta: { requiresAuth: true, roles: ['teacher'] }
+      meta: teacherMeta,
+      children: [
+        {
+          path: '',
+          name: 'teacher-portal',
+          redirect: '/teacher/dashboard'
+        },
+        {
+          path: 'courses',
+          component: TeacherCoursesView,
+          meta: teacherMeta
+        },
+        {
+          path: 'announcements',
+          component: TeacherAnnouncementsView,
+          meta: teacherMeta
+        },
+        {
+          path: 'interactions',
+          component: TeacherInteractionsView,
+          meta: teacherMeta
+        },
+        {
+          path: 'dashboard',
+          component: TeacherDashboardView,
+          meta: teacherMeta
+        }
+      ]
     },
     {
       path: '/enterprise',
