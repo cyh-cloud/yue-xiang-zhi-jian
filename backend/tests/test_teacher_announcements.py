@@ -11,7 +11,10 @@ from app.teacher_console.announcements import (
     publish_teaching_announcement,
     update_teaching_announcement,
 )
-from app.teacher_console.errors import ProviderConflictError
+from app.teacher_console.errors import (
+    ProviderAccessDeniedError,
+    ProviderConflictError,
+)
 
 
 class TestTeacherAnnouncements(unittest.TestCase):
@@ -134,6 +137,63 @@ class TestTeacherAnnouncements(unittest.TestCase):
         ).fetchall()
         self.assertEqual(row["delivery_status"], "failed")
         self.assertEqual([event["status"] for event in events], ["failed"])
+
+    def test_publish_rejects_nonexistent_teacher_before_write_or_broadcast(self):
+        with patch(
+            "app.teacher_console.announcements.emit_teaching_announcement"
+        ) as emit:
+            with self.assertRaises(ProviderAccessDeniedError):
+                publish_teaching_announcement(
+                    999999, "课程安排", "本周课程调整"
+                )
+
+        emit.assert_not_called()
+        self.assertEqual(
+            get_db()
+            .execute("SELECT COUNT(*) AS count FROM teacher_announcements")
+            .fetchone()["count"],
+            0,
+        )
+        self.assertEqual(
+            get_db()
+            .execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM teacher_announcement_delivery_events
+                """
+            )
+            .fetchone()["count"],
+            0,
+        )
+
+    def test_publish_rejects_non_teacher_before_write_or_broadcast(self):
+        student_id = next(iter(self.student_ids))
+        with patch(
+            "app.teacher_console.announcements.emit_teaching_announcement"
+        ) as emit:
+            with self.assertRaises(ProviderAccessDeniedError):
+                publish_teaching_announcement(
+                    student_id, "课程安排", "本周课程调整"
+                )
+
+        emit.assert_not_called()
+        self.assertEqual(
+            get_db()
+            .execute("SELECT COUNT(*) AS count FROM teacher_announcements")
+            .fetchone()["count"],
+            0,
+        )
+        self.assertEqual(
+            get_db()
+            .execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM teacher_announcement_delivery_events
+                """
+            )
+            .fetchone()["count"],
+            0,
+        )
 
 
 if __name__ == "__main__":

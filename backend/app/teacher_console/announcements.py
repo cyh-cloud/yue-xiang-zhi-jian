@@ -6,6 +6,7 @@ from uuid import uuid4
 from app.db import get_db
 from app.messaging.broadcasts import emit_teaching_announcement
 from app.teacher_console.errors import (
+    ProviderAccessDeniedError,
     ProviderConflictError,
     ProviderValidationError,
 )
@@ -132,7 +133,7 @@ def publish_teaching_announcement(
     now = now_shanghai_iso()
     db = get_db()
     with db:
-        db.execute(
+        cursor = db.execute(
             """
             INSERT INTO teacher_announcements (
                 announcement_id,
@@ -144,17 +145,25 @@ def publish_teaching_announcement(
                 delivery_result_json,
                 created_at
             )
-            VALUES (?, ?, ?, ?, ?, 'pending', '{}', ?)
+            SELECT ?, id, ?, ?, ?, 'pending', '{}', ?
+            FROM users
+            WHERE id = ? AND role = 'teacher' AND is_enabled = 1
             """,
             (
                 announcement_id,
-                normalized_teacher_id,
                 normalized_title,
                 normalized_body,
                 event_id,
                 now,
+                normalized_teacher_id,
             ),
         )
+        if cursor.rowcount != 1:
+            raise ProviderAccessDeniedError(
+                "教师身份无效",
+                code="teaching_announcement_access_denied",
+                details={"teacher_id": normalized_teacher_id},
+            )
 
     try:
         result = emit_teaching_announcement(
