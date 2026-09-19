@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 
+from app.enterprise_console.providers import get_job_position_provider
 from app.job_matching.skill_profile import list_skill_outcomes
 
 
@@ -215,35 +216,33 @@ def _seed_visibility(
     return len(fixtures), visible_count, len(fixtures) - visible_count
 
 
-def _available_favorite(
-    connection: sqlite3.Connection,
-) -> dict[str, str]:
-    row = connection.execute(
-        """
-        SELECT
-            positions.job_id,
-            positions.title,
-            users.name AS enterprise_name,
-            positions.salary,
-            positions.location,
-            positions.description
-        FROM job_positions AS positions
-        JOIN users ON users.id = positions.enterprise_id
-        WHERE positions.job_id = ?
-          AND positions.review_status = 'approved'
-          AND positions.deleted_at IS NULL
-        """,
-        (DEMO_AVAILABLE_JOB_ID,),
-    ).fetchone()
-    if row is None:
+def _available_favorite() -> dict[str, str]:
+    job = get_job_position_provider().get_published_position(
+        job_id=DEMO_AVAILABLE_JOB_ID,
+    )
+    if not isinstance(job, dict):
         raise ValueError("Demo approved enterprise job is missing")
+    required = (
+        "job_id",
+        "title",
+        "enterprise_name",
+        "salary",
+        "location",
+        "description",
+    )
+    missing = [field for field in required if field not in job]
+    if missing:
+        raise ValueError(
+            "Demo approved enterprise job is incomplete: "
+            + ", ".join(missing)
+        )
     return {
-        "job_id": str(row["job_id"]),
-        "title_snapshot": str(row["title"]),
-        "enterprise_name_snapshot": str(row["enterprise_name"]),
-        "salary_snapshot": str(row["salary"]),
-        "location_snapshot": str(row["location"]),
-        "description_snapshot": str(row["description"]),
+        "job_id": str(job["job_id"]),
+        "title_snapshot": str(job["title"]),
+        "enterprise_name_snapshot": str(job["enterprise_name"]),
+        "salary_snapshot": str(job["salary"]),
+        "location_snapshot": str(job["location"]),
+        "description_snapshot": str(job["description"]),
     }
 
 
@@ -252,7 +251,7 @@ def _seed_favorites(
     student_id: int,
 ) -> int:
     snapshots = [
-        _available_favorite(connection),
+        _available_favorite(),
         DEMO_CLOSED_FAVORITE,
     ]
     connection.executemany(

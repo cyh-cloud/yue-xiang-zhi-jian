@@ -4,7 +4,13 @@ from flask import Blueprint, Flask, jsonify, request
 
 from app.agri_skills.errors import AiUnavailableError
 from app.db import get_db
-from app.enterprise_console.errors import ProviderUnavailableError
+from app.enterprise_console.errors import (
+    ProviderAccessDeniedError,
+    ProviderConflictError,
+    ProviderNotFoundError,
+    ProviderUnavailableError,
+    ProviderValidationError,
+)
 from app.job_matching.applications import (
     get_my_application,
     list_my_applications,
@@ -156,6 +162,48 @@ def _handle_provider_unavailable(_error: ProviderUnavailableError):
         message="就业服务暂时不可用",
         errors={},
     ), 503
+
+
+@job_matching_bp.errorhandler(ProviderValidationError)
+def _handle_provider_validation(_error: ProviderValidationError):
+    return jsonify(
+        success=False,
+        code="provider_validation_error",
+        message="就业服务输入不正确",
+        errors={},
+    ), 400
+
+
+@job_matching_bp.errorhandler(ProviderNotFoundError)
+def _handle_provider_not_found(_error: ProviderNotFoundError):
+    return jsonify(
+        success=False,
+        code="provider_not_found",
+        message="就业服务数据不存在",
+        errors={},
+    ), 404
+
+
+@job_matching_bp.errorhandler(ProviderConflictError)
+def _handle_provider_conflict(_error: ProviderConflictError):
+    return jsonify(
+        success=False,
+        code="provider_conflict",
+        message="就业服务状态冲突，请刷新后重试",
+        errors={},
+    ), 409
+
+
+@job_matching_bp.errorhandler(ProviderAccessDeniedError)
+def _handle_provider_access_denied(
+    _error: ProviderAccessDeniedError,
+):
+    return jsonify(
+        success=False,
+        code="provider_access_denied",
+        message="无权访问该就业服务数据",
+        errors={},
+    ), 403
 
 
 def register_job_matching_error_handlers(app: Flask) -> None:

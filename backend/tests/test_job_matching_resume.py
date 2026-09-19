@@ -327,6 +327,159 @@ class JobMatchingResumeTests(unittest.TestCase):
                     self.assertEqual(raised.exception.message, message)
                     self.assertEqual(raised.exception.details, details)
 
+    def test_rejects_non_text_oversized_and_unbounded_values(self):
+        valid_education = {
+            "school": "广东职业学院",
+            "major": "电子商务",
+            "start_date": "2022-09",
+        }
+        invalid_payloads = (
+            (
+                {
+                    "education_experiences": [
+                        {**valid_education, "school": []}
+                    ]
+                },
+                "education_experiences.school 必须是文本",
+                {"education_experiences.school": "必须是文本"},
+            ),
+            (
+                {
+                    "education_experiences": [
+                        {**valid_education, "degree": 1}
+                    ]
+                },
+                "education_experiences.degree 必须是文本",
+                {"education_experiences.degree": "必须是文本"},
+            ),
+            (
+                {
+                    "education_experiences": [
+                        {**valid_education, "end_date": None}
+                    ]
+                },
+                "education_experiences.end_date 必须是文本",
+                {"education_experiences.end_date": "必须是文本"},
+            ),
+            (
+                {
+                    "work_experiences": [
+                        {
+                            "company": True,
+                            "role": "运营助理",
+                            "start_date": "2025-07",
+                        }
+                    ]
+                },
+                "work_experiences.company 必须是文本",
+                {"work_experiences.company": "必须是文本"},
+            ),
+            (
+                {
+                    "work_experiences": [
+                        {
+                            "company": "示范农场",
+                            "role": "运营助理",
+                            "start_date": "2025-07",
+                            "description": [],
+                        }
+                    ]
+                },
+                "work_experiences.description 必须是文本",
+                {"work_experiences.description": "必须是文本"},
+            ),
+            (
+                {"skills": [{}]},
+                "skills 条目必须是文本",
+                {"skills": "条目必须是文本"},
+            ),
+            (
+                {"skills": [None]},
+                "skills 条目必须是文本",
+                {"skills": "条目必须是文本"},
+            ),
+            (
+                {"skills": [1]},
+                "skills 条目必须是文本",
+                {"skills": "条目必须是文本"},
+            ),
+            (
+                {
+                    "education_experiences": [
+                        {**valid_education, "school": "超" * 201}
+                    ]
+                },
+                "education_experiences.school 长度不能超过 200",
+                {"education_experiences.school": "最多 200 个字符"},
+            ),
+            (
+                {
+                    "work_experiences": [
+                        {
+                            "company": "示范农场",
+                            "role": "运营助理",
+                            "start_date": "2025-07",
+                            "description": "超" * 2001,
+                        }
+                    ]
+                },
+                "work_experiences.description 长度不能超过 2000",
+                {"work_experiences.description": "最多 2000 个字符"},
+            ),
+            (
+                {"skills": ["超" * 101]},
+                "skills 条目长度不能超过 100",
+                {"skills": "每条最多 100 个字符"},
+            ),
+            (
+                {
+                    "education_experiences": [
+                        dict(valid_education) for _ in range(21)
+                    ]
+                },
+                "education_experiences 最多 20 条",
+                {"education_experiences": "最多 20 条"},
+            ),
+            (
+                {
+                    "work_experiences": [
+                        {
+                            "company": "示范农场",
+                            "role": "运营助理",
+                            "start_date": "2025-07",
+                        }
+                        for _ in range(21)
+                    ]
+                },
+                "work_experiences 最多 20 条",
+                {"work_experiences": "最多 20 条"},
+            ),
+            (
+                {"skills": [f"技能 {index}" for index in range(51)]},
+                "skills 最多 50 条",
+                {"skills": "最多 50 条"},
+            ),
+        )
+
+        with self.app.app_context():
+            for payload, message, details in invalid_payloads:
+                with self.subTest(message=message):
+                    with self.assertRaises(
+                        JobMatchingValidationError
+                    ) as raised:
+                        save_resume(
+                            self.student_id,
+                            payload,
+                            expected_version=0,
+                        )
+                    self.assertEqual(raised.exception.message, message)
+                    self.assertEqual(raised.exception.details, details)
+
+            current = get_resume(self.student_id)
+
+        self.assertEqual(current["version"], 0)
+        self.assertEqual(current["skills"], [])
+
     def test_three_consecutive_saves_create_revisions_one_through_three(self):
         with self.app.app_context():
             first = save_resume(

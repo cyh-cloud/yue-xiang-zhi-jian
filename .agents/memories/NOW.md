@@ -19,7 +19,17 @@
   latest manual status plus a closed marker; favorites retain a full display
   snapshot until manual removal.
 - Independent plan review passed with no remaining High or Medium findings.
-- Implementation has not started.
+- Implementation Tasks 1-18 completed on
+  `v2/lixKRT/007-job-matching`; reviewed baseline HEAD `a76a1db`.
+- Verification at `a76a1db`: backend `881/881`, frontend `535/535`,
+  TypeScript check and production build passed; Task 18 browser geometry
+  passed `18/18` seeded and `15/15` empty-state route/width checks.
+- Final whole-branch review found one Critical and five Important findings.
+  The single authorized fix wave addressed favorites controls, resume bounds,
+  in-flight UI safety, 07 provider error mapping, provider-backed seed reads,
+  and the provider-contract/NOW handoff documentation.
+- The final fix commit is the current branch tip at handoff; no merge or push
+  has been performed.
 
 ## 009 Enterprise Console
 

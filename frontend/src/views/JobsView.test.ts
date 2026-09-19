@@ -88,14 +88,19 @@ function testRouter() {
 
 async function mountJobs(
   jobs: JobMatchingJob[] = [],
-  recommendedJobs: JobMatchingJob[] = []
+  recommendedJobs: JobMatchingJob[] = [],
+  favorites: JobFavorite[] = []
 ) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const store = useJobMatchingStore()
   store.jobs = jobs
   store.recommendedJobs = recommendedJobs
+  store.favorites = favorites
   vi.spyOn(store, 'loadJobs').mockResolvedValue(true)
+  const loadFavorites = vi
+    .spyOn(store, 'loadFavorites')
+    .mockResolvedValue(true)
 
   const router = testRouter()
   await router.push('/student/employment/jobs')
@@ -108,20 +113,25 @@ async function mountJobs(
   })
   await flushPromises()
 
-  return { router, store, wrapper }
+  return { loadFavorites, router, store, wrapper }
 }
 
 async function mountDetail(
   job: JobMatchingJob | null = jobFixture,
-  jobId = jobFixture.job_id
+  jobId = jobFixture.job_id,
+  favorites: JobFavorite[] = []
 ) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const store = useJobMatchingStore()
   store.activeJob = job
+  store.favorites = favorites
   const loadJob = vi
     .spyOn(store, 'loadJob')
     .mockResolvedValue(job?.job_id === jobId ? job : null)
+  const loadFavorites = vi
+    .spyOn(store, 'loadFavorites')
+    .mockResolvedValue(true)
 
   const router = testRouter()
   await router.push(`/student/employment/jobs/${jobId}`)
@@ -134,7 +144,7 @@ async function mountDetail(
   })
   await flushPromises()
 
-  return { loadJob, router, store, wrapper }
+  return { loadFavorites, loadJob, router, store, wrapper }
 }
 
 describe('JobsView', () => {
@@ -184,6 +194,82 @@ describe('JobsView', () => {
     expect(wrapper.text()).not.toContain('待审核')
     expect(wrapper.text()).not.toContain('已驳回')
     expect(wrapper.find('[data-test="job-review"]').exists()).toBe(false)
+  })
+
+  it('adds and cancels favorites from sibling card controls', async () => {
+    const { store, wrapper } = await mountJobs(
+      [jobFixture],
+      [jobFixture]
+    )
+    const addFavorite = vi
+      .spyOn(store, 'addFavorite')
+      .mockImplementation(async jobId => {
+        const favorite = {
+          ...favoriteFixture,
+          job_id: jobId,
+          title: jobFixture.title,
+          title_snapshot: jobFixture.title
+        }
+        store.favorites = [favorite]
+        return favorite
+      })
+
+    const initialToggles = wrapper.findAll(
+      '[data-test="favorite-toggle"]'
+    )
+    expect(initialToggles).toHaveLength(2)
+    expect(initialToggles[0]?.text()).toContain('收藏岗位')
+    expect(initialToggles[0]?.element.closest('a')).toBeNull()
+
+    await initialToggles[0]?.trigger('click')
+    await flushPromises()
+
+    expect(addFavorite).toHaveBeenCalledWith(jobFixture.job_id)
+    expect(
+      wrapper.findAll('[data-test="favorite-toggle"]')[0]?.text()
+    ).toContain('取消收藏')
+
+    const removeFavorite = vi
+      .spyOn(store, 'removeFavorite')
+      .mockImplementation(async jobId => {
+        store.favorites = store.favorites.filter(
+          favorite => favorite.job_id !== jobId
+        )
+        return true
+      })
+    await wrapper
+      .findAll('[data-test="favorite-toggle"]')[0]
+      ?.trigger('click')
+    await flushPromises()
+
+    expect(removeFavorite).toHaveBeenCalledWith(jobFixture.job_id)
+    expect(
+      wrapper.findAll('[data-test="favorite-toggle"]')[0]?.text()
+    ).toContain('收藏岗位')
+  })
+
+  it('shows already-favorited cards without duplicating the favorite', async () => {
+    const { wrapper } = await mountJobs(
+      [jobFixture],
+      [jobFixture],
+      [favoriteFixture]
+    )
+    const toggles = wrapper.findAll('[data-test="favorite-toggle"]')
+
+    expect(toggles).toHaveLength(2)
+    for (const toggle of toggles) {
+      expect(toggle.text()).toContain('取消收藏')
+      expect(toggle.attributes('aria-pressed')).toBe('true')
+    }
+  })
+
+  it('loads favorites with the jobs list', async () => {
+    const { loadFavorites } = await mountJobs(
+      [jobFixture],
+      [jobFixture]
+    )
+
+    expect(loadFavorites).toHaveBeenCalledTimes(1)
   })
 
   it('does not render a nonpublished projection if one reaches the store', async () => {
@@ -277,9 +363,10 @@ describe('JobDetailView', () => {
   })
 
   it('loads the route job into activeJob and shows its complete details', async () => {
-    const { loadJob, wrapper } = await mountDetail()
+    const { loadFavorites, loadJob, wrapper } = await mountDetail()
 
     expect(loadJob).toHaveBeenCalledWith(jobFixture.job_id)
+    expect(loadFavorites).toHaveBeenCalledTimes(1)
     expect(wrapper.get('[data-test="job-detail"]').text()).toContain(
       jobFixture.title
     )
@@ -313,6 +400,56 @@ describe('JobDetailView', () => {
     expect(
       wrapper.get('[data-test="job-detail-unavailable"]').text()
     ).toContain('岗位已关闭或暂不可投递')
+    expect(wrapper.find('[data-test="favorite-toggle"]').exists()).toBe(
+      false
+    )
+  })
+
+  it('adds and cancels the active job favorite', async () => {
+    const { store, wrapper } = await mountDetail()
+    const addFavorite = vi
+      .spyOn(store, 'addFavorite')
+      .mockImplementation(async jobId => {
+        const favorite = { ...favoriteFixture, job_id: jobId }
+        store.favorites = [favorite]
+        return favorite
+      })
+
+    const toggle = wrapper.get('[data-test="favorite-toggle"]')
+    expect(toggle.text()).toContain('收藏岗位')
+    await toggle.trigger('click')
+    await flushPromises()
+    expect(addFavorite).toHaveBeenCalledWith(jobFixture.job_id)
+    expect(
+      wrapper.get('[data-test="favorite-toggle"]').text()
+    ).toContain('取消收藏')
+
+    const removeFavorite = vi
+      .spyOn(store, 'removeFavorite')
+      .mockImplementation(async jobId => {
+        store.favorites = store.favorites.filter(
+          favorite => favorite.job_id !== jobId
+        )
+        return true
+      })
+    await wrapper.get('[data-test="favorite-toggle"]').trigger('click')
+    await flushPromises()
+    expect(removeFavorite).toHaveBeenCalledWith(jobFixture.job_id)
+    expect(
+      wrapper.get('[data-test="favorite-toggle"]').text()
+    ).toContain('收藏岗位')
+  })
+
+  it('renders the already-favorited detail state', async () => {
+    const { wrapper } = await mountDetail(
+      jobFixture,
+      jobFixture.job_id,
+      [favoriteFixture]
+    )
+    const toggle = wrapper.get('[data-test="favorite-toggle"]')
+
+    expect(toggle.text()).toContain('取消收藏')
+    expect(toggle.attributes('aria-pressed')).toBe('true')
   })
 
   it('sends the exact attachment boolean', async () => {

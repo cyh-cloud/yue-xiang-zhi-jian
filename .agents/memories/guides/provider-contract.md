@@ -1,8 +1,8 @@
 # 生产者 Provider 接口契约
 
-Updated: 2026-09-18
+Updated: 2026-09-20
 Status: FROZEN
-Scope: 08、09、10、11 与既有 01、02、03、04、05 的跨模块 provider 边界
+Scope: 07、08、09、10、11 与既有 01、02、03、04、05 的跨模块 provider 边界
 
 ## 1. 契约定位
 
@@ -430,7 +430,79 @@ class JobApplicationIntakeProvider(Protocol):
 - 07 不得直接写 `job_applications`，不得导入 09 的 `applications.py`
   或其他内部实现。
 
-### 4.7 09 全平台就业统计
+### 4.7 09 学员申请状态读取
+
+09 是学员侧申请状态读取契约的签名所有者和生产实现，07 是唯一消费者。
+注册入口固定为：
+
+```python
+def set_job_application_status_provider(
+    app: Flask,
+    provider: JobApplicationStatusProvider,
+) -> None: ...
+
+def get_job_application_status_provider() -> JobApplicationStatusProvider: ...
+```
+
+最终签名：
+
+```python
+class JobApplicationStatusProvider(Protocol):
+    def list_student_applications(
+        self,
+        *,
+        student_id: int,
+    ) -> list[dict]: ...
+
+    def get_student_application(
+        self,
+        *,
+        student_id: int,
+        application_id: str,
+    ) -> dict | None: ...
+```
+
+默认注册与便利入口：
+
+- `install_default_enterprise_services(app)` 在唯一扩展槽
+  `job_application_status_provider` 安装
+  `DatabaseJobApplicationStatusProvider`。
+- `configure_enterprise_providers(app, ...,
+  job_application_status_provider=None)` 可替换该槽，但只能委托
+  `set_job_application_status_provider()`。
+- `get_job_application_status_provider()` 在未注册时返回完整占位实现。
+
+读取记录至少包含：
+
+```text
+application_id
+job_id
+enterprise_id
+enterprise_name
+student_id
+student_name
+job_title
+status
+status_version
+position_closed
+position_closed_at
+effective_status
+effective_status_label
+submitted_at
+```
+
+规则：
+
+- `list_student_applications()` 只返回指定学员的记录，完整返回当前规模
+  列表，并按 `submitted_at DESC, application_id ASC` 排序。
+- `get_student_application()` 对不存在或非当前学员记录返回 `None`。
+- 职位关闭且业务状态为 `pending` 时，`effective_status="closed"`；
+  职位关闭但业务状态已处理时，保留最新人工状态，并单独返回关闭标识。
+- 错误遵循第 4.5 节 `ProviderError` 形状。07 在自身蓝图边界按
+  `code/message` 映射，不泄露内部数据库或 provider 文本。
+- 07 不保存、推断或修改 09 状态历史，也不直接读取 09 表。
+
+### 4.8 09 全平台就业统计
 
 09 为 010 提供全平台只读就业统计，010 spec 已冻结消费者形状：
 
@@ -454,8 +526,9 @@ class EmploymentStatisticsProvider(Protocol):
 | 生产者 → 消费者 | 接口 | 契约现状 | 签名所有者 | 实现/接入归属 |
 | --- | --- | --- | --- | --- |
 | 08 → 03/04/05 | 方向感知课程 | 已存在 | 03 spec 冻结的 `CourseProvider` | 08 实现真 provider；03/04/05 继续消费 |
-| 09 → 07 | 岗位 | 09 spec 已冻结实现形状；待 07 spec 最终确认 | 07 spec | 09 实现 producer，07 接入 |
-| 09 → 07 | 求职申请接收 | 新定义 | 09 spec 冻结 `JobApplicationIntakeProvider` | 09 实现 producer，07 只依赖签名提交 |
+| 09 → 07 | 岗位 | 09 spec 已冻结实现形状，07 已接入 | 07 spec | 09 实现 producer，07 接入 |
+| 09 → 07 | 求职申请接收 | 07 spec 已确认，09 已实现 | 09 spec 冻结 `JobApplicationIntakeProvider` | 09 实现 producer，07 只依赖签名提交 |
+| 09 → 07 | 学员申请状态读取 | 07 spec 已冻结消费形状，09 已实现 | 09 spec 冻结 `JobApplicationStatusProvider` | 09 实现 producer，07 通过单一槽消费 |
 | 09 → 10 | 全平台就业统计 | 010 已冻结消费者协议、09 补实现 | 010 spec 冻结 `EmploymentStatisticsProvider` | 09 实现 producer，010 通过单一注册槽消费 |
 | 10 → 06 | 政策 / 新闻 | 未定义 | 06 spec | 10 实现 producer，06 接入 |
 | 11 → 08/09/05 | 内容审核 | 05 视频专用形状已存在；通用契约新定义 | 11 spec | 08/09 直接接通用 facade；11 为 05 提供适配器 |
@@ -523,6 +596,8 @@ class EmploymentStatisticsProvider(Protocol):
   `set/get`，consumer 只依赖签名。
 - 09 拥有 `JobApplicationIntakeProvider.submit_application()` 签名和实现；
   07 只通过该 provider 创建投递，不得直接写 09 的表或导入内部服务。
+- 09 拥有 `JobApplicationStatusProvider` 和数据库默认实现；07 只通过
+  `set/get_job_application_status_provider()` 扩展槽读取学员申请状态。
 - 09 可在 11 尚未实现时通过 `set_content_review_provider()` 向唯一
   `content_review_provider` 槽安装协议完整的不可用占位实现；11 落地后
   用同一 `set/get` 槽替换，不得建立第二审核注册表。

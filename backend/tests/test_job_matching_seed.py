@@ -12,6 +12,7 @@ from werkzeug.security import generate_password_hash
 from app import create_app
 from app.db import get_db
 from app.enterprise_console import seed_enterprise_console_fixtures
+from app.enterprise_console.providers import set_job_position_provider
 from app.job_matching.seed import (
     DEMO_RESUME,
     seed_job_matching_fixtures,
@@ -396,6 +397,60 @@ class JobMatchingSeedTests(unittest.TestCase):
                 ).fetchone()["count"],
                 0,
             )
+
+    def test_available_favorite_uses_job_position_provider(self):
+        class ReplacementJobPositionProvider:
+            def __init__(self):
+                self.get_calls = []
+
+            def list_published_positions(self):
+                return []
+
+            def get_published_position(self, *, job_id):
+                self.get_calls.append(job_id)
+                return {
+                    "job_id": job_id,
+                    "enterprise_id": 2,
+                    "enterprise_name": "Provider 企业",
+                    "title": "Provider 岗位",
+                    "salary": "9k-12k",
+                    "location": "深圳",
+                    "category_id": 1,
+                    "category_name": "Provider 类别",
+                    "description": "Provider 岗位描述",
+                    "review_status": "approved",
+                    "version": 3,
+                    "published_at": DEMO_TIMESTAMP,
+                    "updated_at": DEMO_TIMESTAMP,
+                }
+
+        provider = ReplacementJobPositionProvider()
+        set_job_position_provider(self.app, provider)
+
+        with self.app.app_context():
+            result = seed_job_matching_fixtures(get_db())
+            favorite = get_db().execute(
+                """
+                SELECT *
+                FROM job_favorites
+                WHERE user_id = ? AND job_id = ?
+                """,
+                (self.student_id, AVAILABLE_JOB_ID),
+            ).fetchone()
+
+        self.assertEqual(provider.get_calls, [AVAILABLE_JOB_ID])
+        self.assertEqual(result["favorites"], 2)
+        self.assertEqual(favorite["title_snapshot"], "Provider 岗位")
+        self.assertEqual(
+            favorite["enterprise_name_snapshot"],
+            "Provider 企业",
+        )
+        self.assertEqual(favorite["salary_snapshot"], "9k-12k")
+        self.assertEqual(favorite["location_snapshot"], "深圳")
+        self.assertEqual(
+            favorite["description_snapshot"],
+            "Provider 岗位描述",
+        )
 
     def test_seed_local_data_wires_demo_fixtures_idempotently(self):
         environment = {

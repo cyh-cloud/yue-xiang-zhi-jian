@@ -124,10 +124,12 @@ function configureStore(
       store.jobs = []
       store.recommendedJobs = []
       vi.spyOn(store, 'loadJobs').mockResolvedValue(true)
+      vi.spyOn(store, 'loadFavorites').mockResolvedValue(true)
       break
     case 'detail':
       store.activeJob = jobFixture
       vi.spyOn(store, 'loadJob').mockResolvedValue(jobFixture)
+      vi.spyOn(store, 'loadFavorites').mockResolvedValue(true)
       break
     case 'applications':
       store.applications = []

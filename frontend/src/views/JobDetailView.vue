@@ -2,6 +2,7 @@
 import {
   AlertCircle,
   ArrowLeft,
+  Bookmark,
   BriefcaseBusiness,
   RefreshCw,
   Send
@@ -20,6 +21,7 @@ const router = useRouter()
 const store = useJobMatchingStore()
 
 const attachSkillProfile = ref(false)
+const favoriteActionJobId = ref('')
 const jobId = computed(() => {
   const value = route.params.jobId
   return Array.isArray(value) ? value[0] ?? '' : String(value ?? '')
@@ -39,7 +41,32 @@ async function loadJob() {
     return
   }
   attachSkillProfile.value = false
-  await store.loadJob(jobId.value)
+  const loaded = await store.loadJob(jobId.value)
+  if (loaded) {
+    await store.loadFavorites()
+  }
+}
+
+function isFavorite(jobId: string): boolean {
+  return store.favorites.some(favorite => favorite.job_id === jobId)
+}
+
+async function toggleFavorite() {
+  const job = activeJob.value
+  if (!job || favoriteActionJobId.value || store.saving) {
+    return
+  }
+
+  favoriteActionJobId.value = job.job_id
+  try {
+    if (isFavorite(job.job_id)) {
+      await store.removeFavorite(job.job_id)
+    } else {
+      await store.addFavorite(job.job_id)
+    }
+  } finally {
+    favoriteActionJobId.value = ''
+  }
 }
 
 async function submitApplication() {
@@ -183,6 +210,33 @@ watch(jobId, () => void loadJob(), { immediate: true })
             >
               <h2 id="application-panel-title">申请岗位</h2>
               <p>投递后可在“我的投递”查看处理状态。</p>
+
+              <button
+                class="application-panel__favorite"
+                :class="{
+                  'is-active': isFavorite(activeJob.job_id)
+                }"
+                type="button"
+                data-test="favorite-toggle"
+                :aria-pressed="isFavorite(activeJob.job_id)"
+                :disabled="
+                  Boolean(favoriteActionJobId) || store.saving
+                "
+                @click="toggleFavorite"
+              >
+                <RefreshCw
+                  v-if="favoriteActionJobId === activeJob.job_id"
+                  class="spinning"
+                  :size="16"
+                  aria-hidden="true"
+                />
+                <Bookmark v-else :size="16" aria-hidden="true" />
+                {{
+                  isFavorite(activeJob.job_id)
+                    ? '取消收藏'
+                    : '收藏岗位'
+                }}
+              </button>
 
               <form
                 class="application-form"
@@ -488,6 +542,36 @@ watch(jobId, () => void loadJob(), { immediate: true })
   overflow-wrap: anywhere;
   text-wrap: pretty;
   word-break: normal;
+}
+
+.application-panel__favorite {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--ark-line-strong);
+  border-radius: var(--ark-radius);
+  background: var(--ark-surface-1);
+  color: var(--ark-paper);
+  line-break: strict;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.application-panel__favorite:hover:not(:disabled),
+.application-panel__favorite:focus-visible:not(:disabled) {
+  border-color: var(--ark-signal);
+  color: var(--ark-signal);
+}
+
+.application-panel__favorite.is-active {
+  border-color: var(--ark-signal);
+  color: var(--ark-signal);
 }
 
 .application-form {

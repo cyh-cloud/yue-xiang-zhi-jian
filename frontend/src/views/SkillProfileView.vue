@@ -52,6 +52,7 @@ const occurredAtFormatter = new Intl.DateTimeFormat('zh-CN', {
 const store = useJobMatchingStore()
 const selectedVisibleIds = ref<string[]>([])
 const saveNotice = ref('')
+const visibilitySaving = ref(false)
 
 const selectedVisibleIdSet = computed(
   () => new Set(selectedVisibleIds.value)
@@ -79,7 +80,10 @@ const showInitialError = computed(
     store.error.length > 0
 )
 const canSave = computed(
-  () => store.skillProfile !== null && !store.saving
+  () =>
+    store.skillProfile !== null &&
+    !store.saving &&
+    !visibilitySaving.value
 )
 
 function syncVisibleSelection(profile: SkillProfile | null) {
@@ -158,10 +162,15 @@ async function saveVisibility() {
   }
 
   saveNotice.value = ''
-  const saved = await store.saveSkillVisibility(visibleIds.value)
-  if (saved) {
-    syncVisibleSelection(saved)
-    saveNotice.value = '可见范围已保存'
+  visibilitySaving.value = true
+  try {
+    const saved = await store.saveSkillVisibility(visibleIds.value)
+    if (saved) {
+      syncVisibleSelection(saved)
+      saveNotice.value = '可见范围已保存'
+    }
+  } finally {
+    visibilitySaving.value = false
   }
 }
 
@@ -375,13 +384,21 @@ onMounted(() => {
 
                 <label
                   class="skill-item__visibility"
-                  :class="{ 'is-disabled': !item.source_available }"
+                  :class="{
+                    'is-disabled':
+                      !item.source_available ||
+                      store.saving ||
+                      visibilitySaving
+                  }"
                 >
                   <input
                     type="checkbox"
                     :data-test="`visibility-${item.item_id}`"
                     :checked="isSelected(item)"
-                    :disabled="!item.source_available"
+                    :disabled="
+                      !item.source_available || store.saving
+                      || visibilitySaving
+                    "
                     @change="
                       setItemVisibility(
                         item,

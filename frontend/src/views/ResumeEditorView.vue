@@ -327,6 +327,7 @@ onMounted(() => {
             :entries="educationEntries"
             :fields="educationFields"
             :errors="store.fieldErrors"
+            :disabled="busy"
             @add="addEducation"
             @remove="index => removeEntry(educationEntries, index)"
             @update-field="updateEducationField"
@@ -339,6 +340,7 @@ onMounted(() => {
             :entries="workEntries"
             :fields="workFields"
             :errors="store.fieldErrors"
+            :disabled="busy"
             @add="addWork"
             @remove="index => removeEntry(workEntries, index)"
             @update-field="updateWorkField"
@@ -354,6 +356,7 @@ onMounted(() => {
                 class="resume-editor-skills__add"
                 type="button"
                 data-test="add-skill"
+                :disabled="busy"
                 @click="addSkill"
               >
                 <Plus :size="16" aria-hidden="true" />
@@ -372,6 +375,7 @@ onMounted(() => {
                   data-test="resume-skill"
                   type="text"
                   :value="skill"
+                  :disabled="busy"
                   :aria-invalid="store.fieldErrors.skills ? 'true' : undefined"
                   @input="
                     updateSkill(
@@ -383,6 +387,7 @@ onMounted(() => {
                 <button
                   type="button"
                   :data-test="`remove-skill-${index}`"
+                  :disabled="busy"
                   :aria-label="`删除第 ${index + 1} 项技能`"
                   @click="removeSkill(index)"
                 >

@@ -17,6 +17,7 @@ const props = defineProps<{
   entries: Array<Record<string, string>>
   fields: ResumeFieldDefinition[]
   errors: Record<string, string>
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -62,6 +63,7 @@ function fieldErrorId(
         class="resume-section-editor__add"
         type="button"
         :data-test="`add-${kind}`"
+        :disabled="disabled"
         @click="emit('add')"
       >
         <Plus :size="16" aria-hidden="true" />
@@ -85,6 +87,7 @@ function fieldErrorId(
             class="resume-section-editor__remove"
             type="button"
             :data-test="`remove-${kind}-${index}`"
+            :disabled="disabled"
             :aria-label="`删除第 ${index + 1} 条${
               kind === 'education' ? '教育经历' : '工作经历'
             }`"
@@ -112,6 +115,7 @@ function fieldErrorId(
               :data-test="`${kind}-${field.testKey}-${index}`"
               :value="entry[field.key] ?? ''"
               rows="3"
+              :disabled="disabled"
               :aria-invalid="fieldError(field) ? 'true' : undefined"
               :aria-describedby="
                 fieldError(field) ? fieldErrorId(field, index) : undefined
@@ -131,6 +135,7 @@ function fieldErrorId(
               :data-test="`${kind}-${field.testKey}-${index}`"
               :type="field.type ?? 'text'"
               :value="entry[field.key] ?? ''"
+              :disabled="disabled"
               :aria-invalid="fieldError(field) ? 'true' : undefined"
               :aria-describedby="
                 fieldError(field) ? fieldErrorId(field, index) : undefined

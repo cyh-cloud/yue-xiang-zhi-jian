@@ -16,6 +16,29 @@ EDUCATION_REQUIRED_FIELDS = ("school", "major", "start_date")
 EDUCATION_OPTIONAL_FIELDS = ("degree", "end_date")
 WORK_REQUIRED_FIELDS = ("company", "role", "start_date")
 WORK_OPTIONAL_FIELDS = ("end_date", "description")
+MAX_EDUCATION_EXPERIENCES = 20
+MAX_WORK_EXPERIENCES = 20
+MAX_SKILLS = 50
+MAX_EDUCATION_TEXT_LENGTH = 200
+MAX_WORK_TEXT_LENGTH = 2000
+MAX_DATE_TEXT_LENGTH = 32
+MAX_SKILL_TEXT_LENGTH = 100
+
+_EDUCATION_FIELD_LIMITS = {
+    "school": MAX_EDUCATION_TEXT_LENGTH,
+    "major": MAX_EDUCATION_TEXT_LENGTH,
+    "degree": MAX_EDUCATION_TEXT_LENGTH,
+    "start_date": MAX_DATE_TEXT_LENGTH,
+    "end_date": MAX_DATE_TEXT_LENGTH,
+}
+_WORK_FIELD_LIMITS = {
+    "company": MAX_EDUCATION_TEXT_LENGTH,
+    "role": MAX_EDUCATION_TEXT_LENGTH,
+    "start_date": MAX_DATE_TEXT_LENGTH,
+    "end_date": MAX_DATE_TEXT_LENGTH,
+    "description": MAX_WORK_TEXT_LENGTH,
+}
+_MISSING = object()
 
 
 def _now_iso() -> str:
@@ -27,26 +50,73 @@ def _normalize_items(
     required_fields,
     optional_fields,
     field_name,
+    *,
+    max_items: int,
+    field_limits: dict[str, int],
 ):
     if not isinstance(value, list):
         raise JobMatchingValidationError(f"{field_name} 必须是列表")
+    if len(value) > max_items:
+        raise JobMatchingValidationError(
+            f"{field_name} 最多 {max_items} 条",
+            details={field_name: f"最多 {max_items} 条"},
+        )
+
     normalized = []
     for item in value:
         if not isinstance(item, dict):
             raise JobMatchingValidationError(f"{field_name} 条目格式不正确")
         normalized_item = {}
         for key in required_fields:
-            text = str(item.get(key, "")).strip()
-            if not text:
-                raise JobMatchingValidationError(
-                    f"{field_name}.{key} 不能为空",
-                    details={f"{field_name}.{key}": "不能为空"},
-                )
-            normalized_item[key] = text
+            normalized_item[key] = _normalize_text_field(
+                item.get(key, _MISSING),
+                f"{field_name}.{key}",
+                field_limits[key],
+                required=True,
+            )
         for key in optional_fields:
-            normalized_item[key] = str(item.get(key, "")).strip()
+            normalized_item[key] = _normalize_text_field(
+                item.get(key, _MISSING),
+                f"{field_name}.{key}",
+                field_limits[key],
+                required=False,
+            )
         normalized.append(normalized_item)
     return normalized
+
+
+def _normalize_text_field(
+    value,
+    field_name: str,
+    max_length: int,
+    *,
+    required: bool,
+) -> str:
+    if value is _MISSING:
+        if required:
+            raise JobMatchingValidationError(
+                f"{field_name} 不能为空",
+                details={field_name: "不能为空"},
+            )
+        return ""
+    if not isinstance(value, str):
+        raise JobMatchingValidationError(
+            f"{field_name} 必须是文本",
+            details={field_name: "必须是文本"},
+        )
+
+    text = value.strip()
+    if required and not text:
+        raise JobMatchingValidationError(
+            f"{field_name} 不能为空",
+            details={field_name: "不能为空"},
+        )
+    if len(text) > max_length:
+        raise JobMatchingValidationError(
+            f"{field_name} 长度不能超过 {max_length}",
+            details={field_name: f"最多 {max_length} 个字符"},
+        )
+    return text
 
 
 def _normalize_payload(payload: dict) -> dict:
@@ -57,19 +127,40 @@ def _normalize_payload(payload: dict) -> dict:
         EDUCATION_REQUIRED_FIELDS,
         EDUCATION_OPTIONAL_FIELDS,
         "education_experiences",
+        max_items=MAX_EDUCATION_EXPERIENCES,
+        field_limits=_EDUCATION_FIELD_LIMITS,
     )
     work = _normalize_items(
         payload.get("work_experiences", []),
         WORK_REQUIRED_FIELDS,
         WORK_OPTIONAL_FIELDS,
         "work_experiences",
+        max_items=MAX_WORK_EXPERIENCES,
+        field_limits=_WORK_FIELD_LIMITS,
     )
     raw_skills = payload.get("skills", [])
     if not isinstance(raw_skills, list):
         raise JobMatchingValidationError("skills 必须是列表")
+    if len(raw_skills) > MAX_SKILLS:
+        raise JobMatchingValidationError(
+            f"skills 最多 {MAX_SKILLS} 条",
+            details={"skills": f"最多 {MAX_SKILLS} 条"},
+        )
     skills = []
     for skill in raw_skills:
-        text = str(skill).strip()
+        if not isinstance(skill, str):
+            raise JobMatchingValidationError(
+                "skills 条目必须是文本",
+                details={"skills": "条目必须是文本"},
+            )
+        text = skill.strip()
+        if len(text) > MAX_SKILL_TEXT_LENGTH:
+            raise JobMatchingValidationError(
+                f"skills 条目长度不能超过 {MAX_SKILL_TEXT_LENGTH}",
+                details={
+                    "skills": f"每条最多 {MAX_SKILL_TEXT_LENGTH} 个字符"
+                },
+            )
         if text and text not in skills:
             skills.append(text)
     if not education and not work and not skills:

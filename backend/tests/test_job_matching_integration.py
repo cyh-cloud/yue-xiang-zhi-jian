@@ -14,6 +14,12 @@ from app.db import get_db
 from app.enterprise_console.applications import (
     close_applications_for_deleted_job,
 )
+from app.enterprise_console.errors import (
+    ProviderAccessDeniedError,
+    ProviderConflictError,
+    ProviderNotFoundError,
+    ProviderValidationError,
+)
 from app.enterprise_console.providers import (
     DatabaseJobApplicationIntakeProvider,
     DatabaseJobApplicationStatusProvider,
@@ -209,6 +215,17 @@ class RecordingIntakeProvider:
             }
         )
         return self.application
+
+
+class RaisingJobPositionProvider:
+    def __init__(self, error: Exception):
+        self.error = error
+
+    def list_published_positions(self) -> list[dict]:
+        raise self.error
+
+    def get_published_position(self, *, job_id: str) -> dict | None:
+        raise self.error
 
 
 class FakeAiClient:
@@ -635,6 +652,51 @@ class JobMatchingIntegrationTests(unittest.TestCase):
             f"007:{self.student_id}:job-1",
         )
 
+    def test_provider_boundary_errors_keep_codes_and_hide_internal_text(self):
+        cases = (
+            (
+                ProviderValidationError("internal provider validation"),
+                400,
+                "provider_validation_error",
+                "就业服务输入不正确",
+            ),
+            (
+                ProviderNotFoundError("internal provider not found"),
+                404,
+                "provider_not_found",
+                "就业服务数据不存在",
+            ),
+            (
+                ProviderConflictError("internal provider conflict"),
+                409,
+                "provider_conflict",
+                "就业服务状态冲突，请刷新后重试",
+            ),
+            (
+                ProviderAccessDeniedError("internal access denied"),
+                403,
+                "provider_access_denied",
+                "无权访问该就业服务数据",
+            ),
+        )
+
+        for error, status, code, message in cases:
+            with self.subTest(code=code):
+                set_job_position_provider(
+                    self.app,
+                    RaisingJobPositionProvider(error),
+                )
+
+                response = self.client.get("/api/job-matching/jobs")
+                body = response.get_json()
+
+                self.assertEqual(response.status_code, status)
+                self.assertEqual(body["code"], code)
+                self.assertEqual(body["message"], message)
+                self.assertEqual(body["errors"], {})
+                self.assertNotIn("internal", body["message"])
+                self.assertNotIn("internal", str(body["errors"]))
+
     def test_07_never_calls_02_application_notification_directly(self):
         self.save_resume()
 
@@ -833,6 +895,7 @@ class JobMatchingIntegrationTests(unittest.TestCase):
             "UPDATE job_applications",
             "DELETE FROM job_applications",
             "FROM job_applications",
+            "FROM job_positions",
         ):
             self.assertNotIn(forbidden, source)
 

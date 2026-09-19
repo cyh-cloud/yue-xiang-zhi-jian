@@ -207,6 +207,65 @@ describe('SkillProfileView', () => {
     expect(saveVisibility).toHaveBeenCalledWith([])
   })
 
+  it('disables visibility controls while saving and preserves private-hide intent', async () => {
+    const profileWithVisibleItem: SkillProfile = {
+      ...profileFixture,
+      items: profileFixture.items.map(item =>
+        item.item_id === 'agriculture:course_quiz:3'
+          ? { ...item, visible: true }
+          : item
+      ),
+      visible_item_ids: ['agriculture:course_quiz:3']
+    }
+    const hiddenProfile: SkillProfile = {
+      ...profileWithVisibleItem,
+      items: profileWithVisibleItem.items.map(item =>
+        item.item_id === 'agriculture:course_quiz:3'
+          ? { ...item, visible: false }
+          : item
+      ),
+      visible_item_ids: []
+    }
+    const { store, wrapper } = mountProfile(profileWithVisibleItem)
+    let resolveSave:
+      | ((profile: SkillProfile | null) => void)
+      | undefined
+    const saveVisibility = vi
+      .spyOn(store, 'saveSkillVisibility')
+      .mockReturnValue(
+        new Promise(resolve => {
+          resolveSave = resolve
+        })
+      )
+    const checkbox = wrapper.get(
+      '[data-test="visibility-agriculture:course_quiz:3"]'
+    )
+
+    await checkbox.setValue(false)
+    await wrapper.get('[data-test="save-visibility"]').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(
+      wrapper
+        .get('[data-test="visibility-agriculture:course_quiz:3"]')
+        .attributes('disabled')
+    ).toBeDefined()
+    expect(
+      wrapper.get('[data-test="save-visibility"]').attributes('disabled')
+    ).toBeDefined()
+    expect(saveVisibility).toHaveBeenCalledWith([])
+
+    resolveSave?.(hiddenProfile)
+    await flushPromises()
+
+    expect(
+      wrapper
+        .get('[data-test="visibility-agriculture:course_quiz:3"]')
+        .attributes('checked')
+    ).toBeUndefined()
+    expect(wrapper.text()).toContain('仅自己可见')
+  })
+
   it('marks unavailable sources and excludes them from the saved set', async () => {
     const profileWithUnavailableVisibleItem: SkillProfile = {
       ...profileFixture,

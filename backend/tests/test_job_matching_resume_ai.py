@@ -352,6 +352,88 @@ class JobMatchingResumeAiTests(unittest.TestCase):
                     "contact": "13800000000",
                 },
             },
+            {
+                "suggestions": ["补充量化成果"],
+                "rewritten_resume": {
+                    "education_experiences": [
+                        {
+                            "school": {},
+                            "major": "电子商务",
+                            "start_date": "2022-09",
+                        }
+                    ],
+                    "work_experiences": [],
+                    "skills": [],
+                },
+            },
+            {
+                "suggestions": ["补充量化成果"],
+                "rewritten_resume": {
+                    "education_experiences": [
+                        {
+                            "school": "广东职业学院",
+                            "major": "电子商务",
+                            "start_date": "2022-09",
+                            "end_date": None,
+                        }
+                    ],
+                    "work_experiences": [],
+                    "skills": [],
+                },
+            },
+            {
+                "suggestions": ["补充量化成果"],
+                "rewritten_resume": {
+                    "education_experiences": [],
+                    "work_experiences": [],
+                    "skills": [1],
+                },
+            },
+            {
+                "suggestions": ["补充量化成果"],
+                "rewritten_resume": {
+                    "education_experiences": [
+                        {
+                            "school": "广东职业学院",
+                            "major": "电子商务",
+                            "start_date": "2022-09",
+                            "degree": False,
+                        }
+                    ],
+                    "work_experiences": [],
+                    "skills": [],
+                },
+            },
+            {
+                "suggestions": ["补充量化成果"],
+                "rewritten_resume": {
+                    "education_experiences": [],
+                    "work_experiences": [
+                        {
+                            "company": "示范农场",
+                            "role": "运营助理",
+                            "start_date": "2025-07",
+                            "description": "超" * 2001,
+                        }
+                    ],
+                    "skills": [],
+                },
+            },
+            {
+                "suggestions": ["补充量化成果"],
+                "rewritten_resume": {
+                    "education_experiences": [],
+                    "work_experiences": [
+                        {
+                            "company": "示范农场",
+                            "role": "运营助理",
+                            "start_date": "2025-07",
+                        }
+                        for _ in range(21)
+                    ],
+                    "skills": [],
+                },
+            },
         )
 
         with self.app.app_context():

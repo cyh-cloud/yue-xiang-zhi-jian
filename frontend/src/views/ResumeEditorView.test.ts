@@ -269,6 +269,51 @@ describe('ResumeEditorView', () => {
     expect(adoptOptimization).toHaveBeenCalledWith('offer-1', 2)
   })
 
+  it('disables draft and adoption controls during save and keeps the saved result', async () => {
+    const { store, wrapper } = mountEditor(savedResume)
+    store.optimizationOffer = offerFixture
+    let resolveSave:
+      | ((resume: StudentResume | null) => void)
+      | undefined
+    vi.spyOn(store, 'saveResume').mockReturnValue(
+      new Promise(resolve => {
+        resolveSave = resolve
+      })
+    )
+    await wrapper.vm.$nextTick()
+
+    await wrapper.get('[data-test="resume-form"]').trigger('submit')
+    await wrapper.vm.$nextTick()
+
+    for (const selector of [
+      '[data-test="education-school-0"]',
+      '[data-test="add-education"]',
+      '[data-test="remove-education-0"]',
+      '[data-test="add-skill"]',
+      '[data-test="resume-skill"]',
+      '[data-test="remove-skill-0"]',
+      '[data-test="resume-save"]',
+      '[data-test="adopt-optimization"]'
+    ]) {
+      expect(wrapper.get(selector).attributes('disabled')).toBeDefined()
+    }
+
+    resolveSave?.({
+      ...savedResume,
+      version: 2,
+      skills: ['后端保存值']
+    })
+    await flushPromises()
+
+    expect(
+      (wrapper.get('[data-test="resume-skill"]')
+        .element as HTMLInputElement).value
+    ).toBe('后端保存值')
+    expect(
+      wrapper.get('[data-test="education-school-0"]').attributes('disabled')
+    ).toBeUndefined()
+  })
+
   it('shows rewritten sections in the AI preview', async () => {
     const { store, wrapper } = mountEditor()
     store.optimizationOffer = offerFixture

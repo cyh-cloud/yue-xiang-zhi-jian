@@ -2,12 +2,14 @@
 import {
   AlertCircle,
   ArrowRight,
+  Bookmark,
   BriefcaseBusiness,
   RefreshCw
 } from 'lucide-vue-next'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import type { JobMatchingJob } from '@/api/types'
 import AppHeader from '@/components/AppHeader.vue'
 import JobMatchingNav from '@/components/JobMatchingNav.vue'
 import { useAuthStore } from '@/stores/auth'
@@ -16,6 +18,7 @@ import { useJobMatchingStore } from '@/stores/jobMatching'
 const auth = useAuthStore()
 const router = useRouter()
 const store = useJobMatchingStore()
+const favoriteActionJobId = ref('')
 
 const hasJobs = computed(
   () => store.jobs.length > 0 || store.recommendedJobs.length > 0
@@ -53,7 +56,31 @@ const sections = computed(() => [
 ])
 
 async function loadJobs() {
-  await store.loadJobs()
+  const loaded = await store.loadJobs()
+  if (loaded) {
+    await store.loadFavorites()
+  }
+}
+
+function isFavorite(jobId: string): boolean {
+  return store.favorites.some(favorite => favorite.job_id === jobId)
+}
+
+async function toggleFavorite(job: JobMatchingJob) {
+  if (favoriteActionJobId.value || store.saving) {
+    return
+  }
+
+  favoriteActionJobId.value = job.job_id
+  try {
+    if (isFavorite(job.job_id)) {
+      await store.removeFavorite(job.job_id)
+    } else {
+      await store.addFavorite(job.job_id)
+    }
+  } finally {
+    favoriteActionJobId.value = ''
+  }
 }
 
 async function logout() {
@@ -147,7 +174,7 @@ onMounted(() => {
               v-if="section.jobs.length"
               :class="section.gridClass"
             >
-              <RouterLink
+              <article
                 v-for="job in section.jobs"
                 :key="job.job_id"
                 class="job-card"
@@ -157,39 +184,73 @@ onMounted(() => {
                     ? 'recommended-job-card'
                     : 'job-card'
                 "
-                :to="
-                  `/student/employment/jobs/${encodeURIComponent(
-                    job.job_id
-                  )}`
-                "
-                :aria-label="`查看${job.title}岗位详情`"
               >
-                <span class="job-card__identity">
-                  <BriefcaseBusiness :size="19" aria-hidden="true" />
-                  <span>{{ job.category_name }}</span>
-                </span>
+                <RouterLink
+                  class="job-card__main"
+                  :to="
+                    `/student/employment/jobs/${encodeURIComponent(
+                      job.job_id
+                    )}`
+                  "
+                  :aria-label="`查看${job.title}岗位详情`"
+                >
+                  <span class="job-card__identity">
+                    <BriefcaseBusiness :size="19" aria-hidden="true" />
+                    <span>{{ job.category_name }}</span>
+                  </span>
 
-                <h3>{{ job.title }}</h3>
-                <p class="job-card__company">{{ job.enterprise_name }}</p>
+                  <h3>{{ job.title }}</h3>
+                  <p class="job-card__company">
+                    {{ job.enterprise_name }}
+                  </p>
 
-                <dl class="job-card__facts">
-                  <div>
-                    <dt>薪资</dt>
-                    <dd class="ark-data">{{ job.salary }}</dd>
-                  </div>
-                  <div>
-                    <dt>地点</dt>
-                    <dd>{{ job.location }}</dd>
-                  </div>
-                </dl>
+                  <dl class="job-card__facts">
+                    <div>
+                      <dt>薪资</dt>
+                      <dd class="ark-data">{{ job.salary }}</dd>
+                    </div>
+                    <div>
+                      <dt>地点</dt>
+                      <dd>{{ job.location }}</dd>
+                    </div>
+                  </dl>
 
-                <p class="job-card__description">{{ job.description }}</p>
+                  <p class="job-card__description">
+                    {{ job.description }}
+                  </p>
 
-                <span class="job-card__action">
-                  查看详情
-                  <ArrowRight :size="16" aria-hidden="true" />
-                </span>
-              </RouterLink>
+                  <span class="job-card__action">
+                    查看详情
+                    <ArrowRight :size="16" aria-hidden="true" />
+                  </span>
+                </RouterLink>
+
+                <button
+                  class="job-card__favorite"
+                  :class="{ 'is-active': isFavorite(job.job_id) }"
+                  type="button"
+                  data-test="favorite-toggle"
+                  :data-job-id="job.job_id"
+                  :aria-pressed="isFavorite(job.job_id)"
+                  :disabled="
+                    Boolean(favoriteActionJobId) || store.saving
+                  "
+                  @click="toggleFavorite(job)"
+                >
+                  <RefreshCw
+                    v-if="favoriteActionJobId === job.job_id"
+                    class="spinning"
+                    :size="16"
+                    aria-hidden="true"
+                  />
+                  <Bookmark v-else :size="16" aria-hidden="true" />
+                  {{
+                    isFavorite(job.job_id)
+                      ? '取消收藏'
+                      : '收藏岗位'
+                  }}
+                </button>
+              </article>
             </div>
 
             <p v-else class="jobs-empty">
@@ -367,21 +428,58 @@ onMounted(() => {
 
 .job-card {
   display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 236px;
-  align-content: start;
-  padding: 20px;
   background: var(--ark-surface-0);
   color: var(--ark-paper);
-  text-decoration: none;
   transition:
     background var(--ark-transition),
     color var(--ark-transition);
 }
 
-.job-card:hover,
-.job-card:focus-visible {
+.job-card__main {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  padding: 20px;
+  color: var(--ark-paper);
+  text-decoration: none;
+}
+
+.job-card__main:hover,
+.job-card__main:focus-visible {
   background: var(--ark-surface-1);
+}
+
+.job-card__favorite {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 0 20px 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--ark-line-strong);
+  border-radius: var(--ark-radius);
+  background: var(--ark-surface-1);
+  color: var(--ark-paper);
+  font-size: 0.78rem;
+  line-break: strict;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.job-card__favorite:hover:not(:disabled),
+.job-card__favorite:focus-visible:not(:disabled) {
+  border-color: var(--ark-signal);
+  color: var(--ark-signal);
+}
+
+.job-card__favorite.is-active {
+  border-color: var(--ark-signal);
+  color: var(--ark-signal);
 }
 
 .job-card__identity {
@@ -538,7 +636,15 @@ onMounted(() => {
   }
 
   .job-card {
+    min-height: 0;
+  }
+
+  .job-card__main {
     padding: 16px;
+  }
+
+  .job-card__favorite {
+    margin: 0 16px 16px;
   }
 
   .job-card__facts {
