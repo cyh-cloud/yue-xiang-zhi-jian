@@ -28,6 +28,10 @@ from app.handcraft_inheritance.routes import (
     handcraft_inheritance_bp,
     register_handcraft_inheritance_error_handlers,
 )
+from app.job_matching import (
+    install_default_job_matching_services,
+    job_matching_bp,
+)
 from app.messaging.routes import messages_bp
 from app.messaging.source_provider import register_messaging_source_provider
 from app.onboarding.routes import onboarding_bp
@@ -46,6 +50,7 @@ PROTECTED_API_PREFIXES = (
     "/api/student",
     "/api/teacher",
     "/api/enterprise",
+    "/api/job-matching",
     "/api/government",
     "/api/admin",
     "/api/onboarding",
@@ -70,6 +75,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_agri_services(app)
     install_default_handcraft_services(app)
     install_default_enterprise_services(app)
+    install_default_job_matching_services(app)
     install_default_government_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
@@ -109,6 +115,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(agri_skills_bp)
     app.register_blueprint(ecommerce_training_bp)
     app.register_blueprint(enterprise_console_bp)
+    app.register_blueprint(job_matching_bp)
     app.register_blueprint(handcraft_inheritance_bp)
     app.register_blueprint(government_bp)
     app.register_blueprint(teacher_console_bp)
