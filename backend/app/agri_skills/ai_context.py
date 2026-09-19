@@ -30,6 +30,11 @@ AI_FIELD_ALLOWLISTS = {
         "course_summary",
         "course_direction",
     },
+    "teacher_learning_report_generate": {
+        "aggregate_stats",
+        "direction_comparison",
+        "risk_summary",
+    },
     "handcraft_ar_guidance_generate": {
         "craft_key",
         "craft_name",
