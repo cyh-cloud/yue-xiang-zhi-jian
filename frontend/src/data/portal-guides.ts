@@ -162,17 +162,20 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
       {
         id: 'enterprise-job-publish',
         title: '职位发布',
-        description: '发布岗位需求并维护招聘信息。'
+        description: '发布岗位需求并维护招聘信息。',
+        href: '/enterprise/jobs'
       },
       {
         id: 'enterprise-applications',
         title: '申请处理',
-        description: '查看并处理学员投递的职位申请。'
+        description: '查看并处理学员投递的职位申请。',
+        href: '/enterprise/applications'
       },
       {
         id: 'enterprise-dashboard',
         title: '企业看板',
-        description: '查看岗位与申请数据的经营概览。'
+        description: '查看岗位与申请数据的经营概览。',
+        href: '/enterprise'
       },
       {
         id: 'enterprise-messages',

@@ -9,6 +9,9 @@ from werkzeug.security import generate_password_hash
 
 from app import create_app
 from app.db import get_db
+from app.enterprise_console.seed import (
+    seed_enterprise_console_fixtures,
+)
 from app.seed import (
     DEFAULT_COURSES,
     DEFAULT_INTEREST_TAGS,
@@ -146,10 +149,13 @@ def seed_local_data(database_path: str | Path | None = None) -> dict[str, int]:
         seed_interest_tags(connection)
         seed_courses(connection)
         _seed_accounts(connection, password)
+        enterprise_fixtures = seed_enterprise_console_fixtures(connection)
         connection.commit()
 
     return {
         "accounts": len(ROLE_ACCOUNTS),
+        "enterprise_applications": enterprise_fixtures["applications"],
+        "enterprise_jobs": enterprise_fixtures["jobs"],
         "courses": len(DEFAULT_COURSES),
         "tags": len(DEFAULT_INTEREST_TAGS),
     }
@@ -166,7 +172,9 @@ def main() -> None:
         "Local seed complete: "
         f"{result['accounts']} accounts, "
         f"{result['courses']} courses, "
-        f"{result['tags']} tags."
+        f"{result['tags']} tags, "
+        f"{result['enterprise_jobs']} enterprise jobs, "
+        f"{result['enterprise_applications']} enterprise applications."
     )
 
 

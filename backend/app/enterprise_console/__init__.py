@@ -55,6 +55,9 @@ from app.enterprise_console.routes import (
     enterprise_console_bp,
     register_enterprise_console_error_handlers,
 )
+from app.enterprise_console.seed import (
+    seed_enterprise_console_fixtures,
+)
 
 
 def install_default_enterprise_services(app: Flask) -> None:
@@ -108,6 +111,7 @@ __all__ = [
     "register_enterprise_console_error_handlers",
     "serialize_job",
     "serialize_application",
+    "seed_enterprise_console_fixtures",
     "set_job_application_intake_provider",
     "set_content_review_provider",
     "set_employment_statistics_provider",
