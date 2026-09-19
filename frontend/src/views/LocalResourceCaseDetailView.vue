@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
 import LocalResourcesNav from '@/components/LocalResourcesNav.vue'
+import SemanticChineseText from '@/components/SemanticChineseText.vue'
 import { useLocalResourcesStore } from '@/stores/localResources'
 
 const route = useRoute()
@@ -60,7 +61,9 @@ onMounted(() => {
           data-test="case-background"
         >
           <h2>创业背景</h2>
-          <p>{{ store.caseDetail.background }}</p>
+          <p>
+            <SemanticChineseText :text="store.caseDetail.background" />
+          </p>
         </section>
 
         <section
@@ -68,7 +71,9 @@ onMounted(() => {
           data-test="case-journey"
         >
           <h2>创业历程</h2>
-          <p>{{ store.caseDetail.journey }}</p>
+          <p>
+            <SemanticChineseText :text="store.caseDetail.journey" />
+          </p>
         </section>
 
         <section
@@ -76,7 +81,9 @@ onMounted(() => {
           data-test="case-lessons"
         >
           <h2>经验启示</h2>
-          <p>{{ store.caseDetail.lessons }}</p>
+          <p>
+            <SemanticChineseText :text="store.caseDetail.lessons" />
+          </p>
         </section>
       </div>
 

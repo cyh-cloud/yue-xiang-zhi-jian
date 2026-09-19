@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
 import LocalResourcesNav from '@/components/LocalResourcesNav.vue'
+import SemanticChineseText from '@/components/SemanticChineseText.vue'
 import { useLocalResourcesStore } from '@/stores/localResources'
 
 const route = useRoute()
@@ -94,7 +95,9 @@ onMounted(() => {
         v-if="store.newsDetail && !loadFailed && !notFound"
         class="local-resource-news-detail__content"
       >
-        <p data-test="news-content">{{ store.newsDetail.content }}</p>
+        <p data-test="news-content">
+          <SemanticChineseText :text="store.newsDetail.content" />
+        </p>
         <p
           v-if="viewNotice"
           class="local-resource-news-detail__notice"

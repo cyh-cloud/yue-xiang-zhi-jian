@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import AppHeader from '@/components/AppHeader.vue'
 import LocalResourcesNav from '@/components/LocalResourcesNav.vue'
+import SemanticChineseText from '@/components/SemanticChineseText.vue'
 import { useLocalResourcesStore } from '@/stores/localResources'
 
 const route = useRoute()
@@ -80,7 +81,9 @@ onMounted(() => {
         v-if="store.policyDetail && !loadFailed"
         class="local-resource-policy-detail__content"
       >
-        <p data-test="policy-body">{{ store.policyDetail.content }}</p>
+        <p data-test="policy-body">
+          <SemanticChineseText :text="store.policyDetail.content" />
+        </p>
         <p
           v-if="viewNotice"
           class="local-resource-policy-detail__notice"

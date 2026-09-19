@@ -84,6 +84,9 @@ const longChinese =
     3
   )
 
+const semanticPolicyContent =
+  '本地申请补贴时，请先准备材料。' + longChinese
+
 const caseSummary: LocalResourceCase = {
   id: 'case-1',
   title: longChinese,
@@ -103,7 +106,7 @@ const caseDetail: LocalResourceCaseDetail = {
 const policyFixture: LocalResourcePolicy = {
   id: 'policy-1',
   title: longChinese,
-  content: longChinese,
+  content: semanticPolicyContent,
   category_code: 'entrepreneurship',
   category_label: '创业支持',
   published_at: '2026-09-19T10:00:00+08:00',
@@ -657,6 +660,26 @@ describe('local-resources responsive and accessibility acceptance', () => {
         contract.label
       )
     }
+  })
+
+  it('keeps policy words intact with semantic nowrap segments', async () => {
+    const wrapper = await mountView(
+      'policy-detail',
+      LocalResourcePolicyDetailView,
+      320
+    )
+    const body = wrapper.get('[data-test="policy-body"]')
+    const semanticText = body.get(
+      '[data-test="semantic-chinese-text"]'
+    )
+    const words = semanticText
+      .findAll('[data-segment="word"]')
+      .map(segment => segment.text())
+
+    expect(body.text()).toBe(semanticPolicyContent)
+    expect(words).toEqual(expect.arrayContaining(['本地', '申请', '补贴']))
+
+    wrapper.unmount()
   })
 
   it('keeps every 006 view on light tokens without unsupported decoration', () => {
