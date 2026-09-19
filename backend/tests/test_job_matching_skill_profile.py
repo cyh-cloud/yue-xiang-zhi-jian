@@ -1,10 +1,22 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from datetime import datetime, timedelta
+from pathlib import Path
 from unittest.mock import patch
 
+from app import create_app
+from app.db import get_db
 from app.job_matching import skill_profile
-from app.job_matching.skill_profile import list_skill_outcomes
+from app.job_matching.constants import SKILL_CATEGORIES
+from app.job_matching.errors import JobMatchingValidationError
+from app.job_matching.skill_profile import (
+    build_skill_profile_snapshot,
+    get_skill_profile,
+    list_skill_outcomes,
+    set_skill_visibility,
+)
 
 
 AGRI_ROWS = [
@@ -430,6 +442,257 @@ class SkillOutcomeAggregationTests(unittest.TestCase):
             "Invalid skill outcome timestamp",
             logs.records[0].getMessage(),
         )
+
+
+class SkillVisibilityProfileTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        database_path = Path(self.temp_dir.name) / "test.db"
+        self.app = create_app(
+            {
+                "TESTING": True,
+                "DATABASE_PATH": str(database_path),
+                "SECRET_KEY": "test-only-secret",
+            }
+        )
+
+        source_patches = (
+            patch.object(
+                skill_profile,
+                "list_learning_outcomes",
+                return_value=AGRI_ROWS,
+            ),
+            patch.object(
+                skill_profile,
+                "list_ecommerce_learning_outcomes",
+                return_value=ECOMMERCE_ROWS,
+            ),
+            patch.object(
+                skill_profile,
+                "list_handcraft_learning_outcomes",
+                return_value=HANDCRAFT_ROWS,
+            ),
+        )
+        for source_patch in source_patches:
+            source_patch.start()
+            self.addCleanup(source_patch.stop)
+
+        with self.app.app_context():
+            db = get_db()
+            self.student_id = self._insert_student(db, "student-1")
+            self.other_student_id = self._insert_student(db, "student-2")
+            db.commit()
+
+    @staticmethod
+    def _insert_student(db, username: str) -> int:
+        timestamp = "2026-09-19T10:00:00+08:00"
+        cursor = db.execute(
+            """
+            INSERT INTO users (
+                username,
+                password_hash,
+                name,
+                role,
+                is_enabled,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, 'student', 1, ?, ?)
+            """,
+            (
+                username,
+                "test-password-hash",
+                username,
+                timestamp,
+                timestamp,
+            ),
+        )
+        return int(cursor.lastrowid)
+
+    def test_profile_defaults_to_hidden_and_snapshot_uses_visible_items(self):
+        with self.app.app_context():
+            profile = get_skill_profile(self.student_id)
+
+            self.assertTrue(profile["items"])
+            self.assertTrue(
+                all(not item["visible"] for item in profile["items"])
+            )
+            self.assertEqual(profile["visible_item_ids"], [])
+            self.assertEqual(
+                set(profile["summary"]),
+                set(SKILL_CATEGORIES),
+            )
+            self.assertIsNone(
+                build_skill_profile_snapshot(self.student_id)
+            )
+
+            visible_id = profile["items"][0]["item_id"]
+            updated = set_skill_visibility(
+                self.student_id,
+                [visible_id],
+            )
+            self.assertEqual(updated["visible_item_ids"], [visible_id])
+
+            snapshot = build_skill_profile_snapshot(self.student_id)
+            self.assertEqual(
+                set(snapshot),
+                {"schema_version", "generated_at", "items", "summary"},
+            )
+            self.assertEqual(snapshot["schema_version"], 1)
+            self.assertEqual(
+                [item["item_id"] for item in snapshot["items"]],
+                [visible_id],
+            )
+            self.assertNotIn("visible", snapshot["items"][0])
+            self.assertEqual(
+                snapshot["summary"],
+                {
+                    "live_script": 0,
+                    "simulation_training": 0,
+                    "quiz_score": 1,
+                    "learning_record": 0,
+                },
+            )
+            generated_at = datetime.fromisoformat(
+                snapshot["generated_at"]
+            )
+            self.assertEqual(
+                generated_at.utcoffset(),
+                timedelta(hours=8),
+            )
+
+    def test_snapshot_excludes_hidden_and_unavailable_items(self):
+        with self.app.app_context():
+            profile = get_skill_profile(self.student_id)
+            visible_id = profile["items"][0]["item_id"]
+            hidden_id = next(
+                item["item_id"]
+                for item in profile["items"][1:]
+                if item["source_available"]
+            )
+            unavailable_id = next(
+                item["item_id"]
+                for item in profile["items"]
+                if not item["source_available"]
+            )
+
+            set_skill_visibility(
+                self.student_id,
+                [visible_id, unavailable_id],
+            )
+            snapshot = build_skill_profile_snapshot(self.student_id)
+
+            self.assertEqual(
+                [item["item_id"] for item in snapshot["items"]],
+                [visible_id],
+            )
+            self.assertNotIn(
+                hidden_id,
+                [item["item_id"] for item in snapshot["items"]],
+            )
+
+    def test_invalid_item_id_is_rejected_without_changing_visibility(self):
+        with self.app.app_context():
+            profile = get_skill_profile(self.student_id)
+            visible_id = profile["items"][0]["item_id"]
+            set_skill_visibility(self.student_id, [visible_id])
+
+            with self.assertRaises(
+                JobMatchingValidationError
+            ) as raised:
+                set_skill_visibility(
+                    self.student_id,
+                    [visible_id, "unknown:item:99"],
+                )
+
+            self.assertEqual(raised.exception.message, "可见成果不存在")
+            self.assertEqual(
+                raised.exception.details,
+                {"item_ids": ["unknown:item:99"]},
+            )
+            self.assertEqual(
+                get_skill_profile(self.student_id)["visible_item_ids"],
+                [visible_id],
+            )
+
+    def test_visibility_is_independent_for_each_student(self):
+        with self.app.app_context():
+            profile = get_skill_profile(self.student_id)
+            first_student_id = profile["items"][0]["item_id"]
+            second_student_id = profile["items"][1]["item_id"]
+
+            set_skill_visibility(
+                self.student_id,
+                [first_student_id],
+            )
+            other_profile = get_skill_profile(self.other_student_id)
+            self.assertTrue(
+                all(not item["visible"] for item in other_profile["items"])
+            )
+            self.assertIsNone(
+                build_skill_profile_snapshot(self.other_student_id)
+            )
+
+            set_skill_visibility(
+                self.other_student_id,
+                [second_student_id],
+            )
+            self.assertEqual(
+                get_skill_profile(self.student_id)["visible_item_ids"],
+                [first_student_id],
+            )
+            self.assertEqual(
+                get_skill_profile(
+                    self.other_student_id
+                )["visible_item_ids"],
+                [second_student_id],
+            )
+
+    def test_set_visibility_replaces_complete_set_and_empty_clears_it(self):
+        with self.app.app_context():
+            profile = get_skill_profile(self.student_id)
+            first_id, second_id = (
+                item["item_id"] for item in profile["items"][:2]
+            )
+
+            set_skill_visibility(
+                self.student_id,
+                [first_id, second_id],
+            )
+            self.assertEqual(
+                get_skill_profile(self.student_id)["visible_item_ids"],
+                [first_id, second_id],
+            )
+
+            set_skill_visibility(self.student_id, [second_id])
+            self.assertEqual(
+                get_skill_profile(self.student_id)["visible_item_ids"],
+                [second_id],
+            )
+
+            cleared = set_skill_visibility(self.student_id, [])
+            self.assertEqual(cleared["visible_item_ids"], [])
+            self.assertIsNone(
+                build_skill_profile_snapshot(self.student_id)
+            )
+
+    def test_snapshot_is_not_mutated_by_later_visibility_changes(self):
+        with self.app.app_context():
+            profile = get_skill_profile(self.student_id)
+            first_id, second_id = (
+                item["item_id"] for item in profile["items"][:2]
+            )
+            set_skill_visibility(self.student_id, [first_id])
+            snapshot = build_skill_profile_snapshot(self.student_id)
+
+            set_skill_visibility(self.student_id, [second_id])
+
+            self.assertEqual(
+                [item["item_id"] for item in snapshot["items"]],
+                [first_id],
+            )
+            self.assertNotIn("visible", snapshot["items"][0])
 
 
 if __name__ == "__main__":

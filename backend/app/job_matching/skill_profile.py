@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.agri_skills.outcomes import list_learning_outcomes
+from app.db import get_db
 from app.ecommerce_training.course_learning import (
     list_ecommerce_learning_outcomes,
 )
 from app.handcraft_inheritance.outcomes import (
     list_handcraft_learning_outcomes,
 )
+from app.job_matching.constants import SKILL_CATEGORIES
+from app.job_matching.errors import JobMatchingValidationError
 
 
 LOGGER = logging.getLogger(__name__)
@@ -33,6 +37,19 @@ CATEGORY_BY_HANDCRAFT_TYPE = {
     "craft_step": "learning_record",
     "ar_usage": "learning_record",
 }
+
+
+def _now_iso() -> str:
+    return datetime.now(
+        ZoneInfo("Asia/Shanghai")
+    ).isoformat(timespec="seconds")
+
+
+def _category_summary(items: list[dict]) -> dict:
+    summary = {category: 0 for category in SKILL_CATEGORIES}
+    for item in items:
+        summary[item["category"]] += 1
+    return summary
 
 
 def _base_item(
@@ -222,3 +239,82 @@ def list_skill_outcomes(student_id: int) -> list[dict]:
             item["item_id"],
         ),
     )
+
+
+def get_skill_profile(student_id: int) -> dict:
+    visible_ids = {
+        str(row["item_id"])
+        for row in get_db().execute(
+            """
+            SELECT item_id
+            FROM skill_visibility_settings
+            WHERE user_id = ? AND visible = 1
+            """,
+            (student_id,),
+        ).fetchall()
+    }
+    items = [
+        {**item, "visible": item["item_id"] in visible_ids}
+        for item in list_skill_outcomes(student_id)
+    ]
+    return {
+        "items": items,
+        "visible_item_ids": [
+            item["item_id"] for item in items if item["visible"]
+        ],
+        "summary": _category_summary(items),
+    }
+
+
+def set_skill_visibility(
+    student_id: int,
+    visible_item_ids: list[str],
+) -> dict:
+    all_items = list_skill_outcomes(student_id)
+    known_ids = {item["item_id"] for item in all_items}
+    if (
+        not isinstance(visible_item_ids, list)
+        or any(not isinstance(value, str) for value in visible_item_ids)
+    ):
+        raise JobMatchingValidationError("可见成果格式不正确")
+    normalized = list(
+        dict.fromkeys(value.strip() for value in visible_item_ids)
+    )
+    unknown = set(normalized).difference(known_ids)
+    if unknown:
+        raise JobMatchingValidationError(
+            "可见成果不存在",
+            details={"item_ids": sorted(unknown)},
+        )
+    now = _now_iso()
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM skill_visibility_settings WHERE user_id = ?",
+            (student_id,),
+        )
+        db.executemany(
+            """
+            INSERT INTO skill_visibility_settings (
+                user_id, item_id, visible, updated_at
+            ) VALUES (?, ?, 1, ?)
+            """,
+            ((student_id, item_id, now) for item_id in normalized),
+        )
+    return get_skill_profile(student_id)
+
+
+def build_skill_profile_snapshot(student_id: int) -> dict | None:
+    profile = get_skill_profile(student_id)
+    items = [
+        {key: value for key, value in item.items() if key != "visible"}
+        for item in profile["items"]
+        if item["visible"] and item["source_available"]
+    ]
+    if not items:
+        return None
+    return {
+        "schema_version": 1,
+        "generated_at": _now_iso(),
+        "items": items,
+        "summary": _category_summary(items),
+    }
