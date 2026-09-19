@@ -192,6 +192,40 @@ class TestTeacherConsoleApi(unittest.TestCase):
             self.teacher_id,
         )
 
+    def test_draft_course_update_uses_real_draft_service(self):
+        created = self.teacher_client.post(
+            "/api/teacher/courses",
+            json={
+                "title": "原始课程",
+                "direction": "agriculture",
+                "summary": "原始简介",
+                "content_tags": ["荔枝"],
+                "duration_seconds": 300,
+                "media_source_type": "external_url",
+                "media_url": "https://media.example.test/course.mp4",
+            },
+        )
+        self.assertEqual(created.status_code, 201)
+        course_id = created.get_json()["course"]["id"]
+
+        response = self.teacher_client.put(
+            f"/api/teacher/courses/{course_id}",
+            json={
+                "title": "修订课程",
+                "expected_version": 1,
+                "teacher_id": 999,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["course"]["title"], "修订课程")
+        self.assertEqual(response.get_json()["course"]["version"], 2)
+        self.assertEqual(response.get_json()["course"]["status"], "draft")
+        self.assertEqual(
+            response.get_json()["course"]["teacher_id"],
+            self.teacher_id,
+        )
+
     def test_course_payloads_use_session_identity_and_forward_fields(self):
         course = {"id": 1, "status": "draft", "teacher_id": self.teacher_id}
 
@@ -219,10 +253,17 @@ class TestTeacherConsoleApi(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             get_course.assert_called_once_with(self.teacher_id, 1)
 
-        with patch(
-            "app.teacher_console.routes.edit_course",
-            return_value=course,
-        ) as edit:
+        reviewable_course = {**course, "status": "pending"}
+        with (
+            patch(
+                "app.teacher_console.routes.get_teacher_course",
+                return_value=reviewable_course,
+            ),
+            patch(
+                "app.teacher_console.routes.edit_course",
+                return_value=course,
+            ) as edit,
+        ):
             response = self.teacher_client.put(
                 "/api/teacher/courses/1",
                 json={

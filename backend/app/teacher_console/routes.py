@@ -26,6 +26,7 @@ from app.teacher_console.course_service import (
     request_course_relist,
     set_course_offline,
     submit_course_for_review,
+    update_teacher_course_draft,
 )
 from app.teacher_console.dashboard import build_teacher_dashboard
 from app.teacher_console.errors import (
@@ -157,17 +158,28 @@ def get_course_route(course_id: int):
 @teacher_console_bp.put("/courses/<int:course_id>")
 def update_course_route(course_id: int):
     session = _teacher_session()
+    teacher_id = int(session["id"])
     payload = _json_object_payload()
     payload.pop("teacher_id", None)
     expected_version = payload.pop("expected_version", None)
-    return jsonify(
-        success=True,
-        course=edit_course(
-            int(session["id"]),
+    current = get_teacher_course(teacher_id, course_id)
+    if current["status"] == "draft":
+        course = update_teacher_course_draft(
+            teacher_id,
             course_id,
             expected_version,
             payload,
-        ),
+        )
+    else:
+        course = edit_course(
+            teacher_id,
+            course_id,
+            expected_version,
+            payload,
+        )
+    return jsonify(
+        success=True,
+        course=course,
     )
 
 
