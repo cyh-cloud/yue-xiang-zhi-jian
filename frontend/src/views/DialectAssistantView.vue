@@ -147,6 +147,7 @@ async function submitQuestion() {
               v-if="store.audioUrl"
               ref="answerAudio"
               :src="store.audioUrl"
+              aria-label="播放方言回答音频"
               controls
               preload="metadata"
             />
@@ -391,8 +392,10 @@ async function submitQuestion() {
 }
 
 .dialect-answer audio {
+  display: block;
   width: 100%;
   min-width: 0;
+  min-height: 44px;
   margin-top: 2px;
 }
 

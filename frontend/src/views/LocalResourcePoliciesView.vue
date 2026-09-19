@@ -291,6 +291,7 @@ onMounted(() => {
 .local-resource-policies__category-select {
   display: flex;
   min-width: 0;
+  min-height: 44px;
   align-items: center;
   gap: 8px;
   padding: 0;
@@ -319,6 +320,7 @@ onMounted(() => {
   display: grid;
   gap: 1px;
   min-width: 82px;
+  min-height: 44px;
   padding: 7px 9px;
   border: 1px solid var(--ark-line-strong);
   background: transparent;
