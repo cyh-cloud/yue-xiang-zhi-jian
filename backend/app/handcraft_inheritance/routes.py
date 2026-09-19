@@ -437,6 +437,33 @@ def get_handcraft_course_quiz_route(course_id: int):
     return jsonify(success=True, quiz=quiz)
 
 
+@handcraft_inheritance_bp.get("/courses/<int:course_id>/comments")
+def get_handcraft_course_comments_route(course_id: int):
+    _student_session()
+    return jsonify(
+        success=True,
+        comments=list_content_comments(
+            "course_video",
+            str(course_id),
+        ),
+    )
+
+
+@handcraft_inheritance_bp.post("/courses/<int:course_id>/comments")
+def post_handcraft_course_comment_route(course_id: int):
+    session = _student_session()
+    payload = _json_object_payload()
+    return jsonify(
+        success=True,
+        comment=create_learner_comment(
+            int(session["id"]),
+            "course_video",
+            str(course_id),
+            payload.get("body"),
+        ),
+    ), 201
+
+
 @handcraft_inheritance_bp.get(
     "/courses/<int:course_id>/quiz/attempts"
 )

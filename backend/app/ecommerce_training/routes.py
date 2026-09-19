@@ -58,6 +58,10 @@ from app.ecommerce_training.store_guidance import (
     list_store_plans as _list_store_plans,
 )
 from app.session_manager import abort_session_required, load_session
+from app.teacher_console.comments import (
+    create_learner_comment,
+    list_content_comments,
+)
 
 
 ecommerce_training_bp = Blueprint(
@@ -443,6 +447,33 @@ def get_ecommerce_course_quiz_route(course_id: int):
     if quiz is None:
         raise AgriNotFoundError("暂无可用测验")
     return jsonify(success=True, quiz=quiz)
+
+
+@ecommerce_training_bp.get("/courses/<int:course_id>/comments")
+def get_ecommerce_course_comments_route(course_id: int):
+    _student_session()
+    return jsonify(
+        success=True,
+        comments=list_content_comments(
+            "course_video",
+            str(course_id),
+        ),
+    )
+
+
+@ecommerce_training_bp.post("/courses/<int:course_id>/comments")
+def post_ecommerce_course_comment_route(course_id: int):
+    session = _student_session()
+    payload = _json_object_payload()
+    return jsonify(
+        success=True,
+        comment=create_learner_comment(
+            int(session["id"]),
+            "course_video",
+            str(course_id),
+            payload.get("body"),
+        ),
+    ), 201
 
 
 @ecommerce_training_bp.get("/courses/<int:course_id>/quiz/attempts")

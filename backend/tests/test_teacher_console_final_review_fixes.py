@@ -1,7 +1,9 @@
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
+from zoneinfo import ZoneInfo
 
 import httpx
 from werkzeug.security import generate_password_hash
@@ -59,8 +61,9 @@ class FakeReviewProvider:
 
 
 class StaticCourseProvider:
-    def __init__(self, visible_ids):
+    def __init__(self, visible_ids, directions=None):
         self.visible_ids = set(visible_ids)
+        self.directions = dict(directions or {})
 
     def list_published_courses(self, student_id, direction):
         return [self.get_course(course_id) for course_id in self.visible_ids]
@@ -71,7 +74,7 @@ class StaticCourseProvider:
         return {
             "id": int(course_id),
             "title": f"课程 {course_id}",
-            "direction": "agriculture",
+            "direction": self.directions.get(int(course_id), "agriculture"),
             "status": "published",
             "summary": "课程简介",
             "teacher_name": "教师",
@@ -87,14 +90,18 @@ class StaticCourseProvider:
 
 
 class StaticTeachingVideoProvider:
+    def __init__(self, review_status="approved", source_available=True):
+        self.review_status = review_status
+        self.source_available = source_available
+
     def get_video(self, video_id):
         if video_id != "video-visible":
             return None
         return {
             "video_id": video_id,
             "craft_key": "guangxiu",
-            "review_status": "approved",
-            "source_available": True,
+            "review_status": self.review_status,
+            "source_available": self.source_available,
         }
 
 
@@ -252,6 +259,7 @@ class TestQuizInputValidation(TeacherReviewFixTestCase):
     def setUp(self):
         super().setUp()
         self.create_user("teacher01", "teacher")
+        self.teacher_client = self.login("teacher01")
         self.ai = Mock()
         from app.agri_skills.ai_client import set_ai_client
 
@@ -286,6 +294,21 @@ class TestQuizInputValidation(TeacherReviewFixTestCase):
                             self.course["id"],
                             **changes,
                         )
+        self.ai.complete_json.assert_not_called()
+
+    def test_non_string_direction_and_summary_return_validation_errors(self):
+        invalid_inputs = (
+            {"summary": "课程简介", "direction": []},
+            {"summary": [], "direction": "agriculture"},
+        )
+        for changes in invalid_inputs:
+            with self.subTest(changes=changes):
+                response = self.teacher_client.post(
+                    f"/api/teacher/courses/{self.course['id']}/quiz/generate",
+                    json=changes,
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertFalse(response.get_json()["success"])
         self.ai.complete_json.assert_not_called()
 
 
@@ -345,89 +368,369 @@ class TestDashboardUsesCourseProviderSlot(TeacherReviewFixTestCase):
 
 
 class TestTeacherReportScope(TeacherReviewFixTestCase):
-    def test_risk_activity_uses_teacher_visible_course_set(self):
-        self.create_user("teacher01", "teacher")
-        self.create_user("student01", "student")
-        self.create_user("student02", "student")
-        self.create_user("other_teacher", "teacher")
+    def setUp(self):
+        super().setUp()
+        self.teacher_id = self.create_user("teacher01", "teacher")
         from app.agri_skills.ai_client import set_ai_client
 
-        ai = Mock()
-        ai.complete_json.return_value = {
+        self.ai = Mock()
+        self.ai.complete_json.return_value = {
             "progress_analysis": "整体进度稳定",
             "direction_comparison": "农业方向领先",
-            "risk_warning": "1 名学员长期零进度",
+            "risk_warning": "存在长期零进度学员",
         }
-        set_ai_client(self.app, ai)
-        self.review = FakeReviewProvider()
-        self.review.set_status(10, "approved")
-        set_content_review_provider(self.app, self.review)
-        now = "2026-09-19T10:00:00+08:00"
+        set_ai_client(self.app, self.ai)
+        self.now = datetime.now(ZoneInfo("Asia/Shanghai")).isoformat(
+            timespec="seconds"
+        )
+        self.recent = (
+            datetime.now(ZoneInfo("Asia/Shanghai")) - timedelta(days=5)
+        ).isoformat(timespec="seconds")
+        self.old = (
+            datetime.now(ZoneInfo("Asia/Shanghai")) - timedelta(days=31)
+        ).isoformat(timespec="seconds")
+
+    def insert_course(self, course_id, teacher_id, direction):
+        get_db().execute(
+            """
+            INSERT INTO courses (
+                id, title, direction, status, duration_seconds,
+                media_url, published_at, summary, teacher_name,
+                teacher_id, version, media_source_type,
+                content_tags_json, created_at, updated_at
+            )
+            VALUES (
+                ?, ?, ?, 'pending', 300,
+                'https://media.example.test/a.mp4', NULL, '简介',
+                '教师', ?, 1, 'external_url', '[]', ?, ?
+            )
+            """,
+            (
+                course_id,
+                f"课程 {course_id}",
+                direction,
+                teacher_id,
+                self.now,
+                self.now,
+            ),
+        )
+
+    def insert_progress(self, user_id, course_id, occurred_at, percent=20):
+        get_db().execute(
+            """
+            INSERT INTO agri_course_progress (
+                user_id, course_id, duration_seconds,
+                furthest_position_seconds, resume_position_seconds,
+                progress_percent, watched_seconds, completed_at,
+                last_viewed_at, updated_at
+            )
+            VALUES (?, ?, 300, 0, 0, ?, 0, NULL, ?, ?)
+            """,
+            (user_id, course_id, percent, occurred_at, occurred_at),
+        )
+
+    def insert_quiz(self, user_id, course_id, occurred_at):
+        get_db().execute(
+            """
+            INSERT INTO agri_course_quiz_attempts (
+                user_id, course_id, answers_json, result_json, score,
+                is_formal, created_at
+            )
+            VALUES (?, ?, '{}', '{}', 80, 1, ?)
+            """,
+            (user_id, course_id, occurred_at),
+        )
+
+    def insert_agri_outcome(self, user_id, occurred_at):
+        db = get_db()
+        cursor = db.execute(
+            """
+            INSERT INTO agri_diagnosis_sessions (
+                user_id, product_key, affected_part, symptoms_json, status,
+                round_count, created_at, updated_at
+            )
+            VALUES (?, 'litchi', 'leaf', '[]', 'completed', 1, ?, ?)
+            """,
+            (user_id, occurred_at, occurred_at),
+        )
+        self_test_id = db.execute(
+            """
+            INSERT INTO agri_self_tests (
+                diagnosis_session_id, questions_json, created_at
+            )
+            VALUES (?, '[]', ?)
+            """,
+            (cursor.lastrowid, occurred_at),
+        ).lastrowid
+        db.execute(
+            """
+            INSERT INTO agri_self_test_attempts (
+                self_test_id, user_id, answers_json, result_json, score,
+                created_at
+            )
+            VALUES (?, ?, '{}', '{}', 80, ?)
+            """,
+            (self_test_id, user_id, occurred_at),
+        )
+
+    def insert_handcraft_outcome(self, user_id, occurred_at):
+        get_db().execute(
+            """
+            INSERT INTO handcraft_learning_outcomes (
+                user_id, outcome_type, source_key, source_id, created_at,
+                source_available, summary, score, is_formal, archive_written
+            )
+            VALUES (?, 'craft', 'guangxiu', 1, ?, 1, '完成广绣练习', 80, 1, 0)
+            """,
+            (user_id, occurred_at),
+        )
+
+    def insert_live_script(self, user_id, occurred_at):
+        get_db().execute(
+            """
+            INSERT INTO ecommerce_live_script_versions (
+                user_id, product_name, selling_points_json, price_text,
+                style, script_json, is_current, created_at
+            )
+            VALUES (?, '荔枝', '[]', '10 元', 'enthusiastic', '{}', 1, ?)
+            """,
+            (user_id, occurred_at),
+        )
+
+    def insert_simulation(self, user_id, completed_at):
+        get_db().execute(
+            """
+            INSERT INTO ecommerce_simulation_trainings (
+                user_id, scene_key, segments_json, status, scores_json,
+                total_score, created_at, updated_at, completed_at
+            )
+            VALUES (
+                ?, 'opening', '[]', 'completed', '[]', 80, ?, ?, ?
+            )
+            """,
+            (user_id, completed_at, completed_at, completed_at),
+        )
+
+    def insert_copy_session(self, user_id, completed_at):
+        get_db().execute(
+            """
+            INSERT INTO ecommerce_copy_training_sessions (
+                user_id, product_type, scene_key, status, case_json,
+                created_at, updated_at, completed_at
+            )
+            VALUES (
+                ?, 'agriculture', 'product_detail', 'completed', '{}', ?, ?, ?
+            )
+            """,
+            (user_id, completed_at, completed_at, completed_at),
+        )
+
+    def insert_customer_session(self, user_id, completed_at):
+        get_db().execute(
+            """
+            INSERT INTO ecommerce_customer_sessions (
+                user_id, scenario_key, goal_criteria_json, status,
+                created_at, updated_at, completed_at
+            )
+            VALUES (?, 'after_sale', '[]', 'completed', ?, ?, ?)
+            """,
+            (user_id, completed_at, completed_at, completed_at),
+        )
+
+    def insert_store_plan(self, user_id, created_at):
+        get_db().execute(
+            """
+            INSERT INTO ecommerce_store_plans (
+                user_id, store_type, platform, style_preference,
+                plan_json, created_at
+            )
+            VALUES (?, 'individual', 'douyin', 'professional', '{}', ?)
+            """,
+            (user_id, created_at),
+        )
+
+    def test_risk_activity_includes_each_supported_source(self):
+        sources = (
+            ("progress", "agriculture"),
+            ("quiz", "agriculture"),
+            ("agri_outcome", "agriculture"),
+            ("handcraft_outcome", "handcraft"),
+            ("live_script", "ecommerce"),
+            ("simulation", "ecommerce"),
+            ("copy", "ecommerce"),
+            ("customer", "ecommerce"),
+            ("store_plan", "ecommerce"),
+        )
+        student_ids = {
+            source: self.create_user(f"student_{source}", "student")
+            for source, _direction in sources
+        }
+        visible_courses = {
+            10: "agriculture",
+            11: "ecommerce",
+            12: "handcraft",
+        }
+        set_course_provider(
+            self.app,
+            StaticCourseProvider(visible_courses, visible_courses),
+        )
+
         with self.app.app_context():
             db = get_db()
-            db.execute(
+            db.executemany(
                 """
                 INSERT INTO student_profiles (
                     user_id, contact, learning_direction, updated_at
                 )
-                VALUES
-                    (2, '13800000002', 'agriculture', ?),
-                    (3, '13800000003', 'ecommerce', ?)
+                VALUES (?, ?, ?, ?)
                 """,
-                (now, now),
+                (
+                    (
+                        student_ids[source],
+                        f"1380000{index:04d}",
+                        direction,
+                        self.now,
+                    )
+                    for index, (source, direction) in enumerate(
+                        sources,
+                        start=1,
+                    )
+                ),
             )
-            db.execute(
-                """
-                INSERT INTO courses (
-                    id, title, direction, status, duration_seconds,
-                    media_url, published_at, summary, teacher_name,
-                    teacher_id, version, media_source_type,
-                    content_tags_json, created_at, updated_at
-                )
-                VALUES (
-                    10, '教师可见课程', 'agriculture', 'pending', 300,
-                    'https://media.example.test/a.mp4', NULL, '简介',
-                    '教师', 1, 1, 'external_url', '[]', ?, ?
-                )
-                """,
-                (now, now),
+            for course_id, direction in visible_courses.items():
+                self.insert_course(course_id, self.teacher_id, direction)
+            self.insert_progress(
+                student_ids["progress"],
+                10,
+                self.recent,
             )
-            db.execute(
-                """
-                INSERT INTO agri_course_progress (
-                    user_id, course_id, duration_seconds,
-                    furthest_position_seconds, resume_position_seconds,
-                    progress_percent, watched_seconds, completed_at,
-                    last_viewed_at, updated_at
-                )
-                VALUES (2, 10, 300, 0, 0, 20, 0, NULL, ?, ?)
-                """,
-                (now, now),
+            self.insert_quiz(student_ids["quiz"], 10, self.recent)
+            self.insert_agri_outcome(
+                student_ids["agri_outcome"],
+                self.recent,
             )
-            db.execute(
-                """
-                INSERT INTO ecommerce_live_script_versions (
-                    user_id, product_name, selling_points_json, price_text,
-                    style, script_json, is_current, created_at
-                )
-                VALUES (
-                    3, '荔枝', '[]', '10 元', 'enthusiastic', '{}', 1, ?
-                )
-                """,
-                (now,),
+            self.insert_handcraft_outcome(
+                student_ids["handcraft_outcome"],
+                self.recent,
+            )
+            self.insert_live_script(
+                student_ids["live_script"],
+                self.recent,
+            )
+            self.insert_simulation(
+                student_ids["simulation"],
+                self.recent,
+            )
+            self.insert_copy_session(
+                student_ids["copy"],
+                self.recent,
+            )
+            self.insert_customer_session(
+                student_ids["customer"],
+                self.recent,
+            )
+            self.insert_store_plan(
+                student_ids["store_plan"],
+                self.recent,
             )
             db.commit()
 
             from app.teacher_console.reports import generate_teacher_report
 
-            report = generate_teacher_report(1)
+            report = generate_teacher_report(self.teacher_id)
+
+        risk = report["stats_snapshot"]["risk_summary"]
+        self.assertEqual(risk["student_count"], len(sources))
+        self.assertEqual(risk["at_risk_count"], 0)
+        self.assertEqual(
+            risk["directions"]["agriculture"]["at_risk_count"],
+            0,
+        )
+        self.assertEqual(
+            risk["directions"]["ecommerce"]["at_risk_count"],
+            0,
+        )
+        self.assertEqual(
+            risk["directions"]["handcraft"]["at_risk_count"],
+            0,
+        )
+
+    def test_risk_summary_excludes_out_of_scope_students_and_courses(self):
+        other_teacher_id = self.create_user("other_teacher", "teacher")
+        in_scope_id = self.create_user("student_in_scope", "student")
+        out_of_scope_course_id = self.create_user(
+            "student_out_of_scope_course",
+            "student",
+        )
+        ecommerce_id = self.create_user("student_ecommerce", "student")
+        handcraft_id = self.create_user("student_handcraft", "student")
+        set_course_provider(
+            self.app,
+            StaticCourseProvider(
+                {10},
+                {10: "agriculture"},
+            ),
+        )
+
+        with self.app.app_context():
+            db = get_db()
+            db.executemany(
+                """
+                INSERT INTO student_profiles (
+                    user_id, contact, learning_direction, updated_at
+                )
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    (in_scope_id, "13800000001", "agriculture", self.now),
+                    (
+                        out_of_scope_course_id,
+                        "13800000002",
+                        "agriculture",
+                        self.now,
+                    ),
+                    (ecommerce_id, "13800000003", "ecommerce", self.now),
+                    (handcraft_id, "13800000004", "handcraft", self.now),
+                ),
+            )
+            self.insert_course(10, self.teacher_id, "agriculture")
+            self.insert_course(
+                99,
+                other_teacher_id,
+                "agriculture",
+            )
+            self.insert_progress(in_scope_id, 10, self.recent)
+            self.insert_progress(
+                out_of_scope_course_id,
+                99,
+                self.recent,
+            )
+            self.insert_live_script(ecommerce_id, self.recent)
+            self.insert_handcraft_outcome(handcraft_id, self.recent)
+            db.commit()
+
+            from app.teacher_console.reports import generate_teacher_report
+
+            report = generate_teacher_report(self.teacher_id)
 
         risk = report["stats_snapshot"]["risk_summary"]
         self.assertEqual(risk["student_count"], 2)
         self.assertEqual(risk["at_risk_count"], 1)
         self.assertEqual(
-            risk["directions"]["ecommerce"]["at_risk_count"],
+            risk["directions"]["agriculture"]["student_count"],
+            2,
+        )
+        self.assertEqual(
+            risk["directions"]["agriculture"]["at_risk_count"],
             1,
+        )
+        self.assertEqual(
+            risk["directions"]["ecommerce"]["student_count"],
+            0,
+        )
+        self.assertEqual(
+            risk["directions"]["handcraft"]["student_count"],
+            0,
         )
 
 
@@ -555,6 +858,39 @@ class TestExternalMediaEgress(unittest.TestCase):
                     )
         self.assertEqual(requests, [])
 
+    def test_head_uses_validated_address_without_second_dns_lookup(self):
+        requests = []
+
+        def handler(request):
+            requests.append(request)
+            return httpx.Response(204, request=request)
+
+        public = [(2, 1, 6, "", ("93.184.216.34", 443))]
+        private = [(2, 1, 6, "", ("127.0.0.1", 443))]
+        with self.app.app_context():
+            from app.teacher_console.media import validate_media_reference
+
+            with patch(
+                "socket.getaddrinfo",
+                side_effect=[public, private],
+            ) as resolver:
+                result = validate_media_reference(
+                    "external_url",
+                    "https://media.example.test/video.mp4",
+                    transport=httpx.MockTransport(handler),
+                    check_remote=True,
+                )
+
+        self.assertEqual(result, "https://media.example.test/video.mp4")
+        self.assertEqual(resolver.call_count, 1)
+        self.assertEqual(len(requests), 1)
+        self.assertEqual(requests[0].url.host, "93.184.216.34")
+        self.assertEqual(requests[0].headers["host"], "media.example.test")
+        self.assertEqual(
+            requests[0].extensions["sni_hostname"],
+            "media.example.test",
+        )
+
 
 class TestLearnerContentComments(TeacherReviewFixTestCase):
     def setUp(self):
@@ -563,9 +899,19 @@ class TestLearnerContentComments(TeacherReviewFixTestCase):
         self.student_id = self.create_user("student01", "student")
         self.teacher_client = self.login("teacher01")
         self.student_client = self.login("student01")
-        set_course_provider(self.app, StaticCourseProvider({101}))
+        set_course_provider(
+            self.app,
+            StaticCourseProvider(
+                {101, 102, 103},
+                {
+                    101: "agriculture",
+                    102: "ecommerce",
+                    103: "handcraft",
+                },
+            ),
+        )
         with self.app.app_context():
-            get_db().execute(
+            get_db().executemany(
                 """
                 INSERT INTO courses (
                     id, title, direction, status, duration_seconds,
@@ -574,7 +920,7 @@ class TestLearnerContentComments(TeacherReviewFixTestCase):
                     content_tags_json, created_at, updated_at
                 )
                 VALUES (
-                    101, '课程', 'agriculture', 'published', 300,
+                    ?, ?, ?, 'published', 300,
                     'https://media.example.test/a.mp4',
                     '2026-09-19T10:00:00+08:00', '课程简介', '教师',
                     ?, 1, 'external_url', '[]',
@@ -582,7 +928,11 @@ class TestLearnerContentComments(TeacherReviewFixTestCase):
                     '2026-09-19T09:00:00+08:00'
                 )
                 """,
-                (self.teacher_id,),
+                (
+                    (101, "农业课程", "agriculture", self.teacher_id),
+                    (102, "电商课程", "ecommerce", self.teacher_id),
+                    (103, "手工课程", "handcraft", self.teacher_id),
+                ),
             )
             get_db().commit()
         set_teaching_video_provider(
@@ -591,43 +941,49 @@ class TestLearnerContentComments(TeacherReviewFixTestCase):
         )
 
     def test_course_comment_creation_visibility_and_teacher_replies(self):
-        response = self.student_client.post(
-            "/api/agri-skills/courses/101/comments",
-            json={"body": "  如何保果？  "},
+        surfaces = (
+            ("/api/agri-skills", 101),
+            ("/api/ecommerce-training", 102),
+            ("/api/handcraft-inheritance", 103),
         )
-        self.assertEqual(response.status_code, 201)
-        comment = response.get_json()["comment"]
-        self.assertEqual(comment["body"], "如何保果？")
-        self.assertFalse(comment["is_teacher_reply"])
-        self.assertEqual(comment["content_id"], "101")
+        for api_prefix, course_id in surfaces:
+            with self.subTest(api_prefix=api_prefix):
+                endpoint = f"{api_prefix}/courses/{course_id}/comments"
+                response = self.student_client.post(
+                    endpoint,
+                    json={"body": "  如何学习？  "},
+                )
+                self.assertEqual(response.status_code, 201)
+                comment = response.get_json()["comment"]
+                self.assertEqual(comment["body"], "如何学习？")
+                self.assertFalse(comment["is_teacher_reply"])
+                self.assertEqual(comment["content_id"], str(course_id))
 
-        with self.app.app_context():
-            first_reply = reply_to_comment(
-                self.teacher_id,
-                comment["comment_id"],
-                "先控梢再补钾",
-            )
-            second_reply = reply_to_comment(
-                self.teacher_id,
-                first_reply["comment_id"],
-                "两周后再复核一次",
-            )
+                with self.app.app_context():
+                    first_reply = reply_to_comment(
+                        self.teacher_id,
+                        comment["comment_id"],
+                        "先完成基础练习",
+                    )
+                    second_reply = reply_to_comment(
+                        self.teacher_id,
+                        first_reply["comment_id"],
+                        "再完成进阶练习",
+                    )
 
-        listed = self.student_client.get(
-            "/api/agri-skills/courses/101/comments"
-        )
-        self.assertEqual(listed.status_code, 200)
-        comments = listed.get_json()["comments"]
-        self.assertEqual(
-            [item["comment_id"] for item in comments],
-            [
-                comment["comment_id"],
-                first_reply["comment_id"],
-                second_reply["comment_id"],
-            ],
-        )
-        self.assertTrue(comments[1]["is_teacher_reply"])
-        self.assertTrue(comments[2]["is_teacher_reply"])
+                listed = self.student_client.get(endpoint)
+                self.assertEqual(listed.status_code, 200)
+                comments = listed.get_json()["comments"]
+                self.assertEqual(
+                    [item["comment_id"] for item in comments],
+                    [
+                        comment["comment_id"],
+                        first_reply["comment_id"],
+                        second_reply["comment_id"],
+                    ],
+                )
+                self.assertTrue(comments[1]["is_teacher_reply"])
+                self.assertTrue(comments[2]["is_teacher_reply"])
 
         denied = self.teacher_client.get(
             "/api/agri-skills/courses/101/comments"
@@ -666,6 +1022,37 @@ class TestLearnerContentComments(TeacherReviewFixTestCase):
             [comment["comment_id"], reply["comment_id"]],
         )
         self.assertTrue(comments[1]["is_teacher_reply"])
+
+    def test_heritage_video_legacy_published_status_is_replyable(self):
+        set_teaching_video_provider(
+            self.app,
+            StaticTeachingVideoProvider(review_status="published"),
+        )
+        response = self.student_client.post(
+            "/api/handcraft-inheritance/videos/video-visible/comments",
+            json={"body": "如何收针？"},
+        )
+        self.assertEqual(response.status_code, 201)
+
+        listed = self.student_client.get(
+            "/api/handcraft-inheritance/videos/video-visible/comments"
+        )
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(
+            [item["body"] for item in listed.get_json()["comments"]],
+            ["如何收针？"],
+        )
+
+    def test_heritage_video_unknown_status_is_rejected(self):
+        set_teaching_video_provider(
+            self.app,
+            StaticTeachingVideoProvider(review_status="published_v2"),
+        )
+        response = self.student_client.post(
+            "/api/handcraft-inheritance/videos/video-visible/comments",
+            json={"body": "未知状态"},
+        )
+        self.assertEqual(response.status_code, 409)
 
 
 if __name__ == "__main__":

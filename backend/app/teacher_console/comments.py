@@ -110,11 +110,12 @@ def _course_id_from_content(content_id: str) -> int:
 
 
 def _video_is_replyable(video: object) -> bool:
-    return (
-        isinstance(video, dict)
-        and video.get("review_status") == "approved"
-        and bool(video.get("source_available"))
-    )
+    if not isinstance(video, dict) or not bool(video.get("source_available")):
+        return False
+    review_status = video.get("review_status")
+    if review_status == "published":
+        review_status = "approved"
+    return review_status == "approved"
 
 
 def _owned_course_ids(teacher_id: int) -> set[str]:

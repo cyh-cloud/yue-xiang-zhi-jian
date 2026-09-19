@@ -112,6 +112,16 @@ LEARNER_ROUTES = (
     ),
     (
         "GET",
+        "/api/handcraft-inheritance/courses/501/comments",
+        None,
+    ),
+    (
+        "POST",
+        "/api/handcraft-inheritance/courses/501/comments",
+        {"body": "课程评论"},
+    ),
+    (
+        "GET",
         "/api/handcraft-inheritance/courses/501/quiz/attempts",
         None,
     ),
@@ -441,6 +451,9 @@ class TestHandcraftApi(unittest.TestCase):
             ): {"POST"},
             (
                 "/api/handcraft-inheritance/courses/<int:course_id>/quiz"
+            ): {"GET", "POST"},
+            (
+                "/api/handcraft-inheritance/courses/<int:course_id>/comments"
             ): {"GET", "POST"},
             (
                 "/api/handcraft-inheritance/courses/<int:course_id>/"

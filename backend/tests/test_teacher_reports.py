@@ -382,19 +382,19 @@ class TestTeacherReports(unittest.TestCase):
         self.assertEqual(
             context["risk_summary"],
             {
-                "student_count": 3,
-                "at_risk_count": 3,
-                "at_risk_ratio": 100.0,
+                "student_count": 0,
+                "at_risk_count": 0,
+                "at_risk_ratio": 0.0,
                 "directions": {
                     "agriculture": {
-                        "student_count": 1,
-                        "at_risk_count": 1,
-                        "at_risk_ratio": 100.0,
+                        "student_count": 0,
+                        "at_risk_count": 0,
+                        "at_risk_ratio": 0.0,
                     },
                     "ecommerce": {
-                        "student_count": 1,
-                        "at_risk_count": 1,
-                        "at_risk_ratio": 100.0,
+                        "student_count": 0,
+                        "at_risk_count": 0,
+                        "at_risk_ratio": 0.0,
                     },
                     "handcraft": {
                         "student_count": 0,
@@ -402,9 +402,9 @@ class TestTeacherReports(unittest.TestCase):
                         "at_risk_ratio": 0.0,
                     },
                     "comprehensive": {
-                        "student_count": 1,
-                        "at_risk_count": 1,
-                        "at_risk_ratio": 100.0,
+                        "student_count": 0,
+                        "at_risk_count": 0,
+                        "at_risk_ratio": 0.0,
                     },
                 },
             },

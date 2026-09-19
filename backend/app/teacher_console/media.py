@@ -4,7 +4,7 @@ import ipaddress
 import os
 import socket
 from pathlib import Path, PureWindowsPath
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 import httpx
@@ -81,6 +81,30 @@ def _resolved_public_addresses(parsed) -> list:
             reason="non_public_address",
         )
     return addresses
+
+
+def _pinned_url(parsed, address) -> str:
+    host = f"[{address}]" if address.version == 6 else str(address)
+    netloc = f"{host}:{parsed.port}" if parsed.port is not None else host
+    return urlunsplit(
+        (
+            parsed.scheme,
+            netloc,
+            parsed.path or "/",
+            parsed.query,
+            parsed.fragment,
+        )
+    )
+
+
+def _host_header(parsed) -> str:
+    host = parsed.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
+    default_port = 80 if parsed.scheme.lower() == "http" else 443
+    if parsed.port is not None and parsed.port != default_port:
+        return f"{host}:{parsed.port}"
+    return host
 
 
 def _validate_local_media_url(media_url: str) -> str:
@@ -203,7 +227,9 @@ def validate_media_reference(
         _validate_external_url(normalized_url)
         parsed_url = urlsplit(normalized_url)
         if check_remote:
-            _resolved_public_addresses(parsed_url)
+            addresses = _resolved_public_addresses(parsed_url)
+            pinned_url = _pinned_url(parsed_url, addresses[0])
+            host_header = _host_header(parsed_url)
         if not check_remote:
             return normalized_url
 
@@ -213,7 +239,11 @@ def validate_media_reference(
                 timeout=REMOTE_CHECK_TIMEOUT_SECONDS,
                 follow_redirects=False,
             ) as client:
-                response = client.head(normalized_url)
+                response = client.head(
+                    pinned_url,
+                    headers={"Host": host_header},
+                    extensions={"sni_hostname": parsed_url.hostname},
+                )
         except httpx.HTTPError as error:
             raise _media_error(
                 "媒体地址不可访问",

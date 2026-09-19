@@ -127,8 +127,94 @@ def _risk_summary(teacher_id: int) -> dict:
         ORDER BY users.id
         """
     ).fetchall()
-    visible_course_ids = _teacher_visible_course_ids(teacher_id)
-    latest_activity = _latest_activity_by_student(visible_course_ids)
+    visible_course_ids, visible_directions = _teacher_visible_course_scope(
+        teacher_id
+    )
+    course_activity_rows = []
+    course_activity_rows.extend(
+        _course_activity_rows(
+            """
+            SELECT user_id, updated_at AS occurred_at
+            FROM agri_course_progress
+            WHERE 1 = 1
+            """,
+            visible_course_ids,
+        )
+    )
+    course_activity_rows.extend(
+        _course_activity_rows(
+            """
+            SELECT user_id, created_at AS occurred_at
+            FROM agri_course_quiz_attempts
+            WHERE 1 = 1
+            """,
+            visible_course_ids,
+        )
+    )
+    activity_rows = list(course_activity_rows)
+    if "agriculture" in visible_directions:
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, created_at AS occurred_at
+                FROM agri_self_test_attempts
+                """
+            ).fetchall()
+        )
+    if "handcraft" in visible_directions:
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, created_at AS occurred_at
+                FROM handcraft_learning_outcomes
+                """
+            ).fetchall()
+        )
+    if "ecommerce" in visible_directions:
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, created_at AS occurred_at
+                FROM ecommerce_live_script_versions
+                """
+            ).fetchall()
+        )
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, completed_at AS occurred_at
+                FROM ecommerce_simulation_trainings
+                WHERE status = 'completed' AND completed_at IS NOT NULL
+                """
+            ).fetchall()
+        )
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, completed_at AS occurred_at
+                FROM ecommerce_copy_training_sessions
+                WHERE status = 'completed' AND completed_at IS NOT NULL
+                """
+            ).fetchall()
+        )
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, completed_at AS occurred_at
+                FROM ecommerce_customer_sessions
+                WHERE status = 'completed' AND completed_at IS NOT NULL
+                """
+            ).fetchall()
+        )
+        activity_rows.extend(
+            get_db().execute(
+                """
+                SELECT user_id, created_at AS occurred_at
+                FROM ecommerce_store_plans
+                """
+            ).fetchall()
+        )
+    latest_activity = _latest_activity_by_student(activity_rows)
     completed_students = {
         int(row["user_id"])
         for row in _course_activity_rows(
@@ -141,25 +227,64 @@ def _risk_summary(teacher_id: int) -> dict:
             visible_course_ids,
         )
     }
-    return _risk_summary_payload(students, latest_activity, completed_students)
+    activity_student_ids = {
+        int(row["user_id"])
+        for row in activity_rows
+    }
+    scoped_students = [
+        student
+        for student in students
+        if _student_in_scope(
+            int(student["id"]),
+            str(student["learning_direction"]),
+            visible_directions,
+            activity_student_ids,
+        )
+    ]
+    return _risk_summary_payload(
+        scoped_students,
+        latest_activity,
+        completed_students,
+    )
 
 
-def _teacher_visible_course_ids(teacher_id: int) -> set[int]:
+def _teacher_visible_course_scope(
+    teacher_id: int,
+) -> tuple[set[int], set[str]]:
     db = get_db()
     candidate_rows = db.execute(
         """
-        SELECT id
+        SELECT id, direction
         FROM courses
         WHERE teacher_id = ?
         """,
         (teacher_id,),
     ).fetchall()
     provider = get_course_provider()
-    return {
-        int(row["id"])
+    visible_rows = [
+        row
         for row in candidate_rows
         if provider.get_course(int(row["id"])) is not None
-    }
+    ]
+    return (
+        {int(row["id"]) for row in visible_rows},
+        {str(row["direction"]) for row in visible_rows},
+    )
+
+
+def _student_in_scope(
+    student_id: int,
+    direction: str,
+    visible_directions: set[str],
+    activity_student_ids: set[int],
+) -> bool:
+    if student_id in activity_student_ids:
+        return True
+    if not visible_directions:
+        return False
+    if direction == "comprehensive":
+        return True
+    return direction in visible_directions
 
 
 def _course_activity_rows(
@@ -177,30 +302,8 @@ def _course_activity_rows(
 
 
 def _latest_activity_by_student(
-    course_ids: set[int],
+    activity_rows,
 ) -> dict[int, datetime]:
-    activity_rows = []
-    activity_rows.extend(
-        _course_activity_rows(
-            """
-            SELECT user_id, updated_at AS occurred_at
-            FROM agri_course_progress
-            WHERE 1 = 1
-            """,
-            course_ids,
-        )
-    )
-    activity_rows.extend(
-        _course_activity_rows(
-            """
-            SELECT user_id, created_at AS occurred_at
-            FROM agri_course_quiz_attempts
-            WHERE 1 = 1
-            """,
-            course_ids,
-        )
-    )
-
     latest_activity = {}
     for row in activity_rows:
         try:

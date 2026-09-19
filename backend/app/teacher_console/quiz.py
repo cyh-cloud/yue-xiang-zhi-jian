@@ -123,15 +123,18 @@ def generate_course_quiz(
     get_teacher_course(teacher_id, course_id)
     if not isinstance(summary, str) or not summary.strip():
         raise _validation_error("课程简介不能为空")
-    if direction not in COURSE_DIRECTIONS:
+    if not isinstance(direction, str) or not direction.strip():
+        raise _validation_error("学习方向无效")
+    normalized_direction = direction.strip()
+    if normalized_direction not in COURSE_DIRECTIONS:
         raise _validation_error("学习方向无效")
     try:
         payload = get_ai_client().complete_json(
             build_ai_messages(
                 "teacher_quiz_generate",
                 {
-                    "course_summary": summary,
-                    "course_direction": direction,
+                    "course_summary": summary.strip(),
+                    "course_direction": normalized_direction,
                 },
             ),
             call_point="teacher_quiz_generate",
