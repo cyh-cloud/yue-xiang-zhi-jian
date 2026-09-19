@@ -92,7 +92,7 @@ async function logout() {
   min-width: 0;
   min-height: 100svh;
   overflow-x: clip;
-  background: var(--ark-ink);
+  background: var(--ark-surface-0);
 }
 
 .local-resources-home__main {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import localResourcesHomeSource from '@/views/LocalResourcesHomeView.vue?raw'
+
 import router from './index'
 
 const expectedRoutes = [
@@ -25,5 +27,18 @@ describe('local resources routes', () => {
         meta: { requiresAuth: true, roles: ['student'] }
       })
     }
+  })
+
+  it('uses the explicit light surface and ink foreground tokens on home', () => {
+    const rootRule =
+      localResourcesHomeSource.match(/\.local-resources-home \{[^}]*\}/)?.[0] ??
+      ''
+    const entryRule =
+      localResourcesHomeSource.match(
+        /\.local-resources-home__entry \{[^}]*\}/
+      )?.[0] ?? ''
+
+    expect(rootRule).toContain('background: var(--ark-surface-0)')
+    expect(entryRule).toContain('color: var(--ark-paper)')
   })
 })
