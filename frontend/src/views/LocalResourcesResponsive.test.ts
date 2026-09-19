@@ -317,7 +317,17 @@ function expectCjkWrapping(
   expect(rule, `${label} break-all`).not.toContain('word-break: break-all')
 }
 
-function accessibleName(element: Element): string {
+function labelText(label: HTMLLabelElement): string {
+  const clone = label.cloneNode(true) as HTMLLabelElement
+  for (const control of clone.querySelectorAll(
+    'button, select, textarea, audio'
+  )) {
+    control.remove()
+  }
+  return clone.textContent?.replace(/\s+/g, ' ').trim() ?? ''
+}
+
+function explicitAccessibleName(element: Element): string {
   const ariaLabel = element.getAttribute('aria-label')?.trim()
   if (ariaLabel) {
     return ariaLabel
@@ -338,13 +348,28 @@ function accessibleName(element: Element): string {
   const id = element.getAttribute('id')
   if (id) {
     const label = element.ownerDocument.querySelector(`label[for="${id}"]`)
-    const text = label?.textContent?.trim()
+    const text =
+      label instanceof HTMLLabelElement ? labelText(label) : ''
     if (text) {
       return text
     }
   }
 
-  return element.textContent?.trim() ?? ''
+  const wrappingLabel = element.closest('label')
+  return wrappingLabel instanceof HTMLLabelElement
+    ? labelText(wrappingLabel)
+    : ''
+}
+
+function accessibleName(element: Element): string {
+  const explicitName = explicitAccessibleName(element)
+  if (explicitName) {
+    return explicitName
+  }
+
+  return element.tagName.toLowerCase() === 'button'
+    ? element.textContent?.trim() ?? ''
+    : ''
 }
 
 const expectedControlCounts: Record<ViewName, number> = {
@@ -480,6 +505,38 @@ describe('local-resources responsive and accessibility acceptance', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     document.body.innerHTML = ''
+  })
+
+  it('resolves accessible names by control type and wrapped labels', () => {
+    document.body.innerHTML = `
+      <select id="bare-select">
+        <option>补贴</option>
+      </select>
+      <label>
+        识别文本
+        <textarea id="wrapped-textarea"></textarea>
+      </label>
+      <label>
+        方言
+        <select id="wrapped-select">
+          <option>粤语</option>
+        </select>
+      </label>
+      <button type="button">提交问题</button>
+    `
+
+    expect(
+      accessibleName(document.querySelector('#bare-select') as Element)
+    ).toBe('')
+    expect(
+      accessibleName(document.querySelector('#wrapped-textarea') as Element)
+    ).toBe('识别文本')
+    expect(
+      accessibleName(document.querySelector('#wrapped-select') as Element)
+    ).toBe('方言')
+    expect(
+      accessibleName(document.querySelector('button') as Element)
+    ).toBe('提交问题')
   })
 
   for (const width of widths) {
