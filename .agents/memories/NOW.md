@@ -18,8 +18,19 @@
   consistency between policy publication and 02 push, no re-push on re-list,
   no published-content editing in this release, and repeated views counted per
   distinct view event.
-- No implementation has started. The 010 spec, plan, checklist, and
-  `.specify/feature.json` are local uncommitted artifacts in the 010 worktree.
+- 2026-09-19: SDD Tasks 1-13 completed in the adjusted order
+  `1,2,3,4,5,7,8,9,10,6,11,12,13`; final code head `8815045`.
+- Verification: backend `557/557`, frontend `355/355`, TypeScript build,
+  production build, and browser geometry `12/12` page/width combinations
+  passed. The browser pass fixed one 320px policy-copy wrapping defect.
+- Final whole-branch review found one Important FR-052 database-error mapping
+  issue; it was fixed in `8815045` and the scoped re-review passed.
+- Deferred non-blocking items remain for later hardening: management-route
+  SQLite error mapping, explicit retry-after-hidden and validator-negative
+  tests, duplicated time helper, partial-09-provider edge handling, and
+  duplicated portal hrefs.
+- True 09 provider integration remains deferred until 09 is merged. No push
+  or merge was performed.
 
 ## Integration Branch
 
