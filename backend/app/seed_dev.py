@@ -12,6 +12,7 @@ from app.db import get_db
 from app.enterprise_console.seed import (
     seed_enterprise_console_fixtures,
 )
+from app.job_matching import seed_job_matching_fixtures
 from app.seed import (
     DEFAULT_COURSES,
     DEFAULT_INTEREST_TAGS,
@@ -150,6 +151,7 @@ def seed_local_data(database_path: str | Path | None = None) -> dict[str, int]:
         seed_courses(connection)
         _seed_accounts(connection, password)
         enterprise_fixtures = seed_enterprise_console_fixtures(connection)
+        job_matching_fixtures = seed_job_matching_fixtures(connection)
         connection.commit()
 
     return {
@@ -157,6 +159,15 @@ def seed_local_data(database_path: str | Path | None = None) -> dict[str, int]:
         "enterprise_applications": enterprise_fixtures["applications"],
         "enterprise_jobs": enterprise_fixtures["jobs"],
         "courses": len(DEFAULT_COURSES),
+        "job_matching_favorites": job_matching_fixtures["favorites"],
+        "job_matching_hidden": job_matching_fixtures["hidden"],
+        "job_matching_resume_revisions": job_matching_fixtures[
+            "resume_revisions"
+        ],
+        "job_matching_resumes": job_matching_fixtures["resumes"],
+        "job_matching_tags": job_matching_fixtures["tags"],
+        "job_matching_visibility": job_matching_fixtures["visibility"],
+        "job_matching_visible": job_matching_fixtures["visible"],
         "tags": len(DEFAULT_INTEREST_TAGS),
     }
 
@@ -174,7 +185,8 @@ def main() -> None:
         f"{result['courses']} courses, "
         f"{result['tags']} tags, "
         f"{result['enterprise_jobs']} enterprise jobs, "
-        f"{result['enterprise_applications']} enterprise applications."
+        f"{result['enterprise_applications']} enterprise applications, "
+        f"{result['job_matching_favorites']} job-matching favorites."
     )
 
 

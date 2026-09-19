@@ -6,6 +6,10 @@ from app.job_matching.routes import (
     job_matching_bp,
     register_job_matching_error_handlers,
 )
+from app.job_matching.seed import (
+    DEMO_RESUME,
+    seed_job_matching_fixtures,
+)
 
 
 def install_default_job_matching_services(app: Flask) -> None:
@@ -17,7 +21,9 @@ def install_default_job_matching_services(app: Flask) -> None:
 
 
 __all__ = [
+    "DEMO_RESUME",
     "install_default_job_matching_services",
     "job_matching_bp",
     "register_job_matching_error_handlers",
+    "seed_job_matching_fixtures",
 ]
