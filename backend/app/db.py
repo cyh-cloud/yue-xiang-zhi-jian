@@ -951,6 +951,54 @@ CREATE TABLE IF NOT EXISTS government_view_events (
     created_at TEXT NOT NULL,
     PRIMARY KEY (content_type, view_event_id)
 );
+
+CREATE TABLE IF NOT EXISTS local_resource_dialect_turns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    turn_id TEXT NOT NULL UNIQUE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    dialect_code TEXT NOT NULL CHECK (dialect_code IN ('yue', 'hak', 'nan')),
+    recognized_text TEXT NOT NULL CHECK (length(trim(recognized_text)) > 0),
+    dialect_answer TEXT NOT NULL CHECK (length(trim(dialect_answer)) > 0),
+    mandarin_answer TEXT NOT NULL CHECK (length(trim(mandarin_answer)) > 0),
+    status TEXT NOT NULL CHECK (status = 'completed'),
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_resource_dialect_user
+    ON local_resource_dialect_turns(user_id, created_at DESC, id DESC);
+
+CREATE TABLE IF NOT EXISTS local_resource_policy_subscriptions (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category_code TEXT NOT NULL CHECK (
+        category_code IN (
+            'subsidy', 'ecommerce', 'heritage', 'training',
+            'certification', 'general', 'entrepreneurship'
+        )
+    ),
+    is_active INTEGER NOT NULL DEFAULT 1 CHECK (is_active IN (0, 1)),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, category_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_resource_policy_subscribers
+    ON local_resource_policy_subscriptions(category_code, is_active, user_id);
+
+CREATE TABLE IF NOT EXISTS local_resource_success_cases (
+    case_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    summary TEXT NOT NULL CHECK (length(trim(summary)) > 0),
+    background TEXT NOT NULL CHECK (length(trim(background)) > 0),
+    journey TEXT NOT NULL CHECK (length(trim(journey)) > 0),
+    lessons TEXT NOT NULL CHECK (length(trim(lessons)) > 0),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    published_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_demo INTEGER NOT NULL DEFAULT 1 CHECK (is_demo IN (0, 1))
+);
+
+CREATE INDEX IF NOT EXISTS idx_local_resource_cases_order
+    ON local_resource_success_cases(sort_order, case_id);
 """
 
 

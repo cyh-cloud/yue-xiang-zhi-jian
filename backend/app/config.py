@@ -76,6 +76,19 @@ def build_config() -> dict[str, object]:
             "AI_ASR_MODEL", "FunAudioLLM/SenseVoiceSmall"
         ).strip(),
         "AI_TIMEOUT_SECONDS": float(os.environ.get("AI_TIMEOUT_SECONDS", "60")),
+        "AI_TTS_URL": os.environ.get("AI_TTS_URL", "").strip(),
+        "AI_TTS_MODEL": os.environ.get("AI_TTS_MODEL", "").strip(),
+        "AI_TTS_API_KEY": os.environ.get("AI_TTS_API_KEY", "").strip(),
+        "AI_TTS_VOICE_YUE": os.environ.get("AI_TTS_VOICE_YUE", "").strip(),
+        "AI_TTS_VOICE_HAKKA": os.environ.get(
+            "AI_TTS_VOICE_HAKKA", ""
+        ).strip(),
+        "AI_TTS_VOICE_TEOCHEW": os.environ.get(
+            "AI_TTS_VOICE_TEOCHEW", ""
+        ).strip(),
+        "AI_TTS_TIMEOUT_SECONDS": float(
+            os.environ.get("AI_TTS_TIMEOUT_SECONDS", "30")
+        ),
         "POINTS_EXPIRY_TOKEN": os.environ.get(
             "POINTS_EXPIRY_TOKEN", ""
         ).strip(),
