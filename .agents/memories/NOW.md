@@ -1,5 +1,51 @@
 # Current Work
 
+## 009 Enterprise Console
+
+- 2026-09-19: Feature source `0f5950c` merged into `v2/lixKRT/dev` before 010.
+- `backend/app/enterprise_console/providers.py` now owns
+  `DatabaseEmploymentStatisticsProvider` for all-platform active-job and
+  cumulative-application counts.
+- The provider uses the shared extension key
+  `government_employment_statistics_provider`; 010 consumes that existing slot
+  instead of creating a second registry.
+- Enterprise jobs, applications, notifications, review facade, provider
+  contracts, frontend routes, and browser-responsive tests are integrated on
+  `v2/lixKRT/dev`.
+
+## 010 Government Console Specification and Plan
+
+- 2026-09-18: Created branch `v2/lixKRT/010-government-console` in
+  `.worktrees/010-government-console`, based on `v2/lixKRT/dev` at `01fff52`.
+- Specification: `specs/010-government-console/spec.md`.
+- Implementation plan:
+  `.agents/memories/plans/2026-09-18-010-government-console.md`.
+- Clarified policy three-state/news two-state behavior, immediate 02 policy
+  push, no re-push on re-list, hard delete, idempotent view events, and
+  non-deduplicated cumulative application counts.
+- Frozen 09 employment placeholder as unavailable `None` values with
+  `set_employment_statistics_provider` as the replacement point.
+- Frozen 06 policy/news producer registration and read/view contract; 06
+  remains the final signature owner.
+- User confirmed all four recommended decisions on 2026-09-18: strong
+  consistency between policy publication and 02 push, no re-push on re-list,
+  no published-content editing in this release, and repeated views counted per
+  distinct view event.
+- 2026-09-19: SDD Tasks 1-13 completed in the adjusted order
+  `1,2,3,4,5,7,8,9,10,6,11,12,13`; final code head `8815045`.
+- Verification: backend `557/557`, frontend `355/355`, TypeScript build,
+  production build, and browser geometry `12/12` page/width combinations
+  passed. The browser pass fixed one 320px policy-copy wrapping defect.
+- Final whole-branch review found one Important FR-052 database-error mapping
+  issue; it was fixed in `8815045` and the scoped re-review passed.
+- Deferred non-blocking items remain for later hardening: management-route
+  SQLite error mapping, explicit retry-after-hidden and validator-negative
+  tests, duplicated time helper, partial-09-provider edge handling, and
+  duplicated portal hrefs.
+- 009 is merged first so the 010 dashboard consumes the real
+  `EmploymentStatisticsProvider`; the post-merge dashboard integration check is
+  part of the 010 merge verification.
+
 ## Integration Branch
 
 - 2026-09-18: `v2/lixKRT/dev` fast-forwarded `e527d34 -> 8e27da8`,

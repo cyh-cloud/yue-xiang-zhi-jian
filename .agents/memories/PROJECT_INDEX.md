@@ -1,6 +1,6 @@
 # Project Index
 
-Updated: 2026-09-17
+Updated: 2026-09-19
 Project: YueXiang Artisan Training
 Status: ACTIVE
 
@@ -9,19 +9,17 @@ Status: ACTIVE
 - Purpose: prototype platform for YueXiang artisan training.
 - Architecture: Flask REST API and SQLite backend; Vue 3 + Vite + Pinia frontend; Vercel serverless entry.
 - Repository root: the repository containing this `.agents/memories/` directory.
-- Current integration branch: `v2/lixKRT/dev`; latest 004 merge `bc58a2a`.
-  Feature source head: `10af068`.
+- Current integration branch: `v2/lixKRT/dev`; integrating 009 enterprise
+  console from `0f5950c` and 010 government console from `4045c41`.
 - Dependency authority: `pyproject.toml` and `uv.lock`; `requirements.txt` is a generated Vercel export.
 
 ## Current Focus
 
-- Active milestone: post-review repair for `004-ecommerce-training`.
-- Last completed work: Tasks 10-17 and final branch review (`31821dc`);
-  post-review Batch A and Batch B repairs through `10af068`; memory handoff
-  `f0b00e7`; integration merge `bc58a2a`.
-- Current blocker: Batch B round 4 cannot start because the mandated
-  `基元律动/glm-5.3` provider returned HTTP 402 (`余额不足`). See
-  `failures/INDEX.md`.
+- Active milestone: integrate 009 enterprise console and 010 government
+  console into `v2/lixKRT/dev`.
+- 009 owns the real employment-statistics provider; 010 consumes it through
+  `government_employment_statistics_provider`.
+- Current blocker: none.
 
 ## Verification
 

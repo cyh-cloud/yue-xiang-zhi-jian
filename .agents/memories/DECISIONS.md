@@ -43,3 +43,12 @@
 - Cross-feature producer provider shapes, registration, review state contracts,
   errors, alignment rules, and consumer ownership are frozen in
   `.agents/memories/guides/provider-contract.md`.
+
+## Employment Statistics Provider
+
+- 009 owns `DatabaseEmploymentStatisticsProvider`, which returns all-platform
+  active-job and cumulative-application counts.
+- The provider is registered under the existing extension key
+  `government_employment_statistics_provider`.
+- 010 consumes that slot without direct job/application table access or a
+  second registry.

@@ -21,6 +21,8 @@ from app.enterprise_console import (
 from app.enterprise_console.messaging_provider import (
     EnterpriseMessagingProvider,
 )
+from app.government_console import install_default_government_services
+from app.government_console.routes import government_bp
 from app.handcraft_inheritance import install_default_handcraft_services
 from app.handcraft_inheritance.routes import (
     handcraft_inheritance_bp,
@@ -61,6 +63,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_agri_services(app)
     install_default_handcraft_services(app)
     install_default_enterprise_services(app)
+    install_default_government_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
         app,
@@ -100,6 +103,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(ecommerce_training_bp)
     app.register_blueprint(enterprise_console_bp)
     app.register_blueprint(handcraft_inheritance_bp)
+    app.register_blueprint(government_bp)
     register_ecommerce_training_error_handlers(app)
     register_enterprise_console_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
