@@ -4,6 +4,7 @@ from pathlib import Path
 
 from app import create_app
 from app.db import get_db
+from app.government_console.dashboard import get_government_dashboard
 from app.government_console.news import delete_news, publish_news
 from app.government_console.policy import (
     delete_policy,
@@ -127,10 +128,16 @@ class LocalResourcesIntegrationTests(unittest.TestCase):
             ).fetchone()["count"]
             self.assertEqual(notification_count_after_relist, 1)
 
+            view_count_before_delete = get_government_dashboard()["policy"][
+                "view_count"
+            ]
             delete_policy(
                 policy["id"],
                 expected_version=relisted["version"],
             )
+            view_count_after_delete = get_government_dashboard()["policy"][
+                "view_count"
+            ]
             with self.assertRaises(LocalResourceNotFoundError):
                 get_policy(policy["id"])
             with self.assertRaises(LocalResourceNotFoundError):
@@ -150,6 +157,8 @@ class LocalResourcesIntegrationTests(unittest.TestCase):
             [self.student_id],
         )
         self.assertEqual(notifications[0]["body"], "政策类别：电商")
+        self.assertEqual(view_count_before_delete, 2)
+        self.assertEqual(view_count_after_delete, 0)
         self.assertEqual(len(retained), 1)
         self.assertEqual(retained[0]["title"], "直播培训补贴")
         self.assertEqual(retained[0]["body"], "政策类别：电商")
