@@ -1,3 +1,5 @@
+from flask import Flask
+
 from app.local_resources.constants import (
     DIALECT_LABELS,
     DIALECTS,
@@ -54,6 +56,28 @@ from app.local_resources.views import (
     record_policy_view,
 )
 
+
+def install_default_local_resource_services(app: Flask) -> None:
+    if "local_resource_case_provider" not in app.extensions:
+        set_local_resource_case_provider(
+            app,
+            DatabaseLocalResourceCaseProvider(),
+        )
+    if "local_resource_tts_client" not in app.extensions:
+        set_local_tts_client(
+            app,
+            OpenAiCompatibleTtsClient(
+                api_url=str(app.config.get("AI_TTS_URL", "")),
+                api_key=(
+                    str(app.config.get("AI_TTS_API_KEY", "")).strip()
+                    or str(app.config.get("AI_API_KEY", "")).strip()
+                ),
+                model=str(app.config.get("AI_TTS_MODEL", "")),
+                timeout=float(app.config["AI_TTS_TIMEOUT_SECONDS"]),
+            ),
+        )
+
+
 __all__ = [
     "DIALECTS",
     "DIALECT_LABELS",
@@ -92,4 +116,5 @@ __all__ = [
     "LocalResourceUnavailableError",
     "LocalResourceAccessDeniedError",
     "LocalResourceAiUnavailableError",
+    "install_default_local_resource_services",
 ]

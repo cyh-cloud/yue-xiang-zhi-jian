@@ -33,6 +33,11 @@ from app.job_matching import (
     job_matching_bp,
     register_job_matching_error_handlers,
 )
+from app.local_resources import install_default_local_resource_services
+from app.local_resources.messaging_provider import (
+    LocalResourcesMessagingProvider,
+)
+from app.local_resources.routes import local_resources_bp
 from app.messaging.routes import messages_bp
 from app.messaging.source_provider import register_messaging_source_provider
 from app.onboarding.routes import onboarding_bp
@@ -59,6 +64,7 @@ PROTECTED_API_PREFIXES = (
     "/api/agri-skills",
     "/api/ecommerce-training",
     "/api/handcraft-inheritance",
+    "/api/local-resources",
 )
 
 PROTECTED_API_ROLES = {
@@ -82,6 +88,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_enterprise_services(app)
     install_default_job_matching_services(app)
     install_default_government_services(app)
+    install_default_local_resource_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
         app,
@@ -90,6 +97,10 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_messaging_source_provider(
         app,
         EnterpriseMessagingProvider(),
+    )
+    register_messaging_source_provider(
+        app,
+        LocalResourcesMessagingProvider(),
     )
     app.teardown_appcontext(close_db)
 
@@ -134,6 +145,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(job_matching_bp)
     app.register_blueprint(handcraft_inheritance_bp)
     app.register_blueprint(government_bp)
+    app.register_blueprint(local_resources_bp)
     app.register_blueprint(teacher_console_bp)
     app.register_blueprint(teacher_media_bp)
     register_ecommerce_training_error_handlers(app)
