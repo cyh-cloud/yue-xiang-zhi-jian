@@ -840,6 +840,102 @@ export interface EnterpriseApplicationFilters {
   sort?: 'submitted_desc' | 'submitted_asc'
 }
 
+export interface ResumePayload {
+  education_experiences: Array<Record<string, string>>
+  work_experiences: Array<Record<string, string>>
+  skills: string[]
+}
+
+export interface StudentResume extends ResumePayload {
+  version: number
+  saved_at: string | null
+  has_saved_resume: boolean
+}
+
+export interface ResumeOptimizationOffer {
+  offer_id: string
+  base_version: number
+  suggestions: string[]
+  rewritten_resume: ResumePayload | null
+  status: 'offered' | 'adopted' | 'discarded'
+  created_at: string
+}
+
+export type SkillCategory =
+  | 'live_script'
+  | 'simulation_training'
+  | 'quiz_score'
+  | 'learning_record'
+
+export interface SkillOutcomeItem {
+  item_id: string
+  category: SkillCategory
+  source_module: 'agriculture' | 'ecommerce' | 'handcraft'
+  source_type: string
+  title: string
+  summary: string
+  score: number | null
+  is_formal: boolean
+  occurred_at: string
+  source_available: boolean
+  visible: boolean
+}
+
+export interface SkillProfile {
+  items: SkillOutcomeItem[]
+  visible_item_ids: string[]
+  summary: Record<SkillCategory, number>
+}
+
+export interface JobMatchingJob {
+  job_id: string
+  enterprise_id: number
+  enterprise_name: string
+  title: string
+  salary: string
+  location: string
+  category_id: number
+  category_name: string
+  description: string
+  review_status: 'approved'
+  version: number
+  published_at: string
+  updated_at: string
+  category_match_count?: number
+  recent_learning?: boolean
+}
+
+export interface StudentApplication {
+  application_id: string
+  job_id: string
+  enterprise_id: number
+  enterprise_name: string
+  student_id: number
+  student_name: string
+  job_title: string
+  status: ApplicationStatus
+  status_version: number
+  position_closed: boolean
+  position_closed_at: string | null
+  effective_status: EffectiveApplicationStatus
+  effective_status_label: string
+  submitted_at: string
+  show_closed_marker: boolean
+}
+
+export interface JobFavorite {
+  job_id: string
+  title: string
+  enterprise_name: string
+  salary: string
+  location: string
+  description: string
+  title_snapshot: string
+  enterprise_name_snapshot: string
+  favorited_at: string
+  closed: boolean
+}
+
 export interface GovernmentPolicy {
   id: string
   title: string
