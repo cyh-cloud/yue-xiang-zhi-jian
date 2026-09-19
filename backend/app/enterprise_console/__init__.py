@@ -35,14 +35,18 @@ from app.enterprise_console.messaging_provider import (
 )
 from app.enterprise_console.providers import (
     DatabaseJobApplicationIntakeProvider,
+    DatabaseJobApplicationStatusProvider,
     DatabaseJobPositionProvider,
     DatabaseEmploymentStatisticsProvider,
     EmploymentStatisticsProvider,
+    JobApplicationStatusProvider,
     get_employment_statistics_provider,
     get_job_application_intake_provider,
+    get_job_application_status_provider,
     get_job_position_provider,
     set_employment_statistics_provider,
     set_job_application_intake_provider,
+    set_job_application_status_provider,
     set_job_position_provider,
 )
 from app.enterprise_console.review import (
@@ -68,6 +72,11 @@ def install_default_enterprise_services(app: Flask) -> None:
             app,
             DatabaseJobApplicationIntakeProvider(),
         )
+    if "job_application_status_provider" not in app.extensions:
+        set_job_application_status_provider(
+            app,
+            DatabaseJobApplicationStatusProvider(),
+        )
     if "content_review_provider" not in app.extensions:
         set_content_review_provider(app, UnavailableContentReviewProvider())
     if "government_employment_statistics_provider" not in app.extensions:
@@ -83,9 +92,11 @@ __all__ = [
     "CLOSED_STATUS_LABEL",
     "ContentReviewProvider",
     "DatabaseJobApplicationIntakeProvider",
+    "DatabaseJobApplicationStatusProvider",
     "DatabaseEmploymentStatisticsProvider",
     "EmploymentStatisticsProvider",
     "EnterpriseMessagingProvider",
+    "JobApplicationStatusProvider",
     "JOB_REVIEW_CONTENT_TYPE",
     "JOB_REVIEW_STATUSES",
     "JOB_TEXT_LIMITS",
@@ -103,6 +114,7 @@ __all__ = [
     "get_employment_statistics_snapshot",
     "get_job",
     "get_job_application_intake_provider",
+    "get_job_application_status_provider",
     "get_job_position_provider",
     "install_default_enterprise_services",
     "list_applications",
@@ -113,6 +125,7 @@ __all__ = [
     "serialize_application",
     "seed_enterprise_console_fixtures",
     "set_job_application_intake_provider",
+    "set_job_application_status_provider",
     "set_content_review_provider",
     "set_employment_statistics_provider",
     "set_job_position_provider",

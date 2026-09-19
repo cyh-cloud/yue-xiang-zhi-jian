@@ -124,6 +124,75 @@ class DatabaseJobApplicationIntakeProvider:
         return self._database_call(record)
 
 
+class JobApplicationStatusProvider(Protocol):
+    def list_student_applications(
+        self,
+        *,
+        student_id: int,
+    ) -> list[dict]: ...
+
+    def get_student_application(
+        self,
+        *,
+        student_id: int,
+        application_id: str,
+    ) -> dict | None: ...
+
+
+class EmptyJobApplicationStatusProvider:
+    def list_student_applications(self, *, student_id: int) -> list[dict]:
+        return []
+
+    def get_student_application(
+        self,
+        *,
+        student_id: int,
+        application_id: str,
+    ) -> dict | None:
+        return None
+
+
+class DatabaseJobApplicationStatusProvider:
+    @staticmethod
+    def _database_call(operation):
+        try:
+            return operation()
+        except sqlite3.Error as error:
+            from app.enterprise_console.errors import (
+                ProviderUnavailableError,
+            )
+
+            raise ProviderUnavailableError(
+                "Application status data is unavailable"
+            ) from error
+
+    def list_student_applications(self, *, student_id: int) -> list[dict]:
+        from app.enterprise_console.applications import (
+            list_student_application_records,
+        )
+
+        return self._database_call(
+            lambda: list_student_application_records(student_id)
+        )
+
+    def get_student_application(
+        self,
+        *,
+        student_id: int,
+        application_id: str,
+    ) -> dict | None:
+        from app.enterprise_console.applications import (
+            get_student_application_record,
+        )
+
+        return self._database_call(
+            lambda: get_student_application_record(
+                student_id,
+                application_id,
+            )
+        )
+
+
 class EmploymentStatisticsProvider(Protocol):
     def get_active_job_count(self) -> int | None: ...
 
@@ -174,6 +243,20 @@ def get_job_application_intake_provider() -> JobApplicationIntakeProvider:
     )
 
 
+def set_job_application_status_provider(
+    app: Flask,
+    provider: JobApplicationStatusProvider,
+) -> None:
+    app.extensions["job_application_status_provider"] = provider
+
+
+def get_job_application_status_provider() -> JobApplicationStatusProvider:
+    return current_app.extensions.get(
+        "job_application_status_provider",
+        EmptyJobApplicationStatusProvider(),
+    )
+
+
 def set_employment_statistics_provider(
     app: Flask,
     provider: EmploymentStatisticsProvider,
@@ -193,6 +276,9 @@ def configure_enterprise_providers(
     *,
     job_position_provider: JobPositionProvider | None = None,
     job_application_intake_provider: JobApplicationIntakeProvider | None = None,
+    job_application_status_provider: (
+        JobApplicationStatusProvider | None
+    ) = None,
     content_review_provider: ContentReviewProvider | None = None,
     employment_statistics_provider: EmploymentStatisticsProvider | None = None,
 ) -> None:
@@ -202,6 +288,11 @@ def configure_enterprise_providers(
         set_job_application_intake_provider(
             app,
             job_application_intake_provider,
+        )
+    if job_application_status_provider is not None:
+        set_job_application_status_provider(
+            app,
+            job_application_status_provider,
         )
     if content_review_provider is not None:
         from app.enterprise_console.review import set_content_review_provider
