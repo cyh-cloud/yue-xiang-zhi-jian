@@ -13,6 +13,7 @@ from app.job_matching.constants import AI_UNAVAILABLE_MESSAGE
 from app.job_matching.errors import (
     JobMatchingValidationError,
     ResumeConflictError,
+    ResumeRequiredError,
 )
 from app.job_matching.resumes import (
     _normalize_payload,
@@ -135,6 +136,8 @@ def _owned_offer(student_id: int, offer_id: str) -> dict:
 
 def optimize_resume(student_id: int, expected_version: int) -> dict:
     resume = get_resume(student_id)
+    if not resume["has_saved_resume"] or expected_version <= 0:
+        raise ResumeRequiredError("请先创建并保存简历")
     if resume["version"] != expected_version:
         raise ResumeConflictError("简历版本已变化")
 

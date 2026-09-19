@@ -17,6 +17,7 @@ from app.db import get_db
 from app.job_matching.errors import (
     JobMatchingValidationError,
     ResumeConflictError,
+    ResumeRequiredError,
 )
 from app.job_matching.resume_ai import (
     _owned_offer,
@@ -279,6 +280,26 @@ class JobMatchingResumeAiTests(unittest.TestCase):
             datetime.fromisoformat(offer["created_at"]).utcoffset().total_seconds(),
             8 * 60 * 60,
         )
+
+    def test_optimize_rejects_empty_resume_without_calling_ai(self):
+        with self.app.app_context():
+            fake = FakeAi()
+            set_ai_client(self.app, fake)
+
+            with self.assertRaises(ResumeRequiredError) as raised:
+                optimize_resume(self.student_id, expected_version=0)
+
+            offer_count = get_db().execute(
+                "SELECT COUNT(*) AS count FROM resume_optimization_offers"
+            ).fetchone()["count"]
+            current = get_resume(self.student_id)
+
+        self.assertEqual(raised.exception.code, "resume_required")
+        self.assertEqual(raised.exception.message, "请先创建并保存简历")
+        self.assertEqual(fake.calls, [])
+        self.assertEqual(offer_count, 0)
+        self.assertEqual(current["version"], 0)
+        self.assertFalse(current["has_saved_resume"])
 
     def test_discard_marks_offer_without_mutating_resume(self):
         with self.app.app_context():
