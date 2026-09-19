@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path, PureWindowsPath
 from urllib.parse import urlsplit
+from uuid import uuid4
 
 import httpx
 from flask import current_app, has_app_context
@@ -11,7 +12,7 @@ from app.teacher_console.errors import ProviderValidationError
 
 
 ALLOWED_MEDIA_SOURCE_TYPES = {"local_upload", "external_url"}
-ALLOWED_VIDEO_SUFFIXES = {".mp4", ".webm"}
+ALLOWED_VIDEO_EXTENSIONS = {".mp4": "video/mp4", ".webm": "video/webm"}
 LOCAL_MEDIA_URL_PREFIX = "/media/teacher-courses/"
 REMOTE_CHECK_TIMEOUT_SECONDS = 5.0
 
@@ -54,7 +55,7 @@ def _validate_local_media_url(media_url: str) -> str:
         or windows_path.is_absolute()
         or len(windows_path.parts) != 1
         or windows_path.name != filename
-        or Path(filename).suffix.lower() not in ALLOWED_VIDEO_SUFFIXES
+        or Path(filename).suffix.lower() not in ALLOWED_VIDEO_EXTENSIONS
     ):
         raise _media_error(
             "本地视频地址无效",
@@ -64,7 +65,10 @@ def _validate_local_media_url(media_url: str) -> str:
     return filename
 
 
-def _local_media_path(filename: str) -> Path:
+def course_media_path(filename: str) -> Path:
+    filename = _validate_local_media_url(
+        f"{LOCAL_MEDIA_URL_PREFIX}{filename}"
+    )
     configured_root = (
         current_app.config.get("COURSE_MEDIA_ROOT")
         if has_app_context()
@@ -85,6 +89,39 @@ def _local_media_path(filename: str) -> Path:
             media_source_type="local_upload",
         )
     return root / filename
+
+
+def save_course_video(file_storage, teacher_id: int) -> dict:
+    filename = str(file_storage.filename or "")
+    suffix = Path(filename).suffix.lower()
+    if suffix not in ALLOWED_VIDEO_EXTENSIONS:
+        raise _media_error(
+            "视频仅支持 MP4 或 WebM",
+            code="media_reference_invalid",
+            media_source_type="local_upload",
+        )
+
+    file_storage.stream.seek(0, os.SEEK_END)
+    size = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+    if size <= 0 or size > current_app.config["MAX_VIDEO_UPLOAD_BYTES"]:
+        raise _media_error(
+            "视频文件大小超出限制",
+            code="media_reference_invalid",
+            media_source_type="local_upload",
+            size_bytes=size,
+            max_size_bytes=current_app.config["MAX_VIDEO_UPLOAD_BYTES"],
+        )
+
+    stored_name = f"{teacher_id}-{uuid4().hex}{suffix}"
+    destination = course_media_path(stored_name)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    file_storage.save(destination)
+    return {
+        "media_source_type": "local_upload",
+        "media_url": f"{LOCAL_MEDIA_URL_PREFIX}{stored_name}",
+        "size_bytes": size,
+    }
 
 
 def validate_media_reference(
@@ -147,7 +184,7 @@ def validate_media_reference(
     if not check_remote:
         return normalized_url
 
-    media_path = _local_media_path(filename)
+    media_path = course_media_path(filename)
     if not media_path.is_file() or not os.access(media_path, os.R_OK):
         raise _media_error(
             "媒体地址不可访问",

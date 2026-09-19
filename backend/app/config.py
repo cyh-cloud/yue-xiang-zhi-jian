@@ -6,6 +6,7 @@ from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SECRET_KEY = "dev-only-change-me"
+MAX_VIDEO_UPLOAD_BYTES = 500 * 1024 * 1024
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -51,6 +52,7 @@ def build_config() -> dict[str, object]:
         "SESSION_HOURS": int(os.environ.get("SESSION_HOURS", "24")),
         "SESSION_COOKIE_SECURE": session_cookie_secure,
         "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
+        "MAX_VIDEO_UPLOAD_BYTES": MAX_VIDEO_UPLOAD_BYTES,
         "AI_API_URL": os.environ.get("AI_API_URL", "").strip(),
         "AI_API_KEY": os.environ.get("AI_API_KEY", "").strip(),
         "AI_MODEL": os.environ.get("AI_MODEL", "Qwen/Qwen3-32B").strip(),
