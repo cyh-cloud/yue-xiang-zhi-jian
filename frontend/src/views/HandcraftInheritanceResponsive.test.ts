@@ -387,8 +387,13 @@ describe('HandcraftInheritanceResponsive', () => {
     expect(player.get('source').attributes('src')).toBe(
       'https://example.test/guangxiu.mp4'
     )
-    expect(videos[0].find('button').exists()).toBe(false)
-    expect(videos[0].text()).not.toMatch(/评论|举报/)
+    expect(videos[0].find('[data-test="submit-comment"]').exists()).toBe(
+      true
+    )
+    expect(videos[0].text()).not.toContain('举报')
+    expect(
+      videos[0].find('[data-test="teacher-reply-label"]').exists()
+    ).toBe(false)
     expect(wrapper.text()).not.toContain('待审核视频')
     expect(wrapper.text()).not.toContain('已驳回视频')
     expect(wrapper.text()).not.toContain('来源不可用视频')

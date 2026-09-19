@@ -83,7 +83,7 @@ class FakeReviewProvider:
             "content_id": content_id,
             "review_status": review_status,
             "version": version,
-            "opinion": opinion,
+            "rejection_opinion": opinion,
             "updated_at": updated_at or now_shanghai_iso(),
         }
 
@@ -214,7 +214,7 @@ class FakeReviewProvider:
             "content_id": content_id,
             "review_status": review_status,
             "version": version,
-            "opinion": None,
+            "rejection_opinion": None,
             "updated_at": now_shanghai_iso(),
         }
         self.records[key] = record

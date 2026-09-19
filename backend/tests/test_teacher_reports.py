@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from app import create_app
 from app.agri_skills.ai_client import set_ai_client
 from app.agri_skills.errors import AiUnavailableError
+from app.content_review import set_content_review_provider
 from app.db import get_db
 from app.teacher_console.dashboard import build_teacher_dashboard
 from app.teacher_console.errors import (
@@ -123,18 +124,36 @@ class TestTeacherReports(unittest.TestCase):
                 submitted_at, created_at, updated_at
             )
             VALUES (
-                1, '平台农业课程', 'agriculture', 'published', 300, ?, ?,
-                '聚合课程', '平台课程', NULL, 1, 'external_url', '[]',
+                1, '教师农业课程', 'agriculture', 'pending', 300, ?, NULL,
+                '聚合课程', '教师甲', ?, 1, 'external_url', '[]',
                 NULL, NULL, ?, ?
             )
             """,
             (
                 "https://media.example.test/1.mp4",
-                now,
+                self.teacher_id,
                 now,
                 now,
             ),
         )
+
+    def _enable_teacher_course_review(self):
+        class ReviewProvider:
+            def get_review_status(self, *, content_type, content_id):
+                if content_type != "course_video" or content_id != "1":
+                    return None
+                return {
+                    "content_type": content_type,
+                    "content_id": content_id,
+                    "review_status": "approved",
+                    "version": 1,
+                    "rejection_opinion": None,
+                    "published_at": "2026-09-19T10:00:00+08:00",
+                    "created_at": "2026-09-19T09:00:00+08:00",
+                    "updated_at": "2026-09-19T10:00:00+08:00",
+                }
+
+        set_content_review_provider(self.app, ReviewProvider())
 
     def _insert_course_progress(self, user_id, updated_at, progress_percent):
         get_db().execute(
@@ -478,6 +497,10 @@ class TestTeacherReports(unittest.TestCase):
         ):
             self._insert_student(user_id, direction)
         self._insert_published_course()
+        self._enable_teacher_course_review()
+
+        for user_id in range(10, 17):
+            self._insert_course_progress(user_id, recent, 10)
 
         self._insert_course_progress(2, recent, 10)
         self._insert_quiz_attempt(2, old)

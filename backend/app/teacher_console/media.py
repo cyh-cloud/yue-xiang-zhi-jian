@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ipaddress
 import os
+import socket
 from pathlib import Path, PureWindowsPath
 from urllib.parse import urlsplit
 from uuid import uuid4
@@ -33,6 +35,52 @@ def _validate_external_url(media_url: str) -> None:
             code="media_reference_invalid",
             media_source_type="external_url",
         )
+
+
+def _resolved_public_addresses(parsed) -> list:
+    host = parsed.hostname
+    if not host:
+        raise _media_error(
+            "媒体地址不可访问",
+            code="media_reference_unreachable",
+            media_url=parsed.geturl(),
+            reason="missing_host",
+        )
+
+    try:
+        direct_ip = ipaddress.ip_address(host)
+    except ValueError:
+        direct_ip = None
+
+    if direct_ip is not None:
+        addresses = [direct_ip]
+    else:
+        try:
+            address_infos = socket.getaddrinfo(
+                host,
+                parsed.port,
+                type=socket.SOCK_STREAM,
+            )
+        except (OSError, UnicodeError) as error:
+            raise _media_error(
+                "媒体地址不可访问",
+                code="media_reference_unreachable",
+                media_url=parsed.geturl(),
+                reason="unresolved",
+            ) from error
+        addresses = [
+            ipaddress.ip_address(address_info[4][0])
+            for address_info in address_infos
+        ]
+
+    if not addresses or any(not address.is_global for address in addresses):
+        raise _media_error(
+            "媒体地址不可访问",
+            code="media_reference_unreachable",
+            media_url=parsed.geturl(),
+            reason="non_public_address",
+        )
+    return addresses
 
 
 def _validate_local_media_url(media_url: str) -> str:
@@ -153,6 +201,9 @@ def validate_media_reference(
 
     if source_type == "external_url":
         _validate_external_url(normalized_url)
+        parsed_url = urlsplit(normalized_url)
+        if check_remote:
+            _resolved_public_addresses(parsed_url)
         if not check_remote:
             return normalized_url
 

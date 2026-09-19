@@ -3,7 +3,6 @@ from __future__ import annotations
 from app.agri_skills.providers import get_course_provider
 from app.db import get_db
 from app.teacher_console.errors import ProviderValidationError
-from app.teacher_console.providers import DatabaseTeacherCourseProvider
 
 
 DIRECTION_GROUPS = (
@@ -147,7 +146,7 @@ def _teacher_quiz_stats(teacher_id: int) -> tuple[int, float]:
         """,
         (teacher_id,),
     ).fetchall()
-    provider = DatabaseTeacherCourseProvider()
+    provider = get_course_provider()
     published_ids = [
         int(row["id"])
         for row in candidate_rows

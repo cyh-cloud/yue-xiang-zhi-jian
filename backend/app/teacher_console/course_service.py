@@ -18,7 +18,14 @@ from app.teacher_console.time_utils import (
 
 
 COURSE_DIRECTIONS = {"agriculture", "ecommerce", "handcraft"}
-COURSE_STATUSES = {"draft", "pending", "published", "offline"}
+COURSE_STATUSES = {
+    "draft",
+    "pending",
+    "published",
+    "rejected",
+    "offline",
+}
+PROVIDER_REVIEW_STATUSES = {"pending", "approved", "rejected"}
 REVIEWABLE_COURSE_STATUSES = {
     "pending",
     "published",
@@ -407,7 +414,33 @@ def get_teacher_course(teacher_id: int, course_id: int) -> dict:
             course["review_status"],
         )
         course["rejection_opinion"] = (
-            review.get("opinion")
+            _review_opinion(review)
+            if course["review_status"] == "rejected"
+            else None
+        )
+    return course
+
+
+def _review_opinion(review: dict) -> str | None:
+    opinion = review.get("rejection_opinion")
+    return str(opinion) if opinion is not None else None
+
+
+def _hydrate_teacher_course(course: dict) -> dict:
+    review = _review_record(int(course["id"]))
+    course["review_status"] = (
+        review.get("review_status") if review is not None else None
+    )
+    course["review_updated_at"] = (
+        review.get("updated_at") if review is not None else None
+    )
+    if review is not None:
+        course["status"] = resolve_teacher_visible_status(
+            course,
+            course["review_status"],
+        )
+        course["rejection_opinion"] = (
+            _review_opinion(review)
             if course["review_status"] == "rejected"
             else None
         )
@@ -433,8 +466,11 @@ def list_teacher_courses(
         normalized_status = _require_text(status, field="status")
         if normalized_status not in COURSE_STATUSES:
             raise _validation_error("课程状态无效", field="status")
-        conditions.append("status = ?")
-        parameters.append(normalized_status)
+    normalized_status = (
+        _require_text(status, field="status")
+        if status is not None
+        else None
+    )
 
     db = get_db()
     rows = db.execute(
@@ -445,10 +481,21 @@ def list_teacher_courses(
         """,
         tuple(parameters),
     ).fetchall()
-    courses = [_course_dict(db, row) for row in rows]
+    courses = [
+        _hydrate_teacher_course(_course_dict(db, row))
+        for row in rows
+    ]
+    if normalized_status is not None:
+        courses = [
+            course
+            for course in courses
+            if course["status"] == normalized_status
+        ]
     courses.sort(
         key=lambda course: (
-            parse_provider_time(course["updated_at"]),
+            parse_provider_time(
+                course.get("review_updated_at") or course["updated_at"]
+            ),
             int(course["id"]),
         ),
         reverse=True,
@@ -486,6 +533,28 @@ def _review_record(course_id: int) -> dict | None:
             code="review_response_invalid",
             details={"course_id": course_id},
         )
+    if review is not None:
+        review_status = review.get("review_status")
+        version = review.get("version")
+        if (
+            review_status not in PROVIDER_REVIEW_STATUSES
+            or isinstance(version, bool)
+            or not isinstance(version, int)
+            or version <= 0
+        ):
+            raise ProviderValidationError(
+                "审核服务返回无效数据",
+                code="review_response_invalid",
+                details={"course_id": course_id},
+            )
+        try:
+            parse_provider_time(review.get("updated_at"))
+        except (TypeError, ValueError):
+            raise ProviderValidationError(
+                "审核服务返回无效数据",
+                code="review_response_invalid",
+                details={"course_id": course_id},
+            ) from None
     return review
 
 
@@ -507,7 +576,7 @@ def _parse_provider_result(
         isinstance(version, bool)
         or not isinstance(version, int)
         or version <= 0
-        or review_status not in {"pending", "approved", "rejected", "offline"}
+        or review_status not in PROVIDER_REVIEW_STATUSES
     ):
         raise ProviderValidationError(
             "审核服务返回无效数据",

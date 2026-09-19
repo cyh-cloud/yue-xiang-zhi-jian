@@ -6,6 +6,7 @@ from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
 from app.db import get_db
 from app.teacher_console.course_service import (
+    COURSE_DIRECTIONS,
     _get_local_teacher_course,
     edit_course,
     get_teacher_course,
@@ -120,6 +121,10 @@ def generate_course_quiz(
     direction: str,
 ) -> dict:
     get_teacher_course(teacher_id, course_id)
+    if not isinstance(summary, str) or not summary.strip():
+        raise _validation_error("课程简介不能为空")
+    if direction not in COURSE_DIRECTIONS:
+        raise _validation_error("学习方向无效")
     try:
         payload = get_ai_client().complete_json(
             build_ai_messages(

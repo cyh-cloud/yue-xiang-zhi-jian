@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from urllib.parse import urlsplit
+from unittest.mock import patch
 
 import httpx
 from werkzeug.datastructures import FileStorage
@@ -127,15 +128,23 @@ class TestTeacherMedia(unittest.TestCase):
 
         media_url = "https://media.example.test/a.mp4"
         with self.app.app_context():
-            self.assertEqual(
-                validate_media_reference(
-                    "external_url",
+            with patch(
+                "socket.getaddrinfo",
+                return_value=[
+                    (2, 1, 6, "", ("93.184.216.34", 443))
+                ],
+            ):
+                self.assertEqual(
+                    validate_media_reference(
+                        "external_url",
+                        media_url,
+                        transport=httpx.MockTransport(
+                            reachable_transport
+                        ),
+                        check_remote=True,
+                    ),
                     media_url,
-                    transport=httpx.MockTransport(reachable_transport),
-                    check_remote=True,
-                ),
-                media_url,
-            )
+                )
             with self.assertRaises(ProviderValidationError):
                 validate_media_reference(
                     "external_url",

@@ -49,6 +49,7 @@ const statusOptions: Array<{
   { value: 'draft', label: '草稿' },
   { value: 'pending', label: '待审核' },
   { value: 'published', label: '已上架' },
+  { value: 'rejected', label: '已驳回' },
   { value: 'offline', label: '已下架' }
 ]
 
@@ -230,7 +231,7 @@ function handleVideoChange(event: Event) {
   }
 }
 
-function startEdit(course: TeacherCourse) {
+async function startEdit(course: TeacherCourse) {
   form.id = course.id
   form.version = course.version
   form.title = course.title
@@ -245,6 +246,12 @@ function startEdit(course: TeacherCourse) {
   formError.value = ''
   mediaError.value = ''
   actionError.value = ''
+  try {
+    await store.loadQuiz(course.id)
+    quizDraftCourseId.value = course.id
+  } catch {
+    actionError.value = store.error || '测验加载失败'
+  }
 }
 
 function resetForm() {

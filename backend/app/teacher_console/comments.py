@@ -135,6 +135,29 @@ def _video_is_visible(video_id: str) -> bool:
     )
 
 
+def _require_target_visible(
+    content_type: str,
+    content_id: str,
+) -> None:
+    if content_type == "course_video":
+        course_id = _course_id_from_content(content_id)
+        if get_course_provider().get_course(course_id) is None:
+            raise ProviderConflictError(
+                "目标课程当前不可评论",
+                code="comment_target_unavailable",
+                details={"content_id": content_id},
+            )
+    elif content_type == "handcraft_teaching_video":
+        if not _video_is_visible(content_id):
+            raise ProviderConflictError(
+                "目标非遗视频当前不可评论",
+                code="comment_target_unavailable",
+                details={"content_id": content_id},
+            )
+    else:
+        raise _validation_error("内容类型无效", field="content_type")
+
+
 def list_teacher_comments(
     teacher_id: int,
     content_type: str | None = None,
@@ -282,3 +305,92 @@ def reply_to_comment(
             ),
         )
     return _comment_payload(_load_comment(reply_id))
+
+
+def list_content_comments(
+    content_type: str,
+    content_id: str,
+) -> list[dict]:
+    normalized_content_type = _required_text(
+        content_type,
+        "content_type",
+    )
+    normalized_content_id = _required_text(content_id, "content_id")
+    if normalized_content_type not in CONTENT_TYPES:
+        raise _validation_error("内容类型无效", field="content_type")
+    _require_target_visible(
+        normalized_content_type,
+        normalized_content_id,
+    )
+
+    rows = get_db().execute(
+        """
+        SELECT
+            comment_id,
+            content_type,
+            content_id,
+            author_id,
+            parent_comment_id,
+            body,
+            is_teacher_reply,
+            is_visible,
+            created_at,
+            updated_at
+        FROM content_comments
+        WHERE content_type = ?
+          AND content_id = ?
+          AND is_visible = 1
+        ORDER BY id ASC
+        """,
+        (normalized_content_type, normalized_content_id),
+    ).fetchall()
+    return [_comment_payload(row) for row in rows]
+
+
+def create_learner_comment(
+    student_id: int,
+    content_type: str,
+    content_id: str,
+    body: object,
+) -> dict:
+    normalized_student_id = _require_positive_int(
+        student_id,
+        field="student_id",
+    )
+    normalized_content_type = _required_text(
+        content_type,
+        "content_type",
+    )
+    normalized_content_id = _required_text(content_id, "content_id")
+    normalized_body = _required_text(body, "评论内容")
+    if normalized_content_type not in CONTENT_TYPES:
+        raise _validation_error("内容类型无效", field="content_type")
+    _require_target_visible(
+        normalized_content_type,
+        normalized_content_id,
+    )
+
+    now = now_shanghai_iso()
+    comment_id = f"comment-{uuid4().hex}"
+    db = get_db()
+    with db:
+        db.execute(
+            """
+            INSERT INTO content_comments (
+                comment_id, content_type, content_id, author_id,
+                body, is_teacher_reply, is_visible, created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, 0, 1, ?, ?)
+            """,
+            (
+                comment_id,
+                normalized_content_type,
+                normalized_content_id,
+                normalized_student_id,
+                normalized_body,
+                now,
+                now,
+            ),
+        )
+    return _comment_payload(_load_comment(comment_id))

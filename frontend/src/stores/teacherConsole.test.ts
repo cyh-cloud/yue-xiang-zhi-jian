@@ -6,7 +6,6 @@ import type {
   TeacherAnnouncement,
   TeacherComment,
   TeacherCourse,
-  TeacherCourseFilters,
   TeacherDashboard,
   TeacherQuiz,
   TeacherReport
@@ -298,18 +297,24 @@ describe('useTeacherConsoleStore', () => {
     expect(store.courses).toEqual([courseFixture])
   })
 
-  it('keeps rejected display state separate from list filter input', () => {
+  it('loads rejected courses through the list filter', async () => {
     const rejectedCourse = {
       ...courseFixture,
-      status: 'rejected'
+      status: 'rejected',
+      rejection_opinion: '请补充知识点'
     } satisfies TeacherCourse
-    const validFilters: TeacherCourseFilters = { status: 'draft' }
-    // @ts-expect-error The backend course list does not accept rejected.
-    const invalidFilters: TeacherCourseFilters = { status: 'rejected' }
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      courses: [rejectedCourse]
+    })
+    const store = useTeacherConsoleStore()
 
-    expect(rejectedCourse.status).toBe('rejected')
-    expect(validFilters.status).toBe('draft')
-    expect(invalidFilters.status).toBe('rejected')
+    await store.loadCourses({ status: 'rejected' })
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/teacher/courses?status=rejected'
+    )
+    expect(store.courses).toEqual([rejectedCourse])
   })
 
   it('saves a course and replaces it with the returned server state', async () => {
@@ -428,6 +433,22 @@ describe('useTeacherConsoleStore', () => {
         body: JSON.stringify(payload)
       }
     )
+    expect(store.quizDraft).toEqual(quizFixture)
+  })
+
+  it('loads an existing quiz for course editing', async () => {
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      quiz: quizFixture
+    })
+    const store = useTeacherConsoleStore()
+
+    const quiz = await store.loadQuiz(1)
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/teacher/courses/1/quiz'
+    )
+    expect(quiz).toEqual(quizFixture)
     expect(store.quizDraft).toEqual(quizFixture)
   })
 

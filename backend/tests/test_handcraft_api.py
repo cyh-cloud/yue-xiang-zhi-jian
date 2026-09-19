@@ -45,6 +45,16 @@ LEARNER_ROUTES = (
         None,
     ),
     (
+        "GET",
+        "/api/handcraft-inheritance/videos/video-visible/comments",
+        None,
+    ),
+    (
+        "POST",
+        "/api/handcraft-inheritance/videos/video-visible/comments",
+        {"body": "如何起针？"},
+    ),
+    (
         "POST",
         "/api/handcraft-inheritance/ar-guidance",
         {
@@ -402,6 +412,9 @@ class TestHandcraftApi(unittest.TestCase):
                 "crafts/<craft_key>/heartbeat"
             ): {"POST"},
             "/api/handcraft-inheritance/videos": {"GET"},
+            (
+                "/api/handcraft-inheritance/videos/<video_id>/comments"
+            ): {"GET", "POST"},
             "/api/handcraft-inheritance/ar-guidance": {"POST"},
             (
                 "/api/handcraft-inheritance/ar-guidance/heartbeat"

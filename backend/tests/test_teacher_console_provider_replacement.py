@@ -42,7 +42,9 @@ class FakeReviewProvider:
             "content_id": content_id,
             "review_status": "pending",
             "version": expected_version,
-            "opinion": None,
+            "rejection_opinion": None,
+            "published_at": None,
+            "created_at": "2026-09-19T10:00:00+08:00",
             "updated_at": "2026-09-19T10:00:00+08:00",
         }
 

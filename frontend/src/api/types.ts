@@ -770,10 +770,7 @@ export type TeacherCourseStatus =
   | 'rejected'
   | 'offline'
 
-export type TeacherCourseFilterStatus = Exclude<
-  TeacherCourseStatus,
-  'rejected'
->
+export type TeacherCourseFilterStatus = TeacherCourseStatus
 
 export type TeacherMediaSourceType = 'local_upload' | 'external_url'
 
@@ -874,9 +871,9 @@ export type TeacherCommentContentType =
   | 'course_video'
   | 'handcraft_teaching_video'
 
-export interface TeacherComment {
+export interface ContentComment {
   comment_id: string
-  content_type: TeacherCommentContentType
+  content_type: string
   content_id: string
   author_id: number
   parent_comment_id: string | null
@@ -884,6 +881,10 @@ export interface TeacherComment {
   is_teacher_reply: boolean
   created_at: string
   updated_at: string
+}
+
+export interface TeacherComment extends ContentComment {
+  content_type: TeacherCommentContentType
 }
 
 export interface TeacherCommentFilters {

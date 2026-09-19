@@ -11,6 +11,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 import { useActiveLearningHeartbeat } from '@/composables/activeLearningHeartbeat'
+import ContentCommentThread from '@/components/ContentCommentThread.vue'
 import {
   useHandcraftInheritanceStore
 } from '@/stores/handcraftInheritance'
@@ -479,6 +480,10 @@ onMounted(() => {
               <source :src="item.playback_url || ''" type="video/mp4">
               当前浏览器不支持视频播放。
             </video>
+            <ContentCommentThread
+              :endpoint="`/api/handcraft-inheritance/videos/${encodeURIComponent(item.video_id)}/comments`"
+              :title="`${item.title || '教学视频'}评论`"
+            />
           </article>
         </div>
       </section>

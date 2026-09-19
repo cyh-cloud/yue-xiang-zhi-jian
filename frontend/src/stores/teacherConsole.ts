@@ -303,6 +303,23 @@ export const useTeacherConsoleStore = defineStore('teacherConsole', {
         this.loading = false
       }
     },
+    async loadQuiz(courseId: number): Promise<TeacherQuiz | null> {
+      this.loading = true
+      this.error = ''
+      try {
+        const response = await apiFetch<{
+          success: true
+          quiz: TeacherQuiz | null
+        }>(`${API_PREFIX}/courses/${courseId}/quiz`)
+        this.quizDraft = response.quiz
+        return response.quiz
+      } catch (error) {
+        this.captureError(error, '测验加载失败')
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
     async saveQuiz(
       courseId: number,
       payload: TeacherQuizSavePayload

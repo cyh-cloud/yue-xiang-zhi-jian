@@ -2,6 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
 
@@ -320,15 +321,21 @@ class TestTeacherCourseMediaValidation(unittest.TestCase):
             return httpx.Response(204, request=request)
 
         with self.app.app_context():
-            self.assertEqual(
-                validate_media_reference(
-                    "external_url",
+            with patch(
+                "socket.getaddrinfo",
+                return_value=[
+                    (2, 1, 6, "", ("93.184.216.34", 443))
+                ],
+            ):
+                self.assertEqual(
+                    validate_media_reference(
+                        "external_url",
+                        "https://media.example.test/lychee.mp4",
+                        transport=httpx.MockTransport(handler),
+                        check_remote=True,
+                    ),
                     "https://media.example.test/lychee.mp4",
-                    transport=httpx.MockTransport(handler),
-                    check_remote=True,
-                ),
-                "https://media.example.test/lychee.mp4",
-            )
+                )
 
     def test_redirect_response_is_accepted_when_checked(self):
         def handler(request):
@@ -339,15 +346,21 @@ class TestTeacherCourseMediaValidation(unittest.TestCase):
             )
 
         with self.app.app_context():
-            self.assertEqual(
-                validate_media_reference(
-                    "external_url",
+            with patch(
+                "socket.getaddrinfo",
+                return_value=[
+                    (2, 1, 6, "", ("93.184.216.34", 443))
+                ],
+            ):
+                self.assertEqual(
+                    validate_media_reference(
+                        "external_url",
+                        "https://media.example.test/lychee.mp4",
+                        transport=httpx.MockTransport(handler),
+                        check_remote=True,
+                    ),
                     "https://media.example.test/lychee.mp4",
-                    transport=httpx.MockTransport(handler),
-                    check_remote=True,
-                ),
-                "https://media.example.test/lychee.mp4",
-            )
+                )
 
     def test_unreachable_external_url_is_rejected(self):
         def handler(request):

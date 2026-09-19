@@ -51,7 +51,7 @@ class FakeReviewProvider:
             "content_type": content_type,
             "content_id": content_id,
             "review_status": review_status,
-            "opinion": opinion,
+            "rejection_opinion": opinion,
             "updated_at": updated_at,
             "published_at": published_at,
             "version": version,

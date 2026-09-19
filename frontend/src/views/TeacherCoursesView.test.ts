@@ -126,6 +126,7 @@ describe('TeacherCoursesView', () => {
       'draft',
       'pending',
       'published',
+      'rejected',
       'offline'
     ])
 
@@ -220,7 +221,11 @@ describe('TeacherCoursesView', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('请选择视频文件')
-    expect(apiFetch).not.toHaveBeenCalled()
+    expect(
+      mockedApiFetch.mock.calls.filter(
+        call => call[1]?.method === 'POST' || call[1]?.method === 'PUT'
+      )
+    ).toEqual([])
   })
 
   it('clears the native file input after an invalid file selection', async () => {
@@ -309,12 +314,63 @@ describe('TeacherCoursesView', () => {
     await wrapper.get('[data-test="save-course"]').trigger('click')
     await flushPromises()
 
-    const request = mockedApiFetch.mock.calls[0]
+    const request = mockedApiFetch.mock.calls[1]
     const payload = JSON.parse(request[1]?.body as string)
     expect(request[0]).toBe('/api/teacher/courses/1')
     expect(request[1]?.method).toBe('PUT')
     expect(payload.expected_version).toBe(1)
     expect(payload.title).toBe('修订课程')
+  })
+
+  it('loads the persisted quiz when editing a course', async () => {
+    const existing = course(1, 'draft')
+    const questions = [
+      {
+        id: 'saved-q1',
+        type: 'true_false' as const,
+        prompt: '已保存题干',
+        options: ['正确', '错误'],
+        answer: '正确'
+      },
+      {
+        id: 'saved-q2',
+        type: 'single_choice' as const,
+        prompt: '第二题',
+        options: ['A', 'B'],
+        answer: 'A'
+      },
+      {
+        id: 'saved-q3',
+        type: 'true_false' as const,
+        prompt: '第三题',
+        options: ['正确', '错误'],
+        answer: '错误'
+      }
+    ]
+    mockedApiFetch.mockResolvedValue({
+      success: true,
+      quiz: {
+        enabled: true,
+        scoring_rule: 'all_correct',
+        questions
+      }
+    } as never)
+    const { wrapper } = mountManager([existing])
+
+    await wrapper.get('[data-test="edit-draft"]').trigger('click')
+    await flushPromises()
+
+    expect(mockedApiFetch).toHaveBeenCalledWith(
+      '/api/teacher/courses/1/quiz'
+    )
+    expect(
+      (wrapper.get('[data-test="question-saved-q1-prompt"]').element as HTMLTextAreaElement)
+        .value
+    ).toBe('已保存题干')
+    expect(
+      (wrapper.find('[data-test="quiz-enabled"]').element as HTMLInputElement)
+        .checked
+    ).toBe(true)
   })
 
   it('submits, offlines, and relists only through valid state actions', async () => {

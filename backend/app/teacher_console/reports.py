@@ -7,6 +7,7 @@ from uuid import uuid4
 from app.agri_skills.ai_client import get_ai_client
 from app.agri_skills.ai_context import build_ai_messages
 from app.agri_skills.errors import AiUnavailableError
+from app.agri_skills.providers import get_course_provider
 from app.db import get_db
 from app.teacher_console.dashboard import (
     DIRECTION_GROUPS,
@@ -42,7 +43,7 @@ def generate_teacher_report(teacher_id: int) -> dict:
     context = {
         "aggregate_stats": _report_stats(dashboard),
         "direction_comparison": _direction_comparison(dashboard),
-        "risk_summary": _risk_summary(),
+        "risk_summary": _risk_summary(teacher_id),
     }
     try:
         payload = get_ai_client().complete_json(
@@ -116,7 +117,7 @@ def _direction_comparison(dashboard: dict) -> dict:
     }
 
 
-def _risk_summary() -> dict:
+def _risk_summary(teacher_id: int) -> dict:
     students = get_db().execute(
         """
         SELECT users.id, student_profiles.learning_direction
@@ -126,18 +127,98 @@ def _risk_summary() -> dict:
         ORDER BY users.id
         """
     ).fetchall()
-    latest_activity = _latest_activity_by_student()
+    visible_course_ids = _teacher_visible_course_ids(teacher_id)
+    latest_activity = _latest_activity_by_student(visible_course_ids)
     completed_students = {
         int(row["user_id"])
-        for row in get_db().execute(
+        for row in _course_activity_rows(
             """
             SELECT user_id
             FROM agri_course_progress
             WHERE progress_percent >= 80
             GROUP BY user_id
-            """
-        ).fetchall()
+            """,
+            visible_course_ids,
+        )
     }
+    return _risk_summary_payload(students, latest_activity, completed_students)
+
+
+def _teacher_visible_course_ids(teacher_id: int) -> set[int]:
+    db = get_db()
+    candidate_rows = db.execute(
+        """
+        SELECT id
+        FROM courses
+        WHERE teacher_id = ?
+        """,
+        (teacher_id,),
+    ).fetchall()
+    provider = get_course_provider()
+    return {
+        int(row["id"])
+        for row in candidate_rows
+        if provider.get_course(int(row["id"])) is not None
+    }
+
+
+def _course_activity_rows(
+    query_without_course_filter: str,
+    course_ids: set[int],
+) -> list:
+    if not course_ids:
+        return []
+    placeholders = ", ".join("?" for _ in course_ids)
+    query = f"{query_without_course_filter.rstrip(';')} AND course_id IN ({placeholders})"
+    return get_db().execute(
+        query,
+        tuple(sorted(course_ids)),
+    ).fetchall()
+
+
+def _latest_activity_by_student(
+    course_ids: set[int],
+) -> dict[int, datetime]:
+    activity_rows = []
+    activity_rows.extend(
+        _course_activity_rows(
+            """
+            SELECT user_id, updated_at AS occurred_at
+            FROM agri_course_progress
+            WHERE 1 = 1
+            """,
+            course_ids,
+        )
+    )
+    activity_rows.extend(
+        _course_activity_rows(
+            """
+            SELECT user_id, created_at AS occurred_at
+            FROM agri_course_quiz_attempts
+            WHERE 1 = 1
+            """,
+            course_ids,
+        )
+    )
+
+    latest_activity = {}
+    for row in activity_rows:
+        try:
+            occurred_at = parse_provider_time(row["occurred_at"])
+        except (TypeError, ValueError):
+            continue
+        student_id = int(row["user_id"])
+        current = latest_activity.get(student_id)
+        if current is None or occurred_at > current:
+            latest_activity[student_id] = occurred_at
+    return latest_activity
+
+
+def _risk_summary_payload(
+    students,
+    latest_activity: dict[int, datetime],
+    completed_students: set[int],
+) -> dict:
     now = parse_provider_time(now_shanghai_iso())
     cutoff = now - timedelta(days=30)
 
@@ -179,97 +260,6 @@ def _risk_summary() -> dict:
         "at_risk_ratio": _ratio(at_risk_count, student_count),
         "directions": directions,
     }
-
-
-def _latest_activity_by_student() -> dict[int, datetime]:
-    activity_rows = []
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, updated_at AS occurred_at
-            FROM agri_course_progress
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, created_at AS occurred_at
-            FROM agri_course_quiz_attempts
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, created_at AS occurred_at
-            FROM agri_self_test_attempts
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, created_at AS occurred_at
-            FROM handcraft_learning_outcomes
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, created_at AS occurred_at
-            FROM ecommerce_live_script_versions
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, completed_at AS occurred_at
-            FROM ecommerce_simulation_trainings
-            WHERE status = 'completed' AND completed_at IS NOT NULL
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, completed_at AS occurred_at
-            FROM ecommerce_copy_training_sessions
-            WHERE status = 'completed' AND completed_at IS NOT NULL
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, completed_at AS occurred_at
-            FROM ecommerce_customer_sessions
-            WHERE status = 'completed' AND completed_at IS NOT NULL
-            """
-        ).fetchall()
-    )
-    activity_rows.extend(
-        get_db().execute(
-            """
-            SELECT user_id, created_at AS occurred_at
-            FROM ecommerce_store_plans
-            """
-        ).fetchall()
-    )
-
-    latest_activity = {}
-    for row in activity_rows:
-        try:
-            occurred_at = parse_provider_time(row["occurred_at"])
-        except (TypeError, ValueError):
-            continue
-        student_id = int(row["user_id"])
-        current = latest_activity.get(student_id)
-        if current is None or occurred_at > current:
-            latest_activity[student_id] = occurred_at
-    return latest_activity
 
 
 def _validate_sections(payload) -> dict:

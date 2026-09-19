@@ -40,6 +40,21 @@ def build_config() -> dict[str, object]:
         raise RuntimeError(
             "POINTS_EXPIRY_BATCH_SIZE must be a positive integer"
         )
+    try:
+        max_video_upload_bytes = int(
+            os.environ.get(
+                "MAX_VIDEO_UPLOAD_BYTES",
+                str(MAX_VIDEO_UPLOAD_BYTES),
+            )
+        )
+    except (TypeError, ValueError):
+        raise RuntimeError(
+            "MAX_VIDEO_UPLOAD_BYTES must be a positive integer"
+        ) from None
+    if max_video_upload_bytes <= 0:
+        raise RuntimeError(
+            "MAX_VIDEO_UPLOAD_BYTES must be a positive integer"
+        )
 
     return {
         "SECRET_KEY": secret_key,
@@ -52,7 +67,7 @@ def build_config() -> dict[str, object]:
         "SESSION_HOURS": int(os.environ.get("SESSION_HOURS", "24")),
         "SESSION_COOKIE_SECURE": session_cookie_secure,
         "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
-        "MAX_VIDEO_UPLOAD_BYTES": MAX_VIDEO_UPLOAD_BYTES,
+        "MAX_VIDEO_UPLOAD_BYTES": max_video_upload_bytes,
         "AI_API_URL": os.environ.get("AI_API_URL", "").strip(),
         "AI_API_KEY": os.environ.get("AI_API_KEY", "").strip(),
         "AI_MODEL": os.environ.get("AI_MODEL", "Qwen/Qwen3-32B").strip(),
