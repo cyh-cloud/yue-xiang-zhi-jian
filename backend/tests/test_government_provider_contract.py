@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -5,7 +6,10 @@ from unittest.mock import patch
 
 from app import create_app
 from app.db import get_db
-from app.government_console.errors import ProviderValidationError
+from app.government_console.errors import (
+    ProviderUnavailableError,
+    ProviderValidationError,
+)
 from app.government_console.news import delete_news, publish_news
 from app.government_console.policy import (
     delete_policy,
@@ -273,6 +277,60 @@ class GovernmentProviderContractTests(TestCase):
                 self.provider.record_news_view(news["id"], "view-2"),
                 2,
             )
+
+    def test_provider_reads_map_sqlite_failures_to_unavailable(self):
+        failure = sqlite3.OperationalError("database is locked")
+        operations = {
+            "list policies": self.provider.list_published_policies,
+            "get policy": lambda: self.provider.get_published_policy("policy-1"),
+            "list news": self.provider.list_published_news,
+            "get news": lambda: self.provider.get_published_news("news-1"),
+        }
+
+        with self.app.app_context():
+            with (
+                patch(
+                    "app.government_console.policy.get_db",
+                    side_effect=failure,
+                ),
+                patch(
+                    "app.government_console.news.get_db",
+                    side_effect=failure,
+                ),
+            ):
+                for label, operation in operations.items():
+                    with self.subTest(operation=label):
+                        with self.assertRaises(
+                            ProviderUnavailableError
+                        ) as raised:
+                            operation()
+                        self.assertIs(raised.exception.__cause__, failure)
+
+    def test_provider_views_map_sqlite_failures_to_unavailable(self):
+        failure = sqlite3.OperationalError("database is locked")
+        operations = {
+            "record policy view": lambda: self.provider.record_policy_view(
+                "policy-1",
+                "view-1",
+            ),
+            "record news view": lambda: self.provider.record_news_view(
+                "news-1",
+                "view-1",
+            ),
+        }
+
+        with self.app.app_context():
+            with patch(
+                "app.government_console.views.get_db",
+                side_effect=failure,
+            ):
+                for label, operation in operations.items():
+                    with self.subTest(operation=label):
+                        with self.assertRaises(
+                            ProviderUnavailableError
+                        ) as raised:
+                            operation()
+                        self.assertIs(raised.exception.__cause__, failure)
 
 
 if __name__ == "__main__":

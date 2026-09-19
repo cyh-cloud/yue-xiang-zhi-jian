@@ -1,3 +1,8 @@
+import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+
 class ProviderError(RuntimeError):
     code = "provider_error"
 
@@ -25,3 +30,11 @@ class ProviderUnavailableError(ProviderError):
 
 class ProviderAccessDeniedError(ProviderError):
     code = "access_denied"
+
+
+@contextmanager
+def database_error_boundary(message: str) -> Iterator[None]:
+    try:
+        yield
+    except sqlite3.Error as error:
+        raise ProviderUnavailableError(message) from error

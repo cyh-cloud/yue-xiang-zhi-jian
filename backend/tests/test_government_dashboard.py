@@ -1,3 +1,4 @@
+import sqlite3
 import tempfile
 from pathlib import Path
 from unittest import TestCase
@@ -8,6 +9,7 @@ from werkzeug.security import generate_password_hash
 from app import create_app
 from app.db import get_db
 from app.government_console.dashboard import get_government_dashboard
+from app.government_console.errors import ProviderUnavailableError
 from app.government_console.news import delete_news, publish_news
 from app.government_console.policy import (
     delete_policy,
@@ -283,3 +285,35 @@ class GovernmentDashboardTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
         self.assertFalse(response.get_json()["success"])
+
+    def test_dashboard_maps_sqlite_failure_to_unavailable(self):
+        failure = sqlite3.OperationalError("database is locked")
+
+        with self.app.app_context():
+            with patch(
+                "app.government_console.dashboard.get_db",
+                side_effect=failure,
+            ):
+                with self.assertRaises(ProviderUnavailableError) as raised:
+                    get_government_dashboard()
+
+        self.assertIs(raised.exception.__cause__, failure)
+
+    def test_dashboard_api_returns_503_on_sqlite_failure(self):
+        self.login("government01")
+
+        with patch(
+            "app.government_console.dashboard.get_db",
+            side_effect=sqlite3.OperationalError("database is locked"),
+        ):
+            response = self.client.get("/api/government/dashboard")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(
+            response.get_json(),
+            {
+                "success": False,
+                "message": "政务数据暂不可用",
+                "details": {},
+            },
+        )
