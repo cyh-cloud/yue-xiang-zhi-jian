@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
+from app.admin_console import install_default_admin_services
 from app.agri_skills import install_default_agri_services
 from app.agri_skills.messaging_provider import AgriMessagingProvider
 from app.agri_skills.routes import agri_skills_bp
@@ -89,6 +90,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_job_matching_services(app)
     install_default_government_services(app)
     install_default_local_resource_services(app)
+    install_default_admin_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
         app,

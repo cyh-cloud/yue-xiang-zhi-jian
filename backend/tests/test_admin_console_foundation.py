@@ -301,3 +301,113 @@ class AdminConsoleFoundationTests(TestCase):
                     """,
                     (platform_now_iso(),),
                 )
+
+    def test_admin_provider_slots_use_single_registry(self):
+        from app.admin_console.providers import (
+            get_assistant_feature_knowledge_provider,
+            get_feedback_intake_provider,
+            set_assistant_feature_knowledge_provider,
+            set_feedback_intake_provider,
+        )
+
+        knowledge = object()
+        feedback = object()
+        set_assistant_feature_knowledge_provider(self.app, knowledge)
+        set_feedback_intake_provider(self.app, feedback)
+
+        with self.app.app_context():
+            self.assertIs(
+                get_assistant_feature_knowledge_provider(),
+                knowledge,
+            )
+            self.assertIs(get_feedback_intake_provider(), feedback)
+
+        self.assertIs(
+            self.app.extensions["assistant_feature_knowledge_provider"],
+            knowledge,
+        )
+        self.assertIs(
+            self.app.extensions["feedback_intake_provider"],
+            feedback,
+        )
+
+    def test_admin_provider_getters_return_complete_unavailable_defaults(self):
+        from app.admin_console.providers import (
+            UnavailableAssistantFeatureKnowledgeProvider,
+            UnavailableFeedbackIntakeProvider,
+            get_assistant_feature_knowledge_provider,
+            get_feedback_intake_provider,
+        )
+
+        self.app.extensions.pop(
+            "assistant_feature_knowledge_provider",
+            None,
+        )
+        self.app.extensions.pop("feedback_intake_provider", None)
+
+        with self.app.app_context():
+            knowledge = get_assistant_feature_knowledge_provider()
+            feedback = get_feedback_intake_provider()
+
+            self.assertIsInstance(
+                knowledge,
+                UnavailableAssistantFeatureKnowledgeProvider,
+            )
+            self.assertIsInstance(
+                feedback,
+                UnavailableFeedbackIntakeProvider,
+            )
+            with self.assertRaises(ProviderUnavailableError) as knowledge_error:
+                knowledge.list_entries()
+            with self.assertRaises(ProviderUnavailableError) as feedback_error:
+                feedback.submit_feedback(
+                    submitter_id=7,
+                    body="建议增加夜校课程",
+                    idempotency_key="feedback-1",
+                )
+
+        self.assertEqual(
+            knowledge_error.exception.code,
+            "assistant_feature_knowledge_unavailable",
+        )
+        self.assertEqual(
+            feedback_error.exception.code,
+            "feedback_intake_unavailable",
+        )
+
+    def test_configure_admin_providers_delegates_to_required_slots(self):
+        from app.admin_console.providers import (
+            configure_admin_providers,
+        )
+
+        knowledge = object()
+        feedback = object()
+        configure_admin_providers(
+            self.app,
+            knowledge=knowledge,
+            feedback_intake=feedback,
+        )
+
+        self.assertIs(
+            self.app.extensions["assistant_feature_knowledge_provider"],
+            knowledge,
+        )
+        self.assertIs(
+            self.app.extensions["feedback_intake_provider"],
+            feedback,
+        )
+
+    def test_install_default_admin_services_registers_database_defaults(self):
+        from app.admin_console.providers import (
+            DatabaseAssistantFeatureKnowledgeProvider,
+            DatabaseFeedbackIntakeProvider,
+        )
+
+        self.assertIsInstance(
+            self.app.extensions["assistant_feature_knowledge_provider"],
+            DatabaseAssistantFeatureKnowledgeProvider,
+        )
+        self.assertIsInstance(
+            self.app.extensions["feedback_intake_provider"],
+            DatabaseFeedbackIntakeProvider,
+        )
