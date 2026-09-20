@@ -5,6 +5,10 @@ from typing import Protocol
 from flask import Flask, current_app
 
 from app.admin_console.errors import ProviderUnavailableError
+from app.content_review.providers import (
+    ContentReviewProvider,
+    set_content_review_provider,
+)
 
 
 class AssistantFeatureKnowledgeProvider(Protocol):
@@ -93,9 +97,12 @@ def get_feedback_intake_provider() -> FeedbackIntakeProvider:
 def configure_admin_providers(
     app: Flask,
     *,
+    content_review: ContentReviewProvider | None = None,
     knowledge: AssistantFeatureKnowledgeProvider | None = None,
     feedback_intake: FeedbackIntakeProvider | None = None,
 ) -> None:
+    if content_review is not None:
+        set_content_review_provider(app, content_review)
     if knowledge is not None:
         set_assistant_feature_knowledge_provider(app, knowledge)
     if feedback_intake is not None:
