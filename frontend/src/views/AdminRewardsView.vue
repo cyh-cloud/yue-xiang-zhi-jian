@@ -1326,7 +1326,7 @@ onBeforeUnmount(() => {
   color: var(--ark-signal);
 }
 
-.rw-actions button[aria-checked="true"] {
+.rw-actions button[aria-pressed="true"] {
   color: var(--ark-state);
 }
 
