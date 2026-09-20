@@ -20,16 +20,20 @@
   snapshot until manual removal.
 - Independent plan review passed with no remaining High or Medium findings.
 - Implementation Tasks 1-18 completed on
-  `v2/lixKRT/007-job-matching`; reviewed baseline HEAD `a76a1db`.
-- Verification at `a76a1db`: backend `881/881`, frontend `535/535`,
-  TypeScript check and production build passed; Task 18 browser geometry
-  passed `18/18` seeded and `15/15` empty-state route/width checks.
+  `v2/lixKRT/007-job-matching`; final feature tip `1bdd893`.
+- Verification before merge: backend `885/885`, frontend `542/542`,
+  TypeScript check and production build passed; browser interaction and
+  geometry covered favorites add/cancel plus the affected views.
 - Final whole-branch review found one Critical and five Important findings.
   The single authorized fix wave addressed favorites controls, resume bounds,
   in-flight UI safety, 07 provider error mapping, provider-backed seed reads,
   and the provider-contract/NOW handoff documentation.
-- The final fix commit is the current branch tip at handoff; no merge or push
-  has been performed.
+- The scoped re-review passed with all six findings addressed.
+- 2026-09-20: 007 was merged into `v2/lixKRT/dev`; merge commits `4e1bbd6`
+  and `01b2dfe` include a CRLF-compatible test fix from `1bdd893`.
+- Merged-result verification: backend `885/885`, frontend `542/542`,
+  TypeScript check and production build passed.
+- The feature worktree and branch are retained. No push has been performed.
 
 ## 009 Enterprise Console
 

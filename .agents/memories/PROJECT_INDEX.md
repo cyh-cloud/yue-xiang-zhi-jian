@@ -1,6 +1,6 @@
 # Project Index
 
-Updated: 2026-09-19
+Updated: 2026-09-20
 Project: YueXiang Artisan Training
 Status: ACTIVE
 
@@ -9,14 +9,15 @@ Status: ACTIVE
 - Purpose: prototype platform for YueXiang artisan training.
 - Architecture: Flask REST API and SQLite backend; Vue 3 + Vite + Pinia frontend; Vercel serverless entry.
 - Repository root: the repository containing this `.agents/memories/` directory.
-- Current integration branch: `v2/lixKRT/dev`; 009 merged as `dbeadb2` and
-  010 merged as `850b345`; post-merge compatibility fix `a00e061`.
+- Current integration branch: `v2/lixKRT/dev`; 009 merged as `dbeadb2`,
+  010 merged as `850b345`, and 007 merged through `01b2dfe`; post-merge
+  compatibility fix `a00e061`.
 - Dependency authority: `pyproject.toml` and `uv.lock`; `requirements.txt` is a generated Vercel export.
 
 ## Current Focus
 
-- Active milestone: 009 enterprise console and 010 government console are
-  integrated on `v2/lixKRT/dev`.
+- Active milestone: 007 job matching, 009 enterprise console, and 010
+  government console are integrated on `v2/lixKRT/dev`.
 - 009 owns the real employment-statistics provider; 010 consumes it through
   `government_employment_statistics_provider`.
 - Current blocker: none.
@@ -24,11 +25,11 @@ Status: ACTIVE
 ## Verification
 
 - Backend tests: `uv run --directory backend python -m unittest discover -s tests`
-  (`644/644` after 009+010 integration).
-- Frontend tests: `cd frontend` then `npm test` (`406/406` after integration).
+  (`885/885` after 007 merge).
+- Frontend tests: `cd frontend` then `npm test` (`542/542` after 007 merge).
 - Frontend build/type check: `cd frontend` then `npx tsc -b --noEmit` and `npm run build`.
 - Runtime and browser checks: see `RUNBOOK.md`.
-- Last application verification: 2026-09-19.
+- Last application verification: 2026-09-20.
 - Memory scaffold migration: 2026-09-12.
 
 ## Topic Links
