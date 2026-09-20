@@ -16,6 +16,12 @@ import JobsView from './JobsView.vue'
 import jobDetailViewSource from './JobDetailView.vue?raw'
 import jobsViewSource from './JobsView.vue?raw'
 
+const normalizedJobDetailViewSource = jobDetailViewSource.replace(
+  /\r\n/g,
+  '\n'
+)
+const normalizedJobsViewSource = jobsViewSource.replace(/\r\n/g, '\n')
+
 const jobFixture: JobMatchingJob = {
   job_id: 'job-1',
   enterprise_id: 2,
@@ -330,7 +336,7 @@ describe('JobsView', () => {
   })
 
   it('uses the requested bounded grid and light-token CJK constraints', () => {
-    expect(jobsViewSource).toContain(
+    expect(normalizedJobsViewSource).toContain(
       `.recommended-grid,
 .job-list {
   display: grid;
@@ -339,7 +345,10 @@ describe('JobsView', () => {
 }`
     )
 
-    for (const source of [jobsViewSource, jobDetailViewSource]) {
+    for (const source of [
+      normalizedJobsViewSource,
+      normalizedJobDetailViewSource
+    ]) {
       expect(source).toContain('min-width: 0')
       expect(source).toContain('line-break: strict')
       expect(source).toContain('overflow-wrap: anywhere')
