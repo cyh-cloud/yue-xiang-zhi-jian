@@ -1,0 +1,1 @@
+"""Administrator console foundation package."""

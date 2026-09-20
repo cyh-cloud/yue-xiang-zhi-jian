@@ -999,6 +999,182 @@ CREATE TABLE IF NOT EXISTS local_resource_success_cases (
 
 CREATE INDEX IF NOT EXISTS idx_local_resource_cases_order
     ON local_resource_success_cases(sort_order, case_id);
+
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_id INTEGER NOT NULL,
+    action TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    before_json TEXT,
+    after_json TEXT,
+    result TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_notification_outbox (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'sent', 'failed')
+    ),
+    attempts INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+    last_error TEXT,
+    created_at TEXT NOT NULL,
+    sent_at TEXT,
+    UNIQUE (event_type, event_id)
+);
+
+CREATE TABLE IF NOT EXISTS content_review_records (
+    content_type TEXT NOT NULL,
+    content_id TEXT NOT NULL,
+    submitter_id INTEGER NOT NULL,
+    review_status TEXT NOT NULL CHECK (
+        review_status IN ('pending', 'approved', 'rejected')
+    ),
+    version INTEGER NOT NULL CHECK (version > 0),
+    rejection_opinion TEXT,
+    published_at TEXT,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (content_type, content_id)
+);
+
+CREATE TABLE IF NOT EXISTS platform_points_policy (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    version INTEGER NOT NULL CHECK (version > 0),
+    policy_json TEXT NOT NULL,
+    updated_by INTEGER NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_rewards (
+    reward_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    points_cost INTEGER NOT NULL CHECK (points_cost > 0),
+    stock INTEGER NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    is_online INTEGER NOT NULL DEFAULT 0 CHECK (is_online IN (0, 1)),
+    source_available INTEGER NOT NULL DEFAULT 1 CHECK (
+        source_available IN (0, 1)
+    ),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS comment_reports (
+    report_id TEXT PRIMARY KEY,
+    comment_id TEXT NOT NULL,
+    reporter_id INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (
+        status IN ('pending', 'confirmed', 'rejected')
+    ),
+    resolver_id INTEGER,
+    result TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    resolved_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS feedback_records (
+    feedback_id TEXT PRIMARY KEY,
+    submitter_id INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    idempotency_key TEXT NOT NULL,
+    handler_id INTEGER,
+    result TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (submitter_id, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS admin_assistant_feature_knowledge (
+    knowledge_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    feature_key TEXT NOT NULL,
+    jump_target TEXT NOT NULL,
+    is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_agri_products (
+    product_key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_agri_calendar (
+    item_id TEXT PRIMARY KEY,
+    product_key TEXT NOT NULL,
+    month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+    tasks_json TEXT NOT NULL DEFAULT '[]',
+    management_json TEXT NOT NULL DEFAULT '[]',
+    solar_terms_json TEXT NOT NULL DEFAULT '[]',
+    reminder TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE (product_key, month)
+);
+
+CREATE TABLE IF NOT EXISTS admin_pest_knowledge (
+    item_id TEXT PRIMARY KEY,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    pest_name TEXT NOT NULL,
+    product_names_json TEXT NOT NULL DEFAULT '[]',
+    symptoms_json TEXT NOT NULL DEFAULT '[]',
+    aliases_json TEXT NOT NULL DEFAULT '[]',
+    answer TEXT NOT NULL,
+    is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_handcraft_crafts (
+    craft_key TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    introduction TEXT NOT NULL,
+    steps_json TEXT NOT NULL DEFAULT '[]',
+    material_guide_json TEXT NOT NULL DEFAULT '[]',
+    source_available INTEGER NOT NULL DEFAULT 1 CHECK (
+        source_available IN (0, 1)
+    ),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+    version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS system_announcements (
+    announcement_id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL,
+    target_roles_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (
+        status IN ('draft', 'published')
+    ),
+    event_id TEXT NOT NULL UNIQUE,
+    created_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    published_at TEXT
+);
 """
 
 
