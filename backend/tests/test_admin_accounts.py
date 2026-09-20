@@ -211,6 +211,130 @@ class AdminAccountTests(TestCase):
             404,
         )
 
+    def test_account_list_rejects_non_managed_role_filters_and_hides_them(self):
+        actor_id = self._create_user("root-admin", "super_admin")
+        self._create_user("student-account", "student")
+        self._create_user("teacher-account", "teacher")
+        client, _ = self._login("root-admin")
+
+        response = client.get("/api/admin/accounts")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [account["id"] for account in response.get_json()["accounts"]],
+            [actor_id],
+        )
+
+        for role in ("student", "teacher"):
+            with self.subTest(role=role):
+                response = client.get(
+                    f"/api/admin/accounts?role={role}"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.get_json()["details"],
+                    {"role": "角色不正确"},
+                )
+
+    def test_non_managed_account_detail_is_not_visible(self):
+        self._create_user("root-admin", "super_admin")
+        student_id = self._create_user("student-account", "student")
+        teacher_id = self._create_user("teacher-account", "teacher")
+        client, _ = self._login("root-admin")
+
+        for user_id in (student_id, teacher_id):
+            with self.subTest(user_id=user_id):
+                response = client.get(f"/api/admin/accounts/{user_id}")
+                self.assertEqual(response.status_code, 404)
+                self.assertEqual(
+                    response.get_json()["code"],
+                    "account_not_found",
+                )
+
+    def test_non_managed_account_status_is_not_mutable(self):
+        self._create_user("root-admin", "super_admin")
+        target_ids = (
+            self._create_user("student-account", "student"),
+            self._create_user("teacher-account", "teacher"),
+        )
+        client, _ = self._login("root-admin")
+
+        for user_id in target_ids:
+            with self.subTest(user_id=user_id):
+                response = client.post(
+                    f"/api/admin/accounts/{user_id}/status",
+                    json={"enabled": False},
+                )
+                self.assertEqual(response.status_code, 404)
+
+        with self.app.app_context():
+            enabled_states = [
+                get_db().execute(
+                    "SELECT is_enabled FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()["is_enabled"]
+                for user_id in target_ids
+            ]
+            audit_count = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM admin_audit_log
+                WHERE target_type = 'user'
+                """
+            ).fetchone()["count"]
+        self.assertEqual(enabled_states, [1, 1])
+        self.assertEqual(audit_count, 0)
+
+    def test_non_managed_account_password_is_not_reset(self):
+        self._create_user("root-admin", "super_admin")
+        target_ids = (
+            self._create_user("student-account", "student"),
+            self._create_user("teacher-account", "teacher"),
+        )
+        client, _ = self._login("root-admin")
+        self.app.config["INITIAL_SUPER_ADMIN_PASSWORD"] = "resetpass8"
+
+        with self.app.app_context():
+            before_hashes = [
+                get_db().execute(
+                    "SELECT password_hash FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()["password_hash"]
+                for user_id in target_ids
+            ]
+
+        for user_id in target_ids:
+            with self.subTest(user_id=user_id):
+                response = client.post(
+                    f"/api/admin/accounts/{user_id}/password-reset"
+                )
+                self.assertEqual(response.status_code, 404)
+
+        with self.app.app_context():
+            after_hashes = [
+                get_db().execute(
+                    "SELECT password_hash FROM users WHERE id = ?",
+                    (user_id,),
+                ).fetchone()["password_hash"]
+                for user_id in target_ids
+            ]
+            notification_count = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM system_notifications
+                WHERE event_type = 'password_reset'
+                """
+            ).fetchone()["count"]
+            audit_count = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM admin_audit_log
+                WHERE action = 'reset_password'
+                """
+            ).fetchone()["count"]
+        self.assertEqual(after_hashes, before_hashes)
+        self.assertEqual(notification_count, 0)
+        self.assertEqual(audit_count, 0)
+
     def test_ordinary_admin_is_denied_without_account_existence_leakage(self):
         self._create_user("ordinary-admin", "admin")
         target_id = self._create_user("target-enterprise", "enterprise")

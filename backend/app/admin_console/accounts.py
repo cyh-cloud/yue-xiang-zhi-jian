@@ -23,9 +23,8 @@ from app.messaging.events import emit_password_reset
 MANAGED_ROLES = frozenset(
     {"enterprise", "government", "admin", "super_admin"}
 )
-ACCOUNT_ROLES = frozenset(
-    {"student", "teacher", "enterprise", "government", "admin", "super_admin"}
-)
+MANAGED_ROLE_VALUES = tuple(sorted(MANAGED_ROLES))
+MANAGED_ROLE_PLACEHOLDERS = ", ".join("?" for _ in MANAGED_ROLE_VALUES)
 MANAGED_USERNAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{2,31}$")
 
 
@@ -70,12 +69,14 @@ def list_accounts(
     keyword: str | None = None,
 ) -> list[dict]:
     normalized_role = str(role or "").strip() or None
-    if normalized_role is not None and normalized_role not in ACCOUNT_ROLES:
+    if normalized_role is not None and normalized_role not in MANAGED_ROLES:
         raise _validation_error({"role": "角色不正确"})
 
     normalized_keyword = str(keyword or "").strip()
-    clauses: list[str] = []
-    parameters: list[str] = []
+    clauses: list[str] = [
+        f"role IN ({MANAGED_ROLE_PLACEHOLDERS})"
+    ]
+    parameters: list[str] = list(MANAGED_ROLE_VALUES)
     if normalized_role is not None:
         clauses.append("role = ?")
         parameters.append(normalized_role)
@@ -106,13 +107,13 @@ def get_account(user_id: int) -> dict:
     ):
         raise _not_found()
     row = get_db().execute(
-        """
+        f"""
         SELECT
             id, username, name, role, is_enabled, created_at, updated_at
         FROM users
-        WHERE id = ?
+        WHERE id = ? AND role IN ({MANAGED_ROLE_PLACEHOLDERS})
         """,
-        (user_id,),
+        (user_id, *MANAGED_ROLE_VALUES),
     ).fetchone()
     if row is None:
         raise _not_found()
@@ -210,8 +211,12 @@ def set_account_enabled(
     now = platform_now_iso()
     with get_db() as db:
         row = db.execute(
-            "SELECT id, is_enabled FROM users WHERE id = ?",
-            (user_id,),
+            f"""
+            SELECT id, is_enabled
+            FROM users
+            WHERE id = ? AND role IN ({MANAGED_ROLE_PLACEHOLDERS})
+            """,
+            (user_id, *MANAGED_ROLE_VALUES),
         ).fetchone()
         if row is None:
             raise _not_found()
@@ -248,12 +253,12 @@ def reset_account_password(actor_id: int, user_id: int) -> dict:
 
     with get_db() as db:
         row = db.execute(
-            """
+            f"""
             SELECT id, password_version
             FROM users
-            WHERE id = ?
+            WHERE id = ? AND role IN ({MANAGED_ROLE_PLACEHOLDERS})
             """,
-            (user_id,),
+            (user_id, *MANAGED_ROLE_VALUES),
         ).fetchone()
         if row is None:
             raise _not_found()
@@ -294,7 +299,6 @@ def reset_account_password(actor_id: int, user_id: int) -> dict:
 
 
 __all__ = [
-    "ACCOUNT_ROLES",
     "MANAGED_ROLES",
     "configured_initial_password",
     "create_managed_account",
