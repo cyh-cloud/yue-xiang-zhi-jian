@@ -29,12 +29,18 @@ describe('resolveCompanionJumpTarget', () => {
           path: '/teacher/courses',
           component: { template: '<div />' },
           meta: { requiresAuth: true, roles: ['teacher'] }
+        },
+        {
+          path: '/open',
+          component: { template: '<div />' },
+          meta: { requiresAuth: true, roles: [] }
         }
       ]
     })
     expect(
       resolveCompanionJumpTarget(router, 'student', '/student/employment/jobs')
     ).toBe('/student/employment/jobs')
+    expect(resolveCompanionJumpTarget(router, 'student', '/open')).toBe('/open')
     expect(
       resolveCompanionJumpTarget(router, 'student', '/teacher/courses')
     ).toBeNull()

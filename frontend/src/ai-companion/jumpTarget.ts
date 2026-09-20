@@ -33,11 +33,11 @@ export function resolveCompanionJumpTarget(
   if (ABSOLUTE_URL_PATTERN.test(trimmed)) return null
   if (trimmed.includes('\\')) return null
 
-  const resolved = router.resolve(target)
+  const resolved = router.resolve(trimmed)
   if (resolved.matched.length === 0) return null
 
   const meta = resolved.meta as AuthRouteMeta
-  if (meta.roles && !(role && meta.roles.includes(role))) return null
+  if (meta.roles?.length && !(role && meta.roles.includes(role))) return null
 
   return resolved.fullPath
 }

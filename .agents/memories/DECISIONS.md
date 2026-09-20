@@ -52,3 +52,7 @@
   `government_employment_statistics_provider`.
 - 010 consumes that slot without direct job/application table access or a
   second registry.
+
+## AI Companion Jump Target Validation
+
+- AI 学伴 jump_target 校验:空 meta.roles 数组视为无限制,对齐既有 authGuard(roleRoutes)。
