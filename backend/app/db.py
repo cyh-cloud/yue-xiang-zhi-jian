@@ -999,6 +999,47 @@ CREATE TABLE IF NOT EXISTS local_resource_success_cases (
 
 CREATE INDEX IF NOT EXISTS idx_local_resource_cases_order
     ON local_resource_success_cases(sort_order, case_id);
+
+CREATE TABLE IF NOT EXISTS ai_companion_conversations (
+    conversation_id TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL CHECK (length(trim(title)) > 0),
+    last_intent TEXT NOT NULL CHECK (
+        last_intent IN ('platform_usage', 'learning_question', 'out_of_scope')
+    ),
+    jump_target TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_companion_conversations_user
+    ON ai_companion_conversations(
+        user_id, updated_at DESC, conversation_id DESC
+    );
+
+CREATE TABLE IF NOT EXISTS ai_companion_messages (
+    message_id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL
+        REFERENCES ai_companion_conversations(conversation_id)
+        ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+    content TEXT NOT NULL CHECK (length(trim(content)) > 0),
+    intent TEXT CHECK (
+        intent IS NULL OR
+        intent IN ('platform_usage', 'learning_question', 'out_of_scope')
+    ),
+    jump_target TEXT,
+    client_request_id TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_companion_messages_request
+    ON ai_companion_messages(user_id, client_request_id)
+    WHERE client_request_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_ai_companion_messages_conversation
+    ON ai_companion_messages(conversation_id, created_at, message_id);
 """
 
 
