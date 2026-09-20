@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
-from app.admin_console import install_default_admin_services
 from app.agri_skills import install_default_agri_services
 from app.agri_skills.messaging_provider import AgriMessagingProvider
 from app.agri_skills.routes import agri_skills_bp
+from app.admin_console import (
+    admin_console_bp,
+    install_default_admin_services,
+    register_admin_console_error_handlers,
+)
 from app.auth.routes import auth_bp
 from app.config import build_config
 from app.courses.routes import student_courses_bp
@@ -148,12 +152,14 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(handcraft_inheritance_bp)
     app.register_blueprint(government_bp)
     app.register_blueprint(local_resources_bp)
+    app.register_blueprint(admin_console_bp)
     app.register_blueprint(teacher_console_bp)
     app.register_blueprint(teacher_media_bp)
     register_ecommerce_training_error_handlers(app)
     register_enterprise_console_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
     register_job_matching_error_handlers(app)
+    register_admin_console_error_handlers(app)
     register_teacher_console_error_handlers(app)
 
     with app.app_context():
