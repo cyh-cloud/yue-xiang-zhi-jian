@@ -21,24 +21,24 @@ BUSINESS_ACTIONS = (
     "支付",
 )
 _WHITESPACE_PATTERN = re.compile(r"\s+")
+# 复合动作短语允许中间插入少量口语词，例如"修改个人资料"、"删除这条内容"；
+# 间隔设上限，避免无界匹配把"审查/名字/付款/投标"这类远距字样误判成代办。
+_BOUNDED_ACTION_PATTERNS = {
+    "修改资料": re.compile(r"修改.{0,4}资料"),
+    "删除内容": re.compile(r"删除.{0,4}内容"),
+}
 
 
 def _normalize_question(question: str) -> str:
     return _WHITESPACE_PATTERN.sub("", str(question or ""))
 
 
-def _contains_action(text: str, action: str) -> bool:
-    """动作短语按序匹配，允许被口语词打断。
-
-    例如"修改资料"命中"替我修改个人资料"，"删除内容"命中"帮我删除这条内容"。
-    """
-    cursor = 0
-    for character in action:
-        cursor = text.find(character, cursor)
-        if cursor < 0:
-            return False
-        cursor += 1
-    return True
+def _matches_action(text: str, action: str) -> bool:
+    """动作短语默认按连续子串匹配，仅复合短语允许有界间隔。"""
+    pattern = _BOUNDED_ACTION_PATTERNS.get(action)
+    if pattern is not None:
+        return pattern.search(text) is not None
+    return action in text
 
 
 def detect_business_proxy(question: str) -> bool:
@@ -48,7 +48,7 @@ def detect_business_proxy(question: str) -> bool:
         phrase in normalized for phrase in AGENCY_PHRASES
     )
     has_business_action = any(
-        _contains_action(normalized, action) for action in BUSINESS_ACTIONS
+        _matches_action(normalized, action) for action in BUSINESS_ACTIONS
     )
     return has_agency_phrase and has_business_action
 
