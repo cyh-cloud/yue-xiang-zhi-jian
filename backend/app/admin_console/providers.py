@@ -14,6 +14,7 @@ from app.admin_console.presets import (
     DatabaseAssistantFeatureKnowledgeProvider,
     DatabaseCraftPresetProvider,
 )
+from app.admin_console.rewards import DatabaseRewardCatalogProvider
 from app.content_review.providers import (
     ContentReviewProvider,
     UnavailableContentReviewProvider,
@@ -21,6 +22,7 @@ from app.content_review.providers import (
 )
 from app.handcraft_inheritance.providers import (
     CraftPresetProvider,
+    set_reward_catalog_provider,
     set_craft_preset_provider,
 )
 from app.local_resources.cases import (
@@ -147,6 +149,13 @@ def install_default_admin_services(app: Flask) -> None:
         app,
         AdminDatabaseLocalResourceCaseProvider(),
     )
+    # This slot must be replaced unconditionally for the same reason. 05's
+    # `install_default_handcraft_services` runs before this function in
+    # `create_app` and already installed `PlaceholderRewardCatalogProvider`,
+    # so a `not in app.extensions` guard would leave 05's placeholder reward
+    # catalog in place and 011's authoritative `admin_rewards` would never
+    # reach the mall.
+    set_reward_catalog_provider(app, DatabaseRewardCatalogProvider())
     if "assistant_feature_knowledge_provider" not in app.extensions:
         set_assistant_feature_knowledge_provider(
             app,
@@ -166,6 +175,7 @@ __all__ = [
     "CraftPresetProvider",
     "DatabaseAssistantFeatureKnowledgeProvider",
     "DatabaseCraftPresetProvider",
+    "DatabaseRewardCatalogProvider",
     "DatabaseFeedbackIntakeProvider",
     "FeedbackIntakeProvider",
     "HandcraftTeachingVideoReviewAdapter",

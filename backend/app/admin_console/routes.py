@@ -307,6 +307,62 @@ def delete_assistant_knowledge_preset_route(knowledge_id: str):
     return jsonify(success=True, item=item)
 
 
+@admin_console_bp.get("/rewards")
+def list_rewards_route():
+    from app.admin_console.rewards import list_rewards_admin
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_rewards_admin()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/rewards")
+def create_reward_route():
+    from app.admin_console.rewards import create_reward
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    reward = create_reward(int(session["id"]), payload)
+    return jsonify(success=True, reward=reward), 201
+
+
+@admin_console_bp.put("/rewards/<reward_id>")
+def update_reward_route(reward_id: str):
+    from app.admin_console.rewards import update_reward
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    reward = update_reward(
+        int(session["id"]),
+        reward_id,
+        payload.get("expected_version"),
+        payload,
+    )
+    return jsonify(success=True, reward=reward)
+
+
+@admin_console_bp.post("/rewards/<reward_id>/online")
+def set_reward_online_route(reward_id: str):
+    from app.admin_console.rewards import set_reward_online
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    # An omitted flag means "put it online", matching the route name.
+    reward = set_reward_online(
+        int(session["id"]),
+        reward_id,
+        payload.get("expected_version"),
+        payload.get("online", True),
+    )
+    return jsonify(success=True, reward=reward)
+
+
 def _error_response(error, status: int):
     return (
         jsonify(

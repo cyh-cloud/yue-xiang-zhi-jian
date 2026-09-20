@@ -1066,6 +1066,18 @@ CREATE TABLE IF NOT EXISTS admin_rewards (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS admin_reward_reservations (
+    reservation_id TEXT PRIMARY KEY,
+    reward_id TEXT NOT NULL,
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    status TEXT NOT NULL CHECK (status IN ('reserved', 'released')),
+    created_at TEXT NOT NULL,
+    released_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_reward_reservations_reward_status
+    ON admin_reward_reservations(reward_id, status);
+
 CREATE TABLE IF NOT EXISTS comment_reports (
     report_id TEXT PRIMARY KEY,
     comment_id TEXT NOT NULL,
@@ -1332,6 +1344,21 @@ def _ensure_handcraft_craft_is_demo_column(db: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_admin_reward_is_demo_column(db: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(admin_rewards)")
+    }
+    if "is_demo" not in columns:
+        db.execute(
+            """
+            ALTER TABLE admin_rewards
+            ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0
+            CHECK (is_demo IN (0, 1))
+            """
+        )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
@@ -1343,6 +1370,7 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_user_password_version_column(db)
     _ensure_local_resource_case_admin_columns(db)
     _ensure_handcraft_craft_is_demo_column(db)
+    _ensure_admin_reward_is_demo_column(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
@@ -1352,6 +1380,9 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     from app.admin_console.presets import seed_craft_presets
 
     seed_craft_presets(db)
+    from app.admin_console.rewards import seed_demo_rewards
+
+    seed_demo_rewards(db)
     from app.admin_console.presets import seed_assistant_feature_knowledge
 
     seed_assistant_feature_knowledge(db)
