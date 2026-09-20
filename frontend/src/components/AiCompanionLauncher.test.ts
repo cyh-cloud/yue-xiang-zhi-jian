@@ -1,6 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import type { UserRole } from '@/api/types'
@@ -44,6 +44,7 @@ function mountLauncher(role: UserRole) {
   auth.sessionState = 'active'
   auth.user = { id: 1, username: role, name: role, role }
   return mount(AiCompanionLauncher, {
+    attachTo: document.body,
     global: { plugins: [pinia] }
   })
 }
@@ -66,6 +67,12 @@ async function mountLauncherAt(role: UserRole, path: string) {
 }
 
 describe('AiCompanionLauncher', () => {
+  // Focus-return tests attach the launcher to document.body; reset it between
+  // tests so a stale launcher can never satisfy the activeElement assertion.
+  afterEach(() => {
+    document.body.innerHTML = ''
+  })
+
   it.each(['student', 'teacher', 'enterprise', 'government'] as const)(
     'shows the launcher for %s',
     role => {
@@ -108,6 +115,19 @@ describe('AiCompanionLauncher', () => {
       key: 'Escape'
     })
     expect(wrapper.find('[data-test="ai-companion-panel"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      wrapper.find('[data-test="ai-companion-launcher"]').element
+    )
+  })
+
+  it('returns focus to the launcher when closed via the close button', async () => {
+    const wrapper = mountLauncher('student')
+    await wrapper.get('[data-test="ai-companion-launcher"]').trigger('click')
+    await wrapper.get('.ai-companion-panel-close').trigger('click')
+    expect(wrapper.find('[data-test="ai-companion-panel"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      wrapper.find('[data-test="ai-companion-launcher"]').element
+    )
   })
 
   // SC-002: visibility must never depend on the current route or its meta.
@@ -165,6 +185,49 @@ describe('AiCompanionLauncher', () => {
         ).toBe(false)
         wrapper.unmount()
       }
+    })
+  })
+
+  // FR-005: anonymous, invalid session, or an unknown role must all hide the
+  // launcher. Only an active session carrying a known companion role shows it.
+  describe('visibility gate', () => {
+    it.each<
+      [string, { sessionState: 'anonymous' | 'pending' | 'active'; user: null }]
+    >([
+      ['anonymous', { sessionState: 'anonymous', user: null }],
+      ['pending', { sessionState: 'pending', user: null }],
+      ['active-no-user', { sessionState: 'active', user: null }]
+    ])('hides the launcher for the %s session', (_label, session) => {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      const auth = useAuthStore()
+      auth.sessionState = session.sessionState
+      auth.user = session.user
+      const wrapper = mount(AiCompanionLauncher, {
+        global: { plugins: [pinia] }
+      })
+      expect(
+        wrapper.find('[data-test="ai-companion-launcher"]').exists()
+      ).toBe(false)
+    })
+
+    it('hides the launcher when the active session has an unknown role', () => {
+      const pinia = createPinia()
+      setActivePinia(pinia)
+      const auth = useAuthStore()
+      auth.sessionState = 'active'
+      auth.user = {
+        id: 1,
+        username: 'ghost',
+        name: 'ghost',
+        role: 'wizard' as UserRole
+      }
+      const wrapper = mount(AiCompanionLauncher, {
+        global: { plugins: [pinia] }
+      })
+      expect(
+        wrapper.find('[data-test="ai-companion-launcher"]').exists()
+      ).toBe(false)
     })
   })
 })
