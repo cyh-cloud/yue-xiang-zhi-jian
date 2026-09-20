@@ -16,6 +16,7 @@ FULFILLMENT_ISSUED = "fulfillment_issued"
 FULFILLMENT_CANCELLED = "fulfillment_cancelled"
 POINTS_EXPIRED = "points_expired"
 PASSWORD_RESET = "password_reset"
+SYSTEM_ANNOUNCEMENT = "system_announcement"
 
 
 def _event_key(event_type: str, event_id: str) -> str:
@@ -188,4 +189,23 @@ def emit_password_reset(*, event_id: str, user_id: int) -> dict:
         event_type=PASSWORD_RESET,
         title="密码已重置",
         body="请联系管理员获取初始密码",
+    )
+
+
+def emit_system_announcement(
+    *,
+    event_id: str,
+    recipient_ids: list[int],
+    announcement_id: str,
+    title: str,
+    body: str,
+) -> dict:
+    return emit_notifications(
+        recipient_ids=recipient_ids,
+        event_key=_event_key(SYSTEM_ANNOUNCEMENT, event_id),
+        event_type=SYSTEM_ANNOUNCEMENT,
+        title=title,
+        body=body,
+        source_type="system_announcement",
+        source_id=announcement_id,
     )

@@ -469,6 +469,39 @@ def verify_fulfillment_route(fulfillment_id: int):
     return _fulfillment_action_response(fulfillment_id, "verify")
 
 
+@admin_console_bp.get("/announcements")
+def list_announcements_route():
+    from app.admin_console.system_announcements import list_announcements
+
+    # Super admin only: the permission matrix keeps announcements invisible
+    # and unoperable for an ordinary admin, so the guard runs before any
+    # announcement row is read.
+    require_admin_session(roles={"super_admin"})
+    items = list_announcements()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/announcements")
+def create_announcement_route():
+    from app.admin_console.system_announcements import create_announcement
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    announcement = create_announcement(int(session["id"]), payload)
+    return jsonify(success=True, announcement=announcement), 201
+
+
+@admin_console_bp.post("/announcements/<announcement_id>/publish")
+def publish_announcement_route(announcement_id: str):
+    from app.admin_console.system_announcements import publish_announcement
+
+    session = require_admin_session(roles={"super_admin"})
+    result = publish_announcement(int(session["id"]), announcement_id)
+    return jsonify(success=True, **result)
+
+
 def _error_response(error, status: int):
     return (
         jsonify(
