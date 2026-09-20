@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from flask import Flask, jsonify, request
 
+from app.ai_companion import install_default_ai_companion_services
+from app.ai_companion.routes import (
+    ai_companion_bp,
+    register_ai_companion_error_handlers,
+)
 from app.agri_skills import install_default_agri_services
 from app.agri_skills.messaging_provider import AgriMessagingProvider
 from app.agri_skills.routes import agri_skills_bp
@@ -65,6 +70,7 @@ PROTECTED_API_PREFIXES = (
     "/api/ecommerce-training",
     "/api/handcraft-inheritance",
     "/api/local-resources",
+    "/api/ai-companion",
 )
 
 PROTECTED_API_ROLES = {
@@ -89,6 +95,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_job_matching_services(app)
     install_default_government_services(app)
     install_default_local_resource_services(app)
+    install_default_ai_companion_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
         app,
@@ -148,11 +155,13 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(local_resources_bp)
     app.register_blueprint(teacher_console_bp)
     app.register_blueprint(teacher_media_bp)
+    app.register_blueprint(ai_companion_bp)
     register_ecommerce_training_error_handlers(app)
     register_enterprise_console_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
     register_job_matching_error_handlers(app)
     register_teacher_console_error_handlers(app)
+    register_ai_companion_error_handlers(app)
 
     with app.app_context():
         init_db()

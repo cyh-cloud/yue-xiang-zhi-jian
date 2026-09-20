@@ -25,6 +25,11 @@ from app.ai_companion.knowledge_provider import (
     get_assistant_feature_knowledge_provider,
     set_assistant_feature_knowledge_provider,
 )
+from app.ai_companion.routes import (
+    ai_companion_bp,
+    install_default_ai_companion_services,
+    register_ai_companion_error_handlers,
+)
 
 
 __all__ = [
@@ -49,4 +54,7 @@ __all__ = [
     "UnavailableAssistantFeatureKnowledgeProvider",
     "get_assistant_feature_knowledge_provider",
     "set_assistant_feature_knowledge_provider",
+    "ai_companion_bp",
+    "install_default_ai_companion_services",
+    "register_ai_companion_error_handlers",
 ]
