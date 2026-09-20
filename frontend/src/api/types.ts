@@ -1285,3 +1285,48 @@ export interface AdminReviewActionResponse {
   success: true
   item: AdminReviewItem
 }
+
+export type AdminManagedRole =
+  | 'enterprise'
+  | 'government'
+  | 'admin'
+  | 'super_admin'
+
+export type AdminAccountRoleFilter = AdminManagedRole | 'all'
+
+export interface AdminAccount {
+  id: number
+  username: string
+  name: string
+  role: AdminManagedRole
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminAccountsResponse {
+  success: true
+  accounts: AdminAccount[]
+}
+
+export interface AdminAccountResponse {
+  success: true
+  account: AdminAccount
+}
+
+export interface AdminAccountCreatePayload {
+  role: AdminManagedRole
+  username: string
+  name: string
+  password: string
+}
+
+export interface AdminAccountStatusPayload {
+  enabled: boolean
+}
+
+export interface AdminPasswordResetResponse {
+  success: true
+  event_id: string
+  account: AdminAccount
+}

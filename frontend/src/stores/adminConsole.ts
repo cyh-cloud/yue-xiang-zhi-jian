@@ -3,8 +3,15 @@ import { computed, ref } from 'vue'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type {
+  AdminAccount,
+  AdminAccountCreatePayload,
+  AdminAccountResponse,
+  AdminAccountStatusPayload,
+  AdminAccountsResponse,
+  AdminPasswordResetResponse,
   AdminConsoleRole,
   AdminDashboard,
+  AdminManagedRole,
   AdminReviewActionResponse,
   AdminReviewContentType,
   AdminReviewCounts,
@@ -31,6 +38,14 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
   const reviewLoading = ref(false)
   const reviewActionLoading = ref(false)
   const reviewError = ref('')
+  const accounts = ref<AdminAccount[]>([])
+  const accountsLoading = ref(false)
+  const accountsError = ref('')
+  const accountActionLoading = ref(false)
+  const accountsQuery = ref<{
+    role: AdminManagedRole | null
+    keyword: string
+  }>({ role: null, keyword: '' })
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -136,6 +151,105 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     reviewError.value = ''
   }
 
+  async function loadAccounts(
+    role: AdminManagedRole | null = null,
+    keyword = ''
+  ): Promise<boolean> {
+    accountsLoading.value = true
+    accountsError.value = ''
+    accountsQuery.value = { role, keyword }
+    try {
+      const params = new URLSearchParams()
+      if (role) {
+        params.set('role', role)
+      }
+      if (keyword) {
+        params.set('keyword', keyword)
+      }
+      const query = params.toString()
+      const response = await apiFetch<AdminAccountsResponse>(
+        `/api/admin/accounts${query ? `?${query}` : ''}`
+      )
+      accounts.value = response.accounts
+      return true
+    } catch (caught) {
+      accountsError.value = errorMessage(caught, '账户列表加载失败')
+      return false
+    } finally {
+      accountsLoading.value = false
+    }
+  }
+
+  async function refreshAccounts(): Promise<boolean> {
+    return loadAccounts(accountsQuery.value.role, accountsQuery.value.keyword)
+  }
+
+  async function createAccount(
+    payload: AdminAccountCreatePayload
+  ): Promise<boolean> {
+    accountActionLoading.value = true
+    accountsError.value = ''
+    try {
+      await apiFetch<AdminAccountResponse>('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
+      await refreshAccounts()
+      return true
+    } catch (caught) {
+      accountsError.value = errorMessage(caught, '创建账户失败')
+      return false
+    } finally {
+      accountActionLoading.value = false
+    }
+  }
+
+  async function setAccountEnabled(
+    userId: number,
+    enabled: boolean
+  ): Promise<boolean> {
+    accountActionLoading.value = true
+    accountsError.value = ''
+    try {
+      await apiFetch<AdminAccountResponse>(
+        `/api/admin/accounts/${userId}/status`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ enabled } satisfies AdminAccountStatusPayload)
+        }
+      )
+      await refreshAccounts()
+      return true
+    } catch (caught) {
+      accountsError.value = errorMessage(caught, '更新账户状态失败')
+      return false
+    } finally {
+      accountActionLoading.value = false
+    }
+  }
+
+  async function resetPassword(userId: number): Promise<boolean> {
+    accountActionLoading.value = true
+    accountsError.value = ''
+    try {
+      await apiFetch<AdminPasswordResetResponse>(
+        `/api/admin/accounts/${userId}/password-reset`,
+        { method: 'POST' }
+      )
+      await refreshAccounts()
+      return true
+    } catch (caught) {
+      accountsError.value = errorMessage(caught, '重置密码失败')
+      return false
+    } finally {
+      accountActionLoading.value = false
+    }
+  }
+
+  function clearAccountsError() {
+    accountsError.value = ''
+  }
+
   return {
     dashboard,
     loading,
@@ -145,6 +259,10 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     reviewLoading,
     reviewActionLoading,
     reviewError,
+    accounts,
+    accountsLoading,
+    accountsError,
+    accountActionLoading,
     role,
     canManagePlatform,
     captureError,
@@ -152,6 +270,11 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     loadReviewQueue,
     approveReview,
     rejectReview,
-    clearReviewError
+    clearReviewError,
+    loadAccounts,
+    createAccount,
+    setAccountEnabled,
+    resetPassword,
+    clearAccountsError
   }
 })

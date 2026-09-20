@@ -94,6 +94,7 @@ describe('admin console routes', () => {
 
   it('registers the admin children with the required role metadata', () => {
     const routes = router.getRoutes()
+    const superAdminOnlyPaths = ['/admin/accounts']
     const adminPaths = [
       '/admin/dashboard',
       '/admin/review',
@@ -110,7 +111,11 @@ describe('admin console routes', () => {
     for (const path of adminPaths) {
       const route = routes.find(record => record.path === path)
       expect(route?.meta.requiresAuth).toBe(true)
-      expect(route?.meta.roles).toEqual(['super_admin', 'admin'])
+      expect(route?.meta.roles).toEqual(
+        superAdminOnlyPaths.includes(path)
+          ? ['super_admin']
+          : ['super_admin', 'admin']
+      )
     }
   })
 

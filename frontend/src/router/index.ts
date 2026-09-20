@@ -8,6 +8,7 @@ import AgriCoursesView from '@/views/AgriCoursesView.vue'
 import AgriDiagnosisView from '@/views/AgriDiagnosisView.vue'
 import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
+import AdminAccountsView from '@/views/AdminAccountsView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
 import AdminReviewView from '@/views/AdminReviewView.vue'
 import CourseCatalogView from '@/views/CourseCatalogView.vue'
@@ -57,6 +58,10 @@ const teacherMeta = { requiresAuth: true, roles: ['teacher'] as const }
 const adminMeta = {
   requiresAuth: true,
   roles: ['super_admin', 'admin'] as const
+}
+const superAdminMeta = {
+  requiresAuth: true,
+  roles: ['super_admin'] as const
 }
 const AdminRoutePlaceholder: RouteComponent = defineComponent({
   name: 'AdminRoutePlaceholder',
@@ -462,8 +467,8 @@ const router = createRouter({
         {
           path: 'accounts',
           name: 'admin-accounts',
-          component: AdminRoutePlaceholder,
-          meta: adminMeta
+          component: AdminAccountsView,
+          meta: superAdminMeta
         },
         {
           path: 'points-policy',
