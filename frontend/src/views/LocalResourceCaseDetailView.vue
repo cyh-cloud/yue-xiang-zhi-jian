@@ -40,7 +40,11 @@ onMounted(() => {
         <span class="local-resource-case-detail__code ark-data">
           06 / CASE DETAIL
         </span>
-        <h1>{{ store.caseDetail?.title ?? '成功案例' }}</h1>
+        <h1>
+          <SemanticChineseText
+            :text="store.caseDetail?.title ?? '成功案例'"
+          />
+        </h1>
         <p v-if="store.caseDetail?.summary">
           {{ store.caseDetail.summary }}
         </p>

@@ -87,9 +87,12 @@ const longChinese =
 const semanticPolicyContent =
   '本地申请补贴时，请先准备材料。' + longChinese
 
+const semanticHeading =
+  '本地申请补贴。完整政策背景和办理条件。'.repeat(5)
+
 const caseSummary: LocalResourceCase = {
   id: 'case-1',
-  title: longChinese,
+  title: semanticHeading,
   summary: longChinese,
   published_at: '2026-09-19T10:00:00+08:00',
   updated_at: '2026-09-19T10:00:00+08:00',
@@ -105,7 +108,7 @@ const caseDetail: LocalResourceCaseDetail = {
 
 const policyFixture: LocalResourcePolicy = {
   id: 'policy-1',
-  title: longChinese,
+  title: semanticHeading,
   content: semanticPolicyContent,
   category_code: 'entrepreneurship',
   category_label: '创业支持',
@@ -116,7 +119,7 @@ const policyFixture: LocalResourcePolicy = {
 
 const newsFixture: LocalResourceNews = {
   id: 'news-1',
-  title: longChinese,
+  title: semanticHeading,
   content: longChinese,
   category_code: 'news',
   category_label: '新闻',
@@ -681,6 +684,30 @@ describe('local-resources responsive and accessibility acceptance', () => {
 
     wrapper.unmount()
   })
+
+  it.each([
+    ['case-detail', LocalResourceCaseDetailView, caseSummary.title],
+    ['policy-detail', LocalResourcePolicyDetailView, policyFixture.title],
+    ['news-detail', LocalResourceNewsDetailView, newsFixture.title]
+  ] as const)(
+    'keeps the %s heading words and punctuation together',
+    async (name, component, title) => {
+      const wrapper = await mountView(name, component, 320)
+      const heading = wrapper.get('h1')
+      const semanticText = heading.get(
+        '[data-test="semantic-chinese-text"]'
+      )
+      const words = semanticText
+        .findAll('[data-segment="word"]')
+        .map(segment => segment.text())
+
+      expect(semanticText.text()).toBe(title)
+      expect(words).toContain('本地')
+      expect(words.some(word => word.endsWith('。'))).toBe(true)
+
+      wrapper.unmount()
+    }
+  )
 
   it('keeps every 006 view on light tokens without unsupported decoration', () => {
     for (const [name] of views) {

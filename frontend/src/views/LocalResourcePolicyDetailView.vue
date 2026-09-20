@@ -56,7 +56,11 @@ onMounted(() => {
         <span class="local-resource-policy-detail__code ark-data">
           06 / POLICY DETAIL
         </span>
-        <h1>{{ store.policyDetail?.title ?? '政策详情' }}</h1>
+        <h1>
+          <SemanticChineseText
+            :text="store.policyDetail?.title ?? '政策详情'"
+          />
+        </h1>
 
         <dl
           v-if="store.policyDetail"

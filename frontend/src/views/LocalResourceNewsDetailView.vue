@@ -65,7 +65,11 @@ onMounted(() => {
         <span class="local-resource-news-detail__code ark-data">
           06 / NEWS DETAIL
         </span>
-        <h1>{{ store.newsDetail?.title ?? '新闻详情' }}</h1>
+        <h1>
+          <SemanticChineseText
+            :text="store.newsDetail?.title ?? '新闻详情'"
+          />
+        </h1>
 
         <dl
           v-if="store.newsDetail"
