@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timedelta
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -9,13 +10,17 @@ from app.ai_companion.constants import (
     MAX_CONVERSATIONS,
     MAX_MESSAGES_PER_CONVERSATION,
 )
-from app.ai_companion.errors import AiCompanionNotFoundError
+from app.ai_companion.errors import (
+    AiCompanionNotFoundError,
+    AiCompanionValidationError,
+)
 from app.db import get_db
 
 
 SHANGHAI_ZONE = ZoneInfo("Asia/Shanghai")
 MAX_TITLE_LENGTH = 80
 CONVERSATION_NOT_FOUND_MESSAGE = "会话不存在"
+CLIENT_REQUEST_ID_REQUIRED_MESSAGE = "客户端请求标识不能为空"
 
 
 def _now() -> str:
@@ -193,6 +198,9 @@ def create_or_append_exchange(
     client_request_id: str,
     conversation_id: str | None = None,
 ) -> dict:
+    if not client_request_id or not client_request_id.strip():
+        raise AiCompanionValidationError(CLIENT_REQUEST_ID_REQUIRED_MESSAGE)
+
     replayed = find_exchange_by_request(user_id, client_request_id)
     if replayed is not None:
         return replayed
@@ -200,51 +208,59 @@ def create_or_append_exchange(
     # 每次创建只取一次时间戳，两条消息与会话更新共用，保证留存判定确定。
     timestamp = _now()
 
-    with get_db() as db:
-        if conversation_id is None:
-            conversation_id = _insert_conversation(
+    # try 包在 with 外层：with 的 __exit__ 先回滚，重复提交被唯一索引拒掉时
+    # 不会留下没有消息的孤儿会话；此时按既有记录重放。
+    try:
+        with get_db() as db:
+            if conversation_id is None:
+                conversation_id = _insert_conversation(
+                    db,
+                    user_id=user_id,
+                    question=question,
+                    intent=intent,
+                    jump_target=jump_target,
+                    timestamp=timestamp,
+                )
+            elif _find_owned_conversation_id(db, conversation_id, user_id) is None:
+                raise AiCompanionNotFoundError(CONVERSATION_NOT_FOUND_MESSAGE)
+
+            user_message_id = _insert_message(
                 db,
+                conversation_id=conversation_id,
                 user_id=user_id,
-                question=question,
+                role="user",
+                content=question,
                 intent=intent,
                 jump_target=jump_target,
+                client_request_id=client_request_id,
                 timestamp=timestamp,
             )
-        elif _find_owned_conversation_id(db, conversation_id, user_id) is None:
-            raise AiCompanionNotFoundError(CONVERSATION_NOT_FOUND_MESSAGE)
-
-        user_message_id = _insert_message(
-            db,
-            conversation_id=conversation_id,
-            user_id=user_id,
-            role="user",
-            content=question,
-            intent=intent,
-            jump_target=jump_target,
-            client_request_id=client_request_id,
-            timestamp=timestamp,
-        )
-        assistant_message_id = _insert_message(
-            db,
-            conversation_id=conversation_id,
-            user_id=user_id,
-            role="assistant",
-            content=answer,
-            intent=intent,
-            jump_target=jump_target,
-            client_request_id=None,
-            timestamp=timestamp,
-        )
-        db.execute(
-            """
-            UPDATE ai_companion_conversations
-            SET last_intent = ?, jump_target = ?, updated_at = ?
-            WHERE conversation_id = ?
-            """,
-            (intent, jump_target, timestamp, conversation_id),
-        )
-        _prune_conversation_messages(db, conversation_id)
-        _prune_user_conversations(db, user_id, timestamp)
+            assistant_message_id = _insert_message(
+                db,
+                conversation_id=conversation_id,
+                user_id=user_id,
+                role="assistant",
+                content=answer,
+                intent=intent,
+                jump_target=jump_target,
+                client_request_id=None,
+                timestamp=timestamp,
+            )
+            db.execute(
+                """
+                UPDATE ai_companion_conversations
+                SET last_intent = ?, jump_target = ?, updated_at = ?
+                WHERE conversation_id = ?
+                """,
+                (intent, jump_target, timestamp, conversation_id),
+            )
+            _prune_conversation_messages(db, conversation_id)
+            _prune_user_conversations(db, user_id, timestamp)
+    except sqlite3.IntegrityError:
+        replayed = find_exchange_by_request(user_id, client_request_id)
+        if replayed is None:
+            raise
+        return replayed
 
     return {
         "conversation_id": conversation_id,
@@ -303,10 +319,10 @@ def get_conversation(user_id: int, conversation_id: str) -> dict | None:
         """
         SELECT message_id, role, content, intent, jump_target, created_at
         FROM ai_companion_messages
-        WHERE conversation_id = ?
+        WHERE conversation_id = ? AND user_id = ?
         ORDER BY rowid
         """,
-        (conversation_id,),
+        (conversation_id, user_id),
     ).fetchall()
     record = _conversation_record(row)
     # rowid 即写入顺序：同一次交换的两条消息时间戳相同，不能只用 created_at 排序。

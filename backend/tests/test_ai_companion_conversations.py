@@ -5,8 +5,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from app import create_app
+from app.ai_companion.errors import AiCompanionValidationError
 from app.ai_companion.repository import (
     create_or_append_exchange,
+    find_exchange_by_request,
     get_conversation,
     list_conversations,
 )
@@ -178,6 +180,93 @@ class AiCompanionConversationTests(unittest.TestCase):
             detail = get_conversation(self.user_id, conversation_id)
             self.assertEqual(len(detail["messages"]), 200)
             self.assertEqual(detail["messages"][0]["content"], "问题 1")
+
+    def test_blank_client_request_id_is_rejected(self):
+        with self.app.app_context():
+            with self.assertRaises(AiCompanionValidationError):
+                create_or_append_exchange(
+                    user_id=self.user_id,
+                    question="怎么投简历",
+                    answer="进入就业对接投递。",
+                    intent="platform_usage",
+                    jump_target=None,
+                    client_request_id="",
+                )
+            self.assertEqual(list_conversations(self.user_id), [])
+
+    def test_concurrent_duplicate_request_replays_instead_of_failing(self):
+        original_finder = find_exchange_by_request
+        lookups = []
+
+        def miss_first_lookup(user_id, client_request_id):
+            lookups.append(client_request_id)
+            if len(lookups) == 1:
+                return None
+            return original_finder(user_id, client_request_id)
+
+        with self.app.app_context():
+            created = create_or_append_exchange(
+                user_id=self.user_id,
+                question="怎么投简历",
+                answer="进入就业对接投递。",
+                intent="platform_usage",
+                jump_target="/student/employment/jobs",
+                client_request_id="concurrent-request",
+            )
+            with patch(
+                "app.ai_companion.repository.find_exchange_by_request",
+                side_effect=miss_first_lookup,
+            ):
+                replayed = create_or_append_exchange(
+                    user_id=self.user_id,
+                    question="怎么投简历",
+                    answer="进入就业对接投递。",
+                    intent="platform_usage",
+                    jump_target="/student/employment/jobs",
+                    client_request_id="concurrent-request",
+                )
+            self.assertEqual(
+                replayed["conversation_id"],
+                created["conversation_id"],
+            )
+            self.assertEqual(
+                replayed["user_message"]["message_id"],
+                created["user_message"]["message_id"],
+            )
+            self.assertEqual(len(list_conversations(self.user_id)), 1)
+
+    def test_pruned_conversation_messages_are_removed(self):
+        with self.app.app_context():
+            oldest = create_or_append_exchange(
+                user_id=self.user_id,
+                question="问题 0",
+                answer="回答 0",
+                intent="learning_question",
+                jump_target=None,
+                client_request_id="prune-request-0",
+            )
+            for index in range(1, 101):
+                create_or_append_exchange(
+                    user_id=self.user_id,
+                    question=f"问题 {index}",
+                    answer=f"回答 {index}",
+                    intent="learning_question",
+                    jump_target=None,
+                    client_request_id=f"prune-request-{index}",
+                )
+            db = get_db()
+            remaining = db.execute(
+                """
+                SELECT COUNT(*) AS total
+                FROM ai_companion_messages
+                WHERE user_id = ?
+                """,
+                (self.user_id,),
+            ).fetchone()["total"]
+            self.assertEqual(remaining, 200)
+            self.assertIsNone(
+                get_conversation(self.user_id, oldest["conversation_id"])
+            )
 
 
 if __name__ == "__main__":
