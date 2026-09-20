@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import copy
+import re
 import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from app import create_app
 from app.admin_console import (
@@ -17,14 +20,32 @@ from app.admin_console import (
     update_reward,
 )
 from app.admin_console.errors import (
+    ProviderAccessDeniedError,
+    ProviderNotFoundError,
     ProviderConflictError,
     ProviderValidationError,
 )
+from app.admin_console.rewards import (
+    apply_fulfillment_action,
+    get_redemption_detail,
+    list_fulfillments,
+    list_redemptions,
+)
 from app.db import get_db, init_db
-from app.handcraft_inheritance import get_reward_catalog_provider
+from app.handcraft_inheritance import (
+    get_reward_catalog_provider,
+    redeem_reward,
+    record_training_points,
+    set_points_policy_provider,
+)
 from app.handcraft_inheritance.presets import (
     PLACEHOLDER_REWARDS,
+    PLACEHOLDER_POINTS_POLICY,
     PlaceholderRewardCatalogProvider,
+)
+from app.handcraft_inheritance.points import (
+    get_points_account,
+    get_points_ledger,
 )
 from app.handcraft_inheritance.rewards import (
     list_rewards as list_rewards_for_student,
@@ -1077,6 +1098,757 @@ class AdminRewardRouteTests(TestCase):
     def test_anonymous_session_cannot_manage_rewards(self):
         response = self.app.test_client().get("/api/admin/rewards")
         self.assertEqual(response.status_code, 401)
+
+
+class StaticPointsPolicyProvider:
+    def __init__(self, policy):
+        self.policy = copy.deepcopy(policy)
+
+    def get_policy(self):
+        return copy.deepcopy(self.policy)
+
+
+class AdminRewardFulfillmentTests(TestCase):
+    """兑换查询、履约队列和履约动作（Task 11）。
+
+    三笔兑换的时间戳故意混用 UTC `Z` 与 `+08:00`：按文本排序会把它们排错，
+    011 必须先解析成带时区的 datetime 再排序。
+    """
+
+    FIRST_STAMP = "2026-09-20T12:00:00Z"
+    SECOND_STAMP = "2026-09-20T15:00:00+08:00"
+    THIRD_STAMP = "2026-09-20T09:00:00+08:00"
+    FORBIDDEN_ACCOUNT_KEYS = frozenset(
+        {
+            "account",
+            "accounts",
+            "account_status",
+            "enabled",
+            "is_enabled",
+            "last_password_reset_at",
+            "must_change_password",
+            "password",
+            "password_hash",
+            "password_reset",
+            "reset_token",
+        }
+    )
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.app = create_app(
+            {
+                "TESTING": True,
+                "PROPAGATE_EXCEPTIONS": False,
+                "DATABASE_PATH": str(
+                    Path(self.temp_dir.name) / "test.db"
+                ),
+                "SECRET_KEY": "test-only-secret",
+                "SESSION_HOURS": 24,
+                "SESSION_COOKIE_SECURE": False,
+            }
+        )
+        policy = copy.deepcopy(PLACEHOLDER_POINTS_POLICY)
+        policy.update(
+            {
+                "seconds_per_point": 1,
+                "daily_limit": 1000,
+                "training_weights": {"default": 1000},
+            }
+        )
+        set_points_policy_provider(
+            self.app,
+            StaticPointsPolicyProvider(policy),
+        )
+        self.student_id = self._create_user("fulfillment-student", "student")
+        self.other_student_id = self._create_user(
+            "fulfillment-other",
+            "student",
+        )
+        self._create_profile(self.student_id, "13800000000")
+        self._create_profile(self.other_student_id, "13900000000")
+        self._award_points(self.student_id)
+        self._award_points(self.other_student_id)
+        self.redemption_id, self.fulfillment_id = self._redeem(
+            self.student_id,
+            "request-1",
+        )
+        self.second_redemption_id, self.second_fulfillment_id = self._redeem(
+            self.student_id,
+            "request-2",
+            "reward-chaoshan-woodcarving-coaster",
+        )
+        self.other_redemption_id, self.other_fulfillment_id = self._redeem(
+            self.other_student_id,
+            "request-3",
+        )
+        self._set_created_at(
+            self.redemption_id,
+            self.fulfillment_id,
+            self.FIRST_STAMP,
+        )
+        self._set_created_at(
+            self.second_redemption_id,
+            self.second_fulfillment_id,
+            self.SECOND_STAMP,
+        )
+        self._set_created_at(
+            self.other_redemption_id,
+            self.other_fulfillment_id,
+            self.THIRD_STAMP,
+        )
+        self.admin_id = self._create_user("fulfillment-admin", "admin")
+        self.super_admin_id = self._create_user(
+            "fulfillment-super-admin",
+            "super_admin",
+        )
+        self.admin = self._login("fulfillment-admin")
+        self.super_admin = self._login("fulfillment-super-admin")
+        self.student = self._login("fulfillment-student")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def _create_user(self, username: str, role: str) -> int:
+        from werkzeug.security import generate_password_hash
+
+        with self.app.app_context():
+            cursor = get_db().execute(
+                """
+                INSERT INTO users (
+                    username, password_hash, name, role, is_enabled,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    username,
+                    generate_password_hash("password8"),
+                    f"{role}-{username}",
+                    role,
+                    self.FIRST_STAMP,
+                    self.FIRST_STAMP,
+                ),
+            )
+            user_id = int(cursor.lastrowid)
+            get_db().commit()
+        return user_id
+
+    def _create_profile(self, user_id: int, contact: str) -> None:
+        with self.app.app_context():
+            get_db().execute(
+                """
+                INSERT INTO student_profiles (user_id, contact, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (user_id, contact, self.FIRST_STAMP),
+            )
+            get_db().commit()
+
+    def _award_points(self, user_id: int) -> None:
+        with self.app.app_context():
+            result = record_training_points(
+                user_id,
+                "ecommerce",
+                "live_script",
+                f"funding-{user_id}",
+                "2026-09-20T08:00:00+08:00",
+            )
+        self.assertEqual(result["status"], "processed")
+
+    def _redeem(
+        self,
+        user_id: int,
+        request_id: str,
+        reward_id: str = "reward-guangxiu-bookmark",
+    ) -> tuple[int, int]:
+        with self.app.app_context(), patch(
+            "app.handcraft_inheritance.rewards.emit_redemption_succeeded"
+        ):
+            redemption = redeem_reward(user_id, reward_id, request_id)
+            fulfillment = get_db().execute(
+                """
+                SELECT id
+                FROM fulfillments
+                WHERE redemption_id = ?
+                """,
+                (redemption["id"],),
+            ).fetchone()
+        return int(redemption["id"]), int(fulfillment["id"])
+
+    def _set_created_at(
+        self,
+        redemption_id: int,
+        fulfillment_id: int,
+        stamp: str,
+    ) -> None:
+        with self.app.app_context():
+            db = get_db()
+            db.execute(
+                """
+                UPDATE redemptions
+                SET created_at = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (stamp, stamp, redemption_id),
+            )
+            db.execute(
+                """
+                UPDATE fulfillments
+                SET created_at = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (stamp, stamp, fulfillment_id),
+            )
+            db.commit()
+
+    def _login(self, username: str):
+        client = self.app.test_client()
+        response = client.post(
+            "/api/auth/login",
+            json={"username": username, "password": "password8"},
+        )
+        self.assertEqual(response.status_code, 200)
+        return client
+
+    def _count(self, table: str) -> int:
+        with self.app.app_context():
+            return int(
+                get_db()
+                .execute(f"SELECT COUNT(*) AS count FROM {table}")
+                .fetchone()["count"]
+            )
+
+    def _fulfillment_notification_count(self, fulfillment_id: int) -> int:
+        with self.app.app_context():
+            return int(
+                get_db()
+                .execute(
+                    """
+                    SELECT COUNT(*) AS count
+                    FROM system_notifications
+                    WHERE source_type = 'fulfillment'
+                      AND source_id = ?
+                    """,
+                    (str(fulfillment_id),),
+                )
+                .fetchone()["count"]
+            )
+
+    def _balance(self, user_id: int) -> int:
+        with self.app.app_context():
+            return int(get_points_account(user_id)["balance"])
+
+    def _items(self, client, path: str) -> list[dict]:
+        response = client.get(path)
+        self.assertEqual(response.status_code, 200, path)
+        body = response.get_json()
+        self.assertTrue(body["success"])
+        self.assertEqual(body["count"], len(body["items"]))
+        return body["items"]
+
+    def _assert_no_account_fields(self, node, path: str = "$") -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                normalized = str(key).lower()
+                self.assertNotIn(
+                    normalized,
+                    self.FORBIDDEN_ACCOUNT_KEYS,
+                    f"{path}.{key} leaks account management",
+                )
+                self._assert_no_account_fields(value, f"{path}.{key}")
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                self._assert_no_account_fields(item, f"{path}[{index}]")
+
+    def test_cancel_restores_points_stock_and_returns_user_context(self):
+        before = self._balance(self.student_id)
+        response = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/cancel"
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self._balance(self.student_id), before + 30)
+        detail = self.admin.get(
+            f"/api/admin/redemptions/{self.redemption_id}"
+        ).get_json()
+        self.assertEqual(detail["user"]["contact"], "13800000000")
+        self.assertTrue(detail["points_ledger"])
+
+    def test_cancel_rolls_back_stock_and_notifies_once(self):
+        with self.app.app_context():
+            reserved_before = get_db().execute(
+                """
+                SELECT status
+                FROM reward_stock_reservations
+                WHERE redemption_id = ?
+                """,
+                (self.redemption_id,),
+            ).fetchone()["status"]
+        self.assertEqual(reserved_before, "reserved")
+
+        response = self.super_admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/cancel"
+        )
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()["fulfillment"]
+        self.assertEqual(body["status"], "canceled")
+        self.assertEqual(body["restored_points"], 30)
+
+        with self.app.app_context():
+            reservation = get_db().execute(
+                """
+                SELECT status, released_at
+                FROM reward_stock_reservations
+                WHERE redemption_id = ?
+                """,
+                (self.redemption_id,),
+            ).fetchone()
+            redemption = get_db().execute(
+                "SELECT status FROM redemptions WHERE id = ?",
+                (self.redemption_id,),
+            ).fetchone()
+        self.assertEqual(reservation["status"], "released")
+        self.assertIsNotNone(reservation["released_at"])
+        self.assertEqual(redemption["status"], "canceled")
+        self.assertEqual(
+            self._fulfillment_notification_count(self.fulfillment_id),
+            1,
+        )
+
+        detail = self.super_admin.get(
+            f"/api/admin/redemptions/{self.redemption_id}"
+        ).get_json()
+        self.assertEqual(detail["status"], "canceled")
+        self.assertEqual(detail["fulfillment"]["status"], "canceled")
+        self.assertEqual(detail["restored_points"], 30)
+        self.assertEqual(detail["stock_reservation"]["status"], "released")
+
+    def test_cancel_is_idempotent_and_does_not_restore_points_twice(self):
+        first = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/cancel"
+        )
+        self.assertEqual(first.status_code, 200)
+        self.assertTrue(first.get_json()["fulfillment"]["changed"])
+        balance = self._balance(self.student_id)
+        second = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/cancel"
+        )
+        self.assertEqual(second.status_code, 200)
+        self.assertFalse(second.get_json()["fulfillment"]["changed"])
+        self.assertEqual(self._balance(self.student_id), balance)
+        self.assertEqual(
+            self._fulfillment_notification_count(self.fulfillment_id),
+            1,
+        )
+
+    def test_issue_and_verify_happy_paths_are_idempotent(self):
+        first = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/issue"
+        )
+        self.assertEqual(first.status_code, 200)
+        body = first.get_json()["fulfillment"]
+        self.assertTrue(body["changed"])
+        self.assertEqual(body["status"], "issued")
+        self.assertIsNotNone(body["issued_at"])
+
+        repeat = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/issue"
+        )
+        self.assertEqual(repeat.status_code, 200)
+        self.assertEqual(repeat.get_json()["fulfillment"]["status"], "issued")
+        self.assertFalse(repeat.get_json()["fulfillment"]["changed"])
+        self.assertEqual(
+            self._fulfillment_notification_count(self.fulfillment_id),
+            1,
+        )
+
+        verified = self.super_admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/verify"
+        )
+        self.assertEqual(verified.status_code, 200)
+        self.assertTrue(verified.get_json()["fulfillment"]["changed"])
+        self.assertEqual(verified.get_json()["fulfillment"]["status"], "verified")
+
+        again = self.super_admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/verify"
+        )
+        self.assertEqual(again.status_code, 200)
+        self.assertFalse(again.get_json()["fulfillment"]["changed"])
+        # 核销不通知，发放也只通知一次。
+        self.assertEqual(
+            self._fulfillment_notification_count(self.fulfillment_id),
+            1,
+        )
+
+        detail = self.admin.get(
+            f"/api/admin/redemptions/{self.redemption_id}"
+        ).get_json()
+        self.assertEqual(detail["status"], "verified")
+        self.assertEqual(detail["fulfillment"]["status"], "verified")
+        self.assertIsNotNone(detail["fulfillment"]["verified_at"])
+        self.assertTrue(
+            detail["fulfillment"]["verified_at"].endswith("+08:00")
+        )
+
+    def test_terminal_states_refuse_further_transitions(self):
+        pending = self.super_admin.post(
+            f"/api/admin/fulfillments/{self.other_fulfillment_id}/verify"
+        )
+        self.assertEqual(pending.status_code, 409)
+        self.assertEqual(
+            pending.get_json()["code"],
+            "fulfillment_state_conflict",
+        )
+
+        self.admin.post(f"/api/admin/fulfillments/{self.fulfillment_id}/issue")
+        self.super_admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/verify"
+        )
+        for method in ("issue", "cancel"):
+            with self.subTest(action=method):
+                response = self.admin.post(
+                    f"/api/admin/fulfillments/{self.fulfillment_id}/{method}"
+                )
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(
+                    response.get_json()["code"],
+                    "fulfillment_state_conflict",
+                )
+
+        self.admin.post(
+            f"/api/admin/fulfillments/{self.second_fulfillment_id}/cancel"
+        )
+        response = self.super_admin.post(
+            f"/api/admin/fulfillments/{self.second_fulfillment_id}/verify"
+        )
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(
+            response.get_json()["code"],
+            "fulfillment_state_conflict",
+        )
+
+    def test_unknown_fulfillment_is_reported_as_404(self):
+        response = self.admin.post("/api/admin/fulfillments/999999/issue")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.get_json()["code"], "fulfillment_not_found")
+        detail = self.admin.get("/api/admin/redemptions/999999")
+        self.assertEqual(detail.status_code, 404)
+        self.assertEqual(detail.get_json()["code"], "redemption_not_found")
+
+    def test_service_rejects_unknown_action_and_non_admin_actor(self):
+        actor = {"id": self.admin_id, "role": "admin"}
+        with self.app.app_context():
+            with self.assertRaises(ProviderValidationError) as caught:
+                apply_fulfillment_action(
+                    actor,
+                    self.fulfillment_id,
+                    "ship",
+                )
+            self.assertEqual(
+                caught.exception.code,
+                "fulfillment_action_invalid",
+            )
+            with self.assertRaises(ProviderNotFoundError):
+                get_redemption_detail(actor, 999999)
+            for reader in (
+                {"id": self.student_id, "role": "student"},
+                {"id": self.admin_id},
+                None,
+            ):
+                with self.subTest(actor=reader):
+                    with self.assertRaises(ProviderAccessDeniedError):
+                        list_redemptions(reader, {})
+                    with self.assertRaises(ProviderAccessDeniedError):
+                        list_fulfillments(reader, {})
+                    with self.assertRaises(ProviderAccessDeniedError):
+                        apply_fulfillment_action(
+                            reader,
+                            self.fulfillment_id,
+                            "issue",
+                        )
+
+    def test_ordinary_admin_reads_context_but_cannot_reach_accounts(self):
+        items = self._items(self.admin, "/api/admin/redemptions")
+        self.assertEqual(len(items), 3)
+        queue = self._items(self.admin, "/api/admin/fulfillments")
+        self.assertEqual(len(queue), 3)
+
+        detail = self.admin.get(
+            f"/api/admin/redemptions/{self.redemption_id}"
+        )
+        self.assertEqual(detail.status_code, 200)
+        redemption = detail.get_json()
+        self.assertEqual(redemption["user"]["contact"], "13800000000")
+        self.assertEqual(redemption["user"]["id"], self.student_id)
+        self.assertEqual(redemption["user"]["role"], "student")
+        self.assertTrue(redemption["points_ledger"])
+
+        with self.app.app_context():
+            self.assertEqual(
+                len(redemption["points_ledger"]),
+                len(get_points_ledger(self.student_id)),
+            )
+        modules = {
+            entry["source_module"] for entry in redemption["points_ledger"]
+        }
+        self.assertIn("ecommerce", modules)
+        self.assertIn("handcraft", modules)
+
+        for path in (
+            "/api/admin/accounts",
+            f"/api/admin/accounts/{self.student_id}",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(
+                    self.admin.get(path).status_code,
+                    403,
+                )
+        self.assertEqual(
+            self.admin.post(
+                f"/api/admin/accounts/{self.student_id}/password-reset"
+            ).status_code,
+            403,
+        )
+        self.assertEqual(
+            self.admin.post(
+                f"/api/admin/accounts/{self.student_id}/status",
+                json={"enabled": False},
+            ).status_code,
+            403,
+        )
+
+    def test_no_admin_route_offers_a_global_user_search(self):
+        admin_paths = {
+            str(rule)
+            for rule in self.app.url_map.iter_rules()
+            if str(rule).startswith("/api/admin/")
+        }
+        self.assertTrue(admin_paths)
+        self.assertFalse(
+            [
+                path
+                for path in admin_paths
+                if re.search(r"/api/admin/[^<]*user", path)
+            ],
+            "管理后台不得提供全局用户搜索入口",
+        )
+
+    def test_redemption_and_fulfillment_views_hide_account_management(self):
+        for client in (self.admin, self.super_admin):
+            detail = client.get(
+                f"/api/admin/redemptions/{self.redemption_id}"
+            ).get_json()
+            self._assert_no_account_fields(detail)
+            for item in self._items(client, "/api/admin/redemptions"):
+                self._assert_no_account_fields(item)
+            for item in self._items(client, "/api/admin/fulfillments"):
+                self._assert_no_account_fields(item)
+
+    def test_redemption_filters_narrow_the_queue(self):
+        items = self._items(self.admin, "/api/admin/redemptions")
+        self.assertEqual(
+            [item["id"] for item in items],
+            [
+                self.redemption_id,
+                self.second_redemption_id,
+                self.other_redemption_id,
+            ],
+        )
+        # 第一笔是 UTC `Z` 时间戳，按文本排序会排到第二笔之后。
+        self.assertEqual(items[0]["created_at"], "2026-09-20T20:00:00+08:00")
+
+        cases = (
+            (f"?user={self.student_id}", 2),
+            ("?user=fulfillment-other", 1),
+            ("?user=admin-fulfillment-admin", 0),
+            # 两位学员都兑换了广绣书签。
+            ("?reward=reward-guangxiu-bookmark", 2),
+            ("?reward=%E6%BD%AE%E6%B1%95%E6%9C%A8%E9%9B%95%E6%9D%AF%E5%9E%AB", 1),
+            ("?reward=reward-missing", 0),
+            ("?status=pending", 3),
+            ("?status=verified", 0),
+            ("?fulfillment_status=pending", 3),
+            ("?fulfillment_status=verified", 0),
+            ("?created_from=2026-09-20T10:00:00%2B08:00", 2),
+            ("?created_to=2026-09-20T10:00:00%2B08:00", 1),
+            (
+                "?created_from=2026-09-20T10:00:00%2B08:00"
+                "&created_to=2026-09-20T16:00:00%2B08:00",
+                1,
+            ),
+        )
+        for query, expected in cases:
+            with self.subTest(query=query):
+                self.assertEqual(
+                    len(self._items(self.admin, f"/api/admin/redemptions{query}")),
+                    expected,
+                )
+
+        combined = self._items(
+            self.admin,
+            "/api/admin/redemptions?user=fulfillment-student&status=pending",
+        )
+        self.assertEqual(
+            [item["id"] for item in combined],
+            [self.redemption_id, self.second_redemption_id],
+        )
+
+    def test_redemption_filters_reject_invalid_values(self):
+        cases = (
+            ("?status=shipped", "redemption_filter_invalid"),
+            ("?fulfillment_status=shipped", "redemption_filter_invalid"),
+            ("?created_from=not-a-time", "redemption_filter_invalid"),
+            (
+                "?created_from=2026-09-21T00:00:00%2B08:00"
+                "&created_to=2026-09-20T00:00:00%2B08:00",
+                "redemption_filter_invalid",
+            ),
+        )
+        for query, code in cases:
+            with self.subTest(query=query):
+                response = self.admin.get(
+                    f"/api/admin/redemptions{query}"
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.get_json()["code"], code)
+
+    def test_fulfillment_queue_filters_and_ordering(self):
+        items = self._items(self.admin, "/api/admin/fulfillments")
+        self.assertEqual(
+            [item["id"] for item in items],
+            [
+                self.fulfillment_id,
+                self.second_fulfillment_id,
+                self.other_fulfillment_id,
+            ],
+        )
+        self.assertEqual(items[0]["created_at"], "2026-09-20T20:00:00+08:00")
+        self.assertEqual(items[0]["user"]["contact"], "13800000000")
+        self.assertEqual(
+            items[0]["stock_reservation"]["status"],
+            "reserved",
+        )
+
+        cases = (
+            ("?status=pending", 3),
+            ("?fulfillment_status=pending", 3),
+            ("?status=verified", 0),
+            (f"?user={self.other_student_id}", 1),
+            ("?user=fulfillment-other", 1),
+            ("?reward=reward-chaoshan-woodcarving-coaster", 1),
+            ("?created_from=2026-09-20T10:00:00%2B08:00", 2),
+        )
+        for query, expected in cases:
+            with self.subTest(query=query):
+                self.assertEqual(
+                    len(self._items(self.admin, f"/api/admin/fulfillments{query}")),
+                    expected,
+                )
+
+        response = self.admin.get("/api/admin/fulfillments?status=shipped")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.get_json()["code"],
+            "fulfillment_filter_invalid",
+        )
+
+    def test_fulfillment_action_writes_one_audit_row_and_no_second_notification(self):
+        before_audit = self._count("admin_audit_log")
+        before_admin_outbox = self._count("admin_notification_outbox")
+        before_fulfillment_outbox = self._count(
+            "fulfillment_notification_outbox"
+        )
+        before_notifications = self._fulfillment_notification_count(
+            self.fulfillment_id
+        )
+
+        response = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/issue"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        with self.app.app_context():
+            audit = get_db().execute(
+                """
+                SELECT actor_id, action, target_type, target_id, result,
+                       after_json
+                FROM admin_audit_log
+                ORDER BY id
+                """
+            ).fetchall()
+        self.assertEqual(len(audit), before_audit + 1)
+        row = audit[-1]
+        self.assertEqual(row["action"], "fulfillment_issue")
+        self.assertEqual(row["target_type"], "fulfillment")
+        self.assertEqual(row["target_id"], str(self.fulfillment_id))
+        self.assertEqual(row["result"], "success")
+        self.assertEqual(row["actor_id"], self.admin_id)
+        self.assertIn('"status": "issued"', row["after_json"])
+
+        self.assertEqual(
+            self._count("admin_notification_outbox"),
+            before_admin_outbox,
+        )
+        self.assertEqual(
+            self._count("fulfillment_notification_outbox"),
+            before_fulfillment_outbox + 1,
+        )
+        self.assertEqual(
+            self._fulfillment_notification_count(self.fulfillment_id),
+            before_notifications + 1,
+        )
+
+        repeat = self.admin.post(
+            f"/api/admin/fulfillments/{self.fulfillment_id}/issue"
+        )
+        self.assertEqual(repeat.status_code, 200)
+        self.assertFalse(repeat.get_json()["fulfillment"]["changed"])
+        self.assertEqual(
+            self._count("admin_notification_outbox"),
+            before_admin_outbox,
+        )
+        self.assertEqual(
+            self._count("fulfillment_notification_outbox"),
+            before_fulfillment_outbox + 1,
+        )
+        self.assertEqual(
+            self._fulfillment_notification_count(self.fulfillment_id),
+            before_notifications + 1,
+        )
+
+    def test_student_session_is_refused_on_every_new_route(self):
+        cases = (
+            ("get", "/api/admin/redemptions", None),
+            ("get", f"/api/admin/redemptions/{self.redemption_id}", None),
+            ("get", "/api/admin/fulfillments", None),
+            ("post", f"/api/admin/fulfillments/{self.fulfillment_id}/issue", {}),
+            ("post", f"/api/admin/fulfillments/{self.fulfillment_id}/cancel", {}),
+            ("post", f"/api/admin/fulfillments/{self.fulfillment_id}/verify", {}),
+        )
+        for method, path, payload in cases:
+            with self.subTest(path=path):
+                response = getattr(self.student, method)(path, json=payload)
+                self.assertEqual(response.status_code, 403)
+                self.assertEqual(
+                    response.get_json()["code"],
+                    "admin_access_denied",
+                )
+
+    def test_anonymous_session_is_refused_on_every_new_route(self):
+        anonymous = self.app.test_client()
+        for path in (
+            "/api/admin/redemptions",
+            f"/api/admin/redemptions/{self.redemption_id}",
+            "/api/admin/fulfillments",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual(anonymous.get(path).status_code, 401)
+        self.assertEqual(
+            anonymous.post(
+                f"/api/admin/fulfillments/{self.fulfillment_id}/issue"
+            ).status_code,
+            401,
+        )
 
 
 if __name__ == "__main__":

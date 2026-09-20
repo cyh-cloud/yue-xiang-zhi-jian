@@ -9,6 +9,7 @@ from app.admin_console.errors import (
     ProviderUnavailableError,
     ProviderValidationError,
 )
+from app.db import get_db
 from app.session_manager import load_session
 
 
@@ -21,6 +22,13 @@ admin_console_bp = Blueprint(
 
 def require_admin_session(*, roles: set[str]) -> dict:
     session = load_session(required=True, allowed_states={"active"})
+    # `load_session` runs a session-cleanup DELETE that opens a deferred
+    # transaction and only commits it when rows were removed, so the
+    # connection can still hold an empty transaction here. 05's domain
+    # functions open `BEGIN IMMEDIATE` themselves, which fails inside an
+    # open transaction, so the empty transaction is closed the same way 05's
+    # `_student_session` closes it before calling into a domain function.
+    get_db().commit()
     if session["role"] not in roles:
         raise ProviderAccessDeniedError(
             "无管理权限",
@@ -38,6 +46,25 @@ def _preset_expected_version():
         if isinstance(payload, dict):
             raw = payload.get("expected_version")
     return raw
+
+
+def _admin_actor(session: dict) -> dict:
+    """Build the actor from the 01 session only.
+
+    A client supplied role or id is never read here: the session is the only
+    authorization source, so a forged body cannot widen an action.
+    """
+    return {"id": int(session["id"]), "role": str(session["role"])}
+
+
+def _admin_filters(*names: str) -> dict:
+    """Read the declared filter keys from the query string, ignoring the rest."""
+    filters: dict = {}
+    for name in names:
+        value = request.args.get(name)
+        if value is not None:
+            filters[name] = value
+    return filters
 
 
 @admin_console_bp.get("/dashboard")
@@ -361,6 +388,85 @@ def set_reward_online_route(reward_id: str):
         payload.get("online", True),
     )
     return jsonify(success=True, reward=reward)
+
+
+@admin_console_bp.get("/redemptions")
+def list_redemptions_route():
+    from app.admin_console.rewards import list_redemptions
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    items = list_redemptions(
+        _admin_actor(session),
+        _admin_filters(
+            "user",
+            "reward",
+            "status",
+            "fulfillment_status",
+            "created_from",
+            "created_to",
+        ),
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.get("/redemptions/<int:redemption_id>")
+def get_redemption_route(redemption_id: int):
+    from app.admin_console.rewards import get_redemption_detail
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    redemption = get_redemption_detail(
+        _admin_actor(session),
+        redemption_id,
+    )
+    # The redemption context is the response body itself, so the console
+    # reads `user`, `points_ledger` and the redemption fields directly.
+    return jsonify(success=True, **redemption)
+
+
+@admin_console_bp.get("/fulfillments")
+def list_fulfillments_route():
+    from app.admin_console.rewards import list_fulfillments
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    items = list_fulfillments(
+        _admin_actor(session),
+        _admin_filters(
+            "user",
+            "reward",
+            "status",
+            "fulfillment_status",
+            "created_from",
+            "created_to",
+        ),
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+def _fulfillment_action_response(fulfillment_id: int, action: str):
+    from app.admin_console.rewards import apply_fulfillment_action
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    result = apply_fulfillment_action(
+        _admin_actor(session),
+        fulfillment_id,
+        action,
+    )
+    return jsonify(success=True, fulfillment=result)
+
+
+@admin_console_bp.post("/fulfillments/<int:fulfillment_id>/issue")
+def issue_fulfillment_route(fulfillment_id: int):
+    return _fulfillment_action_response(fulfillment_id, "issue")
+
+
+@admin_console_bp.post("/fulfillments/<int:fulfillment_id>/cancel")
+def cancel_fulfillment_route(fulfillment_id: int):
+    return _fulfillment_action_response(fulfillment_id, "cancel")
+
+
+@admin_console_bp.post("/fulfillments/<int:fulfillment_id>/verify")
+def verify_fulfillment_route(fulfillment_id: int):
+    return _fulfillment_action_response(fulfillment_id, "verify")
 
 
 def _error_response(error, status: int):

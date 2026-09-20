@@ -1,21 +1,30 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
+from datetime import datetime, timezone
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from app.admin_console.audit import record_admin_audit
 from app.admin_console.errors import (
+    ProviderAccessDeniedError,
     ProviderConflictError,
     ProviderNotFoundError,
     ProviderValidationError,
 )
 from app.admin_console.time_utils import platform_now_iso
+from app.agri_skills.errors import AgriNotFoundError, AgriValidationError
 from app.db import get_db
+from app.handcraft_inheritance.admin_actions import (
+    apply_fulfillment_admin_action,
+)
 from app.handcraft_inheritance.presets import (
     PLACEHOLDER_REWARDS,
     PlaceholderRewardCatalogProvider,
 )
+from app.handcraft_inheritance.points import get_points_ledger
 
 
 STABLE_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -42,6 +51,103 @@ REWARD_RESERVED_JOINS = """
 REWARD_ORDER = "ORDER BY r.is_online DESC, r.points_cost ASC, r.reward_id ASC"
 RESERVATION_COLUMNS = """
     reservation_id, reward_id, quantity, status, created_at, released_at
+"""
+
+ADMIN_CONSOLE_ROLES = frozenset({"admin", "super_admin"})
+REDEMPTION_STATUSES = frozenset({"pending", "issued", "verified", "canceled"})
+FULFILLMENT_OPERATIONS = {
+    "issue": "issue",
+    "cancel": "cancel_pending",
+    "verify": "manual_verify",
+}
+FULFILLMENT_ACCESS_MARKERS = ("无管理权限", "无操作权限", "无权操作")
+FULFILLMENT_CONFLICT_MARKERS = ("不可", "已变化", "回滚失败", "不存在")
+PLATFORM_TIMEZONE = ZoneInfo("Asia/Shanghai")
+TIME_FLOOR = datetime.min.replace(tzinfo=timezone.utc)
+REDEMPTION_COLUMNS = """
+    r.id,
+    r.user_id,
+    r.reward_id,
+    r.reward_name,
+    r.reward_snapshot_json,
+    r.points_cost,
+    r.request_id,
+    r.status AS redemption_status,
+    r.created_at,
+    r.updated_at,
+    r.canceled_at,
+    f.id AS fulfillment_id,
+    f.status AS fulfillment_status,
+    f.issued_at,
+    f.verified_at,
+    f.canceled_at AS fulfillment_canceled_at,
+    f.created_at AS fulfillment_created_at,
+    f.updated_at AS fulfillment_updated_at,
+    rs.reservation_id,
+    rs.status AS reservation_status,
+    rs.quantity AS reservation_quantity,
+    rs.created_at AS reservation_created_at,
+    rs.released_at AS reservation_released_at,
+    u.username,
+    u.name AS user_name,
+    u.role AS user_role,
+    COALESCE(sp.contact, '') AS contact,
+    COALESCE(refund.delta, 0) AS restored_points
+"""
+REDEMPTION_JOINS = """
+    FROM redemptions r
+    JOIN users u ON u.id = r.user_id
+    LEFT JOIN student_profiles sp ON sp.user_id = r.user_id
+    LEFT JOIN fulfillments f ON f.redemption_id = r.id
+    LEFT JOIN reward_stock_reservations rs ON rs.redemption_id = r.id
+    LEFT JOIN points_transactions refund
+      ON refund.user_id = r.user_id
+     AND refund.transaction_type = 'refund'
+     AND refund.source_module = 'handcraft'
+     AND refund.source_event_id =
+         ('fulfillment-cancel:' || CAST(f.id AS TEXT))
+"""
+FULFILLMENT_COLUMNS = """
+    f.id,
+    f.redemption_id,
+    f.user_id,
+    f.status AS fulfillment_status,
+    f.issued_at,
+    f.verified_at,
+    f.canceled_at,
+    f.created_at,
+    f.updated_at,
+    r.reward_id,
+    r.reward_name,
+    r.points_cost,
+    r.request_id,
+    r.status AS redemption_status,
+    r.created_at AS redemption_created_at,
+    r.updated_at AS redemption_updated_at,
+    r.canceled_at AS redemption_canceled_at,
+    rs.reservation_id,
+    rs.status AS reservation_status,
+    rs.quantity AS reservation_quantity,
+    rs.created_at AS reservation_created_at,
+    rs.released_at AS reservation_released_at,
+    u.username,
+    u.name AS user_name,
+    u.role AS user_role,
+    COALESCE(sp.contact, '') AS contact,
+    COALESCE(refund.delta, 0) AS restored_points
+"""
+FULFILLMENT_JOINS = """
+    FROM fulfillments f
+    JOIN redemptions r ON r.id = f.redemption_id
+    JOIN users u ON u.id = f.user_id
+    LEFT JOIN student_profiles sp ON sp.user_id = f.user_id
+    LEFT JOIN reward_stock_reservations rs ON rs.redemption_id = r.id
+    LEFT JOIN points_transactions refund
+      ON refund.user_id = f.user_id
+     AND refund.transaction_type = 'refund'
+     AND refund.source_module = 'handcraft'
+     AND refund.source_event_id =
+         ('fulfillment-cancel:' || CAST(f.id AS TEXT))
 """
 
 
@@ -528,6 +634,549 @@ def list_reward_reservations(reward_id: str | None = None) -> list[dict]:
     return [dict(row) for row in rows]
 
 
+def _admin_actor(actor: object) -> dict:
+    """Reject a non-admin caller before any redemption data is read."""
+    role = actor.get("role") if isinstance(actor, dict) else None
+    if role not in ADMIN_CONSOLE_ROLES:
+        raise ProviderAccessDeniedError(
+            "无管理权限",
+            code="admin_access_denied",
+            details={"role": role},
+        )
+    return actor
+
+
+def _actor_id(actor: dict) -> int:
+    return _positive_integer(actor.get("id"), field="actor_id")
+
+
+def _parse_timestamp(value: object) -> datetime | None:
+    """Read one ISO 8601 stamp as an aware datetime, or `None`.
+
+    05 writes `+08:00` stamps while the notification outbox writes UTC `Z`
+    stamps, so the raw text is never comparable. A stamp without an offset is
+    read as platform time, and an unparseable value stays `None` instead of
+    raising: one malformed row must not break a whole queue.
+    """
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith(("Z", "z")):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=PLATFORM_TIMEZONE)
+    return parsed
+
+
+def _sort_time(value: object) -> datetime:
+    return _parse_timestamp(value) or TIME_FLOOR
+
+
+def _normalized_time(value: object) -> object:
+    """Render one stored stamp as canonical `+08:00` ISO 8601 text.
+
+    05 already writes Shanghai stamps, but a legacy row can carry a UTC `Z`
+    offset and the console must not have to guess. Unparseable text is
+    returned untouched instead of dropped, so a bad row stays visible.
+    """
+    if value is None or value == "":
+        return value
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        text = str(value).strip()
+        if not text:
+            return value
+        try:
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return value
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=PLATFORM_TIMEZONE)
+    return parsed.astimezone(PLATFORM_TIMEZONE).isoformat()
+
+
+def _ordered_by_created_desc(
+    records: list[dict],
+    *,
+    time_field: str,
+) -> list[dict]:
+    """Sort by parsed time descending with the stable id ascending.
+
+    Two passes keep the tie-breaker correct: the first pass fixes `id ASC`,
+    the second is a stable sort on the parsed timestamp, so equal timestamps
+    keep their id order.
+    """
+    ordered = sorted(records, key=lambda record: int(record["id"]))
+    ordered.sort(
+        key=lambda record: _sort_time(record[time_field]),
+        reverse=True,
+    )
+    return ordered
+
+
+def _filter_value(filters: object, *names: str) -> str | None:
+    if not isinstance(filters, dict):
+        raise _validation("筛选条件格式不正确", field="filters")
+    for name in names:
+        value = filters.get(name)
+        if value is None:
+            continue
+        if isinstance(value, bool):
+            raise _validation("筛选条件格式不正确", field=name)
+        if isinstance(value, int):
+            return str(value)
+        if not isinstance(value, str):
+            raise _validation("筛选条件格式不正确", field=name)
+        normalized = value.strip()
+        if normalized:
+            return normalized
+    return None
+
+
+def _status_filter(
+    filters: object,
+    *names: str,
+    code: str,
+) -> str | None:
+    value = _filter_value(filters, *names)
+    if value is None:
+        return None
+    if value not in REDEMPTION_STATUSES:
+        raise _validation(
+            "筛选状态不正确",
+            code=code,
+            field=names[0],
+            value=value,
+            allowed=sorted(REDEMPTION_STATUSES),
+        )
+    return value
+
+
+def _time_boundary(
+    filters: object,
+    name: str,
+    *,
+    code: str,
+) -> datetime | None:
+    value = _filter_value(filters, name)
+    if value is None:
+        return None
+    parsed = _parse_timestamp(value)
+    if parsed is None:
+        raise _validation(
+            "筛选时间格式不正确",
+            code=code,
+            field=name,
+            value=value,
+        )
+    return parsed
+
+
+def _time_range(filters: object, *, code: str) -> tuple | None:
+    start = _time_boundary(filters, "created_from", code=code)
+    end = _time_boundary(filters, "created_to", code=code)
+    if start is not None and end is not None and start > end:
+        raise _validation(
+            "筛选时间范围不正确",
+            code=code,
+            field="created_from",
+        )
+    if start is None and end is None:
+        return None
+    return (start, end)
+
+
+def _within_range(value: object, bounds: tuple | None) -> bool:
+    if bounds is None:
+        return True
+    parsed = _parse_timestamp(value)
+    if parsed is None:
+        return False
+    start, end = bounds
+    if start is not None and parsed < start:
+        return False
+    if end is not None and parsed > end:
+        return False
+    return True
+
+
+def _user_condition(filters: object) -> tuple[str, list] | None:
+    value = _filter_value(filters, "user")
+    if value is None:
+        return None
+    if value.isdigit():
+        return ("(u.id = ? OR u.username = ?)", [int(value), value])
+    keyword = f"%{value}%"
+    return ("(u.username LIKE ? OR u.name LIKE ?)", [keyword, keyword])
+
+
+def _reward_condition(filters: object) -> tuple[str, list] | None:
+    value = _filter_value(filters, "reward")
+    if value is None:
+        return None
+    return (
+        "(r.reward_id = ? OR r.reward_name LIKE ?)",
+        [value, f"%{value}%"],
+    )
+
+
+def _conditions(filters: object, parts: list[tuple[str, list]]) -> tuple[str, list]:
+    if not parts:
+        return "", []
+    where = " AND ".join(condition for condition, _ in parts)
+    parameters: list = []
+    for _, values in parts:
+        parameters.extend(values)
+    return f"WHERE {where}", parameters
+
+
+def _redemption_conditions(filters: object) -> tuple[str, list]:
+    parts: list[tuple[str, list]] = []
+    for condition in (
+        _user_condition(filters),
+        _reward_condition(filters),
+    ):
+        if condition is not None:
+            parts.append(condition)
+    status = _status_filter(
+        filters,
+        "status",
+        code="redemption_filter_invalid",
+    )
+    if status is not None:
+        parts.append(("r.status = ?", [status]))
+    fulfillment_status = _status_filter(
+        filters,
+        "fulfillment_status",
+        code="redemption_filter_invalid",
+    )
+    if fulfillment_status is not None:
+        parts.append(("f.status = ?", [fulfillment_status]))
+    return _conditions(filters, parts)
+
+
+def _fulfillment_conditions(filters: object) -> tuple[str, list]:
+    parts: list[tuple[str, list]] = []
+    for condition in (
+        _user_condition(filters),
+        _reward_condition(filters),
+    ):
+        if condition is not None:
+            parts.append(condition)
+    status = _status_filter(
+        filters,
+        "status",
+        "fulfillment_status",
+        code="fulfillment_filter_invalid",
+    )
+    if status is not None:
+        parts.append(("f.status = ?", [status]))
+    return _conditions(filters, parts)
+
+
+def _serialize_user(row: sqlite3.Row) -> dict:
+    """Identity, role and contact of the redeeming learner.
+
+    Account management stays out of this block on purpose: it carries no
+    account status, no password reset and no account list, because the only
+    reason an admin sees it is to fulfil the reward (FR-006, FR-047).
+    """
+    return {
+        "id": int(row["user_id"]),
+        "username": str(row["username"]),
+        "name": str(row["user_name"]),
+        "role": str(row["user_role"]),
+        "contact": str(row["contact"] or ""),
+    }
+
+
+def _serialize_reward(
+    row: sqlite3.Row,
+    *,
+    snapshot: dict | None = None,
+) -> dict:
+    reward = {
+        "reward_id": str(row["reward_id"]),
+        "name": str(row["reward_name"]),
+        "points_cost": int(row["points_cost"]),
+    }
+    if snapshot is not None:
+        reward["snapshot"] = snapshot
+    return reward
+
+
+def _reward_snapshot(row: sqlite3.Row) -> dict:
+    raw = row["reward_snapshot_json"]
+    if not isinstance(raw, str) or not raw:
+        return {}
+    try:
+        snapshot = json.loads(raw)
+    except ValueError:
+        return {}
+    return snapshot if isinstance(snapshot, dict) else {}
+
+
+def _serialize_reservation(row: sqlite3.Row) -> dict | None:
+    reservation_id = row["reservation_id"]
+    if reservation_id is None:
+        return None
+    return {
+        "reservation_id": str(reservation_id),
+        "status": (
+            None
+            if row["reservation_status"] is None
+            else str(row["reservation_status"])
+        ),
+        "quantity": int(row["reservation_quantity"] or 0),
+        "created_at": _normalized_time(row["reservation_created_at"]),
+        "released_at": _normalized_time(row["reservation_released_at"]),
+    }
+
+
+def _serialize_redemption_summary(row: sqlite3.Row) -> dict:
+    return {
+        "id": int(row["id"]),
+        "user_id": int(row["user_id"]),
+        "user": _serialize_user(row),
+        "reward": _serialize_reward(row),
+        "points_cost": int(row["points_cost"]),
+        "request_id": str(row["request_id"]),
+        "status": str(row["redemption_status"]),
+        "fulfillment_id": (
+            None
+            if row["fulfillment_id"] is None
+            else int(row["fulfillment_id"])
+        ),
+        "fulfillment_status": (
+            None
+            if row["fulfillment_status"] is None
+            else str(row["fulfillment_status"])
+        ),
+        "stock_reservation": _serialize_reservation(row),
+        "restored_points": int(row["restored_points"] or 0),
+        "created_at": _normalized_time(row["created_at"]),
+        "updated_at": _normalized_time(row["updated_at"]),
+        "canceled_at": _normalized_time(row["canceled_at"]),
+    }
+
+
+def _serialize_redemption_detail(row: sqlite3.Row) -> dict:
+    detail = _serialize_redemption_summary(row)
+    detail["reward"] = _serialize_reward(row, snapshot=_reward_snapshot(row))
+    detail["fulfillment"] = (
+        None
+        if row["fulfillment_id"] is None
+        else {
+            "id": int(row["fulfillment_id"]),
+            "status": str(row["fulfillment_status"]),
+            "issued_at": _normalized_time(row["issued_at"]),
+            "verified_at": _normalized_time(row["verified_at"]),
+            "canceled_at": _normalized_time(row["fulfillment_canceled_at"]),
+            "created_at": _normalized_time(row["fulfillment_created_at"]),
+            "updated_at": _normalized_time(row["fulfillment_updated_at"]),
+        }
+    )
+    return detail
+
+
+def _serialize_fulfillment_summary(row: sqlite3.Row) -> dict:
+    return {
+        "id": int(row["id"]),
+        "redemption_id": int(row["redemption_id"]),
+        "user_id": int(row["user_id"]),
+        "user": _serialize_user(row),
+        "reward": _serialize_reward(row),
+        "points_cost": int(row["points_cost"]),
+        "request_id": str(row["request_id"]),
+        "status": str(row["fulfillment_status"]),
+        "redemption_status": str(row["redemption_status"]),
+        "stock_reservation": _serialize_reservation(row),
+        "restored_points": int(row["restored_points"] or 0),
+        "issued_at": _normalized_time(row["issued_at"]),
+        "verified_at": _normalized_time(row["verified_at"]),
+        "canceled_at": _normalized_time(row["canceled_at"]),
+        "created_at": _normalized_time(row["created_at"]),
+        "updated_at": _normalized_time(row["updated_at"]),
+    }
+
+
+def list_redemptions(actor: dict, filters: dict) -> list[dict]:
+    """Redemption queue for both admin roles (FR-043, FR-046, FR-047).
+
+    Filters are `user` (id or keyword), `reward` (id or name), `status`,
+    `fulfillment_status` and the `created_from`/`created_to` time range. The
+    time range is applied on parsed timestamps, because 05 mixes `+08:00`
+    and UTC `Z` stamps and SQL text comparison would order them wrongly.
+    """
+    _admin_actor(actor)
+    where, parameters = _redemption_conditions(filters)
+    bounds = _time_range(filters, code="redemption_filter_invalid")
+    rows = _fetch_all(
+        f"""
+        SELECT {REDEMPTION_COLUMNS}
+        {REDEMPTION_JOINS}
+        {where}
+        """,
+        tuple(parameters),
+    )
+    records = [
+        _serialize_redemption_summary(row)
+        for row in rows
+        if _within_range(row["created_at"], bounds)
+    ]
+    return _ordered_by_created_desc(records, time_field="created_at")
+
+
+def get_redemption_detail(actor: dict, redemption_id: int) -> dict:
+    """Redemption with the learner context an admin needs to fulfil it.
+
+    The response carries the reward snapshot, the points cost, the request
+    id, the redemption, reservation and fulfillment states, every time field
+    and the complete points ledger of that user from 05's
+    `get_points_ledger`. Account management is deliberately absent.
+    """
+    _admin_actor(actor)
+    identifier = _positive_integer(redemption_id, field="redemption_id")
+    row = _fetch_one(
+        f"""
+        SELECT {REDEMPTION_COLUMNS}
+        {REDEMPTION_JOINS}
+        WHERE r.id = ?
+        """,
+        (identifier,),
+    )
+    if row is None:
+        raise _not_found(
+            "兑换记录不存在",
+            "redemption_not_found",
+            redemption_id=identifier,
+        )
+    detail = _serialize_redemption_detail(row)
+    detail["points_ledger"] = get_points_ledger(int(row["user_id"]))
+    return detail
+
+
+def list_fulfillments(actor: dict, filters: dict) -> list[dict]:
+    """Fulfillment queue for both admin roles (FR-094).
+
+    This is 011's own filtered read over `fulfillments`; 05's
+    `list_admin_fulfillments` stays untouched, and the fulfillment state
+    machine itself stays in 05.
+    """
+    _admin_actor(actor)
+    where, parameters = _fulfillment_conditions(filters)
+    bounds = _time_range(filters, code="fulfillment_filter_invalid")
+    rows = _fetch_all(
+        f"""
+        SELECT {FULFILLMENT_COLUMNS}
+        {FULFILLMENT_JOINS}
+        {where}
+        """,
+        tuple(parameters),
+    )
+    records = [
+        _serialize_fulfillment_summary(row)
+        for row in rows
+        if _within_range(row["created_at"], bounds)
+    ]
+    return _ordered_by_created_desc(records, time_field="created_at")
+
+
+def _fulfillment_boundary_error(
+    error: AgriValidationError,
+    fulfillment_id: int,
+):
+    """Re-express 05's validation failure as an 011 boundary error.
+
+    05's `AgriValidationError` covers three different situations: a role
+    refusal, a state that cannot take the action, and a malformed request.
+    Mapping them to one status would tell the console the wrong thing, so
+    the message decides the 011 error type and 05's type never escapes.
+    """
+    message = str(error)
+    if any(marker in message for marker in FULFILLMENT_ACCESS_MARKERS):
+        return ProviderAccessDeniedError(
+            "无管理权限",
+            code="admin_access_denied",
+            details={"fulfillment_id": fulfillment_id},
+        )
+    if any(marker in message for marker in FULFILLMENT_CONFLICT_MARKERS):
+        return ProviderConflictError(
+            message,
+            code="fulfillment_state_conflict",
+            details={"fulfillment_id": fulfillment_id},
+        )
+    return ProviderValidationError(
+        message,
+        code="fulfillment_action_invalid",
+        details={"fulfillment_id": fulfillment_id},
+    )
+
+
+def apply_fulfillment_action(
+    actor: dict,
+    fulfillment_id: int,
+    action: str,
+) -> dict:
+    """Run one fulfillment action through 05 and audit it (FR-095, FR-099).
+
+    05 owns the state change, the points refund, the stock release and the
+    single `fulfillment_notification_outbox` row plus its delivery. 011 maps
+    the action name, records one admin audit row and projects 05's errors
+    into its own boundary types; it never enqueues or delivers a second
+    fulfillment notification.
+    """
+    _admin_actor(actor)
+    normalized_action = _required_text(action)
+    operation = FULFILLMENT_OPERATIONS.get(normalized_action or "")
+    if operation is None:
+        raise _validation(
+            "履约动作不正确",
+            code="fulfillment_action_invalid",
+            action=action,
+            allowed=sorted(FULFILLMENT_OPERATIONS),
+        )
+    identifier = _positive_integer(fulfillment_id, field="fulfillment_id")
+    actor_id = _actor_id(actor)
+    try:
+        result = apply_fulfillment_admin_action(
+            {
+                "fulfillment_id": identifier,
+                "action": operation,
+                "admin_role": str(actor["role"]),
+                "actor_id": actor_id,
+            }
+        )
+    except AgriNotFoundError as error:
+        raise _not_found(
+            "履约单不存在",
+            "fulfillment_not_found",
+            fulfillment_id=identifier,
+        ) from error
+    except AgriValidationError as error:
+        raise _fulfillment_boundary_error(error, identifier) from error
+    db = get_db()
+    record_admin_audit(
+        db,
+        actor_id=actor_id,
+        action=f"fulfillment_{normalized_action}",
+        target_type="fulfillment",
+        target_id=str(identifier),
+        before=None,
+        after=result,
+        result="success",
+    )
+    db.commit()
+    return result
+
+
 def _reward_payload(
     payload: dict,
     *,
@@ -863,9 +1512,13 @@ def seed_demo_rewards(connection) -> None:
 
 __all__ = [
     "DatabaseRewardCatalogProvider",
+    "apply_fulfillment_action",
     "create_reward",
+    "get_redemption_detail",
     "list_reward_reservations",
     "list_rewards_admin",
+    "list_fulfillments",
+    "list_redemptions",
     "release_reward_stock",
     "reserve_reward_stock",
     "seed_demo_rewards",
