@@ -141,7 +141,12 @@ class AiCompanionApiTests(unittest.TestCase):
             data={"audio": (io.BytesIO(b""), "empty.webm")},
             content_type="multipart/form-data",
         )
-        for response in (missing, empty):
+        no_filename = teacher.post(
+            "/api/ai-companion/speech/transcriptions",
+            data={"audio": (io.BytesIO(b"audio"), "")},
+            content_type="multipart/form-data",
+        )
+        for response in (missing, empty, no_filename):
             self.assertEqual(response.status_code, 422)
             self.assertEqual(
                 response.get_json()["message"],
@@ -170,6 +175,60 @@ class AiCompanionApiTests(unittest.TestCase):
         self.assertEqual(
             unavailable.get_json()["message"],
             "AI 服务暂时不可用",
+        )
+
+    def test_append_to_other_users_conversation_is_not_found(self):
+        owner = self._login("student")
+        intruder = self._login("teacher")
+        created = owner.post(
+            "/api/ai-companion/messages",
+            json={"question": "怎么投简历", "client_request_id": "owner-1"},
+        ).get_json()
+        response = intruder.post(
+            "/api/ai-companion/messages",
+            json={
+                "question": "另一个问题",
+                "client_request_id": "intruder-1",
+                "conversation_id": created["conversation_id"],
+            },
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            response.get_json(),
+            {"success": False, "message": "会话不存在"},
+        )
+
+    def test_conversation_list_only_contains_own_conversations(self):
+        student = self._login("student")
+        teacher = self._login("teacher")
+        self.ai.complete_json.return_value = {"intent": "out_of_scope"}
+        student_conversation = student.post(
+            "/api/ai-companion/messages",
+            json={"question": "今天天气怎么样", "client_request_id": "list-1"},
+        ).get_json()["conversation_id"]
+        teacher_conversation = teacher.post(
+            "/api/ai-companion/messages",
+            json={"question": "明天会下雨吗", "client_request_id": "list-2"},
+        ).get_json()["conversation_id"]
+
+        student_list = student.get("/api/ai-companion/conversations")
+        self.assertEqual(student_list.status_code, 200)
+        student_ids = [
+            item["conversation_id"]
+            for item in student_list.get_json()["conversations"]
+        ]
+        self.assertTrue(student_ids)
+        self.assertEqual(student_ids, [student_conversation])
+        self.assertNotIn(teacher_conversation, student_ids)
+
+        teacher_list = teacher.get("/api/ai-companion/conversations")
+        self.assertEqual(teacher_list.status_code, 200)
+        self.assertEqual(
+            [
+                item["conversation_id"]
+                for item in teacher_list.get_json()["conversations"]
+            ],
+            [teacher_conversation],
         )
 
 
