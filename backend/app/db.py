@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
         role IN ('student', 'teacher', 'enterprise', 'government', 'super_admin', 'admin')
     ),
     is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
+    password_version INTEGER NOT NULL DEFAULT 1 CHECK (password_version > 0),
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -1266,6 +1267,18 @@ def _ensure_job_matching_columns(db: sqlite3.Connection) -> None:
             )
 
 
+def _ensure_user_password_version_column(db: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(users)")}
+    if "password_version" not in columns:
+        db.execute(
+            """
+            ALTER TABLE users
+            ADD COLUMN password_version INTEGER NOT NULL DEFAULT 1
+            CHECK (password_version > 0)
+            """
+        )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
@@ -1274,12 +1287,16 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_points_consumed_units_column(db)
     _ensure_teacher_console_columns(db)
     _ensure_job_matching_columns(db)
+    _ensure_user_password_version_column(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
     from app.local_resources.cases import seed_local_resource_cases
 
     seed_local_resource_cases(db)
+    from app.admin_console.seed import seed_initial_super_admin
+
+    seed_initial_super_admin()
     db.commit()
 
 
