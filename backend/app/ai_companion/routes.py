@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from flask import Blueprint, Flask, jsonify, request
 
-from app.ai_companion.constants import AI_COMPANION_ROLES, ASR_FAILURE_MESSAGE
+from app.ai_companion.constants import (
+    AI_COMPANION_ROLES,
+    AI_UNAVAILABLE_MESSAGE,
+    ASR_FAILURE_MESSAGE,
+    KNOWLEDGE_UNAVAILABLE_MESSAGE,
+)
 from app.ai_companion.errors import (
     AiCompanionAiUnavailableError,
     AiCompanionForbiddenError,
@@ -10,10 +15,6 @@ from app.ai_companion.errors import (
     AiCompanionNotFoundError,
     AiCompanionRecognitionError,
     AiCompanionValidationError,
-)
-from app.ai_companion.knowledge_provider import (
-    UnavailableAssistantFeatureKnowledgeProvider,
-    set_assistant_feature_knowledge_provider,
 )
 from app.ai_companion.repository import get_conversation, list_conversations
 from app.ai_companion.service import answer_question
@@ -30,14 +31,6 @@ ai_companion_bp = Blueprint(
     __name__,
     url_prefix="/api/ai-companion",
 )
-
-
-def install_default_ai_companion_services(app: Flask) -> None:
-    if "assistant_feature_knowledge_provider" not in app.extensions:
-        set_assistant_feature_knowledge_provider(
-            app,
-            UnavailableAssistantFeatureKnowledgeProvider(),
-        )
 
 
 def _companion_session() -> dict:
@@ -66,11 +59,11 @@ def _handle_recognition(_error: AiCompanionRecognitionError):
 def _handle_knowledge_unavailable(
     _error: AiCompanionKnowledgeUnavailableError,
 ):
-    return jsonify(success=False, message="暂无法回答，请稍后再试"), 422
+    return jsonify(success=False, message=KNOWLEDGE_UNAVAILABLE_MESSAGE), 422
 
 
 def _handle_ai_unavailable(_error: AiCompanionAiUnavailableError):
-    return jsonify(success=False, message="AI 服务暂时不可用"), 503
+    return jsonify(success=False, message=AI_UNAVAILABLE_MESSAGE), 503
 
 
 def register_ai_companion_error_handlers(app: Flask) -> None:
@@ -137,10 +130,10 @@ def get_conversation_route(conversation_id: str):
 def transcribe_speech():
     _companion_session()
     audio_file = request.files.get("audio")
-    if audio_file is None:
+    if audio_file is None or not audio_file.filename:
         raise AiCompanionRecognitionError(ASR_FAILURE_MESSAGE)
     audio = audio_file.read()
     if not audio:
         raise AiCompanionRecognitionError(ASR_FAILURE_MESSAGE)
-    text = transcribe_question(audio, audio_file.filename or "")
+    text = transcribe_question(audio, audio_file.filename)
     return jsonify(success=True, text=text)

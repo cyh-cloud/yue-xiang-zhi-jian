@@ -1,3 +1,5 @@
+from flask import Flask
+
 from app.ai_companion.constants import (
     ADMIN_ROLES,
     AI_COMPANION_ROLES,
@@ -27,9 +29,16 @@ from app.ai_companion.knowledge_provider import (
 )
 from app.ai_companion.routes import (
     ai_companion_bp,
-    install_default_ai_companion_services,
     register_ai_companion_error_handlers,
 )
+
+
+def install_default_ai_companion_services(app: Flask) -> None:
+    if "assistant_feature_knowledge_provider" not in app.extensions:
+        set_assistant_feature_knowledge_provider(
+            app,
+            UnavailableAssistantFeatureKnowledgeProvider(),
+        )
 
 
 __all__ = [
