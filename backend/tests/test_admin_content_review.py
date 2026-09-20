@@ -18,6 +18,7 @@ from app.admin_console.errors import (
 )
 from app.admin_console.providers import configure_admin_providers
 from app.db import get_db
+from app.handcraft_inheritance.providers import set_teaching_video_provider
 
 
 COMMON_REVIEW_FIELDS = {
@@ -31,6 +32,60 @@ COMMON_REVIEW_FIELDS = {
     "created_at",
     "updated_at",
 }
+
+
+class StaticTeachingVideoProvider:
+    def __init__(self, videos):
+        self.videos = list(videos)
+
+    def list_videos(self, craft_key=None):
+        return [
+            dict(video)
+            for video in self.videos
+            if craft_key is None or video["craft_key"] == craft_key
+        ]
+
+    def get_video(self, video_id):
+        return next(
+            (
+                dict(video)
+                for video in self.videos
+                if video["video_id"] == video_id
+            ),
+            None,
+        )
+
+    def get_review_status(self, video_id):
+        video = self.get_video(video_id)
+        return video.get("review_status") if video is not None else None
+
+
+class RecordingContentReviewProvider:
+    def __init__(self, *, item=None, items=None):
+        self.item = dict(item) if item is not None else None
+        self.items = list(items or [])
+        self.get_calls = []
+        self.approve_calls = []
+        self.reject_calls = []
+
+    def list_review_items(self, content_type=None):
+        return [
+            dict(item)
+            for item in self.items
+            if content_type is None or item["content_type"] == content_type
+        ]
+
+    def get_review_status(self, **kwargs):
+        self.get_calls.append(dict(kwargs))
+        return dict(self.item) if self.item is not None else None
+
+    def approve(self, **kwargs):
+        self.approve_calls.append(dict(kwargs))
+        return {**(self.item or {}), "review_status": "approved"}
+
+    def reject(self, **kwargs):
+        self.reject_calls.append(dict(kwargs))
+        return {**(self.item or {}), "review_status": "rejected"}
 
 
 class AdminContentReviewTests(unittest.TestCase):
@@ -188,6 +243,15 @@ class AdminContentReviewTests(unittest.TestCase):
             ORDER BY id
             """
         ).fetchall()
+
+    def _login(self, username: str):
+        client = self.app.test_client()
+        response = client.post(
+            "/api/auth/login",
+            json={"username": username, "password": "password8"},
+        )
+        self.assertEqual(response.status_code, 200)
+        return client
 
     def test_provider_registry_accepts_content_review_override(self):
         replacement = object()
@@ -667,6 +731,188 @@ class AdminContentReviewTests(unittest.TestCase):
                     content_id="missing",
                 )
             )
+
+    def test_review_queue_lists_three_types_with_pending_counts(self):
+        with self.app.app_context():
+            self._submit_course()
+            self._submit_job()
+            set_teaching_video_provider(
+                self.app,
+                StaticTeachingVideoProvider(
+                    [
+                        {
+                            "video_id": "video-1",
+                            "craft_key": "guangxiu",
+                            "title": "广绣针法",
+                            "review_status": "pending",
+                            "source_available": True,
+                            "media_url": "https://example.test/video.mp4",
+                            "version": 1,
+                            "submitter_id": self.teacher_id,
+                            "updated_at": "2026-09-20T09:00:00+08:00",
+                        }
+                    ]
+                ),
+            )
+
+        response = self._login("admin").get("/api/admin/review")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data["success"])
+        self.assertEqual(
+            data["counts"],
+            {
+                "course_video": 1,
+                "job_position": 1,
+                "handcraft_teaching_video": 1,
+            },
+        )
+        self.assertEqual(
+            {item["content_type"] for item in data["items"]},
+            {
+                "course_video",
+                "job_position",
+                "handcraft_teaching_video",
+            },
+        )
+
+    def test_review_queue_sorts_parsed_iso_timestamps_and_tie_keys(self):
+        items = [
+            {
+                "content_type": "job_position",
+                "content_id": "b",
+                "review_status": "pending",
+                "updated_at": "2026-09-20T10:00:00+08:00",
+            },
+            {
+                "content_type": "course_video",
+                "content_id": "z",
+                "review_status": "pending",
+                "updated_at": "2026-09-20T10:00:00+08:00",
+            },
+            {
+                "content_type": "course_video",
+                "content_id": "a",
+                "review_status": "pending",
+                "updated_at": "2026-09-20T10:00:00+08:00",
+            },
+            {
+                "content_type": "course_video",
+                "content_id": "later-utc",
+                "review_status": "pending",
+                "updated_at": "2026-09-20T03:00:00+00:00",
+            },
+        ]
+        configure_admin_providers(
+            self.app,
+            content_review=RecordingContentReviewProvider(items=items),
+        )
+
+        response = self._login("admin").get("/api/admin/review")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item["content_id"] for item in response.get_json()["items"]],
+            ["a", "z", "b", "later-utc"],
+        )
+
+    def test_review_routes_require_admin_and_use_session_actor(self):
+        with self.app.app_context():
+            submitted = self._submit_job()
+            super_admin_id = self._insert_user(
+                get_db(),
+                "super-admin",
+                "super_admin",
+            )
+            get_db().commit()
+
+        provider = RecordingContentReviewProvider(item=submitted)
+        configure_admin_providers(self.app, content_review=provider)
+
+        self.assertEqual(
+            self.app.test_client().get("/api/admin/review").status_code,
+            401,
+        )
+        self.assertEqual(
+            self._login("teacher").get("/api/admin/review").status_code,
+            403,
+        )
+        self.assertEqual(
+            self._login("admin").get("/api/admin/review").status_code,
+            200,
+        )
+        self.assertEqual(
+            self._login("super-admin").get("/api/admin/review").status_code,
+            200,
+        )
+
+        response = self._login("admin").post(
+            "/api/admin/review/job_position/job-1/approve",
+            json={
+                "expected_version": submitted["version"],
+                "reviewer_id": super_admin_id,
+                "reviewer_role": "student",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            provider.approve_calls,
+            [
+                {
+                    "content_type": "job_position",
+                    "content_id": "job-1",
+                    "submitter_id": self.enterprise_id,
+                    "reviewer_id": self.admin_id,
+                    "reviewer_role": "admin",
+                    "expected_version": submitted["version"],
+                }
+            ],
+        )
+
+    def test_reject_route_trims_opinion_and_preserves_state_on_invalid_input(
+        self,
+    ):
+        with self.app.app_context():
+            submitted = self._submit_job()
+
+        client = self._login("admin")
+        for opinion in ("", "   ", "x" * 501, None):
+            with self.subTest(opinion=opinion):
+                response = client.post(
+                    "/api/admin/review/job_position/job-1/reject",
+                    json={
+                        "expected_version": submitted["version"],
+                        "opinion": opinion,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    response.get_json()["code"],
+                    "review_opinion_invalid",
+                )
+                with self.app.app_context():
+                    current = self._record_row("job_position", "job-1")
+                    self.assertEqual(current["review_status"], "pending")
+                    self.assertEqual(current["version"], submitted["version"])
+                    self.assertIsNone(current["rejection_opinion"])
+                    self.assertEqual(self._outbox_rows(), [])
+
+        response = client.post(
+            "/api/admin/review/job_position/job-1/reject",
+            json={
+                "expected_version": submitted["version"],
+                "opinion": "  补充岗位职责  ",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.get_json()["item"]["rejection_opinion"],
+            "补充岗位职责",
+        )
 
 
 if __name__ == "__main__":

@@ -1245,3 +1245,43 @@ export interface AdminDashboardResponse {
 }
 
 export type AdminDashboard = AdminDashboardResponse
+
+export type AdminReviewContentType =
+  | 'course_video'
+  | 'job_position'
+  | 'handcraft_teaching_video'
+
+export type AdminReviewStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'offline'
+
+export interface AdminReviewItem {
+  content_type: AdminReviewContentType
+  content_id: string
+  title?: string | null
+  submitter_id: number | null
+  submitter_name?: string | null
+  owner_id?: number | null
+  owner_name?: string | null
+  review_status: AdminReviewStatus
+  version: number | null
+  rejection_opinion: string | null
+  published_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type AdminReviewCounts = Record<AdminReviewContentType, number>
+
+export interface AdminReviewQueueResponse {
+  success: true
+  items: AdminReviewItem[]
+  counts: AdminReviewCounts
+}
+
+export interface AdminReviewActionResponse {
+  success: true
+  item: AdminReviewItem
+}

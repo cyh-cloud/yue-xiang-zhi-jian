@@ -113,6 +113,52 @@ def reset_account_password_route(user_id: int):
     return jsonify(success=True, **result)
 
 
+@admin_console_bp.get("/review")
+def review_queue_route():
+    from app.admin_console.content_review_service import list_review_queue
+
+    require_admin_session(roles={"admin", "super_admin"})
+    return jsonify(
+        success=True,
+        **list_review_queue(request.args.get("content_type")),
+    )
+
+
+@admin_console_bp.post("/review/<content_type>/<content_id>/approve")
+def approve_review_route(content_type: str, content_id: str):
+    from app.admin_console.content_review_service import approve_review
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = approve_review(
+        {"id": int(session["id"]), "role": str(session["role"])},
+        content_type=content_type,
+        content_id=content_id,
+        expected_version=payload.get("expected_version"),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.post("/review/<content_type>/<content_id>/reject")
+def reject_review_route(content_type: str, content_id: str):
+    from app.admin_console.content_review_service import reject_review
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = reject_review(
+        {"id": int(session["id"]), "role": str(session["role"])},
+        content_type=content_type,
+        content_id=content_id,
+        expected_version=payload.get("expected_version"),
+        opinion=payload.get("opinion"),
+    )
+    return jsonify(success=True, item=item)
+
+
 def _error_response(error, status: int):
     return (
         jsonify(

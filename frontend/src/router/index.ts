@@ -9,6 +9,7 @@ import AgriDiagnosisView from '@/views/AgriDiagnosisView.vue'
 import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
+import AdminReviewView from '@/views/AdminReviewView.vue'
 import CourseCatalogView from '@/views/CourseCatalogView.vue'
 import EcommerceCopyTrainingView from '@/views/EcommerceCopyTrainingView.vue'
 import EcommerceCoursesView from '@/views/EcommerceCoursesView.vue'
@@ -431,7 +432,7 @@ const router = createRouter({
         {
           path: 'review',
           name: 'admin-review',
-          component: AdminRoutePlaceholder,
+          component: AdminReviewView,
           meta: adminMeta
         },
         {
