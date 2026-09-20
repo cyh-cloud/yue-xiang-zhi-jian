@@ -9,6 +9,8 @@ import AgriDiagnosisView from '@/views/AgriDiagnosisView.vue'
 import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminAccountsView from '@/views/AdminAccountsView.vue'
+import AdminAnnouncementsView from '@/views/AdminAnnouncementsView.vue'
+import AdminDashboardView from '@/views/AdminDashboardView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
 import AdminRedemptionsView from '@/views/AdminRedemptionsView.vue'
 import AdminReviewView from '@/views/AdminReviewView.vue'
@@ -433,7 +435,7 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'admin-dashboard',
-          component: AdminRoutePlaceholder,
+          component: AdminDashboardView,
           meta: adminMeta
         },
         {
@@ -487,8 +489,8 @@ const router = createRouter({
         {
           path: 'announcements',
           name: 'admin-announcements',
-          component: AdminRoutePlaceholder,
-          meta: adminMeta
+          component: AdminAnnouncementsView,
+          meta: superAdminMeta
         }
       ]
     }

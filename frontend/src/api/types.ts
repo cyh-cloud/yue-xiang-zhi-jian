@@ -1526,3 +1526,99 @@ export interface AdminRewardQueueQuery {
   created_from: string
   created_to: string
 }
+
+export type AdminAnnouncementTargetRole = Extract<
+  UserRole,
+  | 'student'
+  | 'teacher'
+  | 'enterprise'
+  | 'government'
+  | 'admin'
+  | 'super_admin'
+>
+
+export type AdminAnnouncementStatus = 'draft' | 'published'
+
+export interface AdminDashboardUnavailableMetric {
+  available: false
+  value: null
+}
+
+export type AdminDashboardMetric =
+  | number
+  | AdminDashboardUnavailableMetric
+
+export interface AdminDashboardPendingReview {
+  course_video: AdminDashboardMetric
+  job_position: AdminDashboardMetric
+  handcraft_teaching_video: AdminDashboardMetric
+}
+
+export interface AdminDashboardSnapshot {
+  pending_review: AdminDashboardPendingReview
+  published_course_count: AdminDashboardMetric
+  active_job_count: AdminDashboardMetric
+  comment_processed_count: AdminDashboardMetric
+  report_processed_count: AdminDashboardMetric
+  feedback_processed_count: AdminDashboardMetric
+  reward_stock: AdminDashboardMetric
+  pending_fulfillment_count: AdminDashboardMetric
+  total_users?: AdminDashboardMetric
+  role_distribution?: Partial<
+    Record<AdminAnnouncementTargetRole, AdminDashboardMetric>
+  >
+  student_count?: AdminDashboardMetric
+  policy_count?: AdminDashboardMetric
+  policy_view_count?: AdminDashboardMetric
+  news_count?: AdminDashboardMetric
+  news_view_count?: AdminDashboardMetric
+  points_issued?: AdminDashboardMetric
+  redemption_count?: AdminDashboardMetric
+}
+
+export interface AdminDashboardPayload {
+  success: true
+  dashboard: AdminDashboardSnapshot
+}
+
+export interface AdminAnnouncement {
+  announcement_id: string
+  title: string
+  body: string
+  target_roles: AdminAnnouncementTargetRole[]
+  status: AdminAnnouncementStatus
+  event_id: string
+  created_by: number
+  created_at: string | null
+  published_at: string | null
+}
+
+export interface AdminAnnouncementDelivery {
+  delivered: number
+  recipient_count: number
+  failed: number
+}
+
+export interface AdminAnnouncementsResponse {
+  success: true
+  items: AdminAnnouncement[]
+  count: number
+}
+
+export interface AdminAnnouncementCreatePayload {
+  title: string
+  body: string
+  target_roles: AdminAnnouncementTargetRole[]
+}
+
+export interface AdminAnnouncementResponse {
+  success: true
+  announcement: AdminAnnouncement
+}
+
+export interface AdminAnnouncementPublishResponse {
+  success: true
+  changed: boolean
+  announcement: AdminAnnouncement
+  delivery: AdminAnnouncementDelivery
+}

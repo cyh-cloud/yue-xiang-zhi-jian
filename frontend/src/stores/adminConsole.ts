@@ -8,9 +8,15 @@ import type {
   AdminAccountResponse,
   AdminAccountStatusPayload,
   AdminAccountsResponse,
+  AdminAnnouncement,
+  AdminAnnouncementCreatePayload,
+  AdminAnnouncementResponse,
+  AdminAnnouncementPublishResponse,
+  AdminAnnouncementsResponse,
   AdminPasswordResetResponse,
   AdminConsoleRole,
-  AdminDashboard,
+  AdminDashboardPayload,
+  AdminDashboardSnapshot,
   AdminManagedRole,
   AdminReviewActionResponse,
   AdminReviewContentType,
@@ -45,7 +51,7 @@ function emptyReviewCounts(): AdminReviewCounts {
 
 export const useAdminConsoleStore = defineStore('adminConsole', () => {
   const auth = useAuthStore()
-  const dashboard = ref<AdminDashboard | null>(null)
+  const dashboard = ref<AdminDashboardSnapshot | null>(null)
   const loading = ref(false)
   const error = ref('')
   const reviewItems = ref<AdminReviewItem[]>([])
@@ -92,6 +98,16 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     created_from: '',
     created_to: ''
   })
+  const announcements = ref<AdminAnnouncement[]>([])
+  const announcementsLoading = ref(false)
+  const announcementsError = ref('')
+  const announcementAccessDenied = ref(false)
+  const announcementActionLoading = ref(false)
+  const announcementFormError = ref('')
+  const announcementFormErrorCode = ref('')
+  const announcementPublishResult = ref<AdminAnnouncementPublishResponse | null>(
+    null
+  )
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -114,6 +130,28 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
 
   function clearError() {
     error.value = ''
+  }
+
+  async function loadDashboard(): Promise<boolean> {
+    loading.value = true
+    error.value = ''
+    try {
+      // The role picks the endpoint, so an ordinary admin never asks the
+      // server for the platform-wide metrics the permission matrix hides.
+      const path =
+        role.value === 'super_admin'
+          ? '/api/admin/dashboard'
+          : '/api/admin/content-dashboard'
+      const response = await apiFetch<AdminDashboardPayload>(path)
+      dashboard.value = response.dashboard
+      return true
+    } catch (caught) {
+      captureError(caught, '看板加载失败')
+      dashboard.value = null
+      return false
+    } finally {
+      loading.value = false
+    }
   }
 
   async function loadReviewQueue(
@@ -569,6 +607,93 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     redemptionDetailError.value = ''
   }
 
+  async function loadAnnouncements(): Promise<boolean> {
+    announcementsLoading.value = true
+    announcementsError.value = ''
+    announcementAccessDenied.value = false
+    try {
+      const response = await apiFetch<AdminAnnouncementsResponse>(
+        '/api/admin/announcements'
+      )
+      announcements.value = response.items
+      return true
+    } catch (caught) {
+      announcementsError.value = errorMessage(caught, '公告列表加载失败')
+      // A 403 means the role is outside the permission matrix, which is a
+      // denial and not an empty history: the screen must say so instead of
+      // rendering "no announcements yet".
+      announcementAccessDenied.value =
+        caught instanceof ApiError && caught.status === 403
+      announcements.value = []
+      return false
+    } finally {
+      announcementsLoading.value = false
+    }
+  }
+
+  async function createAnnouncement(
+    payload: AdminAnnouncementCreatePayload
+  ): Promise<boolean> {
+    announcementActionLoading.value = true
+    announcementFormError.value = ''
+    announcementFormErrorCode.value = ''
+    try {
+      const response = await apiFetch<AdminAnnouncementResponse>(
+        '/api/admin/announcements',
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }
+      )
+      announcements.value = [response.announcement, ...announcements.value]
+      return true
+    } catch (caught) {
+      announcementFormError.value = errorMessage(caught, '创建公告失败')
+      announcementFormErrorCode.value =
+        caught instanceof ApiError && caught.code ? caught.code : ''
+      return false
+    } finally {
+      announcementActionLoading.value = false
+    }
+  }
+
+  async function publishAnnouncement(
+    announcementId: string
+  ): Promise<boolean> {
+    announcementActionLoading.value = true
+    announcementsError.value = ''
+    announcementPublishResult.value = null
+    try {
+      const response = await apiFetch<AdminAnnouncementPublishResponse>(
+        `/api/admin/announcements/${encodeURIComponent(announcementId)}/publish`,
+        { method: 'POST' }
+      )
+      announcementPublishResult.value = response
+      // The publish keeps its own delivery summary, so the list is re-read to
+      // show the committed status without guessing it from the response.
+      await loadAnnouncements()
+      return true
+    } catch (caught) {
+      announcementsError.value = errorMessage(caught, '发布公告失败')
+      return false
+    } finally {
+      announcementActionLoading.value = false
+    }
+  }
+
+  function clearAnnouncementFormError() {
+    announcementFormError.value = ''
+    announcementFormErrorCode.value = ''
+  }
+
+  function clearAnnouncementsError() {
+    announcementsError.value = ''
+  }
+
+  function clearAnnouncementPublishResult() {
+    announcementPublishResult.value = null
+  }
+
   return {
     dashboard,
     loading,
@@ -586,6 +711,7 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     canManagePlatform,
     captureError,
     clearError,
+    loadDashboard,
     loadReviewQueue,
     approveReview,
     rejectReview,
@@ -625,6 +751,20 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     loadRedemptionDetail,
     clearRedemptionDetail,
     clearRedemptionsError,
-    clearRedemptionDetailError
+    clearRedemptionDetailError,
+    announcements,
+    announcementsLoading,
+    announcementsError,
+    announcementAccessDenied,
+    announcementActionLoading,
+    announcementFormError,
+    announcementFormErrorCode,
+    announcementPublishResult,
+    loadAnnouncements,
+    createAnnouncement,
+    publishAnnouncement,
+    clearAnnouncementFormError,
+    clearAnnouncementsError,
+    clearAnnouncementPublishResult
   }
 })
