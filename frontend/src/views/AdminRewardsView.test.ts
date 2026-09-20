@@ -143,10 +143,35 @@ const verifiedFulfillment = fulfillmentFixture({
   updated_at: '2026-09-19T15:05:00+08:00'
 })
 
+const cancelCandidateFulfillment = fulfillmentFixture({
+  id: 4,
+  redemption_id: 14,
+  user_id: 8,
+  user: {
+    id: 8,
+    username: 'guangxiu-apprentice',
+    name: '粤乡智匠平台非遗广绣技艺传承培训班学员黄梓姗',
+    role: 'student',
+    contact: '13900002222'
+  },
+  status: 'pending',
+  redemption_status: 'pending',
+  stock_reservation: {
+    reservation_id: 'reservation-14',
+    status: 'reserved',
+    quantity: 1,
+    created_at: '2026-09-20T09:30:00+08:00',
+    released_at: null
+  },
+  created_at: '2026-09-20T09:30:00+08:00',
+  updated_at: '2026-09-20T09:30:00+08:00'
+})
+
 const defaultFulfillments = [
   fulfillmentFixture(),
   issuedFulfillment,
-  verifiedFulfillment
+  verifiedFulfillment,
+  cancelCandidateFulfillment
 ]
 
 function actionResult(patch: Partial<AdminFulfillmentActionResult> = {}) {
@@ -165,7 +190,42 @@ function actionResult(patch: Partial<AdminFulfillmentActionResult> = {}) {
   }
 }
 
-function redemptionDetailFixture(): AdminRedemptionDetail {
+function fulfillmentActionResult(
+  fulfillmentId: number,
+  action: string
+): AdminFulfillmentActionResult {
+  if (action === 'issue') {
+    return actionResult({
+      fulfillment_id: fulfillmentId,
+      status: 'issued',
+      issued_at: '2026-09-20T15:00:00+08:00',
+      canceled_at: null,
+      restored_points: 0,
+      changed: true
+    })
+  }
+  if (action === 'verify') {
+    return actionResult({
+      fulfillment_id: fulfillmentId,
+      status: 'verified',
+      issued_at: '2026-09-20T12:05:00+08:00',
+      verified_at: '2026-09-20T14:05:00+08:00',
+      canceled_at: null,
+      restored_points: 0,
+      changed: true
+    })
+  }
+  return actionResult({
+    fulfillment_id: fulfillmentId,
+    status: 'canceled',
+    restored_points: 320,
+    changed: true
+  })
+}
+
+function redemptionDetailFixture(
+  patch: Partial<AdminRedemptionDetail> = {}
+): AdminRedemptionDetail {
   return {
     id: 11,
     user_id: 7,
@@ -219,7 +279,8 @@ function redemptionDetailFixture(): AdminRedemptionDetail {
     ],
     created_at: '2026-09-20T09:00:00+08:00',
     updated_at: '2026-09-20T09:00:00+08:00',
-    canceled_at: null
+    canceled_at: null,
+    ...patch
   }
 }
 
@@ -227,6 +288,8 @@ let listRewards: AdminReward[] = defaultRewards
 let listFulfillments: AdminFulfillment[] = defaultFulfillments
 let listFailure: Error | null = null
 let onlineConflict = false
+let updateConflict = false
+let fulfillmentConflict = false
 let listHold: Array<() => void> = []
 let holdLists = false
 
@@ -264,16 +327,27 @@ apiFetchMock.mockImplementation(async (path: string) => {
       }
       return { success: true, reward: listRewards[0] }
     }
+    if (updateConflict) {
+      throw new ApiError('奖品已被其他管理员修改', 409)
+    }
     if (path.endsWith('/api/admin/rewards') === false) {
       return { success: true, reward: listRewards[1] }
     }
     return { success: true, reward: listRewards[0] }
   }
   if (pathname.startsWith('/api/admin/fulfillments/')) {
-    return { success: true, fulfillment: actionResult() }
+    if (fulfillmentConflict) {
+      throw new ApiError('履约发放冲突', 409)
+    }
+    const [, , , fulfillmentId, action] = pathname.split('/')
+    return {
+      success: true,
+      fulfillment: fulfillmentActionResult(Number(fulfillmentId), action ?? '')
+    }
   }
   if (pathname.startsWith('/api/admin/redemptions/')) {
-    return { success: true, ...redemptionDetailFixture() }
+    const requested = Number(pathname.slice('/api/admin/redemptions/'.length))
+    return { success: true, ...redemptionDetailFixture({ id: requested }) }
   }
   return { success: true }
 })
@@ -336,13 +410,24 @@ describe('AdminRewardsView', () => {
           }
           return { success: true, reward: listRewards[0] }
         }
+        if (updateConflict) {
+          throw new ApiError('奖品已被其他管理员修改', 409)
+        }
         return { success: true, reward: listRewards[1] }
       }
       if (pathname.startsWith('/api/admin/fulfillments/')) {
-        return { success: true, fulfillment: actionResult() }
+        if (fulfillmentConflict) {
+          throw new ApiError('履约发放冲突', 409)
+        }
+        const [, , , fulfillmentId, action] = pathname.split('/')
+        return {
+          success: true,
+          fulfillment: fulfillmentActionResult(Number(fulfillmentId), action ?? '')
+        }
       }
       if (pathname.startsWith('/api/admin/redemptions/')) {
-        return { success: true, ...redemptionDetailFixture() }
+        const requested = Number(pathname.slice('/api/admin/redemptions/'.length))
+        return { success: true, ...redemptionDetailFixture({ id: requested }) }
       }
       return { success: true }
     })
@@ -350,6 +435,8 @@ describe('AdminRewardsView', () => {
     listFulfillments = defaultFulfillments
     listFailure = null
     onlineConflict = false
+    updateConflict = false
+    fulfillmentConflict = false
     holdLists = false
     listHold = []
     document.body.innerHTML = ''
@@ -378,8 +465,115 @@ describe('AdminRewardsView', () => {
     )
   })
 
+  it('refreshes an open detail for another redemption with its own id', async () => {
+    const { wrapper, pinia } = await mountView()
+    const store = useAdminConsoleStore(pinia)
+    store.redemptionDetail = redemptionDetailFixture({ id: 14 })
+    apiFetchMock.mockClear()
+
+    await wrapper.get('[data-test="fulfillment-cancel-4"]').trigger('click')
+    await wrapper.get('[data-test="confirm-cancel"]').trigger('click')
+    await flushPromises()
+
+    expect(
+      apiFetchMock.mock.calls.filter(call => call[0] === '/api/admin/redemptions/14')
+    ).toHaveLength(1)
+    expect(
+      apiFetchMock.mock.calls.filter(call => call[0] === '/api/admin/redemptions/11')
+    ).toHaveLength(0)
+    expect(store.redemptionDetail?.id).toBe(14)
+  })
+
+  it('re-reads the queue row and the reward aggregates after issue and cancel', async () => {
+    const { wrapper } = await mountView()
+
+    listFulfillments = defaultFulfillments.map(item =>
+      item.id === 1
+        ? {
+            ...item,
+            status: 'issued',
+            redemption_status: 'issued',
+            issued_at: '2026-09-20T15:00:00+08:00',
+            updated_at: '2026-09-20T15:00:00+08:00'
+          }
+        : item
+    )
+    listRewards = defaultRewards.map(reward =>
+      reward.reward_id === 'reward-litchi'
+        ? { ...reward, reserved: 5, available: 35 }
+        : reward
+    )
+
+    await wrapper.get('[data-test="fulfillment-issue-1"]').trigger('click')
+    await wrapper.get('[data-test="confirm-issue"]').trigger('click')
+    await flushPromises()
+
+    const issuedCells = wrapper
+      .get('[data-test="fulfillment-row"]')
+      .findAll('td')
+      .map(cell => cell.text())
+    expect(issuedCells[4]).toBe('已发放')
+    expect(issuedCells[5]).toBe('已发放')
+
+    const issuedRewardCells = wrapper
+      .get('[data-test="reward-row"]')
+      .findAll('td')
+      .map(cell => cell.text())
+    expect(issuedRewardCells[4]).toBe('5')
+    expect(issuedRewardCells[5]).toBe('35')
+    expect(
+      apiFetchMock.mock.calls.filter(call => call[0] === '/api/admin/rewards').length
+    ).toBeGreaterThan(1)
+
+    listFulfillments = defaultFulfillments.map(item =>
+      item.id === 4
+        ? {
+            ...item,
+            status: 'canceled',
+            redemption_status: 'canceled',
+            canceled_at: '2026-09-20T16:00:00+08:00',
+            restored_points: 60,
+            updated_at: '2026-09-20T16:00:00+08:00'
+          }
+        : item
+    )
+    listRewards = defaultRewards.map(reward =>
+      reward.reward_id === 'reward-offline-tool'
+        ? { ...reward, reserved: 4, available: 1 }
+        : reward
+    )
+
+    await wrapper.get('[data-test="fulfillment-cancel-4"]').trigger('click')
+    await wrapper.get('[data-test="confirm-cancel"]').trigger('click')
+    await flushPromises()
+
+    const canceledRow = wrapper.get(
+      '[data-test="fulfillment-row"][data-fulfillment-id="4"]'
+    )
+    const canceledCells = canceledRow.findAll('td').map(cell => cell.text())
+    expect(canceledCells[4]).toBe('已取消')
+    expect(canceledCells[5]).toBe('已取消')
+
+    const canceledRewardRow = wrapper.get(
+      '[data-test="reward-row"][data-reward-id="reward-offline-tool"]'
+    )
+    const canceledRewardCells = canceledRewardRow
+      .findAll('td')
+      .map(cell => cell.text())
+    expect(canceledRewardCells[4]).toBe('4')
+    expect(canceledRewardCells[5]).toBe('1')
+  })
+
   it('renders the reward catalog columns and the fulfillment queue actions', async () => {
     const { wrapper } = await mountView()
+
+    // The queue rows carry the identity block the server sends for filtering;
+    // the screen renders only the learner name and the id from it.
+    const queue = wrapper.get('[data-test="fulfillment-table"]')
+    expect(queue.text()).toContain('粤乡农业职业培训学院学员李想')
+    expect(queue.text()).toContain('#7')
+    expect(queue.html()).not.toContain('13800001111')
+    expect(wrapper.html()).not.toContain('13800001111')
 
     expect(
       wrapper.findAll('[data-test="reward-table"] thead th').map(header => header.text())
@@ -488,6 +682,98 @@ describe('AdminRewardsView', () => {
     ).toBeGreaterThan(1)
   })
 
+  it('keeps a failed online toggle reachable instead of hiding it behind the scrim', async () => {
+    const { wrapper } = await mountView()
+    onlineConflict = true
+
+    await wrapper.get('[data-test="reward-online-reward-litchi"]').trigger('click')
+    await wrapper.get('[data-test="confirm-online"]').trigger('click')
+    await flushPromises()
+
+    // The dialog closes on failure too, so the banner sits in the page flow
+    // rather than underneath `.rw-dialog-backdrop`.
+    expect(wrapper.find('[data-test="reward-online-dialog"]').exists()).toBe(false)
+    expect(wrapper.find('.rw-dialog-backdrop').exists()).toBe(false)
+
+    const alert = wrapper.get('[data-test="reward-error"]')
+    expect(alert.text()).toContain('奖品已被其他管理员修改')
+    expect(alert.element.closest('.rw-dialog-backdrop')).toBeNull()
+    expect(wrapper.find('[data-test="reward-retry"]').exists()).toBe(true)
+  })
+
+  it('keeps a failed fulfillment action reachable instead of hiding it behind the scrim', async () => {
+    const { wrapper } = await mountView()
+    fulfillmentConflict = true
+
+    await wrapper.get('[data-test="fulfillment-issue-1"]').trigger('click')
+    await wrapper.get('[data-test="confirm-issue"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="fulfillment-dialog-issue"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.find('.rw-dialog-backdrop').exists()).toBe(false)
+
+    const alert = wrapper.get('[data-test="fulfillment-error"]')
+    expect(alert.text()).toContain('履约发放冲突')
+    expect(alert.element.closest('.rw-dialog-backdrop')).toBeNull()
+    expect(wrapper.find('[data-test="fulfillment-retry"]').exists()).toBe(true)
+  })
+
+  it('reloads the catalog and re-arms the edit form after a 409 on reward edit', async () => {
+    const { wrapper } = await mountView()
+    updateConflict = true
+
+    await wrapper.get('[data-test="reward-edit"]').trigger('click')
+    await wrapper.get('[data-test="reward-name"]').setValue('荔枝保果技术手册冲突版')
+    await wrapper.get('[data-test="reward-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="reward-form-error"]').text()).toContain(
+      '奖品已被其他管理员修改'
+    )
+    expect(
+      apiFetchMock.mock.calls.filter(call => call[0] === '/api/admin/rewards')
+        .length
+    ).toBeGreaterThan(1)
+    expect(wrapper.find('[data-test="reward-form-retry"]').exists()).toBe(true)
+    const retry = wrapper.get('[data-test="reward-form-retry"]')
+
+    // The server row moved on: adopt its version so the resubmit can succeed.
+    listRewards = defaultRewards.map(reward =>
+      reward.reward_id === 'reward-litchi'
+        ? { ...reward, version: 4, name: '服务端已更新的名称' }
+        : reward
+    )
+    updateConflict = false
+    await retry.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="reward-row"]').text()).toContain(
+      '服务端已更新的名称'
+    )
+
+    await wrapper.get('[data-test="reward-submit"]').trigger('click')
+    await flushPromises()
+
+    const retried = apiFetchMock.mock.calls
+      .filter(
+        call =>
+          call[0] === '/api/admin/rewards/reward-litchi' &&
+          call[1]?.method === 'PUT'
+      )
+      .pop()
+    expect(JSON.parse(String(retried?.[1]?.body))).toEqual({
+      name: '荔枝保果技术手册冲突版',
+      points_cost: 320,
+      stock: 40,
+      expected_version: 4
+    })
+    expect(wrapper.get('[data-test="reward-form-message"]').text()).toContain(
+      '已保存奖品'
+    )
+  })
+
   it('confirms the online toggle and re-renders the catalog', async () => {
     const { wrapper } = await mountView()
 
@@ -510,6 +796,22 @@ describe('AdminRewardsView', () => {
     expect(wrapper.find('[data-test="reward-online-dialog"]').exists()).toBe(
       false
     )
+  })
+
+  it('exposes no reward delete control anywhere on the screen', async () => {
+    const { wrapper } = await mountView()
+
+    await wrapper.get('[data-test="reward-edit"]').trigger('click')
+    await wrapper.get('[data-test="reward-online-reward-litchi"]').trigger('click')
+
+    const html = wrapper.html()
+    expect(html).not.toContain('删除')
+    expect(html).not.toContain('delete')
+    expect(html).not.toContain('remove')
+    expect(
+      wrapper.findAll('[data-test$="-delete"], [data-test*="delete"]')
+    ).toHaveLength(0)
+    expect(wrapper.find('[data-test="reward-online-dialog"]').exists()).toBe(true)
   })
 
   it('creates a reward and edits its name, points cost and stock', async () => {
@@ -1171,7 +1473,7 @@ function flexValues(declarations: Record<string, string>): {
   }
   if (parts.length === 2) {
     if (/^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
-      return { grow: Number(parts[0]), shrink: 1, basis: '0%' }
+      return { grow: Number(parts[0]), shrink: Number(parts[1]), basis: '0%' }
     }
     return { grow: numeric(parts[0], 1), shrink: 1, basis: parts[1] }
   }
@@ -1538,6 +1840,9 @@ function installGeometry(
 }
 
 describe('AdminRewardsView geometry', () => {
+  // Blind spot: `.rw-dialog-backdrop` is `position: fixed` with `inset: 0`,
+  // so it is deliberately outside the in-flow measurement below. Dialog
+  // overflow at narrow widths is not covered by these assertions.
   it('keeps the screen root unclipped so the geometry assertion has teeth', () => {
     const rootRule = cssRule(rewardsViewSource, '.admin-rewards')
     expect(rootRule).toContain('min-width: 0')

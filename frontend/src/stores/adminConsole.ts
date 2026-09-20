@@ -372,7 +372,12 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
       await loadRewards()
       return true
     } catch (caught) {
-      rewardFormError.value = errorMessage(caught, '编辑奖品失败')
+      // A 409 means another admin already moved the row: reload so the edit
+      // form re-seeds its expected version from the server values, then keep
+      // the conflict message visible next to the form.
+      const conflictMessage = errorMessage(caught, '编辑奖品失败')
+      await loadRewards()
+      rewardFormError.value = conflictMessage
       return false
     } finally {
       rewardActionLoading.value = false
@@ -465,6 +470,12 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
         { method: 'POST' }
       )
       replaceFulfillment(response.fulfillment)
+      // The 05 action also rewrites the linked redemption and, on cancel,
+      // releases the stock reservation. The optimistic merge above cannot
+      // carry redemption_status or updated_at, so re-read the queue and the
+      // catalog to keep both tables authoritative.
+      await loadFulfillments()
+      await loadRewards()
       if (redemptionDetail.value !== null) {
         await loadRedemptionDetail(redemptionDetail.value.id)
       }

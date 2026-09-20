@@ -1526,7 +1526,3 @@ export interface AdminRewardQueueQuery {
   created_from: string
   created_to: string
 }
-
-export interface AdminRedemptionQuery extends AdminRewardQueueQuery {
-  status: AdminRedemptionStatusFilter
-}

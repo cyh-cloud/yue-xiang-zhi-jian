@@ -173,6 +173,21 @@ function resetForm(): void {
   form.value = { name: '', points_cost: '', stock: '' }
 }
 
+async function reloadCatalogForFormError(): Promise<void> {
+  const editing = editingId.value
+  const done = await store.loadRewards()
+  if (!done) return
+  if (editing === null) return
+  const fresh = store.rewards.find(reward => reward.reward_id === editing)
+  // Keep the operator's typed values, but adopt the server's version so a
+  // resubmit after a 409 conflict can actually succeed.
+  if (fresh) {
+    editingVersion.value = fresh.version
+    return
+  }
+  resetForm()
+}
+
 function startEdit(reward: AdminReward): void {
   store.clearRewardFormError()
   formMessage.value = ''
@@ -234,9 +249,11 @@ async function confirmOnlineToggle(): Promise<void> {
   if (reward === null) return
   const online = !reward.is_online
   const done = await store.setRewardOnline(reward.reward_id, reward.version, online)
+  // Close either way: the failure banner lives in the page flow, and a dialog
+  // left open would cover it with the backdrop scrim.
+  closeDialogs()
   if (done) {
     actionMessage.value = `奖品「${reward.name}」已${online ? '上架' : '下架'}`
-    closeDialogs()
   }
 }
 
@@ -250,9 +267,9 @@ async function confirmAction(): Promise<void> {
       : action === 'cancel'
         ? await store.cancelFulfillment(fulfillment.id)
         : await store.verifyFulfillment(fulfillment.id)
+  closeDialogs()
   if (done) {
     actionMessage.value = `履约 #${fulfillment.id} 已${actionLabels[action].title}`
-    closeDialogs()
   }
 }
 
@@ -397,6 +414,15 @@ onBeforeUnmount(() => {
       >
         <ShieldAlert :size="17" aria-hidden="true" />
         <span>{{ store.rewardFormError }}</span>
+        <button
+          type="button"
+          data-test="reward-form-retry"
+          :disabled="store.rewardsLoading"
+          @click="reloadCatalogForFormError"
+        >
+          <RefreshCw :size="16" aria-hidden="true" />
+          重新加载
+        </button>
       </p>
       <p
         v-if="formMessage"
@@ -507,8 +533,7 @@ onBeforeUnmount(() => {
                   </button>
                   <button
                     type="button"
-                    role="switch"
-                    :aria-checked="reward.is_online"
+                    :aria-pressed="reward.is_online"
                     :aria-label="`${reward.is_online ? '下架' : '上架'}奖品：${reward.name}`"
                     :title="`${reward.is_online ? '下架' : '上架'}奖品：${reward.name}`"
                     :data-test="`reward-online-${reward.reward_id}`"

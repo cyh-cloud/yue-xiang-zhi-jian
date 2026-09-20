@@ -68,7 +68,7 @@ const roleLabels: Record<string, string> = {
 }
 
 const ledgerTypeLabels: Record<string, string> = {
-  earn: '发放',
+  award: '发放',
   spend: '兑换扣减',
   refund: '回退',
   expire: '过期'
@@ -84,6 +84,7 @@ const filters = ref<RedemptionFilters>({
   created_to: ''
 })
 const detailMessage = ref('')
+const requestedRedemptionId = ref<number | null>(null)
 
 let filterTimer: ReturnType<typeof setTimeout> | undefined
 
@@ -154,13 +155,23 @@ watch(
   scheduleRedemptionReload
 )
 
-async function openDetail(redemption: AdminRedemption): Promise<void> {
+async function loadDetail(redemptionId: number): Promise<void> {
   detailMessage.value = ''
   store.clearRedemptionDetailError()
-  const done = await store.loadRedemptionDetail(redemption.id)
+  requestedRedemptionId.value = redemptionId
+  const done = await store.loadRedemptionDetail(redemptionId)
   if (done) {
-    detailMessage.value = `已载入兑换 #${redemption.id} 的完整上下文`
+    detailMessage.value = `已载入兑换 #${redemptionId} 的完整上下文`
   }
+}
+
+async function openDetail(redemption: AdminRedemption): Promise<void> {
+  await loadDetail(redemption.id)
+}
+
+function retryDetail(): void {
+  if (requestedRedemptionId.value === null) return
+  void loadDetail(requestedRedemptionId.value)
 }
 
 function closeDetail(): void {
@@ -192,7 +203,7 @@ onBeforeUnmount(() => {
         <PackageCheck :size="26" aria-hidden="true" />
         <div>
           <h1>兑换履约</h1>
-          <p>查询兑换记录，并在履约上下文内查看学员身份、联系方式与积分流水。</p>
+          <p>兑换记录、履约状态、学员身份与积分流水的查询入口。</p>
         </div>
       </div>
       <dl class="rd-header__summary">
@@ -440,7 +451,7 @@ onBeforeUnmount(() => {
         type="button"
         data-test="redemption-detail-retry"
         :disabled="store.redemptionDetailLoading"
-        @click="store.loadRedemptionDetail(store.redemptions[0]?.id ?? 0)"
+        @click="retryDetail"
       >
         <RefreshCw :size="16" aria-hidden="true" />
         重新加载
@@ -751,6 +762,9 @@ onBeforeUnmount(() => {
 .rd-header__summary dt {
   color: var(--ark-muted);
   font-size: 0.74rem;
+  line-break: strict;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
 }
 
 .rd-header__summary dd {

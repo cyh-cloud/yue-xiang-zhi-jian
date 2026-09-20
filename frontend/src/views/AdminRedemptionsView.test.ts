@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ApiError, apiFetch } from '@/api/client'
 import type {
+  AdminFulfillment,
   AdminPointsLedgerEntry,
   AdminRedemption,
   AdminRedemptionDetail
@@ -54,7 +55,9 @@ function ledgerEntry(
   }
 }
 
-function redemptionDetailFixture(): AdminRedemptionDetail {
+function redemptionDetailFixture(
+  patch: Partial<AdminRedemptionDetail> = {}
+): AdminRedemptionDetail {
   return {
     id: 11,
     user_id: 7,
@@ -97,7 +100,7 @@ function redemptionDetailFixture(): AdminRedemptionDetail {
       ledgerEntry(),
       ledgerEntry({
         id: 49,
-        transaction_type: 'earn',
+        transaction_type: 'award',
         source_module: 'handcraft',
         source_event_id: 'course-segment:88',
         delta: 40,
@@ -108,25 +111,26 @@ function redemptionDetailFixture(): AdminRedemptionDetail {
     ],
     created_at: '2026-09-20T09:00:00+08:00',
     updated_at: '2026-09-20T09:00:00+08:00',
-    canceled_at: null
+    canceled_at: null,
+    ...patch
   }
 }
 
 function redemptionFixture(
   patch: Partial<AdminRedemption> = {}
 ): AdminRedemption {
-    const detail = redemptionDetailFixture()
-    const { fulfillment: _fulfillment, points_ledger: _ledger, ...summary } = detail
-    return {
-      ...summary,
-      reward: {
-        reward_id: detail.reward.reward_id,
-        name: detail.reward.name,
-        points_cost: detail.reward.points_cost
-      },
-      ...patch
-    }
+  const detail = redemptionDetailFixture()
+  const { fulfillment: _fulfillment, points_ledger: _ledger, ...summary } = detail
+  return {
+    ...summary,
+    reward: {
+      reward_id: detail.reward.reward_id,
+      name: detail.reward.name,
+      points_cost: detail.reward.points_cost
+    },
+    ...patch
   }
+}
 
 const longNameRedemption = redemptionFixture({
   id: 12,
@@ -148,6 +152,28 @@ const longNameRedemption = redemptionFixture({
 
 const defaultRedemptions = [redemptionFixture(), longNameRedemption]
 
+function fulfillmentQueueFixture(): AdminFulfillment {
+  const redemption = redemptionFixture()
+  return {
+    id: 1,
+    redemption_id: redemption.id,
+    user_id: redemption.user_id,
+    user: redemption.user,
+    reward: redemption.reward,
+    points_cost: redemption.points_cost,
+    request_id: redemption.request_id,
+    status: 'pending',
+    redemption_status: 'pending',
+    stock_reservation: redemption.stock_reservation,
+    restored_points: 0,
+    issued_at: null,
+    verified_at: null,
+    canceled_at: null,
+    created_at: '2026-09-20T09:00:00+08:00',
+    updated_at: '2026-09-20T09:00:00+08:00'
+  }
+}
+
 let listRedemptions: AdminRedemption[] = defaultRedemptions
 let listFailure: Error | null = null
 let detailFailure: Error | null = null
@@ -165,11 +191,14 @@ function redemptionsResponse(): unknown {
   }
 }
 
-function detailResponse(): unknown {
+function detailResponse(redemptionId: number): unknown {
   if (detailFailure) {
     throw detailFailure
   }
-  return { success: true, ...redemptionDetailFixture() }
+  return {
+    success: true,
+    ...redemptionDetailFixture({ id: redemptionId })
+  }
 }
 
 apiFetchMock.mockImplementation(async (path: string) => {
@@ -183,7 +212,8 @@ apiFetchMock.mockImplementation(async (path: string) => {
     return redemptionsResponse()
   }
   if (pathname.startsWith('/api/admin/redemptions/')) {
-    return detailResponse()
+    const requested = Number(pathname.slice('/api/admin/redemptions/'.length))
+    return detailResponse(requested)
   }
   return { success: true }
 })
@@ -227,7 +257,8 @@ describe('AdminRedemptionsView', () => {
         return redemptionsResponse()
       }
       if (pathname.startsWith('/api/admin/redemptions/')) {
-        return detailResponse()
+        const requested = Number(pathname.slice('/api/admin/redemptions/'.length))
+        return detailResponse(requested)
       }
       return { success: true }
     })
@@ -274,6 +305,36 @@ describe('AdminRedemptionsView', () => {
     ).toEqual(['交易类型', '来源模块', '来源事件', '金额', '余额影响', '时间'])
   })
 
+  it('labels every transaction type the ledger constraint allows', async () => {
+    const { wrapper, pinia } = await mountView()
+    const store = useAdminConsoleStore(pinia)
+
+    // backend/app/db.py constrains transaction_type to exactly these values.
+    const allowed = ['award', 'spend', 'refund', 'expire'] as const
+    store.redemptionDetail = redemptionDetailFixture({
+      points_ledger: allowed.map((type, index) =>
+        ledgerEntry({ id: 60 + index, transaction_type: type })
+      )
+    })
+    await flushPromises()
+
+    const rows = wrapper.findAll('[data-test="redemption-ledger-row"]')
+    expect(rows).toHaveLength(allowed.length)
+    for (const [index, type] of allowed.entries()) {
+      const label = rows[index].get('td').text()
+      expect(label, `transaction_type ${type} label`).not.toBe(type)
+      expect(label, `transaction_type ${type} is Chinese`).toMatch(
+        /[\u4e00-\u9fff]/
+      )
+    }
+    expect(rows.map(row => row.get('td').text())).toEqual([
+      '发放',
+      '兑换扣减',
+      '回退',
+      '过期'
+    ])
+  })
+
   it('filters redemptions by user, reward, status, fulfillment status and time range', async () => {
     const { wrapper } = await mountView()
 
@@ -315,6 +376,7 @@ describe('AdminRedemptionsView', () => {
   it('keeps account management and points policy out of the detail and the DTO', async () => {
     const { wrapper, pinia } = await mountView()
     const store = useAdminConsoleStore(pinia)
+    store.fulfillments = [fulfillmentQueueFixture()]
 
     await wrapper.get('[data-test="redemption-detail"]').trigger('click')
     await flushPromises()
@@ -353,6 +415,8 @@ describe('AdminRedemptionsView', () => {
       }
     }
     collect(store.redemptionDetail)
+    collect(store.redemptions)
+    collect(store.fulfillments)
 
     for (const key of [...accountKeys, ...policyKeys]) {
       expect(keys, `store DTO key ${key}`).not.toContain(key)
@@ -384,6 +448,65 @@ describe('AdminRedemptionsView', () => {
         '[data-test*="account"], [data-test*="password"], [data-test*="policy"], [data-test*="weight"], [data-test*="expiry"], [data-test*="enable"], [data-test*="disable"]'
       )
     ).toHaveLength(0)
+  })
+
+  it('pins the queue rows to user name and id and keeps contact in the detail', async () => {
+    const { wrapper, pinia } = await mountView()
+    const store = useAdminConsoleStore(pinia)
+    store.fulfillments = [fulfillmentQueueFixture()]
+    await flushPromises()
+
+    // The list payloads carry the identity block the queues need for filtering
+    // (FR-046, FR-094); the screen renders only the name and the id from it.
+    expect(store.redemptions.length).toBeGreaterThan(0)
+    expect(store.fulfillments.length).toBeGreaterThan(0)
+
+    const queue = wrapper.get('[data-test="redemption-table"]')
+    expect(queue.text()).toContain('粤乡农业职业培训学院学员李想')
+    expect(queue.text()).toContain('#7')
+    expect(queue.html()).not.toContain('13800001111')
+    expect(wrapper.html()).not.toContain('13800001111')
+
+    await wrapper.get('[data-test="redemption-detail"]').trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-test="redemption-user-contact"]').text()
+    ).toContain('13800001111')
+    expect(wrapper.get('[data-test="redemption-table"]').html()).not.toContain(
+      '13800001111'
+    )
+  })
+
+  it('retries the detail request with the id that was last requested', async () => {
+    detailFailure = new ApiError('兑换详情加载失败', 500)
+    const { wrapper } = await mountView()
+
+    await wrapper
+      .get(
+        '[data-test="redemption-row"][data-redemption-id="12"] [data-test="redemption-detail"]'
+      )
+      .trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-test="redemption-detail-error"]').text()).toContain(
+      '兑换详情加载失败'
+    )
+
+    detailFailure = null
+    apiFetchMock.mockClear()
+    await wrapper.get('[data-test="redemption-detail-retry"]').trigger('click')
+    await flushPromises()
+
+    const retried = apiFetchMock.mock.calls.filter(
+      call => call[0] === '/api/admin/redemptions/12'
+    )
+    expect(retried).toHaveLength(1)
+    expect(
+      apiFetchMock.mock.calls.filter(call => call[0] === '/api/admin/redemptions/11')
+    ).toHaveLength(0)
+    expect(wrapper.get('[data-test="redemption-detail-panel"]').text()).toContain(
+      '#12'
+    )
   })
 
   it('renders loading, error, and empty states for the list and the detail', async () => {
@@ -980,7 +1103,7 @@ function flexValues(declarations: Record<string, string>): {
   }
   if (parts.length === 2) {
     if (/^\d+$/.test(parts[0]) && /^\d+$/.test(parts[1])) {
-      return { grow: Number(parts[0]), shrink: 1, basis: '0%' }
+      return { grow: Number(parts[0]), shrink: Number(parts[1]), basis: '0%' }
     }
     return { grow: numeric(parts[0], 1), shrink: 1, basis: parts[1] }
   }
@@ -1366,6 +1489,18 @@ describe('AdminRedemptionsView geometry', () => {
     expect(cssRule(redemptionsViewSource, '.rd-search', 560)).toContain(
       'grid-template-columns: minmax(0, 1fr)'
     )
+    expect(cssRule(redemptionsViewSource, '.rd-detail__grid')).toContain(
+      'grid-template-columns: repeat(2, minmax(0, 1fr))'
+    )
+    expect(cssRule(redemptionsViewSource, '.rd-detail__grid', 900)).toContain(
+      'grid-template-columns: minmax(0, 1fr)'
+    )
+    expect(cssRule(redemptionsViewSource, '.rd-block__grid > div')).toContain(
+      'grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr)'
+    )
+    expect(
+      cssRule(redemptionsViewSource, '.rd-block__grid > div', 560)
+    ).toContain('grid-template-columns: minmax(0, 1fr)')
     expect(cssRule(redemptionsViewSource, '.rd-table')).toContain(
       'table-layout: fixed'
     )
@@ -1377,6 +1512,7 @@ describe('AdminRedemptionsView geometry', () => {
   it('wraps long Chinese text without mid-word breaks', () => {
     for (const selector of [
       '.rd-header p',
+      '.rd-header__summary dt',
       '.rd-field > span',
       '.rd-table td',
       '.rd-block dt',
