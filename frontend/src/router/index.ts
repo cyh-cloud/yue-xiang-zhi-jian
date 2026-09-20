@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteComponent } from 'vue-router'
+import { defineComponent, h } from 'vue'
 
 import { useAuthStore } from '@/stores/auth'
 import AgriCalendarView from '@/views/AgriCalendarView.vue'
@@ -56,9 +57,12 @@ const adminMeta = {
   requiresAuth: true,
   roles: ['super_admin', 'admin'] as const
 }
-const AdminRoutePlaceholder: RouteComponent = {
-  template: '<div data-test="admin-route-placeholder"></div>'
-}
+const AdminRoutePlaceholder: RouteComponent = defineComponent({
+  name: 'AdminRoutePlaceholder',
+  setup() {
+    return () => h('div', { 'data-test': 'admin-route-placeholder' })
+  }
+})
 
 const localResourceViewLoaders = import.meta.glob<{
   default: RouteComponent

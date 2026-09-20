@@ -1,8 +1,9 @@
 import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, expectTypeOf, it } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
+import type { AdminDashboardResponse } from '@/api/types'
 import AdminConsoleNav from '@/components/AdminConsoleNav.vue'
 import AdminMetricGroup from '@/components/AdminMetricGroup.vue'
 import router from '@/router'
@@ -113,6 +114,17 @@ describe('admin console routes', () => {
     }
   })
 
+  it('uses render-function placeholders for admin child routes', () => {
+    const route = router
+      .getRoutes()
+      .find(record => record.path === '/admin/dashboard')
+    const component = route?.components?.default
+
+    expect(component).toBeTruthy()
+    expect(typeof component).toBe('object')
+    expect(component).not.toHaveProperty('template')
+  })
+
   it('renders the navigation and child route inside the parent shell', async () => {
     const test = createRouter({
       history: createMemoryHistory(),
@@ -182,19 +194,22 @@ describe('admin console routes', () => {
 })
 
 describe('AdminMetricGroup', () => {
-  it('renders stable metric selectors and unavailable values', () => {
+  it('keeps the dashboard DTO metrics flat and numeric', () => {
+    expectTypeOf<AdminDashboardResponse['metrics']>().toEqualTypeOf<
+      Record<string, number>
+    >()
+  })
+
+  it('renders stable metric selectors for numeric values', () => {
     const wrapper = mount(AdminMetricGroup, {
       props: {
         metrics: {
           total_users: 12,
-          'pending_review.course_video': {
-            available: false,
-            value: null
-          }
+          pending_review: 3
         },
         labels: {
           total_users: '总用户数',
-          'pending_review.course_video': '课程待审核'
+          pending_review: '待审核'
         }
       }
     })
@@ -206,9 +221,7 @@ describe('AdminMetricGroup', () => {
       wrapper.get('[data-test="admin-metric-total-users"]').text()
     ).toContain('12')
     expect(
-      wrapper
-        .get('[data-test="admin-metric-pending-review-course-video"]')
-        .text()
-    ).toContain('不可用')
+      wrapper.get('[data-test="admin-metric-pending-review"]').text()
+    ).toContain('3')
   })
 })

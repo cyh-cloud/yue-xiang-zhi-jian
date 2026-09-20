@@ -1,45 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type {
-  AdminMetricRecord,
-  AdminMetricValue
-} from '@/api/types'
-
-interface MetricEntry {
-  key: string
-  value: AdminMetricValue
-}
-
 const props = defineProps<{
-  metrics: AdminMetricRecord
+  metrics: Record<string, number>
   labels?: Record<string, string>
 }>()
-
-function isMetricValue(
-  value: AdminMetricValue | AdminMetricRecord
-): value is AdminMetricValue {
-  if (typeof value === 'number') {
-    return true
-  }
-  return (
-    'available' in value &&
-    'value' in value &&
-    typeof value.available === 'boolean'
-  )
-}
-
-function flattenMetrics(
-  metrics: AdminMetricRecord,
-  prefix = ''
-): MetricEntry[] {
-  return Object.entries(metrics).flatMap(([key, value]) => {
-    const metricKey = prefix ? `${prefix}.${key}` : key
-    return isMetricValue(value)
-      ? [{ key: metricKey, value }]
-      : flattenMetrics(value, metricKey)
-  })
-}
 
 function metricTestId(key: string): string {
   return `admin-metric-${key
@@ -49,21 +14,11 @@ function metricTestId(key: string): string {
     .toLowerCase()}`
 }
 
-function displayValue(value: AdminMetricValue): string {
-  if (typeof value === 'number') {
-    return value.toLocaleString('zh-CN')
-  }
-  if (!value.available || value.value === null) {
-    return '不可用'
-  }
-  return value.value.toLocaleString('zh-CN')
+function displayValue(value: number): string {
+  return value.toLocaleString('zh-CN')
 }
 
-function available(value: AdminMetricValue): boolean {
-  return typeof value === 'number' || value.available
-}
-
-const entries = computed(() => flattenMetrics(props.metrics))
+const entries = computed(() => Object.entries(props.metrics))
 </script>
 
 <template>
@@ -73,18 +28,17 @@ const entries = computed(() => flattenMetrics(props.metrics))
     data-test="admin-metric-group"
   >
     <article
-      v-for="entry in entries"
-      :key="entry.key"
+      v-for="[key, value] in entries"
+      :key="key"
       class="admin-metric-group__item"
-      :data-test="metricTestId(entry.key)"
-      :data-metric-key="entry.key"
-      :data-available="available(entry.value)"
+      :data-test="metricTestId(key)"
+      :data-metric-key="key"
     >
       <span class="admin-metric-group__label">
-        {{ labels?.[entry.key] ?? entry.key }}
+        {{ labels?.[key] ?? key }}
       </span>
       <strong class="admin-metric-group__value">
-        {{ displayValue(entry.value) }}
+        {{ displayValue(value) }}
       </strong>
     </article>
   </section>
@@ -128,8 +82,4 @@ const entries = computed(() => flattenMetrics(props.metrics))
   overflow-wrap: anywhere;
 }
 
-.admin-metric-group__item[data-available="false"] .admin-metric-group__value {
-  color: var(--ark-muted);
-  font-size: 1rem;
-}
 </style>
