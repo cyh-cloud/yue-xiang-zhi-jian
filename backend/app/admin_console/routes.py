@@ -30,6 +30,30 @@ def require_admin_session(*, roles: set[str]) -> dict:
     return session
 
 
+@admin_console_bp.get("/dashboard")
+def super_admin_dashboard():
+    from app.admin_console.dashboard import get_super_admin_dashboard
+
+    require_admin_session(roles={"super_admin"})
+    return jsonify(
+        success=True,
+        dashboard=get_super_admin_dashboard(),
+    )
+
+
+@admin_console_bp.get("/content-dashboard")
+def content_operations_dashboard():
+    from app.admin_console.dashboard import (
+        get_content_operations_dashboard,
+    )
+
+    require_admin_session(roles={"admin", "super_admin"})
+    return jsonify(
+        success=True,
+        dashboard=get_content_operations_dashboard(),
+    )
+
+
 def _error_response(error, status: int):
     return (
         jsonify(

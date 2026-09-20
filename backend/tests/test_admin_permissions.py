@@ -88,7 +88,7 @@ class AdminPermissionsTests(TestCase):
             )
 
         self.app.add_url_rule(
-            "/api/admin/dashboard",
+            "/api/admin/test-session-boundary",
             endpoint="test_admin_dashboard",
             view_func=view,
             methods=["GET", "POST"],
@@ -126,7 +126,9 @@ class AdminPermissionsTests(TestCase):
     def test_anonymous_admin_request_is_rejected(self):
         self._register_permission_route({"super_admin"})
 
-        response = self.app.test_client().get("/api/admin/dashboard")
+        response = self.app.test_client().get(
+            "/api/admin/test-session-boundary"
+        )
 
         self.assertEqual(response.status_code, 401)
         self.assertFalse(response.get_json()["success"])
@@ -136,7 +138,7 @@ class AdminPermissionsTests(TestCase):
         self._register_permission_route({"super_admin"})
         client = self._login("super-admin")
 
-        response = client.get("/api/admin/dashboard")
+        response = client.get("/api/admin/test-session-boundary")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
@@ -150,7 +152,7 @@ class AdminPermissionsTests(TestCase):
         client = self._login("ordinary-admin")
 
         response = client.post(
-            "/api/admin/dashboard",
+            "/api/admin/test-session-boundary",
             json={"role": "super_admin", "user_id": user_id + 100},
         )
 
@@ -175,7 +177,7 @@ class AdminPermissionsTests(TestCase):
             user_id = self._create_user(username, role)
             with self.subTest(role=role):
                 response = self._login(username).get(
-                    "/api/admin/dashboard"
+                    "/api/admin/test-session-boundary"
                 )
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(
