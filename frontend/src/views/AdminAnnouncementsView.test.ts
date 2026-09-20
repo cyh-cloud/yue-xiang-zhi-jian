@@ -164,6 +164,12 @@ function requestMethod(options: unknown): string {
   return (options as { method?: string } | undefined)?.method ?? 'GET'
 }
 
+function publishCalls(): number {
+  return apiFetchMock.mock.calls.filter(([path]) =>
+    path.startsWith('/api/admin/announcements/') && path.endsWith('/publish')
+  ).length
+}
+
 function announcementsResponse(path: string, options?: unknown): unknown {
   const pathname = path.split('?')[0] ?? path
   if (pathname === '/api/admin/announcements') {
@@ -431,6 +437,21 @@ apiFetchMock.mockImplementation(async (path: string, options?: unknown) =>
     ).toContain('已发布并送达 3 个账户')
   })
 
+  it('keeps the announcement copy free of internal module jargon', async () => {
+    const { wrapper } = await mountView('super_admin')
+
+    const heading = wrapper.get('.announcements-create__heading')
+    expect(heading.text()).toContain('公告通过站内消息群发，不重复发送通知。')
+    expect(heading.text()).not.toContain('02')
+
+    await wrapper.get('[data-test="announcement-publish"]').trigger('click')
+    const dialog = wrapper.get('[data-test="announcement-publish-dialog"]')
+    expect(dialog.text()).toContain('通过站内消息群发给目标角色')
+    expect(dialog.text()).toContain('重复发布不会重复通知')
+    expect(dialog.text()).not.toContain('02')
+    expect(dialog.text()).not.toContain('第二份通知')
+  })
+
   it('notifies once when the same announcement is published twice', async () => {
     const { wrapper, store } = await mountView('super_admin')
 
@@ -448,7 +469,7 @@ apiFetchMock.mockImplementation(async (path: string, options?: unknown) =>
     ).toContain('本次未产生新的用户通知')
   })
 
-  it('reports a delivery failure as a retryable state', async () => {
+  it('reports a delivery failure as a system-retryable state', async () => {
     deliveryFailuresRemaining = 1
     const { wrapper, store } = await mountView('super_admin')
 
@@ -460,20 +481,19 @@ apiFetchMock.mockImplementation(async (path: string, options?: unknown) =>
 
     const outcome = wrapper.get('[data-test="announcement-publish-outcome"]')
     expect(outcome.text()).toContain('通知未送达')
-    expect(
-      wrapper.find('[data-test="announcement-publish-retry"]').exists()
-    ).toBe(true)
+    expect(outcome.text()).toContain('已记录为可重试状态')
+    expect(outcome.text()).toContain('系统会自动重试')
     expect(store.announcementPublishResult?.delivery.failed).toBe(1)
 
-    await wrapper
-      .get('[data-test="announcement-publish-retry"]')
-      .trigger('click')
-    await flushPromises()
-
-    const retried = wrapper.get('[data-test="announcement-publish-outcome"]')
-    expect(retried.text()).not.toContain('通知未送达')
-    expect(retried.text()).toContain('本次未产生新的用户通知')
-    // The publish itself is idempotent, so the retry must not deliver twice.
+    // The interim backend has no retry endpoint, so the view must not offer a
+    // manual retry that would silently no-op on an already-published row.
+    expect(
+      wrapper.find('[data-test="announcement-publish-retry"]').exists()
+    ).toBe(false)
+    expect(
+      wrapper.find('[data-test="announcement-publish-retry-note"]').text()
+    ).toContain('系统会自动重试')
+    expect(publishCalls()).toBe(1)
     expect(deliveredPublishes).toBe(0)
   })
 

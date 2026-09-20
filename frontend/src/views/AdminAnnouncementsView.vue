@@ -198,12 +198,6 @@ async function confirmPublish(): Promise<void> {
   }
 }
 
-async function retryPublish(): Promise<void> {
-  const announcement = publishResult.value?.announcement
-  if (announcement === undefined) return
-  await store.publishAnnouncement(announcement.announcement_id)
-}
-
 onMounted(() => {
   void store.loadAnnouncements()
 })
@@ -310,32 +304,31 @@ onMounted(() => {
     >
       <AlertTriangle v-if="publishFailed" :size="18" aria-hidden="true" />
       <Check v-else :size="18" aria-hidden="true" />
-      <span>
-        {{
-          publishFailed
-            ? `通知未送达，已记录为可重试状态：${publishResult?.delivery.failed ?? 0} 次失败。`
-            : publishResult?.changed
-              ? `已发布并送达 ${publishResult?.delivery.recipient_count ?? 0} 个账户。`
-              : '该公告已发布，本次未产生新的用户通知。'
-        }}
-      </span>
-      <button
-        v-if="publishFailed"
-        type="button"
-        data-test="announcement-publish-retry"
-        :disabled="store.announcementActionLoading"
-        @click="retryPublish"
-      >
-        <RefreshCw :size="16" aria-hidden="true" />
-        重试发布
-      </button>
+      <div class="announcements-outcome__text">
+        <span>
+          {{
+            publishFailed
+              ? `通知未送达，已记录为可重试状态：${publishResult?.delivery.failed ?? 0} 次失败。`
+              : publishResult?.changed
+                ? `已发布并送达 ${publishResult?.delivery.recipient_count ?? 0} 个账户。`
+                : '该公告已发布，本次未产生新的用户通知。'
+          }}
+        </span>
+        <span
+          v-if="publishFailed"
+          class="announcements-outcome__note"
+          data-test="announcement-publish-retry-note"
+        >
+          系统会自动重试发送，无需手动操作。
+        </span>
+      </div>
     </div>
 
     <section class="announcements-create" aria-labelledby="announcements-create-title">
       <header class="announcements-create__heading">
         <Plus :size="20" aria-hidden="true" />
         <h2 id="announcements-create-title">新建公告</h2>
-        <span>公告经 02 消息通道群发，不写入第二套通知。</span>
+        <span>公告通过站内消息群发，不重复发送通知。</span>
       </header>
       <button
         v-if="!createOpen"
@@ -554,8 +547,7 @@ onMounted(() => {
           </button>
         </header>
         <p>
-          「{{ publishCandidate.title }}」发布后将经 02
-          消息通道群发给目标角色，重复发布不会产生第二份通知。
+          「{{ publishCandidate.title }}」发布后将通过站内消息群发给目标角色，重复发布不会重复通知。
         </p>
         <dl class="announcements-dialog__meta">
           <div>
@@ -763,6 +755,12 @@ onMounted(() => {
   gap: 4px;
 }
 
+.announcements-outcome__text {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
 .announcements-denied strong {
   font-size: 0.9rem;
 }
@@ -787,8 +785,7 @@ onMounted(() => {
   color: var(--ark-signal);
 }
 
-.announcements-error button,
-.announcements-outcome button {
+.announcements-error button {
   display: inline-flex;
   min-height: 38px;
   flex: 0 0 auto;
@@ -802,8 +799,7 @@ onMounted(() => {
   color: var(--ark-paper);
 }
 
-.announcements-error button:hover:not(:disabled),
-.announcements-outcome button:hover:not(:disabled) {
+.announcements-error button:hover:not(:disabled) {
   background: var(--ark-surface-1);
   color: var(--ark-signal);
 }

@@ -171,11 +171,14 @@ describe('AdminDashboardView', () => {
   })
 
   // The plan's Step-1 case, adapted to the Task 4 AdminMetricGroup selector.
+  // The payload is deliberately the contaminated platform snapshot, so the
+  // exclusion assertions below run against keys the response really carries.
   it('ordinary admin renders only content operations metrics', async () => {
-    dashboardPayload = contentOperationsDashboard()
-    const { wrapper, store } = await mountView('admin')
+    dashboardPayload = platformDashboard()
+    const { wrapper } = await mountView('admin')
 
     expect(apiFetchMock).toHaveBeenCalledWith('/api/admin/content-dashboard')
+    expect(apiFetchMock).not.toHaveBeenCalledWith('/api/admin/dashboard')
     expect(
       wrapper.find('[data-test="admin-metric-pending-review-course-video"]')
         .exists()
@@ -198,12 +201,42 @@ describe('AdminDashboardView', () => {
     for (const key of FORBIDDEN_DASHBOARD_KEYS) {
       expect(wrapper.html(), `rendered markup leaks ${key}`).not.toContain(key)
     }
+  })
 
-    const dtoKeys = [...collectKeys(store.dashboard)]
-    const leaked = FORBIDDEN_DASHBOARD_KEYS.filter(key =>
-      dtoKeys.includes(key)
+  // FR-102/FR-103 defence in depth: the exclusion must also hold when the
+  // response body carries the platform-only keys, so a mis-scoped payload
+  // still cannot surface a forbidden metric in the ordinary-admin view.
+  it('surfaces no forbidden metric from a contaminated payload', async () => {
+    dashboardPayload = platformDashboard()
+    const { wrapper, store } = await mountView('admin')
+
+    // Guard: the contamination really reached the store, so the assertions
+    // below cannot pass against a clean payload.
+    const receivedKeys = [...collectKeys(store.dashboard)]
+    const contaminated = FORBIDDEN_DASHBOARD_KEYS.filter(key =>
+      receivedKeys.includes(key)
     )
-    expect(leaked).toEqual([])
+    expect(contaminated).toEqual([
+      'total_users',
+      'role_distribution',
+      'student_count'
+    ])
+
+    for (const key of FORBIDDEN_DASHBOARD_KEYS) {
+      expect(wrapper.html(), `rendered markup leaks ${key}`).not.toContain(key)
+      expect(
+        wrapper.find(`[data-metric-key="${key}"]`).exists(),
+        `rendered tile leaks ${key}`
+      ).toBe(false)
+    }
+
+    expect(wrapper.find('[data-test="dashboard-group-users"]').exists()).toBe(
+      false
+    )
+    expect(wrapper.text()).not.toContain('账户分布')
+    expect(wrapper.text()).not.toContain('总用户数')
+    expect(wrapper.text()).not.toContain('学员数')
+    expect(wrapper.text()).toContain('内容审核')
   })
 
   it('super admin renders the full metric set', async () => {
