@@ -1,5 +1,22 @@
 # Current Work
 
+## 006 Local Resources
+
+- 2026-09-20: Final whole-branch review passed on the 基元律动 channel after
+  one fix wave for ASR failure semantics, category validation, provider error
+  mapping, request ordering, subscription feedback, and TTS timeout handling.
+- Rebased `v2/lixKRT/006-local-resources` onto `v2/lixKRT/dev` at `c0cbddc`
+  and fast-forwarded the integration branch to rebased feature tip `b97a9ef`.
+- Rebased verification: backend `941/941`, frontend `100` files / `625` tests,
+  TypeScript check and production build passed. The browser acceptance set
+  contains 24 screenshots across 8 views and 320/375/1280.
+- Rebase resolution preserved both the merged 007 job-matching routes/wiring
+  and the new 006 routes, providers, and portal entry.
+- Deferred minor: rapid category switching can still clear a newer view-level
+  error notice through an older promise; data selection remains correct.
+- The 006 worktree and branch are retained. No push or branch/worktree cleanup
+  has been performed.
+
 ## 007 Job Matching Specification and Plan
 
 - 2026-09-19: Specification frozen at
