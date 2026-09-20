@@ -32,4 +32,4 @@
 ## Notes
 
 - Cross-module signatures are included as frozen consumer boundaries required by the task, not as implementation design.
-- Provider definition ownership must be de-duplicated when 011 merges; the spec requires one slot and one authoritative setter/getter pair.
+- 011 owns the single provider protocol/placeholder/setter/getter; 12 only re-exports and consumes the same objects.

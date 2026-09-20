@@ -211,7 +211,7 @@
 #### 11 功能说明知识库消费边界
 
 - **FR-050**: 12 MUST 使用唯一注册槽 `assistant_feature_knowledge_provider`，不得建立第二张知识库注册表或直接读取 11 数据库。
-- **FR-051**: 12 MUST 冻结以下消费协议，11 落地后只替换同一槽的 provider，不修改 12 的调用分支：
+- **FR-051**: 12 MUST 直接消费 11 已冻结的以下协议，不得复制为第二份同名协议：
 
 ```python
 class AssistantFeatureKnowledgeProvider(Protocol):
@@ -219,10 +219,10 @@ class AssistantFeatureKnowledgeProvider(Protocol):
 ```
 
 - **FR-052**: 知识条目 MUST 至少包含 `knowledge_id`、`title`、`body`、`feature_key`、`jump_target`、`is_enabled`、`version`、`updated_at`；12 MUST 拒绝未知结构并返回空知识结果。
-- **FR-053**: 12 MUST 提供 `set_assistant_feature_knowledge_provider(app, provider)` 和 `get_assistant_feature_knowledge_provider()`；未注册时 `get` MUST 返回协议完整的不可用占位。
-- **FR-054**: 12 的占位实现 MUST 只返回空列表，不得伪造平台功能说明；11 落地后 MUST 通过同一 setter 注册真实 provider。
+- **FR-053**: 12 MUST 导入或重导出 11 的 `set_assistant_feature_knowledge_provider(app, provider)` 和 `get_assistant_feature_knowledge_provider()`；12 MUST NOT 定义第二组同名 setter/getter。
+- **FR-054**: 未注册或不可用时，11 的占位 MUST 通过同一协议表达不可用；12 MUST 捕获该状态并映射为“暂无法回答，请稍后再试”，不得伪造平台功能说明。
 - **FR-055**: 12 MUST NOT 根据 provider 的具体类型、数据库实现或“是否占位”分叉业务逻辑。
-- **FR-056**: 11 与 12 合并时必须保留同一扩展键、同一方法签名和同一占位语义；若双方已有同名定义，只允许一方保留权威定义，另一方导入或委托，不得出现第二注册表。
+- **FR-056**: 11 MUST 是 Protocol、占位、setter 和 getter 的唯一权威定义方；12 MUST 只导入或重导出同一函数对象，不得出现第二注册表。
 
 #### 请求幂等与交互状态
 
@@ -255,7 +255,7 @@ class AssistantFeatureKnowledgeProvider(Protocol):
 - **01 账户与门户**: 复用当前会话、用户 ID、启用状态和 `role`；角色值固定为 `student`、`teacher`、`enterprise`、`government`、`super_admin`、`admin`。
 - **003 农业技能**: 复用 `app.agri_skills.ai_client.get_ai_client().transcribe()`、共享 ASR 模型配置和 `speech_to_text` 调用点；不复制客户端或模型配置。
 - **006 本土资源**: 只复用其已经验证的 ASR 失败语义和方言代码 `yue/hak/nan`；不调用 006 的方言回答、TTS 或会话存储。
-- **11 系统管理后台**: 消费 `assistant_feature_knowledge_provider`；11 负责知识条目维护和真实 provider，12 负责消费协议、占位和问答使用。
+- **11 系统管理后台**: 消费 `assistant_feature_knowledge_provider`；11 负责 Protocol、占位、set/get、知识条目维护和真实 provider，12 只导入/重导出并用于问答消费。
 - **现有前端路由**: `jump_target` 必须能解析为当前角色可访问的站内路由；不新增第二张业务模块映射表。
 
 ### Scope Boundaries
@@ -290,12 +290,12 @@ class AssistantFeatureKnowledgeProvider(Protocol):
 - AI 调用返回结构化数据；平台回答不得新增知识条目中不存在的 URL、角色权限或业务规则。
 - TTS 不是本 feature 的首期验收必需项；如后续启用，必须保持文字回答为权威结果。
 - 会话留存上限是产品保护性默认值，不替代用户账户删除；未来如需调整应先修订 spec。
-- 11 的计划当前把 provider 定义放在 `app.admin_console.providers`，12 在本分支先冻结同一槽和同一方法形状并提供占位；合并时必须通过导入、委托或重导出消除重复定义，不能保留两个 setter/getter 注册表。
+- 11 的计划和 worktree 已把 provider 定义放在 `app.admin_console.providers`；12 以该定义为唯一权威，只做同槽导入/重导出，不创建本地 setter/getter 或第二占位。
 
 ## Dependencies and Placeholder Boundaries
 
 - **01-账户与门户（已实现，复用）**: 当前用户、会话、启用状态和 `role`。不得建立第二套身份。
 - **003-农业技能（已实现，复用）**: `get_ai_client().transcribe()`、ASR 模型配置和识别失败语义。不得复制 ASR 客户端。
 - **006-本土资源（已实现，复用）**: 方言代码、提问侧语音交互经验和用户文案口径。不得调用其方言回答或 TTS 会话。
-- **11-系统管理后台（计划中，消费）**: `assistant_feature_knowledge_provider`、`AssistantFeatureKnowledgeProvider` 和 `DatabaseAssistantFeatureKnowledgeProvider`。11 未落地时使用 12 的协议完整占位。
+- **11-系统管理后台（计划中，消费）**: `assistant_feature_knowledge_provider`、`AssistantFeatureKnowledgeProvider`、不可用占位和 `DatabaseAssistantFeatureKnowledgeProvider`。12 只导入/重导出 11 的注册函数，不复制定义。
 - **外部 AI 服务（外部依赖）**: 意图分类、平台回答和学习引导；失败统一无降级。
