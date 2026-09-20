@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from '@/api/client'
 import type {
   AiCompanionAnswerResponse,
   AiCompanionConversation,
+  AiCompanionConversationDetailResponse,
   AiCompanionMessage,
   LocalDialectCode
 } from '@/api/types'
@@ -43,12 +44,6 @@ interface AiCompanionState {
 interface ConversationsResponse {
   success: true
   conversations: AiCompanionConversation[]
-}
-
-interface ConversationDetailResponse {
-  success: true
-  // 后端把 messages 嵌在 conversation 记录内，store 归一后按 DTO 语义写入 state。
-  conversation: AiCompanionConversation & { messages: AiCompanionMessage[] }
 }
 
 interface TranscriptionResponse {
@@ -215,7 +210,7 @@ export const useAiCompanionStore = defineStore('aiCompanion', {
       this.error = ''
 
       try {
-        const response = await apiFetch<ConversationDetailResponse>(
+        const response = await apiFetch<AiCompanionConversationDetailResponse>(
           `${CONVERSATIONS_PATH}/${encodeURIComponent(conversationId)}`
         )
         const { messages, ...conversation } = response.conversation

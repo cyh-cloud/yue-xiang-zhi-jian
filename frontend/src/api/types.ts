@@ -1274,3 +1274,9 @@ export interface AiCompanionAnswerResponse {
   module_key: string | null
   jump_target: string | null
 }
+
+export interface AiCompanionConversationDetailResponse {
+  success: true
+  // 后端把 messages 内嵌在 conversation 记录内(repository.get_conversation)。
+  conversation: AiCompanionConversation & { messages: AiCompanionMessage[] }
+}
