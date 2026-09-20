@@ -87,6 +87,37 @@ def code_without_comments(source: str) -> str:
     )
 
 
+def _raises(error: Exception):
+    def _stub(*args, **kwargs):
+        raise error
+
+    return _stub
+
+
+def _returns(value):
+    def _stub(*args, **kwargs):
+        return value
+
+    return _stub
+
+
+def _intent_then(intent: str, second_stub):
+    """第一次调用返回意图，第二次调用走第二段 stub。
+
+    Mock 的 iterable side_effect 只按值返回、不执行其中的可调用对象，因此
+    多段调用必须用一个可调用 side_effect 自己排序。
+    """
+    calls: list = []
+
+    def _stub(*args, **kwargs):
+        calls.append(args)
+        if len(calls) == 1:
+            return {"intent": intent}
+        return second_stub(*args, **kwargs)
+
+    return _stub
+
+
 class RecordingKnowledgeProvider:
     def __init__(self, entries):
         self.entries = list(entries)
@@ -216,7 +247,8 @@ class AiCompanionIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(provider.calls, 1)
 
-        # 热替换：同一应用实例、同一份路由/服务代码，只换 provider 槽位。
+        # 11 侧维护变更：在同一个 provider 实例上更新条目；若 12 建立了长期
+        # 缓存，第二次提问仍会返回旧的 jump_target。
         provider.entries = [
             self.entry(
                 "knowledge-points",
@@ -240,6 +272,28 @@ class AiCompanionIntegrationTests(unittest.TestCase):
         # 每次平台问答都重新读取来源，不建立长期缓存。
         self.assertEqual(provider.calls, 2)
 
+        # 换槽：替换 provider 对象本身，新对象的读取次数从 0 重新计数。
+        replacement = RecordingKnowledgeProvider(
+            [
+                self.entry(
+                    "knowledge-points",
+                    "积分怎么算",
+                    "积分通过完成课程获得",
+                    "/student/points",
+                )
+            ]
+        )
+        set_assistant_feature_knowledge_provider(self.app, replacement)
+        self.ai.complete_json.side_effect = [
+            {"intent": "platform_usage"},
+            {"answer": "换槽后的答案。"},
+        ]
+        third = self._ask(student, "积分怎么算", "provider-3")
+        self.assertEqual(third.status_code, 200)
+        self.assertEqual(third.get_json()["jump_target"], "/student/points")
+        self.assertEqual(replacement.calls, 1)
+        self.assertEqual(provider.calls, 2)
+
     def test_ai_failure_matrix_returns_exact_503_without_local_fallback(self):
         self._insert_user(102, "failure-student", "student")
         student = self._login("failure-student")
@@ -255,13 +309,17 @@ class AiCompanionIntegrationTests(unittest.TestCase):
         )
         set_assistant_feature_knowledge_provider(self.app, provider)
         matrix = (
-            ("timeout", AiUnavailableError("upstream timeout")),
-            ("not-an-object", ["platform_usage"]),
-            ("missing-field", {"answers": ["没有 intent 字段"]}),
-            ("unknown-intent", {"intent": "unknown_intent"}),
+            ("timeout", _raises(AiUnavailableError("upstream timeout"))),
+            ("not-an-object", _returns(["platform_usage"])),
+            ("missing-field", _returns({"answers": ["没有 intent 字段"]})),
+            ("unknown-intent", _returns({"intent": "unknown_intent"})),
+            ("empty-intent", _returns({"intent": ""})),
         )
         for name, stub in matrix:
             with self.subTest(case=name):
+                ai_calls_before = self.ai.complete_json.call_count
+                # 可调用 stub：Mock 每次调用都真正执行它，用例必然到达
+                # classify_intent 的对应分支，而不是被一次性返回值绕过。
                 self.ai.complete_json.side_effect = stub
                 response = self._ask(
                     student,
@@ -273,10 +331,100 @@ class AiCompanionIntegrationTests(unittest.TestCase):
                     response.get_json(),
                     {"success": False, "message": AI_UNAVAILABLE_MESSAGE},
                 )
+                # 请求确实走到了意图分类调用，失败就发生在这一段。
+                self.assertEqual(
+                    self.ai.complete_json.call_count,
+                    ai_calls_before + 1,
+                )
         # 零本地知识兜底：意图阶段就失败，不读知识来源，也不落库。
         self.assertEqual(provider.calls, 0)
         self.assertEqual(self._count("ai_companion_conversations", 102), 0)
         self.assertEqual(self._count("ai_companion_messages", 102), 0)
+
+    def test_second_stage_failures_map_to_503_for_every_call_point(self):
+        self._insert_user(107, "second-stage-student", "student")
+        student = self._login("second-stage-student")
+        provider = RecordingKnowledgeProvider(
+            [
+                self.entry(
+                    "knowledge-job",
+                    "如何投递简历",
+                    "进入就业对接后投递岗位",
+                    "/student/employment/jobs",
+                )
+            ]
+        )
+        set_assistant_feature_knowledge_provider(self.app, provider)
+        # 意图 stub + 第二段 stub：第一次调用返回意图，第二次调用走第二段，
+        # 分别打 ai_companion_feature_answer 与 ai_companion_learning_guidance。
+        cases = (
+            (
+                "feature-answer-timeout",
+                "platform_usage",
+                _raises(AiUnavailableError("upstream timeout")),
+                True,
+            ),
+            (
+                "feature-answer-illegal-shape",
+                "platform_usage",
+                _returns({"answers": []}),
+                True,
+            ),
+            (
+                "feature-answer-empty-answer",
+                "platform_usage",
+                _returns({"answer": "  "}),
+                True,
+            ),
+            (
+                "learning-guidance-timeout",
+                "learning_question",
+                _raises(AiUnavailableError("upstream timeout")),
+                False,
+            ),
+            (
+                "learning-guidance-illegal-shape",
+                "learning_question",
+                _returns({"bullets": []}),
+                False,
+            ),
+            (
+                "learning-guidance-unknown-module",
+                "learning_question",
+                _returns({"bullets": ["要点一"], "module_key": "unknown"}),
+                False,
+            ),
+        )
+        for name, intent, second_stub, reads_knowledge in cases:
+            with self.subTest(case=name):
+                ai_calls_before = self.ai.complete_json.call_count
+                provider_calls_before = provider.calls
+                self.ai.complete_json.side_effect = _intent_then(
+                    intent,
+                    second_stub,
+                )
+                response = self._ask(student, "怎么投简历", f"second-{name}")
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(
+                    response.get_json(),
+                    {"success": False, "message": AI_UNAVAILABLE_MESSAGE},
+                )
+                # 意图段成功后才进第二段：整次请求恰好两次 AI 调用。
+                self.assertEqual(
+                    self.ai.complete_json.call_count,
+                    ai_calls_before + 2,
+                )
+                if reads_knowledge:
+                    # 失败发生在第二段而非意图段：知识来源已被读取过。
+                    self.assertGreater(provider.calls, provider_calls_before)
+                self.assertEqual(
+                    self._count("ai_companion_conversations", 107),
+                    0,
+                )
+                self.assertEqual(
+                    self._count("ai_companion_messages", 107),
+                    0,
+                )
 
     def test_refusals_only_write_ai_companion_tables(self):
         self._insert_user(103, "refusal-student", "student")
@@ -316,8 +464,12 @@ class AiCompanionIntegrationTests(unittest.TestCase):
         # 行为，不属于 AI 学伴的业务写路径；除该语句外不允许写其它任何表。
         for statement in writes:
             if "AI_COMPANION_" not in statement.upper():
-                self.assertIn("sessions", statement)
-                self.assertIn("DELETE", statement.upper())
+                self.assertTrue(
+                    statement.lstrip().upper().startswith(
+                        "DELETE FROM SESSIONS"
+                    ),
+                    statement,
+                )
         self.assertTrue(
             any(
                 "AI_COMPANION_" in statement.upper() for statement in writes
@@ -331,10 +483,12 @@ class AiCompanionIntegrationTests(unittest.TestCase):
         self.assertTrue(modules)
         for module in modules:
             with self.subTest(module=module):
-                self.assertNotIn(module, FORBIDDEN_WRITE_MODULES)
-                if module.startswith("app.admin_console"):
-                    self.assertIn(module, ALLOWED_ADMIN_CONSOLE_MODULES)
-
+                for forbidden in FORBIDDEN_WRITE_MODULES:
+                    self.assertFalse(
+                        module == forbidden
+                        or module.startswith(f"{forbidden}."),
+                        module,
+                    )
                 if module.startswith("app.admin_console"):
                     self.assertIn(module, ALLOWED_ADMIN_CONSOLE_MODULES)
 
@@ -390,10 +544,6 @@ class AiCompanionIntegrationTests(unittest.TestCase):
         self.assertNotIn("AI_ASR_", code)
         self.assertEqual(code.count(".transcribe("), 1)
         self.assertIn("call_point=SPEECH_TO_TEXT_CALL_POINT", source)
-        self.assertNotIn("httpx", source)
-        self.assertNotIn("urllib", source)
-        self.assertNotIn("socket", source)
-
         self.assertNotIn("httpx", source)
         self.assertNotIn("urllib", source)
         self.assertNotIn("socket", source)
@@ -468,6 +618,7 @@ class AiCompanionIntegrationTests(unittest.TestCase):
             self.assertEqual(call_point, "ai_companion_intent")
             self.assertEqual(set(metadata), {"operation", "message_count"})
             self.assertEqual(metadata["operation"], "complete_json")
+
 
 if __name__ == "__main__":
     unittest.main()
