@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type {
+  AiCompanionIntent,
   AgriculturalCourse,
   CourseDirection,
   CourseProgress,
@@ -353,5 +354,16 @@ describe('004 wire DTOs', () => {
         ]
       }
     })
+  })
+})
+
+describe('012 AI 学伴 wire DTOs', () => {
+  it('keeps exactly three AI companion intents', () => {
+    const intents: AiCompanionIntent[] = [
+      'platform_usage',
+      'learning_question',
+      'out_of_scope'
+    ]
+    expect(intents).toHaveLength(3)
   })
 })

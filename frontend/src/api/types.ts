@@ -1236,3 +1236,41 @@ export interface PolicySubscriptionState {
   categories: PolicyCategorySubscription[]
   recommended_category_codes: PolicyCategoryCode[]
 }
+
+export type AiCompanionIntent =
+  | 'platform_usage'
+  | 'learning_question'
+  | 'out_of_scope'
+
+export interface AiCompanionMessage {
+  message_id: string
+  role: 'user' | 'assistant'
+  content: string
+  intent: AiCompanionIntent | null
+  jump_target: string | null
+  created_at: string
+}
+
+export interface AiCompanionConversation {
+  conversation_id: string
+  title: string
+  last_intent: AiCompanionIntent
+  jump_target: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AiCompanionConversationDetail {
+  conversation: AiCompanionConversation
+  messages: AiCompanionMessage[]
+}
+
+export interface AiCompanionAnswerResponse {
+  success: true
+  conversation_id: string
+  user_message: AiCompanionMessage
+  assistant_message: AiCompanionMessage
+  bullets: string[]
+  module_key: string | null
+  jump_target: string | null
+}
