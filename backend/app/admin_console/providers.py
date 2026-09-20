@@ -137,6 +137,11 @@ def install_default_admin_services(app: Flask) -> None:
             app,
             CompositeContentReviewProvider(),
         )
+    # These two slots must be replaced unconditionally. 05 and 06 install
+    # their own defaults earlier in `create_app`, so a `not in
+    # app.extensions` guard here would leave 05's placeholder craft provider
+    # and 06's unfiltered case provider installed, and 011 would never take
+    # effect.
     set_craft_preset_provider(app, DatabaseCraftPresetProvider())
     set_local_resource_case_provider(
         app,

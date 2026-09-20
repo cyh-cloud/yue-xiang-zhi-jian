@@ -30,6 +30,16 @@ def require_admin_session(*, roles: set[str]) -> dict:
     return session
 
 
+def _preset_expected_version():
+    """Optional optimistic-lock token carried by a preset DELETE request."""
+    raw = request.args.get("expected_version")
+    if raw is None:
+        payload = request.get_json(silent=True)
+        if isinstance(payload, dict):
+            raw = payload.get("expected_version")
+    return raw
+
+
 @admin_console_bp.get("/dashboard")
 def super_admin_dashboard():
     from app.admin_console.dashboard import get_super_admin_dashboard
@@ -197,7 +207,11 @@ def delete_handcraft_craft_preset_route(craft_key: str):
     from app.admin_console.presets import disable_craft_preset
 
     session = require_admin_session(roles={"admin", "super_admin"})
-    item = disable_craft_preset(int(session["id"]), craft_key)
+    item = disable_craft_preset(
+        int(session["id"]),
+        craft_key,
+        _preset_expected_version(),
+    )
     return jsonify(success=True, item=item)
 
 
@@ -239,7 +253,11 @@ def delete_success_case_preset_route(case_id: str):
     from app.admin_console.presets import disable_case_preset
 
     session = require_admin_session(roles={"admin", "super_admin"})
-    item = disable_case_preset(int(session["id"]), case_id)
+    item = disable_case_preset(
+        int(session["id"]),
+        case_id,
+        _preset_expected_version(),
+    )
     return jsonify(success=True, item=item)
 
 
@@ -281,7 +299,11 @@ def delete_assistant_knowledge_preset_route(knowledge_id: str):
     from app.admin_console.presets import disable_knowledge_preset
 
     session = require_admin_session(roles={"admin", "super_admin"})
-    item = disable_knowledge_preset(int(session["id"]), knowledge_id)
+    item = disable_knowledge_preset(
+        int(session["id"]),
+        knowledge_id,
+        _preset_expected_version(),
+    )
     return jsonify(success=True, item=item)
 
 

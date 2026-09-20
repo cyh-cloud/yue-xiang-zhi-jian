@@ -1157,6 +1157,7 @@ CREATE TABLE IF NOT EXISTS admin_handcraft_crafts (
         source_available IN (0, 1)
     ),
     sort_order INTEGER NOT NULL DEFAULT 0,
+    is_demo INTEGER NOT NULL DEFAULT 0 CHECK (is_demo IN (0, 1)),
     is_enabled INTEGER NOT NULL DEFAULT 1 CHECK (is_enabled IN (0, 1)),
     version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
     created_at TEXT NOT NULL,
@@ -1316,6 +1317,21 @@ def _ensure_local_resource_case_admin_columns(
     )
 
 
+def _ensure_handcraft_craft_is_demo_column(db: sqlite3.Connection) -> None:
+    columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(admin_handcraft_crafts)")
+    }
+    if "is_demo" not in columns:
+        db.execute(
+            """
+            ALTER TABLE admin_handcraft_crafts
+            ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0
+            CHECK (is_demo IN (0, 1))
+            """
+        )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
@@ -1326,12 +1342,16 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_job_matching_columns(db)
     _ensure_user_password_version_column(db)
     _ensure_local_resource_case_admin_columns(db)
+    _ensure_handcraft_craft_is_demo_column(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
     from app.local_resources.cases import seed_local_resource_cases
 
     seed_local_resource_cases(db)
+    from app.admin_console.presets import seed_craft_presets
+
+    seed_craft_presets(db)
     from app.admin_console.presets import seed_assistant_feature_knowledge
 
     seed_assistant_feature_knowledge(db)

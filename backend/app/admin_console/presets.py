@@ -14,20 +14,18 @@ from app.admin_console.errors import (
 )
 from app.admin_console.time_utils import platform_now_iso
 from app.db import get_db
+from app.handcraft_inheritance.crafts import (
+    CRAFT_SORT_ORDERS,
+    EXPECTED_CRAFT_KEYS,
+    MATERIAL_GUIDE_FIELDS,
+    REQUIRED_STEP_COUNT,
+)
 from app.handcraft_inheritance.presets import PlaceholderCraftPresetProvider
 from app.local_resources.cases import DatabaseLocalResourceCaseProvider
 
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
-REQUIRED_STEP_COUNT = 6
 STABLE_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
-MATERIAL_GUIDE_FIELDS = (
-    "name",
-    "reference_price",
-    "purchase_channel",
-    "precautions",
-    "taobao_keyword",
-)
 ASSISTANT_FEATURE_KEYS = (
     "agri_skills",
     "ai_companion",
@@ -43,7 +41,8 @@ ASSISTANT_FEATURE_KEYS = (
 
 CRAFT_COLUMNS = """
     craft_key, name, introduction, steps_json, material_guide_json,
-    source_available, sort_order, is_enabled, version, created_at, updated_at
+    source_available, sort_order, is_demo, is_enabled, version,
+    created_at, updated_at
 """
 CASE_COLUMNS = """
     case_id, title, summary, background, journey, lessons, sort_order,
@@ -110,6 +109,21 @@ def _not_found(
     return ProviderNotFoundError(message, code=code, details=details)
 
 
+def _begin(db: sqlite3.Connection) -> None:
+    """Open the write transaction before any read that guards a write.
+
+    `load_session` leaves a deferred transaction open on the request
+    connection, and a deferred transaction holds no write lock, so it is
+    committed away first. Without this the version SELECT below would run
+    outside any write transaction and two admins could still both pass
+    the optimistic check. The previous `with get_db() as db:` code
+    committed that pending work on exit as well.
+    """
+    if db.in_transaction:
+        db.commit()
+    db.execute("BEGIN IMMEDIATE")
+
+
 def _bounded_text(value: object, *, field: str, maximum: int) -> str:
     normalized = _required_text(value)
     if normalized is None:
@@ -150,6 +164,27 @@ def _stable_key(value: object, *, field: str) -> str:
     return normalized
 
 
+def _matching_stable_id(
+    payload: dict,
+    *,
+    field: str,
+    existing: sqlite3.Row,
+) -> str:
+    """Refuse a body-supplied stable ID that differs from the path."""
+    current = str(existing[field])
+    supplied = payload.get(field)
+    if supplied is None:
+        return current
+    if _required_text(supplied) != current:
+        raise _validation(
+            f"{field} 与请求路径不一致，不可修改",
+            code=f"{field}_mismatch",
+            field=field,
+            current=current,
+        )
+    return current
+
+
 def _expected_version(value: object) -> int:
     version = _integer(value, field="expected_version")
     if version <= 0:
@@ -158,6 +193,23 @@ def _expected_version(value: object) -> int:
             field="expected_version",
         )
     return version
+
+
+def _optional_expected_version(value: object) -> int | None:
+    """Read the optional optimistic-lock token used by the delete paths."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        normalized = value.strip()
+        if not normalized:
+            return None
+        if not normalized.isdigit():
+            raise _validation(
+                "expected_version 必须是正整数",
+                field="expected_version",
+            )
+        value = int(normalized)
+    return _expected_version(value)
 
 
 def _platform_timestamp(value: object, *, field: str) -> str:
@@ -191,7 +243,7 @@ def _valid_step(raw_step: object) -> dict | None:
         or step_key is None
         or title is None
         or description is None
-        or not isinstance(raw_tips, list)
+        or not isinstance(raw_tips, (list, tuple))
         or not raw_tips
     ):
         return None
@@ -210,21 +262,66 @@ def _valid_step(raw_step: object) -> dict | None:
     }
 
 
-def _craft_is_learnable(source_available: bool, steps: list) -> bool:
-    """A craft is learnable only with a usable source and six valid steps."""
-    if not source_available:
+def _valid_material(raw_material: object) -> bool:
+    """Apply the frozen 05 material guide rule to one raw entry."""
+    if not isinstance(raw_material, dict):
+        return False
+    return all(
+        _required_text(raw_material.get(field)) is not None
+        for field in MATERIAL_GUIDE_FIELDS
+    )
+
+
+def _craft_is_learnable(craft: dict) -> bool:
+    """Mirror the frozen 05 `_normalize_craft` rule over the whole row.
+
+    05 only reports `available`/`status = "available"` when the craft key is
+    expected, the source is usable, the descriptive fields are non-empty,
+    `sort_order` is a positive int, the steps are exactly six valid entries
+    numbered 1..6 with unique keys, and `material_guide` is a non-empty list
+    whose entries carry every `MATERIAL_GUIDE_FIELDS` value. Checking only the
+    steps here is what let the console report `available: true` for a craft 05
+    refuses to render, so the whole row has to be validated.
+    """
+    if not isinstance(craft, dict):
+        return False
+    if craft.get("craft_key") not in EXPECTED_CRAFT_KEYS:
+        return False
+    if craft.get("source_available") is False:
+        return False
+    if _required_text(craft.get("name")) is None:
+        return False
+    if _required_text(craft.get("introduction")) is None:
+        return False
+    sort_order = craft.get("sort_order")
+    if (
+        isinstance(sort_order, bool)
+        or not isinstance(sort_order, int)
+        or sort_order <= 0
+    ):
+        return False
+    raw_steps = craft.get("steps")
+    raw_materials = craft.get("material_guide")
+    if (
+        not isinstance(raw_steps, (list, tuple))
+        or len(raw_steps) != REQUIRED_STEP_COUNT
+        or not isinstance(raw_materials, (list, tuple))
+        or not raw_materials
+    ):
         return False
     normalized: list[dict] = []
     seen_keys: set[str] = set()
-    for raw_step in steps:
+    for raw_step in raw_steps:
         step = _valid_step(raw_step)
         if step is None or step["step_key"] in seen_keys:
             return False
         seen_keys.add(step["step_key"])
         normalized.append(step)
-    return [
-        step["step_no"] for step in normalized
-    ] == list(range(1, REQUIRED_STEP_COUNT + 1))
+    if [step["step_no"] for step in normalized] != list(
+        range(1, REQUIRED_STEP_COUNT + 1)
+    ):
+        return False
+    return all(_valid_material(material) for material in raw_materials)
 
 
 def _validated_steps(value: object) -> list[dict]:
@@ -314,23 +411,25 @@ def _validated_material_guide(value: object) -> list[dict]:
 
 def _serialize_craft(row: sqlite3.Row) -> dict:
     fields = _json_fields(dict(row))
-    steps = _parse_json_list(fields.get("steps"))
-    source_available = bool(fields["source_available"])
-    return {
+    craft = {
         "craft_key": str(fields["craft_key"]),
         "name": str(fields["name"]),
         "introduction": str(fields["introduction"]),
-        "steps": steps,
+        "steps": _parse_json_list(fields.get("steps")),
         "material_guide": _parse_json_list(fields.get("material_guide")),
-        "is_demo": False,
-        "source_available": source_available,
-        "available": _craft_is_learnable(source_available, steps),
+        "is_demo": bool(fields["is_demo"]),
+        "source_available": bool(fields["source_available"]),
+        "available": False,
         "sort_order": int(fields["sort_order"]),
         "is_enabled": bool(fields["is_enabled"]),
         "version": int(fields["version"]),
         "created_at": str(fields["created_at"]),
         "updated_at": str(fields["updated_at"]),
     }
+    # The learnability rule must see the normalized values, not the raw
+    # SQLite integers, so it is evaluated on the serialized craft.
+    craft["available"] = _craft_is_learnable(craft)
+    return craft
 
 
 def _serialize_case(row: sqlite3.Row) -> dict:
@@ -382,11 +481,15 @@ def _serialize_knowledge_item(row: sqlite3.Row) -> dict:
 class DatabaseCraftPresetProvider(PlaceholderCraftPresetProvider):
     """Authoritative craft presets read from `admin_handcraft_crafts`.
 
-    The frozen 05 demo presets stay reachable while the admin console has not
-    taken craft content over yet (the table holds no row at all), so learner
-    facing pages keep working before the first managed craft exists. Logical
-    deletes keep rows in the table, so the demo fallback never reappears once
-    the console owns craft content.
+    The `PlaceholderCraftPresetProvider` base class is retained only as a
+    compatibility shim: the frozen `tests/test_handcraft_presets.py` asserts
+    the installed provider `isinstance(provider,
+    PlaceholderCraftPresetProvider)`. No placeholder content is ever served
+    from here. `admin_handcraft_crafts` is the single authoritative source
+    once 011 owns the slot, and `seed_craft_presets` turns the four 05 demo
+    crafts into real manageable rows on first start, so an empty or fully
+    disabled table means learners see no crafts at all instead of content
+    the admin console cannot reach.
     """
 
     def _enabled_rows(self) -> list[sqlite3.Row]:
@@ -399,17 +502,8 @@ class DatabaseCraftPresetProvider(PlaceholderCraftPresetProvider):
             """
         )
 
-    def _has_managed_crafts(self) -> bool:
-        return (
-            _fetch_one("SELECT 1 FROM admin_handcraft_crafts LIMIT 1")
-            is not None
-        )
-
     def list_crafts(self) -> list[dict]:
-        rows = self._enabled_rows()
-        if not rows and not self._has_managed_crafts():
-            return super().list_crafts()
-        return [_serialize_craft(row) for row in rows]
+        return [_serialize_craft(row) for row in self._enabled_rows()]
 
     def get_craft(self, craft_key: str) -> dict | None:
         row = _fetch_one(
@@ -421,9 +515,7 @@ class DatabaseCraftPresetProvider(PlaceholderCraftPresetProvider):
             (craft_key,),
         )
         if row is None:
-            if self._has_managed_crafts():
-                return None
-            return super().get_craft(craft_key)
+            return None
         if not row["is_enabled"]:
             return None
         return _serialize_craft(row)
@@ -490,7 +582,11 @@ def _craft_payload(
         source_default = True
         enabled_default = True
     else:
-        craft_key = str(existing["craft_key"])
+        craft_key = _matching_stable_id(
+            payload,
+            field="craft_key",
+            existing=existing,
+        )
         source_default = bool(existing["source_available"])
         enabled_default = bool(existing["is_enabled"])
     return {
@@ -535,7 +631,11 @@ def _case_payload(
         published_at = payload.get("published_at")
         enabled_default = True
     else:
-        case_id = str(existing["case_id"])
+        case_id = _matching_stable_id(
+            payload,
+            field="case_id",
+            existing=existing,
+        )
         published_at = payload.get("published_at")
         if published_at is None:
             published_at = existing["published_at"]
@@ -594,7 +694,11 @@ def _knowledge_payload(
         )
         enabled_default = True
     else:
-        knowledge_id = str(existing["knowledge_id"])
+        knowledge_id = _matching_stable_id(
+            payload,
+            field="knowledge_id",
+            existing=existing,
+        )
         enabled_default = bool(existing["is_enabled"])
 
     feature_key = _required_text(payload.get("feature_key"))
@@ -728,7 +832,9 @@ def update_craft_preset(
     expected_version = _expected_version(
         payload.get("expected_version") if isinstance(payload, dict) else None
     )
-    with get_db() as db:
+    db = get_db()
+    _begin(db)
+    try:
         row = db.execute(
             f"""
             SELECT {CRAFT_COLUMNS}
@@ -744,24 +850,25 @@ def update_craft_preset(
                 craft_key=key,
             )
         values = _craft_payload(payload, existing=row)
-        if int(row["version"]) != expected_version:
+        current_version = int(row["version"])
+        if current_version != expected_version:
             raise ProviderConflictError(
                 "技艺内容已被其他管理员修改",
                 code="craft_preset_version_conflict",
                 details={
                     "craft_key": key,
                     "expected_version": expected_version,
-                    "current_version": int(row["version"]),
+                    "current_version": current_version,
                 },
             )
         now = platform_now_iso()
-        db.execute(
+        cursor = db.execute(
             """
             UPDATE admin_handcraft_crafts
             SET name = ?, introduction = ?, steps_json = ?,
                 material_guide_json = ?, source_available = ?, sort_order = ?,
                 is_enabled = ?, version = ?, updated_at = ?
-            WHERE craft_key = ?
+            WHERE craft_key = ? AND version = ?
             """,
             (
                 values["name"],
@@ -771,27 +878,49 @@ def update_craft_preset(
                 int(values["source_available"]),
                 values["sort_order"],
                 int(values["is_enabled"]),
-                int(row["version"]) + 1,
+                current_version + 1,
                 now,
                 key,
+                current_version,
             ),
         )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "技艺内容已被其他管理员修改",
+                code="craft_preset_version_conflict",
+                details={
+                    "craft_key": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
         record_admin_audit(
             db,
             actor_id=actor_id,
             action="update_craft_preset",
             target_type="handcraft_craft",
             target_id=key,
-            before={"version": int(row["version"]), "name": row["name"]},
-            after={"version": int(row["version"]) + 1, "name": values["name"]},
+            before={"version": current_version, "name": row["name"]},
+            after={"version": current_version + 1, "name": values["name"]},
             result="success",
         )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
     return _craft_item(key)
 
 
-def disable_craft_preset(actor_id: int, craft_key: str) -> dict:
+def disable_craft_preset(
+    actor_id: int,
+    craft_key: str,
+    expected_version: object = None,
+) -> dict:
     key = _stable_key(craft_key, field="craft_key")
-    with get_db() as db:
+    locked_version = _optional_expected_version(expected_version)
+    db = get_db()
+    _begin(db)
+    try:
         row = db.execute(
             f"""
             SELECT {CRAFT_COLUMNS}
@@ -807,26 +936,52 @@ def disable_craft_preset(actor_id: int, craft_key: str) -> dict:
                 craft_key=key,
             )
         if not row["is_enabled"]:
+            db.commit()
             return _serialize_craft(row)
+        current_version = int(row["version"])
+        if locked_version is not None and current_version != locked_version:
+            raise ProviderConflictError(
+                "技艺内容已被其他管理员修改",
+                code="craft_preset_version_conflict",
+                details={
+                    "craft_key": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
         now = platform_now_iso()
-        db.execute(
+        cursor = db.execute(
             """
             UPDATE admin_handcraft_crafts
             SET is_enabled = 0, version = version + 1, updated_at = ?
-            WHERE craft_key = ?
+            WHERE craft_key = ? AND version = ?
             """,
-            (now, key),
+            (now, key, current_version),
         )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "技艺内容已被其他管理员修改",
+                code="craft_preset_version_conflict",
+                details={
+                    "craft_key": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
         record_admin_audit(
             db,
             actor_id=actor_id,
             action="disable_craft_preset",
             target_type="handcraft_craft",
             target_id=key,
-            before={"is_enabled": True, "version": int(row["version"])},
-            after={"is_enabled": False, "version": int(row["version"]) + 1},
+            before={"is_enabled": True, "version": current_version},
+            after={"is_enabled": False, "version": current_version + 1},
             result="success",
         )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
     return _craft_item(key)
 
 
@@ -910,7 +1065,9 @@ def update_case_preset(actor_id: int, case_id: str, payload: dict) -> dict:
     expected_version = _expected_version(
         payload.get("expected_version") if isinstance(payload, dict) else None
     )
-    with get_db() as db:
+    db = get_db()
+    _begin(db)
+    try:
         row = db.execute(
             f"""
             SELECT {CASE_COLUMNS}
@@ -925,25 +1082,33 @@ def update_case_preset(actor_id: int, case_id: str, payload: dict) -> dict:
                 "case_preset_not_found",
                 case_id=key,
             )
+        if int(row["is_demo"]):
+            raise _validation(
+                "演示案例由平台种子维护，每次启动都会被还原；"
+                "请新建案例后再编辑或停用",
+                code="demo_case_not_editable",
+                case_id=key,
+            )
         values = _case_payload(payload, existing=row)
-        if int(row["version"]) != expected_version:
+        current_version = int(row["version"])
+        if current_version != expected_version:
             raise ProviderConflictError(
                 "成功案例已被其他管理员修改",
                 code="case_preset_version_conflict",
                 details={
                     "case_id": key,
                     "expected_version": expected_version,
-                    "current_version": int(row["version"]),
+                    "current_version": current_version,
                 },
             )
         now = platform_now_iso()
-        db.execute(
+        cursor = db.execute(
             """
             UPDATE local_resource_success_cases
             SET title = ?, summary = ?, background = ?, journey = ?,
                 lessons = ?, sort_order = ?, published_at = ?, updated_at = ?,
                 is_enabled = ?, version = ?
-            WHERE case_id = ?
+            WHERE case_id = ? AND version = ?
             """,
             (
                 values["title"],
@@ -955,26 +1120,48 @@ def update_case_preset(actor_id: int, case_id: str, payload: dict) -> dict:
                 values["published_at"],
                 now,
                 int(values["is_enabled"]),
-                int(row["version"]) + 1,
+                current_version + 1,
                 key,
+                current_version,
             ),
         )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "成功案例已被其他管理员修改",
+                code="case_preset_version_conflict",
+                details={
+                    "case_id": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
         record_admin_audit(
             db,
             actor_id=actor_id,
             action="update_case_preset",
             target_type="success_case",
             target_id=key,
-            before={"version": int(row["version"]), "title": row["title"]},
-            after={"version": int(row["version"]) + 1, "title": values["title"]},
+            before={"version": current_version, "title": row["title"]},
+            after={"version": current_version + 1, "title": values["title"]},
             result="success",
         )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
     return _case_item(key)
 
 
-def disable_case_preset(actor_id: int, case_id: str) -> dict:
+def disable_case_preset(
+    actor_id: int,
+    case_id: str,
+    expected_version: object = None,
+) -> dict:
     key = _stable_key(case_id, field="case_id")
-    with get_db() as db:
+    locked_version = _optional_expected_version(expected_version)
+    db = get_db()
+    _begin(db)
+    try:
         row = db.execute(
             f"""
             SELECT {CASE_COLUMNS}
@@ -989,27 +1176,60 @@ def disable_case_preset(actor_id: int, case_id: str) -> dict:
                 "case_preset_not_found",
                 case_id=key,
             )
+        if int(row["is_demo"]):
+            raise _validation(
+                "演示案例由平台种子维护，每次启动都会被还原；"
+                "请新建案例后再编辑或停用",
+                code="demo_case_not_editable",
+                case_id=key,
+            )
         if not row["is_enabled"]:
+            db.commit()
             return _serialize_case_item(row)
+        current_version = int(row["version"])
+        if locked_version is not None and current_version != locked_version:
+            raise ProviderConflictError(
+                "成功案例已被其他管理员修改",
+                code="case_preset_version_conflict",
+                details={
+                    "case_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
         now = platform_now_iso()
-        db.execute(
+        cursor = db.execute(
             """
             UPDATE local_resource_success_cases
             SET is_enabled = 0, version = version + 1, updated_at = ?
-            WHERE case_id = ?
+            WHERE case_id = ? AND version = ?
             """,
-            (now, key),
+            (now, key, current_version),
         )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "成功案例已被其他管理员修改",
+                code="case_preset_version_conflict",
+                details={
+                    "case_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
         record_admin_audit(
             db,
             actor_id=actor_id,
             action="disable_case_preset",
             target_type="success_case",
             target_id=key,
-            before={"is_enabled": True, "version": int(row["version"])},
-            after={"is_enabled": False, "version": int(row["version"]) + 1},
+            before={"is_enabled": True, "version": current_version},
+            after={"is_enabled": False, "version": current_version + 1},
             result="success",
         )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
     return _case_item(key)
 
 
@@ -1095,7 +1315,9 @@ def update_knowledge_preset(
     expected_version = _expected_version(
         payload.get("expected_version") if isinstance(payload, dict) else None
     )
-    with get_db() as db:
+    db = get_db()
+    _begin(db)
+    try:
         row = db.execute(
             f"""
             SELECT {KNOWLEDGE_COLUMNS}
@@ -1111,23 +1333,24 @@ def update_knowledge_preset(
                 knowledge_id=key,
             )
         values = _knowledge_payload(payload, existing=row)
-        if int(row["version"]) != expected_version:
+        current_version = int(row["version"])
+        if current_version != expected_version:
             raise ProviderConflictError(
                 "知识条目已被其他管理员修改",
                 code="knowledge_preset_version_conflict",
                 details={
                     "knowledge_id": key,
                     "expected_version": expected_version,
-                    "current_version": int(row["version"]),
+                    "current_version": current_version,
                 },
             )
         now = platform_now_iso()
-        db.execute(
+        cursor = db.execute(
             """
             UPDATE admin_assistant_feature_knowledge
             SET title = ?, body = ?, feature_key = ?, jump_target = ?,
                 is_enabled = ?, sort_order = ?, version = ?, updated_at = ?
-            WHERE knowledge_id = ?
+            WHERE knowledge_id = ? AND version = ?
             """,
             (
                 values["title"],
@@ -1136,27 +1359,49 @@ def update_knowledge_preset(
                 values["jump_target"],
                 int(values["is_enabled"]),
                 values["sort_order"],
-                int(row["version"]) + 1,
+                current_version + 1,
                 now,
                 key,
+                current_version,
             ),
         )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "知识条目已被其他管理员修改",
+                code="knowledge_preset_version_conflict",
+                details={
+                    "knowledge_id": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
         record_admin_audit(
             db,
             actor_id=actor_id,
             action="update_knowledge_preset",
             target_type="assistant_knowledge",
             target_id=key,
-            before={"version": int(row["version"]), "title": row["title"]},
-            after={"version": int(row["version"]) + 1, "title": values["title"]},
+            before={"version": current_version, "title": row["title"]},
+            after={"version": current_version + 1, "title": values["title"]},
             result="success",
         )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
     return _knowledge_item(key)
 
 
-def disable_knowledge_preset(actor_id: int, knowledge_id: str) -> dict:
+def disable_knowledge_preset(
+    actor_id: int,
+    knowledge_id: str,
+    expected_version: object = None,
+) -> dict:
     key = _stable_key(knowledge_id, field="knowledge_id")
-    with get_db() as db:
+    locked_version = _optional_expected_version(expected_version)
+    db = get_db()
+    _begin(db)
+    try:
         row = db.execute(
             f"""
             SELECT {KNOWLEDGE_COLUMNS}
@@ -1172,26 +1417,52 @@ def disable_knowledge_preset(actor_id: int, knowledge_id: str) -> dict:
                 knowledge_id=key,
             )
         if not row["is_enabled"]:
+            db.commit()
             return _serialize_knowledge_item(row)
+        current_version = int(row["version"])
+        if locked_version is not None and current_version != locked_version:
+            raise ProviderConflictError(
+                "知识条目已被其他管理员修改",
+                code="knowledge_preset_version_conflict",
+                details={
+                    "knowledge_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
         now = platform_now_iso()
-        db.execute(
+        cursor = db.execute(
             """
             UPDATE admin_assistant_feature_knowledge
             SET is_enabled = 0, version = version + 1, updated_at = ?
-            WHERE knowledge_id = ?
+            WHERE knowledge_id = ? AND version = ?
             """,
-            (now, key),
+            (now, key, current_version),
         )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "知识条目已被其他管理员修改",
+                code="knowledge_preset_version_conflict",
+                details={
+                    "knowledge_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
         record_admin_audit(
             db,
             actor_id=actor_id,
             action="disable_knowledge_preset",
             target_type="assistant_knowledge",
             target_id=key,
-            before={"is_enabled": True, "version": int(row["version"])},
-            after={"is_enabled": False, "version": int(row["version"]) + 1},
+            before={"is_enabled": True, "version": current_version},
+            after={"is_enabled": False, "version": current_version + 1},
             result="success",
         )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
     return _knowledge_item(key)
 
 
@@ -1348,6 +1619,58 @@ def seed_assistant_feature_knowledge(connection) -> None:
     )
 
 
+def seed_craft_presets(connection) -> None:
+    """Seed the 05 demo crafts as real, manageable admin rows.
+
+    The content is read from 05's `PlaceholderCraftPresetProvider`, which stays
+    the single source of truth for the demo text. `ON CONFLICT(craft_key) DO
+    NOTHING` keeps admin edits and logical deletes across restarts, so the
+    seed only fills an empty slot instead of overwriting the console.
+    """
+    now = platform_now_iso()
+    rows = []
+    for craft in PlaceholderCraftPresetProvider().list_crafts():
+        craft_key = str(craft["craft_key"])
+        sort_order = craft.get("sort_order")
+        if (
+            isinstance(sort_order, bool)
+            or not isinstance(sort_order, int)
+            or sort_order <= 0
+        ):
+            sort_order = CRAFT_SORT_ORDERS.get(craft_key, 0)
+        rows.append(
+            (
+                craft_key,
+                str(craft["name"]),
+                str(craft["introduction"]),
+                json.dumps(
+                    [dict(step) for step in craft["steps"]],
+                    ensure_ascii=False,
+                ),
+                json.dumps(
+                    [dict(material) for material in craft["material_guide"]],
+                    ensure_ascii=False,
+                ),
+                int(bool(craft.get("source_available", True))),
+                int(sort_order),
+                now,
+                now,
+            )
+        )
+    connection.executemany(
+        """
+        INSERT INTO admin_handcraft_crafts (
+            craft_key, name, introduction, steps_json, material_guide_json,
+            source_available, sort_order, is_demo, is_enabled, version,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?, ?)
+        ON CONFLICT(craft_key) DO NOTHING
+        """,
+        rows,
+    )
+
+
 __all__ = [
     "ASSISTANT_FEATURE_KEYS",
     "ASSISTANT_KNOWLEDGE_SEED",
@@ -1364,6 +1687,7 @@ __all__ = [
     "list_craft_presets",
     "list_knowledge_presets",
     "seed_assistant_feature_knowledge",
+    "seed_craft_presets",
     "update_case_preset",
     "update_craft_preset",
     "update_knowledge_preset",
