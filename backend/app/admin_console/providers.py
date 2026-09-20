@@ -9,10 +9,23 @@ from app.admin_console.handcraft_review_adapter import (
     CompositeContentReviewProvider,
     HandcraftTeachingVideoReviewAdapter,
 )
+from app.admin_console.presets import (
+    AdminDatabaseLocalResourceCaseProvider,
+    DatabaseAssistantFeatureKnowledgeProvider,
+    DatabaseCraftPresetProvider,
+)
 from app.content_review.providers import (
     ContentReviewProvider,
     UnavailableContentReviewProvider,
     set_content_review_provider,
+)
+from app.handcraft_inheritance.providers import (
+    CraftPresetProvider,
+    set_craft_preset_provider,
+)
+from app.local_resources.cases import (
+    LocalResourceCaseProvider,
+    set_local_resource_case_provider,
 )
 
 
@@ -60,12 +73,6 @@ class UnavailableFeedbackIntakeProvider:
         )
 
 
-class DatabaseAssistantFeatureKnowledgeProvider(
-    UnavailableAssistantFeatureKnowledgeProvider
-):
-    pass
-
-
 class DatabaseFeedbackIntakeProvider(UnavailableFeedbackIntakeProvider):
     pass
 
@@ -103,11 +110,17 @@ def configure_admin_providers(
     app: Flask,
     *,
     content_review: ContentReviewProvider | None = None,
+    craft_preset: CraftPresetProvider | None = None,
+    local_case: LocalResourceCaseProvider | None = None,
     knowledge: AssistantFeatureKnowledgeProvider | None = None,
     feedback_intake: FeedbackIntakeProvider | None = None,
 ) -> None:
     if content_review is not None:
         set_content_review_provider(app, content_review)
+    if craft_preset is not None:
+        set_craft_preset_provider(app, craft_preset)
+    if local_case is not None:
+        set_local_resource_case_provider(app, local_case)
     if knowledge is not None:
         set_assistant_feature_knowledge_provider(app, knowledge)
     if feedback_intake is not None:
@@ -124,6 +137,11 @@ def install_default_admin_services(app: Flask) -> None:
             app,
             CompositeContentReviewProvider(),
         )
+    set_craft_preset_provider(app, DatabaseCraftPresetProvider())
+    set_local_resource_case_provider(
+        app,
+        AdminDatabaseLocalResourceCaseProvider(),
+    )
     if "assistant_feature_knowledge_provider" not in app.extensions:
         set_assistant_feature_knowledge_provider(
             app,
@@ -134,3 +152,25 @@ def install_default_admin_services(app: Flask) -> None:
             app,
             DatabaseFeedbackIntakeProvider(),
         )
+
+
+__all__ = [
+    "AdminDatabaseLocalResourceCaseProvider",
+    "AssistantFeatureKnowledgeProvider",
+    "CompositeContentReviewProvider",
+    "CraftPresetProvider",
+    "DatabaseAssistantFeatureKnowledgeProvider",
+    "DatabaseCraftPresetProvider",
+    "DatabaseFeedbackIntakeProvider",
+    "FeedbackIntakeProvider",
+    "HandcraftTeachingVideoReviewAdapter",
+    "LocalResourceCaseProvider",
+    "UnavailableAssistantFeatureKnowledgeProvider",
+    "UnavailableFeedbackIntakeProvider",
+    "configure_admin_providers",
+    "get_assistant_feature_knowledge_provider",
+    "get_feedback_intake_provider",
+    "install_default_admin_services",
+    "set_assistant_feature_knowledge_provider",
+    "set_feedback_intake_provider",
+]

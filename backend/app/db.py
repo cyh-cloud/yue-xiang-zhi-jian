@@ -1176,6 +1176,12 @@ CREATE TABLE IF NOT EXISTS system_announcements (
     created_at TEXT NOT NULL,
     published_at TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_admin_handcraft_crafts_order
+    ON admin_handcraft_crafts(sort_order, craft_key);
+
+CREATE INDEX IF NOT EXISTS idx_admin_assistant_knowledge_order
+    ON admin_assistant_feature_knowledge(sort_order, knowledge_id);
 """
 
 
@@ -1279,6 +1285,37 @@ def _ensure_user_password_version_column(db: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_local_resource_case_admin_columns(
+    db: sqlite3.Connection,
+) -> None:
+    columns = {
+        row["name"]
+        for row in db.execute("PRAGMA table_info(local_resource_success_cases)")
+    }
+    if "is_enabled" not in columns:
+        db.execute(
+            """
+            ALTER TABLE local_resource_success_cases
+            ADD COLUMN is_enabled INTEGER NOT NULL DEFAULT 1
+            CHECK (is_enabled IN (0, 1))
+            """
+        )
+    if "version" not in columns:
+        db.execute(
+            """
+            ALTER TABLE local_resource_success_cases
+            ADD COLUMN version INTEGER NOT NULL DEFAULT 1
+            CHECK (version > 0)
+            """
+        )
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_local_resource_cases_enabled
+            ON local_resource_success_cases(is_enabled, sort_order, case_id)
+        """
+    )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
@@ -1288,12 +1325,16 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_teacher_console_columns(db)
     _ensure_job_matching_columns(db)
     _ensure_user_password_version_column(db)
+    _ensure_local_resource_case_admin_columns(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
     from app.local_resources.cases import seed_local_resource_cases
 
     seed_local_resource_cases(db)
+    from app.admin_console.presets import seed_assistant_feature_knowledge
+
+    seed_assistant_feature_knowledge(db)
     from app.admin_console.seed import seed_initial_super_admin
 
     seed_initial_super_admin()

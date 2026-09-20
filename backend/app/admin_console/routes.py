@@ -159,6 +159,132 @@ def reject_review_route(content_type: str, content_id: str):
     return jsonify(success=True, item=item)
 
 
+@admin_console_bp.get("/presets/handcraft_crafts")
+def list_handcraft_craft_presets_route():
+    from app.admin_console.presets import list_craft_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_craft_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/handcraft_crafts")
+def create_handcraft_craft_preset_route():
+    from app.admin_console.presets import create_craft_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_craft_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/handcraft_crafts/<craft_key>")
+def update_handcraft_craft_preset_route(craft_key: str):
+    from app.admin_console.presets import update_craft_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_craft_preset(int(session["id"]), craft_key, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/handcraft_crafts/<craft_key>")
+def delete_handcraft_craft_preset_route(craft_key: str):
+    from app.admin_console.presets import disable_craft_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_craft_preset(int(session["id"]), craft_key)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/success_cases")
+def list_success_case_presets_route():
+    from app.admin_console.presets import list_case_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_case_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/success_cases")
+def create_success_case_preset_route():
+    from app.admin_console.presets import create_case_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_case_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/success_cases/<case_id>")
+def update_success_case_preset_route(case_id: str):
+    from app.admin_console.presets import update_case_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_case_preset(int(session["id"]), case_id, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/success_cases/<case_id>")
+def delete_success_case_preset_route(case_id: str):
+    from app.admin_console.presets import disable_case_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_case_preset(int(session["id"]), case_id)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/assistant_knowledge")
+def list_assistant_knowledge_presets_route():
+    from app.admin_console.presets import list_knowledge_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_knowledge_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/assistant_knowledge")
+def create_assistant_knowledge_preset_route():
+    from app.admin_console.presets import create_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_knowledge_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/assistant_knowledge/<knowledge_id>")
+def update_assistant_knowledge_preset_route(knowledge_id: str):
+    from app.admin_console.presets import update_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_knowledge_preset(int(session["id"]), knowledge_id, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/assistant_knowledge/<knowledge_id>")
+def delete_assistant_knowledge_preset_route(knowledge_id: str):
+    from app.admin_console.presets import disable_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_knowledge_preset(int(session["id"]), knowledge_id)
+    return jsonify(success=True, item=item)
+
+
 def _error_response(error, status: int):
     return (
         jsonify(
