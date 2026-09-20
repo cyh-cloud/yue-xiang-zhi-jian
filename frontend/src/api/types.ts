@@ -1236,3 +1236,31 @@ export interface PolicySubscriptionState {
   categories: PolicyCategorySubscription[]
   recommended_category_codes: PolicyCategoryCode[]
 }
+
+export type AdminConsoleRole = Extract<UserRole, 'super_admin' | 'admin'>
+
+export interface AdminUnavailableMetric {
+  available: false
+  value: null
+}
+
+export interface AdminAvailableMetric {
+  available: true
+  value: number
+}
+
+export type AdminMetricValue =
+  | number
+  | AdminAvailableMetric
+  | AdminUnavailableMetric
+
+export interface AdminMetricRecord {
+  [key: string]: AdminMetricValue | AdminMetricRecord
+}
+
+export interface AdminDashboardResponse {
+  scope: 'platform' | 'content_operations'
+  metrics: AdminMetricRecord
+}
+
+export type AdminDashboard = AdminDashboardResponse

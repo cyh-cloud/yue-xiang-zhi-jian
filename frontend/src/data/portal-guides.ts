@@ -267,17 +267,20 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
       {
         id: 'admin-accounts',
         title: '账号管理',
-        description: '管理平台账号、角色与启用状态。'
+        description: '管理平台账号、角色与启用状态。',
+        href: '/admin/accounts'
       },
       {
         id: 'admin-content-review',
         title: '内容审核',
-        description: '审核平台发布内容与业务信息。'
+        description: '审核平台发布内容与业务信息。',
+        href: '/admin/review'
       },
       {
         id: 'admin-system-config',
         title: '系统配置',
-        description: '维护平台运行参数与基础配置。'
+        description: '维护平台运行参数与基础配置。',
+        href: '/admin/points-policy'
       },
       {
         id: 'admin-messages',

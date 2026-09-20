@@ -52,6 +52,13 @@ import TeacherPortalView from '@/views/TeacherPortalView.vue'
 import { authGuard } from './roleRoutes'
 
 const teacherMeta = { requiresAuth: true, roles: ['teacher'] as const }
+const adminMeta = {
+  requiresAuth: true,
+  roles: ['super_admin', 'admin'] as const
+}
+const AdminRoutePlaceholder: RouteComponent = {
+  template: '<div data-test="admin-route-placeholder"></div>'
+}
 
 const localResourceViewLoaders = import.meta.glob<{
   default: RouteComponent
@@ -403,9 +410,75 @@ const router = createRouter({
     },
     {
       path: '/admin',
-      name: 'admin-portal',
       component: AdminPortalView,
-      meta: { requiresAuth: true, roles: ['super_admin', 'admin'] }
+      meta: adminMeta,
+      children: [
+        {
+          path: '',
+          name: 'admin-portal',
+          redirect: '/admin/dashboard'
+        },
+        {
+          path: 'dashboard',
+          name: 'admin-dashboard',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'review',
+          name: 'admin-review',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'moderation',
+          name: 'admin-moderation',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'presets',
+          name: 'admin-presets',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'rewards',
+          name: 'admin-rewards',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'redemptions',
+          name: 'admin-redemptions',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'accounts',
+          name: 'admin-accounts',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'points-policy',
+          name: 'admin-points-policy',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'content',
+          name: 'admin-content',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        },
+        {
+          path: 'announcements',
+          name: 'admin-announcements',
+          component: AdminRoutePlaceholder,
+          meta: adminMeta
+        }
+      ]
     }
   ]
 })
