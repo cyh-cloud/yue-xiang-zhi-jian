@@ -205,7 +205,7 @@ class DatabaseContentReviewProvider:
                     )
 
                 if (
-                    current_status != "rejected"
+                    current_status == "pending"
                     and existing["payload_json"] == payload_json
                 ):
                     _finish(db, owns_transaction)

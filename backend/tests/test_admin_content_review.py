@@ -143,6 +143,15 @@ class AdminContentReviewTests(unittest.TestCase):
             payload=payload or {"title": "农业技术员"},
         )
 
+    def _submit_course(self, payload=None):
+        return self.provider.submit_for_review(
+            content_type="course_video",
+            content_id="41",
+            submitter_id=self.teacher_id,
+            expected_version=1,
+            payload=payload or {"title": "荔枝保果"},
+        )
+
     def _record_row(self, content_type, content_id):
         return get_db().execute(
             """
@@ -159,6 +168,15 @@ class AdminContentReviewTests(unittest.TestCase):
             SELECT *
             FROM job_positions
             WHERE job_id = 'job-1'
+            """
+        ).fetchone()
+
+    def _course_row(self):
+        return get_db().execute(
+            """
+            SELECT *
+            FROM courses
+            WHERE id = 41
             """
         ).fetchone()
 
@@ -284,6 +302,88 @@ class AdminContentReviewTests(unittest.TestCase):
             self.assertEqual(projected["version"], 5)
             self.assertIsNone(projected["published_at"])
             self.assertIsNone(projected["rejection_opinion"])
+
+    def test_course_approval_projects_published_status_and_publication(self):
+        with self.app.app_context():
+            pending = self._submit_course()
+
+            approved = self.provider.approve(
+                content_type="course_video",
+                content_id="41",
+                submitter_id=self.teacher_id,
+                reviewer_id=self.admin_id,
+                reviewer_role="admin",
+                expected_version=pending["version"],
+            )
+
+            self.assertEqual(approved["review_status"], "approved")
+            self.assertEqual(approved["version"], 2)
+            self.assertIsNotNone(approved["published_at"])
+            course = self._course_row()
+            self.assertEqual(course["status"], "published")
+            self.assertEqual(course["version"], 2)
+            self.assertEqual(course["published_at"], approved["published_at"])
+            self.assertIsNone(course["rejection_opinion"])
+
+    def test_course_rejection_projects_pending_status_and_opinion(self):
+        with self.app.app_context():
+            pending = self._submit_course()
+
+            rejected = self.provider.reject(
+                content_type="course_video",
+                content_id="41",
+                submitter_id=self.teacher_id,
+                reviewer_id=self.admin_id,
+                reviewer_role="admin",
+                expected_version=pending["version"],
+                opinion="补充课程案例",
+            )
+
+            self.assertEqual(rejected["review_status"], "rejected")
+            self.assertEqual(rejected["version"], 2)
+            self.assertIsNone(rejected["published_at"])
+            course = self._course_row()
+            self.assertEqual(course["status"], "pending")
+            self.assertEqual(course["version"], 2)
+            self.assertIsNone(course["published_at"])
+            self.assertEqual(course["rejection_opinion"], "补充课程案例")
+
+    def test_approved_course_submit_reopens_pending_for_relist(self):
+        with self.app.app_context():
+            payload = {"title": "荔枝保果", "summary": "课程简介"}
+            pending = self._submit_course(payload)
+            approved = self.provider.approve(
+                content_type="course_video",
+                content_id="41",
+                submitter_id=self.teacher_id,
+                reviewer_id=self.admin_id,
+                reviewer_role="admin",
+                expected_version=pending["version"],
+            )
+            get_db().execute(
+                """
+                UPDATE courses
+                SET status = 'offline',
+                    published_at = NULL
+                WHERE id = 41
+                """
+            )
+            get_db().commit()
+            outbox_count = len(self._outbox_rows())
+
+            relisted = self.provider.submit_for_review(
+                content_type="course_video",
+                content_id="41",
+                submitter_id=self.teacher_id,
+                expected_version=approved["version"],
+                payload=dict(payload),
+            )
+
+            self.assertEqual(relisted["review_status"], "pending")
+            self.assertEqual(relisted["version"], 3)
+            self.assertIsNone(relisted["published_at"])
+            self.assertIsNone(relisted["rejection_opinion"])
+            self.assertEqual(len(self._outbox_rows()), outbox_count)
 
     def test_rejected_resubmit_reopens_pending_even_with_same_payload(self):
         with self.app.app_context():
