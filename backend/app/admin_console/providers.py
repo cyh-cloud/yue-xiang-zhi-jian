@@ -5,8 +5,13 @@ from typing import Protocol
 from flask import Flask, current_app
 
 from app.admin_console.errors import ProviderUnavailableError
+from app.admin_console.handcraft_review_adapter import (
+    CompositeContentReviewProvider,
+    HandcraftTeachingVideoReviewAdapter,
+)
 from app.content_review.providers import (
     ContentReviewProvider,
+    UnavailableContentReviewProvider,
     set_content_review_provider,
 )
 
@@ -110,6 +115,15 @@ def configure_admin_providers(
 
 
 def install_default_admin_services(app: Flask) -> None:
+    content_review = app.extensions.get("content_review_provider")
+    if content_review is None or isinstance(
+        content_review,
+        UnavailableContentReviewProvider,
+    ):
+        set_content_review_provider(
+            app,
+            CompositeContentReviewProvider(),
+        )
     if "assistant_feature_knowledge_provider" not in app.extensions:
         set_assistant_feature_knowledge_provider(
             app,
