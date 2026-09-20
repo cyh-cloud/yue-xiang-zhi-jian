@@ -61,6 +61,26 @@ class TestBuildConfig(unittest.TestCase):
         self.assertEqual(config["SECRET_KEY"], "dev-only-change-me")
         self.assertIs(config["SESSION_COOKIE_SECURE"], False)
 
+    def test_tts_timeout_defaults_for_empty_and_invalid_values(self):
+        cases = (
+            (None, 30.0),
+            ("", 30.0),
+            ("not-a-number", 30.0),
+            ("12.5", 12.5),
+        )
+
+        for value, expected in cases:
+            environment = {}
+            if value is not None:
+                environment["AI_TTS_TIMEOUT_SECONDS"] = value
+            with self.subTest(value=value):
+                with patch.dict(os.environ, environment, clear=True):
+                    config = build_config()
+                self.assertEqual(
+                    config["AI_TTS_TIMEOUT_SECONDS"],
+                    expected,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

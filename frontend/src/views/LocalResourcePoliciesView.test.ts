@@ -6,12 +6,20 @@ import type {
   LocalResourcePolicy,
   PolicyCategorySubscription
 } from '@/api/types'
+import { ApiError, apiFetch } from '@/api/client'
 import { useLocalResourcesStore } from '@/stores/localResources'
 
 import LocalResourcePoliciesView from './LocalResourcePoliciesView.vue'
 import LocalResourcePolicyDetailView from './LocalResourcePolicyDetailView.vue'
 import localResourcePoliciesSource from './LocalResourcePoliciesView.vue?raw'
 import localResourcePolicyDetailSource from './LocalResourcePolicyDetailView.vue?raw'
+
+vi.mock('@/api/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/api/client')>()
+  return { ...actual, apiFetch: vi.fn() }
+})
+
+const mockedApiFetch = vi.mocked(apiFetch)
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { policyId: 'policy-1' } }),
@@ -49,6 +57,16 @@ function subscriptionState(): PolicyCategorySubscription[] {
     subscribed: code === 'ecommerce',
     recommended: code === 'entrepreneurship'
   }))
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, reject, resolve }
 }
 
 function mountList() {
@@ -106,6 +124,7 @@ function mountDetail() {
 describe('local-resource policy views', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    mockedApiFetch.mockReset()
   })
 
   it('renders exactly seven policy categories and subscription state', async () => {
@@ -151,6 +170,56 @@ describe('local-resource policy views', () => {
 
     await toggles[6].trigger('click')
     expect(subscribe).toHaveBeenCalledWith('entrepreneurship')
+  })
+
+  it('shows a failed subscription change without hiding content or false success', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const store = useLocalResourcesStore()
+    store.policies = [policyFixture]
+    store.subscriptions = {
+      categories: subscriptionState(),
+      recommended_category_codes: ['entrepreneurship']
+    }
+    mockedApiFetch
+      .mockResolvedValueOnce({
+        success: true,
+        subscriptions: store.subscriptions
+      } as never)
+      .mockResolvedValueOnce({
+        success: true,
+        policies: [policyFixture]
+      } as never)
+    const subscriptionRequest = deferred<never>()
+    mockedApiFetch.mockReturnValueOnce(subscriptionRequest.promise)
+    const wrapper = mount(LocalResourcePoliciesView, {
+      global: {
+        plugins: [pinia],
+        stubs: { AppHeader: true, LocalResourcesNav: true }
+      }
+    })
+    await flushPromises()
+
+    const toggle = wrapper.get(
+      '[data-category="ecommerce"] [data-test="policy-subscription-toggle"]'
+    )
+    expect(toggle.attributes('disabled')).toBeUndefined()
+    await toggle.trigger('click')
+
+    expect(toggle.attributes('disabled')).toBeDefined()
+    expect(toggle.text()).toContain('已订阅')
+
+    subscriptionRequest.reject(
+      new ApiError('政策订阅更新失败', 503)
+    )
+    await flushPromises()
+
+    expect(toggle.attributes('disabled')).toBeUndefined()
+    expect(
+      wrapper.get('[data-test="policy-subscription-feedback"]').text()
+    ).toContain('政策订阅更新失败')
+    expect(toggle.text()).toContain('已订阅')
+    expect(wrapper.find('[data-test="policy-link"]').exists()).toBe(true)
   })
 
   it('loads subscriptions and all policies, then renders stable detail links', async () => {

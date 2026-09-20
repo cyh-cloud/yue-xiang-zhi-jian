@@ -40,14 +40,19 @@ function createMultipartBoundary(): string {
 function normalizeAsrError(error: unknown): string {
   if (
     error instanceof ApiError &&
-    error.message === '未能识别，请重试或改用文字输入'
+    (error.status === 400 || error.status === 422)
   ) {
     return ASR_FAILURE
   }
-  if (error instanceof ApiError && error.status === 503) {
-    return AI_UNAVAILABLE
+  if (
+    error instanceof DOMException &&
+    ['AbortError', 'NotAllowedError', 'NotFoundError', 'NotReadableError'].includes(
+      error.name
+    )
+  ) {
+    return ASR_FAILURE
   }
-  return ASR_FAILURE
+  return AI_UNAVAILABLE
 }
 
 function decodeAudio(

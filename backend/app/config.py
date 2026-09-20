@@ -16,6 +16,17 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _env_positive_float(name: str, default: float) -> float:
+    value = os.environ.get(name)
+    if value is None or not value.strip():
+        return default
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
 def build_config() -> dict[str, object]:
     is_production = os.environ.get("FLASK_ENV", "").strip().lower() == "production"
     secret_key = os.environ.get("SECRET_KEY", DEFAULT_SECRET_KEY).strip()
@@ -86,8 +97,9 @@ def build_config() -> dict[str, object]:
         "AI_TTS_VOICE_TEOCHEW": os.environ.get(
             "AI_TTS_VOICE_TEOCHEW", ""
         ).strip(),
-        "AI_TTS_TIMEOUT_SECONDS": float(
-            os.environ.get("AI_TTS_TIMEOUT_SECONDS", "30")
+        "AI_TTS_TIMEOUT_SECONDS": _env_positive_float(
+            "AI_TTS_TIMEOUT_SECONDS",
+            30.0,
         ),
         "POINTS_EXPIRY_TOKEN": os.environ.get(
             "POINTS_EXPIRY_TOKEN", ""

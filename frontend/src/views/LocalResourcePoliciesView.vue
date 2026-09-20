@@ -15,6 +15,7 @@ const store = useLocalResourcesStore()
 const initialLoading = ref(true)
 const loadFailed = ref(false)
 const selectedCategory = ref<PolicyCategoryCode | null>(null)
+const pendingSubscriptions = ref<Set<PolicyCategoryCode>>(new Set())
 
 async function loadPolicyLibrary() {
   initialLoading.value = true
@@ -35,11 +36,28 @@ async function selectCategory(category: PolicyCategoryCode) {
 }
 
 async function toggleSubscription(category: PolicyCategorySubscription) {
-  if (category.subscribed) {
-    await store.unsubscribePolicyCategory(category.code)
-  } else {
-    await store.subscribePolicyCategory(category.code)
+  if (pendingSubscriptions.value.has(category.code)) {
+    return
   }
+  pendingSubscriptions.value = new Set([
+    ...pendingSubscriptions.value,
+    category.code
+  ])
+  try {
+    if (category.subscribed) {
+      await store.unsubscribePolicyCategory(category.code)
+    } else {
+      await store.subscribePolicyCategory(category.code)
+    }
+  } finally {
+    const next = new Set(pendingSubscriptions.value)
+    next.delete(category.code)
+    pendingSubscriptions.value = next
+  }
+}
+
+function isSubscriptionPending(code: PolicyCategoryCode): boolean {
+  return pendingSubscriptions.value.has(code)
 }
 
 onMounted(() => {
@@ -73,6 +91,16 @@ onMounted(() => {
           <span class="ark-data">SUBSCRIPTIONS</span>
           <h2 id="policy-subscriptions-title">政策订阅</h2>
         </header>
+
+        <p
+          v-if="store.error"
+          class="local-resource-policies__subscription-feedback"
+          data-test="policy-subscription-feedback"
+          role="alert"
+          aria-live="polite"
+        >
+          {{ store.error }}
+        </p>
 
         <p
           v-if="loadFailed && store.subscriptions.categories.length === 0"
@@ -119,6 +147,10 @@ onMounted(() => {
               type="button"
               data-test="policy-subscription-toggle"
               :aria-pressed="category.subscribed"
+              :aria-busy="
+                isSubscriptionPending(category.code) ? 'true' : undefined
+              "
+              :disabled="isSubscriptionPending(category.code)"
               @click="toggleSubscription(category)"
             >
               <span data-test="policy-subscription-state">
@@ -257,6 +289,17 @@ onMounted(() => {
   font-size: 1.1rem;
 }
 
+.local-resource-policies__subscription-feedback {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--ark-signal);
+  color: var(--ark-muted);
+  line-break: strict;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  word-break: keep-all;
+}
+
 .local-resource-policies__category-list,
 .local-resource-policies__list {
   margin: 0;
@@ -331,6 +374,11 @@ onMounted(() => {
   overflow-wrap: anywhere;
   text-align: center;
   word-break: keep-all;
+}
+
+.local-resource-policies__subscription-toggle:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 .local-resource-policies__subscription-toggle > span:first-child {

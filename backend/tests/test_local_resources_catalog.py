@@ -3,7 +3,14 @@ import unittest
 from pathlib import Path
 
 from app import create_app
-from app.government_console.errors import ProviderUnavailableError
+from app.government_console.errors import (
+    ProviderAccessDeniedError,
+    ProviderConflictError,
+    ProviderError,
+    ProviderNotFoundError,
+    ProviderUnavailableError,
+    ProviderValidationError,
+)
 from app.government_console.providers import set_policy_news_provider
 from app.local_resources.catalog import (
     get_news,
@@ -12,6 +19,8 @@ from app.local_resources.catalog import (
     list_policies,
 )
 from app.local_resources.errors import (
+    LocalResourceAccessDeniedError,
+    LocalResourceConflictError,
     LocalResourceNotFoundError,
     LocalResourceUnavailableError,
     LocalResourceValidationError,
@@ -69,6 +78,26 @@ class FailingProvider(FakeProvider):
 
     def get_published_news(self, news_id):
         raise ProviderUnavailableError("新闻数据暂不可用")
+
+
+class TargetedFailingProvider(FakeProvider):
+    def __init__(self, error):
+        self.error = error
+
+    def _raise_error(self):
+        raise self.error
+
+    def list_published_policies(self, category=None):
+        self._raise_error()
+
+    def get_published_policy(self, policy_id):
+        self._raise_error()
+
+    def list_published_news(self, category=None):
+        self._raise_error()
+
+    def get_published_news(self, news_id):
+        self._raise_error()
 
 
 class LocalResourceCatalogTests(unittest.TestCase):
@@ -158,6 +187,130 @@ class LocalResourceCatalogTests(unittest.TestCase):
                         ProviderUnavailableError,
                     )
 
+    def test_provider_error_hierarchy_is_preserved_and_unknown_errors_are_private(self):
+        operations = (
+            (
+                "list policies",
+                lambda: list_policies("entrepreneurship"),
+                "政策不存在",
+                "政策数据暂不可用",
+            ),
+            (
+                "get policy",
+                lambda: get_policy("policy-1"),
+                "政策不存在",
+                "政策数据暂不可用",
+            ),
+            (
+                "list news",
+                lambda: list_news("disaster_warning"),
+                "新闻不存在",
+                "新闻数据暂不可用",
+            ),
+            (
+                "get news",
+                lambda: get_news("news-1"),
+                "新闻不存在",
+                "新闻数据暂不可用",
+            ),
+        )
+        error_cases = (
+            (
+                "validation",
+                lambda: ProviderValidationError(
+                    "参数非法",
+                    details={"category": "不允许"},
+                ),
+                LocalResourceValidationError,
+                "参数非法",
+                {"category": "不允许"},
+            ),
+            (
+                "not found",
+                lambda: ProviderNotFoundError("provider missing"),
+                LocalResourceNotFoundError,
+                None,
+                {},
+            ),
+            (
+                "conflict",
+                lambda: ProviderConflictError("状态冲突"),
+                LocalResourceConflictError,
+                "状态冲突",
+                {},
+            ),
+            (
+                "unavailable",
+                lambda: ProviderUnavailableError(
+                    "目录暂不可用",
+                    details={"retryable": True},
+                ),
+                LocalResourceUnavailableError,
+                "目录暂不可用",
+                {"retryable": True},
+            ),
+            (
+                "access denied",
+                lambda: ProviderAccessDeniedError("无权读取"),
+                LocalResourceAccessDeniedError,
+                "无权读取",
+                {},
+            ),
+            (
+                "unknown",
+                lambda: ProviderError(
+                    "sqlite3.OperationalError: no such table: secrets"
+                ),
+                LocalResourceUnavailableError,
+                None,
+                {},
+            ),
+        )
+
+        with self.app.app_context():
+            for (
+                operation_label,
+                operation,
+                missing_message,
+                unknown_message,
+            ) in operations:
+                for (
+                    error_label,
+                    error_factory,
+                    expected_error,
+                    expected_message,
+                    expected_details,
+                ) in error_cases:
+                    with self.subTest(
+                        operation=operation_label,
+                        error=error_label,
+                    ):
+                        provider_error = error_factory()
+                        set_policy_news_provider(
+                            self.app,
+                            TargetedFailingProvider(provider_error),
+                        )
+                        with self.assertRaises(expected_error) as raised:
+                            operation()
+                        if isinstance(
+                            provider_error,
+                            ProviderNotFoundError,
+                        ):
+                            expected_message = missing_message
+                        elif type(provider_error) is ProviderError:
+                            expected_message = unknown_message
+                        self.assertEqual(
+                            raised.exception.message,
+                            expected_message,
+                        )
+                        self.assertEqual(
+                            raised.exception.details,
+                            expected_details,
+                        )
+                        self.assertIs(
+                            raised.exception.__cause__,
+                            provider_error,
+                        )
 
 if __name__ == "__main__":
     unittest.main()

@@ -39,9 +39,22 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
   const loading = ref(false)
   const error = ref('')
   const viewNotice = ref('')
+  let pendingRequests = 0
+  let policiesRequestId = 0
+  let newsRequestId = 0
+
+  function beginRequest(): void {
+    pendingRequests += 1
+    loading.value = true
+  }
+
+  function finishRequest(): void {
+    pendingRequests = Math.max(0, pendingRequests - 1)
+    loading.value = pendingRequests > 0
+  }
 
   async function loadCases(): Promise<boolean> {
-    loading.value = true
+    beginRequest()
     error.value = ''
     try {
       const response = await apiFetch<{
@@ -54,7 +67,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
       error.value = errorMessage(caught, '案例列表加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
@@ -62,7 +75,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
     if (caseDetail.value?.id !== caseId) {
       caseDetail.value = null
     }
-    loading.value = true
+    beginRequest()
     error.value = ''
     try {
       const response = await apiFetch<{
@@ -75,14 +88,15 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
       error.value = errorMessage(caught, '案例详情加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
   async function loadPolicies(
     category?: PolicyCategoryCode
   ): Promise<boolean> {
-    loading.value = true
+    const requestId = ++policiesRequestId
+    beginRequest()
     error.value = ''
     try {
       const suffix = category
@@ -92,13 +106,19 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
         success: true
         policies: LocalResourcePolicy[]
       }>(`${API_PREFIX}/policies${suffix}`)
+      if (requestId !== policiesRequestId) {
+        return true
+      }
       policies.value = response.policies
       return true
     } catch (caught) {
+      if (requestId !== policiesRequestId) {
+        return true
+      }
       error.value = errorMessage(caught, '政策列表加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
@@ -107,7 +127,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
     if (policyDetail.value?.id !== policyId) {
       policyDetail.value = null
     }
-    loading.value = true
+    beginRequest()
     error.value = ''
     viewNotice.value = ''
     try {
@@ -121,12 +141,13 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
       error.value = errorMessage(caught, '政策详情加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
   async function loadNews(category?: NewsCategoryCode): Promise<boolean> {
-    loading.value = true
+    const requestId = ++newsRequestId
+    beginRequest()
     error.value = ''
     try {
       const suffix = category
@@ -136,13 +157,19 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
         success: true
         news: LocalResourceNews[]
       }>(`${API_PREFIX}/news${suffix}`)
+      if (requestId !== newsRequestId) {
+        return true
+      }
       news.value = response.news
       return true
     } catch (caught) {
+      if (requestId !== newsRequestId) {
+        return true
+      }
       error.value = errorMessage(caught, '新闻列表加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
@@ -151,7 +178,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
     if (newsDetail.value?.id !== newsId) {
       newsDetail.value = null
     }
-    loading.value = true
+    beginRequest()
     error.value = ''
     viewNotice.value = ''
     try {
@@ -165,12 +192,12 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
       error.value = errorMessage(caught, '新闻详情加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
   async function loadSubscriptions(): Promise<boolean> {
-    loading.value = true
+    beginRequest()
     error.value = ''
     try {
       const response = await apiFetch<{
@@ -183,7 +210,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
       error.value = errorMessage(caught, '政策订阅加载失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 
@@ -191,7 +218,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
     category: PolicyCategoryCode,
     method: 'POST' | 'DELETE'
   ): Promise<boolean> {
-    loading.value = true
+    beginRequest()
     error.value = ''
     try {
       await apiFetch<{
@@ -206,7 +233,7 @@ export const useLocalResourcesStore = defineStore('localResources', () => {
       error.value = errorMessage(caught, '政策订阅更新失败')
       return false
     } finally {
-      loading.value = false
+      finishRequest()
     }
   }
 

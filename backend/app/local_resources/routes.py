@@ -90,7 +90,7 @@ def list_policies_route():
     _student_session()
     return jsonify(
         success=True,
-        policies=list_policies(request.args.get("category") or None),
+        policies=list_policies(request.args.get("category")),
     )
 
 
@@ -144,7 +144,7 @@ def list_news_route():
     _student_session()
     return jsonify(
         success=True,
-        news=list_news(request.args.get("category") or None),
+        news=list_news(request.args.get("category")),
     )
 
 

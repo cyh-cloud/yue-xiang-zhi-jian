@@ -8,8 +8,8 @@ from app.local_resources.constants import (
 )
 from app.local_resources.errors import (
     LocalResourceNotFoundError,
-    LocalResourceUnavailableError,
     LocalResourceValidationError,
+    map_provider_error,
 )
 
 
@@ -38,7 +38,11 @@ def list_policies(category_code: str | None = None) -> list[dict]:
             )
         ]
     except ProviderError as error:
-        raise LocalResourceUnavailableError(error.message) from error
+        map_provider_error(
+            error,
+            missing_message="政策不存在",
+            unknown_message="政策数据暂不可用",
+        )
 
 
 def get_policy(policy_id: str) -> dict:
@@ -49,7 +53,11 @@ def get_policy(policy_id: str) -> dict:
             policy_id.strip()
         )
     except ProviderError as error:
-        raise LocalResourceUnavailableError(error.message) from error
+        map_provider_error(
+            error,
+            missing_message="政策不存在",
+            unknown_message="政策数据暂不可用",
+        )
     if item is None:
         raise LocalResourceNotFoundError("政策不存在")
     return dict(item)
@@ -65,7 +73,11 @@ def list_news(category_code: str | None = None) -> list[dict]:
             )
         ]
     except ProviderError as error:
-        raise LocalResourceUnavailableError(error.message) from error
+        map_provider_error(
+            error,
+            missing_message="新闻不存在",
+            unknown_message="新闻数据暂不可用",
+        )
 
 
 def get_news(news_id: str) -> dict:
@@ -74,7 +86,11 @@ def get_news(news_id: str) -> dict:
     try:
         item = get_policy_news_provider().get_published_news(news_id.strip())
     except ProviderError as error:
-        raise LocalResourceUnavailableError(error.message) from error
+        map_provider_error(
+            error,
+            missing_message="新闻不存在",
+            unknown_message="新闻数据暂不可用",
+        )
     if item is None:
         raise LocalResourceNotFoundError("新闻不存在")
     return dict(item)

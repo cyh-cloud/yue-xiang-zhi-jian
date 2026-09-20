@@ -261,6 +261,31 @@ class LocalResourceApiTests(unittest.TestCase):
             {"success": True, "news": self.news},
         )
 
+    def test_empty_or_whitespace_category_filters_are_rejected(self):
+        for path in (
+            "/api/local-resources/policies",
+            "/api/local-resources/news",
+        ):
+            for category in ("", "   "):
+                with self.subTest(path=path, category=category):
+                    response = self.student.get(
+                        path,
+                        query_string={"category": category},
+                    )
+                    self.assertEqual(response.status_code, 400)
+                    self.assertEqual(
+                        response.get_json(),
+                        {
+                            "success": False,
+                            "message": "类别不正确",
+                            "details": {
+                                "category": "类别不属于允许值",
+                            },
+                        },
+                    )
+        self.provider.list_published_policies.assert_not_called()
+        self.provider.list_published_news.assert_not_called()
+
     def test_teacher_and_anonymous_are_rejected(self):
         self.assertEqual(
             self.app.test_client().get(

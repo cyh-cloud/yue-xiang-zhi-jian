@@ -12,6 +12,16 @@ vi.mock('@/api/client', async importOriginal => {
 
 const mockedApiFetch = vi.mocked(apiFetch)
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise
+    reject = rejectPromise
+  })
+  return { promise, reject, resolve }
+}
+
 describe('localResources store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -181,6 +191,133 @@ describe('localResources store', () => {
     expect(store.error).toBe('新闻不存在')
   })
 
+  it('ignores a stale policy list response and keeps current loading state', async () => {
+    const olderRequest = deferred<unknown>()
+    const newerRequest = deferred<unknown>()
+    mockedApiFetch
+      .mockReturnValueOnce(olderRequest.promise)
+      .mockReturnValueOnce(newerRequest.promise)
+    const store = useLocalResourcesStore()
+
+    const olderLoad = store.loadPolicies('ecommerce')
+    const newerLoad = store.loadPolicies('heritage')
+    newerRequest.resolve({
+      success: true,
+      policies: [
+        {
+          id: 'policy-heritage',
+          title: '非遗政策',
+          content: '正文',
+          category_code: 'heritage',
+          category_label: '非遗',
+          published_at: '2026-09-19T11:00:00+08:00',
+          updated_at: '2026-09-19T11:00:00+08:00',
+          version: 1
+        }
+      ]
+    })
+    await newerLoad
+
+    expect(store.policies.map(policy => policy.id)).toEqual([
+      'policy-heritage'
+    ])
+    expect(store.loading).toBe(true)
+
+    olderRequest.resolve({
+      success: true,
+      policies: [
+        {
+          id: 'policy-ecommerce',
+          title: '电商政策',
+          content: '正文',
+          category_code: 'ecommerce',
+          category_label: '电商',
+          published_at: '2026-09-19T10:00:00+08:00',
+          updated_at: '2026-09-19T10:00:00+08:00',
+          version: 1
+        }
+      ]
+    })
+    await olderLoad
+
+    expect(store.policies.map(policy => policy.id)).toEqual([
+      'policy-heritage'
+    ])
+    expect(store.loading).toBe(false)
+  })
+
+  it('ignores a stale news list response and keeps current loading state', async () => {
+    const olderRequest = deferred<unknown>()
+    const newerRequest = deferred<unknown>()
+    mockedApiFetch
+      .mockReturnValueOnce(olderRequest.promise)
+      .mockReturnValueOnce(newerRequest.promise)
+    const store = useLocalResourcesStore()
+
+    const olderLoad = store.loadNews('news')
+    const newerLoad = store.loadNews('disaster_warning')
+    newerRequest.resolve({
+      success: true,
+      news: [
+        {
+          id: 'news-warning',
+          title: '灾害预警',
+          content: '正文',
+          category_code: 'disaster_warning',
+          category_label: '灾害预警',
+          published_at: '2026-09-19T11:00:00+08:00',
+          updated_at: '2026-09-19T11:00:00+08:00',
+          version: 1
+        }
+      ]
+    })
+    await newerLoad
+
+    expect(store.news.map(item => item.id)).toEqual(['news-warning'])
+    expect(store.loading).toBe(true)
+
+    olderRequest.resolve({
+      success: true,
+      news: [
+        {
+          id: 'news-general',
+          title: '新闻',
+          content: '正文',
+          category_code: 'news',
+          category_label: '新闻',
+          published_at: '2026-09-19T10:00:00+08:00',
+          updated_at: '2026-09-19T10:00:00+08:00',
+          version: 1
+        }
+      ]
+    })
+    await olderLoad
+
+    expect(store.news.map(item => item.id)).toEqual(['news-warning'])
+    expect(store.loading).toBe(false)
+  })
+
+  it('keeps shared loading active until every unrelated request finishes', async () => {
+    const policyRequest = deferred<unknown>()
+    const newsRequest = deferred<unknown>()
+    mockedApiFetch
+      .mockReturnValueOnce(policyRequest.promise)
+      .mockReturnValueOnce(newsRequest.promise)
+    const store = useLocalResourcesStore()
+
+    const policyLoad = store.loadPolicies()
+    const newsLoad = store.loadNews()
+    newsRequest.resolve({ success: true, news: [] })
+    await newsLoad
+
+    expect(store.loading).toBe(true)
+
+    policyRequest.resolve({ success: true, policies: [] })
+    await policyLoad
+
+    expect(store.loading).toBe(false)
+  })
+
   it('subscribes and unsubscribes idempotently through exact routes', async () => {
     mockedApiFetch
       .mockResolvedValueOnce({ success: true, subscription: {} } as never)
@@ -212,5 +349,29 @@ describe('localResources store', () => {
       '/api/local-resources/policy-subscriptions/ecommerce',
       { method: 'DELETE' }
     ])
+  })
+
+  it('records a subscription failure without changing the current state', async () => {
+    mockedApiFetch.mockRejectedValueOnce(
+      new ApiError('政策订阅更新失败', 503)
+    )
+    const store = useLocalResourcesStore()
+    store.subscriptions = {
+      categories: [
+        {
+          code: 'ecommerce',
+          label: '电商',
+          subscribed: true,
+          recommended: false
+        }
+      ],
+      recommended_category_codes: []
+    }
+
+    const result = await store.unsubscribePolicyCategory('ecommerce')
+
+    expect(result).toBe(false)
+    expect(store.error).toBe('政策订阅更新失败')
+    expect(store.subscriptions.categories[0].subscribed).toBe(true)
   })
 })

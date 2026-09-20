@@ -142,6 +142,22 @@ describe('dialectAssistant store', () => {
     expect(store.error).toBe('AI 服务暂时不可用')
   })
 
+  it('maps native transport and other server failures to the AI-unavailable copy', async () => {
+    const cases: unknown[] = [
+      new TypeError('Failed to fetch'),
+      new ApiError('Internal Server Error', 500),
+      new ApiError('Bad Gateway', 502)
+    ]
+    const store = useDialectAssistantStore()
+    const audio = new Blob(['audio'], { type: 'audio/webm' })
+
+    for (const error of cases) {
+      mockedApiFetch.mockRejectedValueOnce(error)
+      expect(await store.transcribe(audio, 'question.webm')).toBe('')
+      expect(store.error).toBe('AI 服务暂时不可用')
+    }
+  })
+
   it('submits dialect and decodes returned audio without storing it', async () => {
     mockedApiFetch.mockResolvedValueOnce({
       success: true,
