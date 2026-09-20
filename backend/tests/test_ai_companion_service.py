@@ -15,7 +15,7 @@ from app.ai_companion.errors import (
 from app.ai_companion.knowledge_provider import (
     set_assistant_feature_knowledge_provider,
 )
-from app.ai_companion.repository import list_conversations
+from app.ai_companion.repository import get_conversation, list_conversations
 from app.ai_companion.service import answer_question
 from app.ai_companion.speech import transcribe_question
 from app.db import get_db
@@ -184,6 +184,96 @@ class AiCompanionServiceTests(unittest.TestCase):
         with self.app.app_context():
             with self.assertRaises(AiCompanionAiUnavailableError):
                 transcribe_question(b"audio", "question.webm")
+
+    def test_learning_branch_returns_bullets_and_role_aware_jump(self):
+        self.ai.complete_json.side_effect = [
+            {"intent": "learning_question"},
+            {"bullets": ["要点一", "要点二"], "module_key": "agriculture"},
+        ]
+        with self.app.app_context():
+            student = answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="荔枝怎么修剪",
+                client_request_id="learning-student",
+            )
+        self.assertEqual(student["bullets"], ["要点一", "要点二"])
+        self.assertEqual(student["module_key"], "agriculture")
+        self.assertEqual(student["jump_target"], "/student/agri-skills/qa")
+        self.assertEqual(
+            student["assistant_message"]["intent"],
+            "learning_question",
+        )
+
+        teacher_id = self._insert_user("teacher-self", "teacher")
+        self.ai.complete_json.side_effect = [
+            {"intent": "learning_question"},
+            {"bullets": ["要点一", "要点二"], "module_key": "agriculture"},
+        ]
+        with self.app.app_context():
+            teacher = answer_question(
+                user_id=teacher_id,
+                role="teacher",
+                question="荔枝怎么修剪",
+                client_request_id="learning-teacher",
+            )
+        self.assertEqual(teacher["bullets"], ["要点一", "要点二"])
+        self.assertIsNone(teacher["jump_target"])
+
+    def test_replay_returns_same_result_without_second_ai_call(self):
+        # 单元素 side_effect：重放若再次调用 AI 会抛 StopIteration，配合 call_count
+        # 断言锁死 Medium-1 的“重放不再推理”契约。
+        self.ai.complete_json.side_effect = [{"intent": "out_of_scope"}]
+        with self.app.app_context():
+            first = answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="今天天气怎么样",
+                client_request_id="replay-request",
+            )
+            second = answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="今天天气怎么样",
+                client_request_id="replay-request",
+            )
+        self.assertEqual(first["answer"], second["answer"])
+        self.assertEqual(first["jump_target"], second["jump_target"])
+        self.assertEqual(first["conversation_id"], second["conversation_id"])
+        self.assertEqual(
+            first["user_message"]["message_id"],
+            second["user_message"]["message_id"],
+        )
+        self.assertEqual(
+            first["assistant_message"]["message_id"],
+            second["assistant_message"]["message_id"],
+        )
+        self.assertEqual(self.ai.complete_json.call_count, 1)
+
+    def test_append_to_existing_conversation_keeps_same_thread(self):
+        self.ai.complete_json.side_effect = [
+            {"intent": "out_of_scope"},
+            {"intent": "out_of_scope"},
+        ]
+        with self.app.app_context():
+            first = answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="今天天气怎么样",
+                client_request_id="append-request-1",
+            )
+            conversation_id = first["conversation_id"]
+            answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="明天会下雨吗",
+                client_request_id="append-request-2",
+                conversation_id=conversation_id,
+            )
+            detail = get_conversation(self.user_id, conversation_id)
+        self.assertEqual(len(detail["messages"]), 4)
+        self.assertEqual(detail["messages"][0]["role"], "user")
+        self.assertEqual(detail["messages"][3]["role"], "assistant")
 
 
 if __name__ == "__main__":
