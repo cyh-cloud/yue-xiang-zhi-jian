@@ -1,0 +1,190 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import Mock
+
+from app import create_app
+from app.agri_skills.ai_client import set_ai_client
+from app.agri_skills.errors import AgriValidationError, AiUnavailableError
+from app.ai_companion.errors import (
+    AiCompanionAiUnavailableError,
+    AiCompanionForbiddenError,
+    AiCompanionRecognitionError,
+    AiCompanionValidationError,
+)
+from app.ai_companion.knowledge_provider import (
+    set_assistant_feature_knowledge_provider,
+)
+from app.ai_companion.repository import list_conversations
+from app.ai_companion.service import answer_question
+from app.ai_companion.speech import transcribe_question
+from app.db import get_db
+
+
+class FakeKnowledgeProvider:
+    def __init__(self, entries, error=None):
+        self.entries = entries
+        self.error = error
+
+    def list_entries(self, enabled_only=True):
+        if self.error:
+            raise self.error
+        return self.entries if enabled_only else list(self.entries)
+
+
+class AiCompanionServiceTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.app = create_app(
+            {
+                "TESTING": True,
+                "DATABASE_PATH": str(Path(self.temp_dir.name) / "test.db"),
+                "SECRET_KEY": "test-only-secret",
+            }
+        )
+        # 冻结的拒绝分支在 with 块之外调用 list_conversations，需常驻应用上下文；
+        # 与 tests/test_teacher_reports.py 的 setUp/tearDown 模式一致。
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+        self.ai = Mock()
+        set_ai_client(self.app, self.ai)
+        self.user_id = self._insert_user("student-self", "student")
+
+    def tearDown(self):
+        self.app_context.pop()
+        self.temp_dir.cleanup()
+
+    def _insert_user(self, username, role):
+        timestamp = "2026-09-21T10:00:00+08:00"
+        with self.app.app_context():
+            db = get_db()
+            cursor = db.execute(
+                """
+                INSERT INTO users (
+                    username,
+                    password_hash,
+                    name,
+                    role,
+                    is_enabled,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    username,
+                    "test-password-hash",
+                    username,
+                    role,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+            db.commit()
+            return int(cursor.lastrowid)
+
+    def entry(
+        self,
+        knowledge_id,
+        title,
+        body,
+        jump_target,
+        *,
+        is_enabled=1,
+    ):
+        return {
+            "knowledge_id": knowledge_id,
+            "title": title,
+            "body": body,
+            "feature_key": knowledge_id.removeprefix("knowledge-"),
+            "jump_target": jump_target,
+            "is_enabled": is_enabled,
+            "version": 1,
+            "updated_at": "2026-09-20T10:00:00+08:00",
+        }
+
+    def job_entry(self):
+        return self.entry(
+            "knowledge-job",
+            "如何投递简历",
+            "进入就业对接",
+            "/student/employment/jobs",
+        )
+
+    def test_platform_branch_persists_knowledge_answer(self):
+        set_assistant_feature_knowledge_provider(
+            self.app,
+            FakeKnowledgeProvider([self.job_entry()]),
+        )
+        self.ai.complete_json.side_effect = [
+            {"intent": "platform_usage"},
+            {"answer": "进入就业对接后选择岗位投递。"},
+        ]
+        with self.app.app_context():
+            result = answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="怎么投简历",
+                client_request_id="request-1",
+            )
+        self.assertEqual(result["assistant_message"]["intent"], "platform_usage")
+        self.assertEqual(
+            result["assistant_message"]["jump_target"],
+            "/student/employment/jobs",
+        )
+
+    def test_business_proxy_refusal_does_not_call_ai_or_repository_writes(self):
+        with self.app.app_context():
+            result = answer_question(
+                user_id=self.user_id,
+                role="student",
+                question="帮我投简历",
+                client_request_id="request-2",
+            )
+        self.assertEqual(result["assistant_message"]["intent"], "out_of_scope")
+        self.ai.complete_json.assert_not_called()
+        self.assertEqual(len(list_conversations(self.user_id)), 1)
+
+    def test_unknown_role_and_invalid_question_are_rejected(self):
+        with self.app.app_context():
+            with self.assertRaises(AiCompanionForbiddenError):
+                answer_question(
+                    user_id=self.user_id,
+                    role="admin",
+                    question="怎么投简历",
+                    client_request_id="request-3",
+                )
+            with self.assertRaises(AiCompanionValidationError):
+                answer_question(
+                    user_id=self.user_id,
+                    role="student",
+                    question=" ",
+                    client_request_id="request-4",
+                )
+
+    def test_asr_reuses_shared_client_and_maps_errors(self):
+        self.ai.transcribe.return_value = "荔枝什么时候套袋"
+        with self.app.app_context():
+            self.assertEqual(
+                transcribe_question(b"audio", "question.webm"),
+                "荔枝什么时候套袋",
+            )
+        self.ai.transcribe.assert_called_once_with(
+            b"audio",
+            "question.webm",
+            call_point="speech_to_text",
+        )
+
+        self.ai.transcribe.side_effect = AgriValidationError("noise")
+        with self.app.app_context():
+            with self.assertRaises(AiCompanionRecognitionError):
+                transcribe_question(b"noise", "noise.webm")
+
+        self.ai.transcribe.side_effect = AiUnavailableError("down")
+        with self.app.app_context():
+            with self.assertRaises(AiCompanionAiUnavailableError):
+                transcribe_question(b"audio", "question.webm")
+
+
+if __name__ == "__main__":
+    unittest.main()
