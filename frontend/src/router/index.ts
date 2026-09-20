@@ -10,7 +10,9 @@ import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminAccountsView from '@/views/AdminAccountsView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
+import AdminRedemptionsView from '@/views/AdminRedemptionsView.vue'
 import AdminReviewView from '@/views/AdminReviewView.vue'
+import AdminRewardsView from '@/views/AdminRewardsView.vue'
 import CourseCatalogView from '@/views/CourseCatalogView.vue'
 import EcommerceCopyTrainingView from '@/views/EcommerceCopyTrainingView.vue'
 import EcommerceCoursesView from '@/views/EcommerceCoursesView.vue'
@@ -455,13 +457,13 @@ const router = createRouter({
         {
           path: 'rewards',
           name: 'admin-rewards',
-          component: AdminRoutePlaceholder,
+          component: AdminRewardsView,
           meta: adminMeta
         },
         {
           path: 'redemptions',
           name: 'admin-redemptions',
-          component: AdminRoutePlaceholder,
+          component: AdminRedemptionsView,
           meta: adminMeta
         },
         {

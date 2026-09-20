@@ -1330,3 +1330,203 @@ export interface AdminPasswordResetResponse {
   event_id: string
   account: AdminAccount
 }
+
+export type AdminRewardStatusFilter = 'all' | 'online' | 'offline'
+
+export type AdminFulfillmentStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'issued'
+  | 'verified'
+  | 'canceled'
+
+export type AdminRedemptionStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'issued'
+  | 'verified'
+  | 'canceled'
+
+export type AdminReservationStatus = 'reserved' | 'released'
+
+export interface AdminReward {
+  reward_id: string
+  name: string
+  points_cost: number
+  stock: number
+  reserved: number
+  available: number
+  is_online: boolean
+  is_demo: boolean
+  source_available: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminRewardsResponse {
+  success: true
+  items: AdminReward[]
+  count: number
+}
+
+export interface AdminRewardWritePayload {
+  name: string
+  points_cost: number
+  stock: number
+}
+
+export type AdminRewardCreatePayload = AdminRewardWritePayload
+
+export interface AdminRewardUpdatePayload extends AdminRewardWritePayload {
+  expected_version: number
+}
+
+export interface AdminRewardOnlinePayload {
+  expected_version: number
+  online: boolean
+}
+
+export interface AdminRewardResponse {
+  success: true
+  reward: AdminReward
+}
+
+export interface AdminRewardUserContext {
+  id: number
+  username: string
+  name: string
+  role: string
+  contact: string
+}
+
+export interface AdminRewardReference {
+  reward_id: string
+  name: string
+  points_cost: number
+  snapshot?: Record<string, unknown>
+}
+
+export interface AdminStockReservation {
+  reservation_id: string
+  status: AdminReservationStatus | null
+  quantity: number
+  created_at: string | null
+  released_at: string | null
+}
+
+export interface AdminFulfillmentTimestamps {
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AdminRedemptionTimestamps {
+  created_at: string | null
+  updated_at: string | null
+  canceled_at: string | null
+}
+
+export interface AdminFulfillment extends AdminFulfillmentTimestamps {
+  id: number
+  redemption_id: number
+  user_id: number
+  user: AdminRewardUserContext
+  reward: AdminRewardReference
+  points_cost: number
+  request_id: string
+  status: AdminFulfillmentStatusFilter
+  redemption_status: AdminFulfillmentStatusFilter
+  stock_reservation: AdminStockReservation | null
+  restored_points: number
+}
+
+export interface AdminFulfillmentsResponse {
+  success: true
+  items: AdminFulfillment[]
+  count: number
+}
+
+export interface AdminFulfillmentActionResult {
+  fulfillment_id: number
+  redemption_id: number
+  user_id: number
+  status: AdminFulfillmentStatusFilter
+  changed: boolean
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  points_cost: number
+  restored_points: number
+}
+
+export interface AdminFulfillmentActionResponse {
+  success: true
+  fulfillment: AdminFulfillmentActionResult
+}
+
+export interface AdminRedemption extends AdminRedemptionTimestamps {
+  id: number
+  user_id: number
+  user: AdminRewardUserContext
+  reward: AdminRewardReference
+  points_cost: number
+  request_id: string
+  status: AdminRedemptionStatusFilter
+  fulfillment_id: number | null
+  fulfillment_status: AdminFulfillmentStatusFilter | null
+  stock_reservation: AdminStockReservation | null
+  restored_points: number
+}
+
+export interface AdminRedemptionsResponse {
+  success: true
+  items: AdminRedemption[]
+  count: number
+}
+
+export interface AdminRedemptionFulfillment {
+  id: number
+  status: AdminFulfillmentStatusFilter
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AdminPointsLedgerEntry {
+  id: number
+  user_id: number
+  transaction_type: string
+  source_module: string
+  source_event_id: string
+  delta: number
+  balance_after: number
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface AdminRedemptionDetail extends AdminRedemption {
+  fulfillment: AdminRedemptionFulfillment | null
+  points_ledger: AdminPointsLedgerEntry[]
+}
+
+export interface AdminRedemptionDetailResponse extends AdminRedemptionDetail {
+  success: true
+}
+
+export interface AdminRewardQueueQuery {
+  user: string
+  reward: string
+  status: AdminFulfillmentStatusFilter
+  fulfillment_status: AdminFulfillmentStatusFilter
+  created_from: string
+  created_to: string
+}
+
+export interface AdminRedemptionQuery extends AdminRewardQueueQuery {
+  status: AdminRedemptionStatusFilter
+}

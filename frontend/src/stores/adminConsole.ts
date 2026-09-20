@@ -16,7 +16,22 @@ import type {
   AdminReviewContentType,
   AdminReviewCounts,
   AdminReviewItem,
-  AdminReviewQueueResponse
+  AdminReviewQueueResponse,
+  AdminFulfillment,
+  AdminFulfillmentActionResponse,
+  AdminFulfillmentActionResult,
+  AdminFulfillmentsResponse,
+  AdminRedemption,
+  AdminRedemptionDetail,
+  AdminRedemptionDetailResponse,
+  AdminRedemptionsResponse,
+  AdminReward,
+  AdminRewardCreatePayload,
+  AdminRewardOnlinePayload,
+  AdminRewardQueueQuery,
+  AdminRewardResponse,
+  AdminRewardUpdatePayload,
+  AdminRewardsResponse
 } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 
@@ -46,6 +61,37 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     role: AdminManagedRole | null
     keyword: string
   }>({ role: null, keyword: '' })
+  const rewards = ref<AdminReward[]>([])
+  const rewardsLoading = ref(false)
+  const rewardsError = ref('')
+  const rewardActionLoading = ref(false)
+  const rewardFormError = ref('')
+  const fulfillments = ref<AdminFulfillment[]>([])
+  const fulfillmentsLoading = ref(false)
+  const fulfillmentsError = ref('')
+  const fulfillmentActionLoading = ref(false)
+  const redemptions = ref<AdminRedemption[]>([])
+  const redemptionsLoading = ref(false)
+  const redemptionsError = ref('')
+  const redemptionDetail = ref<AdminRedemptionDetail | null>(null)
+  const redemptionDetailLoading = ref(false)
+  const redemptionDetailError = ref('')
+  const fulfillmentQuery = ref<AdminRewardQueueQuery>({
+    user: '',
+    reward: '',
+    status: 'all',
+    fulfillment_status: 'all',
+    created_from: '',
+    created_to: ''
+  })
+  const redemptionQuery = ref<AdminRewardQueueQuery>({
+    user: '',
+    reward: '',
+    status: 'all',
+    fulfillment_status: 'all',
+    created_from: '',
+    created_to: ''
+  })
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -250,6 +296,268 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     accountsError.value = ''
   }
 
+  function queueQuery(query: AdminRewardQueueQuery): string {
+    const params = new URLSearchParams()
+    if (query.user) {
+      params.set('user', query.user)
+    }
+    if (query.reward) {
+      params.set('reward', query.reward)
+    }
+    if (query.status !== 'all') {
+      params.set('status', query.status)
+    }
+    if (query.fulfillment_status !== 'all') {
+      params.set('fulfillment_status', query.fulfillment_status)
+    }
+    if (query.created_from) {
+      params.set('created_from', query.created_from)
+    }
+    if (query.created_to) {
+      params.set('created_to', query.created_to)
+    }
+    const serialized = params.toString()
+    return serialized ? `?${serialized}` : ''
+  }
+
+  async function loadRewards(): Promise<boolean> {
+    rewardsLoading.value = true
+    rewardsError.value = ''
+    try {
+      const response = await apiFetch<AdminRewardsResponse>('/api/admin/rewards')
+      rewards.value = response.items
+      return true
+    } catch (caught) {
+      rewardsError.value = errorMessage(caught, '奖品目录加载失败')
+      return false
+    } finally {
+      rewardsLoading.value = false
+    }
+  }
+
+  async function createReward(
+    payload: AdminRewardCreatePayload
+  ): Promise<boolean> {
+    rewardActionLoading.value = true
+    rewardFormError.value = ''
+    try {
+      await apiFetch<AdminRewardResponse>('/api/admin/rewards', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      })
+      await loadRewards()
+      return true
+    } catch (caught) {
+      rewardFormError.value = errorMessage(caught, '创建奖品失败')
+      return false
+    } finally {
+      rewardActionLoading.value = false
+    }
+  }
+
+  async function updateReward(
+    rewardId: string,
+    payload: AdminRewardUpdatePayload
+  ): Promise<boolean> {
+    rewardActionLoading.value = true
+    rewardFormError.value = ''
+    try {
+      await apiFetch<AdminRewardResponse>(
+        `/api/admin/rewards/${encodeURIComponent(rewardId)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        }
+      )
+      await loadRewards()
+      return true
+    } catch (caught) {
+      rewardFormError.value = errorMessage(caught, '编辑奖品失败')
+      return false
+    } finally {
+      rewardActionLoading.value = false
+    }
+  }
+
+  async function setRewardOnline(
+    rewardId: string,
+    expectedVersion: number,
+    online: boolean
+  ): Promise<boolean> {
+    rewardActionLoading.value = true
+    rewardsError.value = ''
+    try {
+      const body = {
+        expected_version: expectedVersion,
+        online
+      } satisfies AdminRewardOnlinePayload
+      await apiFetch<AdminRewardResponse>(
+        `/api/admin/rewards/${encodeURIComponent(rewardId)}/online`,
+        {
+          method: 'POST',
+          body: JSON.stringify(body)
+        }
+      )
+      await loadRewards()
+      return true
+    } catch (caught) {
+      // A 409 means another admin already moved the row: reload so the
+      // table shows the server values, then keep the conflict message.
+      const conflictMessage = errorMessage(caught, '更新上架状态失败')
+      await loadRewards()
+      rewardsError.value = conflictMessage
+      return false
+    } finally {
+      rewardActionLoading.value = false
+    }
+  }
+
+  async function loadFulfillments(
+    query: AdminRewardQueueQuery = fulfillmentQuery.value
+  ): Promise<boolean> {
+    fulfillmentsLoading.value = true
+    fulfillmentsError.value = ''
+    fulfillmentQuery.value = query
+    try {
+      const response = await apiFetch<AdminFulfillmentsResponse>(
+        `/api/admin/fulfillments${queueQuery(query)}`
+      )
+      fulfillments.value = response.items
+      return true
+    } catch (caught) {
+      fulfillmentsError.value = errorMessage(caught, '履约队列加载失败')
+      return false
+    } finally {
+      fulfillmentsLoading.value = false
+    }
+  }
+
+  function replaceFulfillment(result: AdminFulfillmentActionResult): void {
+    const index = fulfillments.value.findIndex(
+      item => item.id === result.fulfillment_id
+    )
+    if (index === -1) return
+    const current = fulfillments.value[index]
+    if (!current) return
+    fulfillments.value = [
+      ...fulfillments.value.slice(0, index),
+      {
+        ...current,
+        status: result.status,
+        issued_at: result.issued_at,
+        verified_at: result.verified_at,
+        canceled_at: result.canceled_at,
+        restored_points: result.restored_points
+      },
+      ...fulfillments.value.slice(index + 1)
+    ]
+  }
+
+  async function applyFulfillmentAction(
+    fulfillmentId: number,
+    action: 'issue' | 'cancel' | 'verify'
+  ): Promise<boolean> {
+    fulfillmentActionLoading.value = true
+    fulfillmentsError.value = ''
+    try {
+      const response = await apiFetch<AdminFulfillmentActionResponse>(
+        `/api/admin/fulfillments/${fulfillmentId}/${action}`,
+        { method: 'POST' }
+      )
+      replaceFulfillment(response.fulfillment)
+      if (redemptionDetail.value !== null) {
+        await loadRedemptionDetail(redemptionDetail.value.id)
+      }
+      return true
+    } catch (caught) {
+      const labels: Record<typeof action, string> = {
+        issue: '发放奖品失败',
+        cancel: '取消履约失败',
+        verify: '核销履约失败'
+      }
+      fulfillmentsError.value = errorMessage(caught, labels[action])
+      return false
+    } finally {
+      fulfillmentActionLoading.value = false
+    }
+  }
+
+  function issueFulfillment(fulfillmentId: number): Promise<boolean> {
+    return applyFulfillmentAction(fulfillmentId, 'issue')
+  }
+
+  function cancelFulfillment(fulfillmentId: number): Promise<boolean> {
+    return applyFulfillmentAction(fulfillmentId, 'cancel')
+  }
+
+  function verifyFulfillment(fulfillmentId: number): Promise<boolean> {
+    return applyFulfillmentAction(fulfillmentId, 'verify')
+  }
+
+  async function loadRedemptions(
+    query: AdminRewardQueueQuery = redemptionQuery.value
+  ): Promise<boolean> {
+    redemptionsLoading.value = true
+    redemptionsError.value = ''
+    redemptionQuery.value = query
+    try {
+      const response = await apiFetch<AdminRedemptionsResponse>(
+        `/api/admin/redemptions${queueQuery(query)}`
+      )
+      redemptions.value = response.items
+      return true
+    } catch (caught) {
+      redemptionsError.value = errorMessage(caught, '兑换记录加载失败')
+      return false
+    } finally {
+      redemptionsLoading.value = false
+    }
+  }
+
+  async function loadRedemptionDetail(
+    redemptionId: number
+  ): Promise<boolean> {
+    redemptionDetailLoading.value = true
+    redemptionDetailError.value = ''
+    try {
+      const response = await apiFetch<AdminRedemptionDetailResponse>(
+        `/api/admin/redemptions/${redemptionId}`
+      )
+      redemptionDetail.value = response
+      return true
+    } catch (caught) {
+      redemptionDetailError.value = errorMessage(caught, '兑换详情加载失败')
+      return false
+    } finally {
+      redemptionDetailLoading.value = false
+    }
+  }
+
+  function clearRewardFormError() {
+    rewardFormError.value = ''
+  }
+
+  function clearRewardsError() {
+    rewardsError.value = ''
+  }
+
+  function clearFulfillmentsError() {
+    fulfillmentsError.value = ''
+  }
+
+  function clearRedemptionsError() {
+    redemptionsError.value = ''
+  }
+
+  function clearRedemptionDetailError() {
+    redemptionDetailError.value = ''
+  }
+
+  function clearRedemptionDetail() {
+    redemptionDetail.value = null
+    redemptionDetailError.value = ''
+  }
+
   return {
     dashboard,
     loading,
@@ -275,6 +583,37 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     createAccount,
     setAccountEnabled,
     resetPassword,
-    clearAccountsError
+    clearAccountsError,
+    rewards,
+    rewardsLoading,
+    rewardsError,
+    rewardActionLoading,
+    rewardFormError,
+    fulfillments,
+    fulfillmentsLoading,
+    fulfillmentsError,
+    fulfillmentActionLoading,
+    redemptions,
+    redemptionsLoading,
+    redemptionsError,
+    redemptionDetail,
+    redemptionDetailLoading,
+    redemptionDetailError,
+    loadRewards,
+    createReward,
+    updateReward,
+    setRewardOnline,
+    clearRewardFormError,
+    clearRewardsError,
+    loadFulfillments,
+    issueFulfillment,
+    cancelFulfillment,
+    verifyFulfillment,
+    clearFulfillmentsError,
+    loadRedemptions,
+    loadRedemptionDetail,
+    clearRedemptionDetail,
+    clearRedemptionsError,
+    clearRedemptionDetailError
   }
 })
