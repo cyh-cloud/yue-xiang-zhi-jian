@@ -4,18 +4,21 @@ export class ApiError extends Error {
   readonly status: number
   readonly errors: ApiFieldErrors
   readonly redirect?: string
+  readonly code?: string
 
   constructor(
     message: string,
     status: number,
     errors: ApiFieldErrors = {},
-    redirect?: string
+    redirect?: string,
+    code?: string
   ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.errors = errors
     this.redirect = redirect
+    this.code = code
   }
 }
 
@@ -86,8 +89,18 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
         : {}
     const redirect =
       typeof payloadRecord?.redirect === 'string' ? payloadRecord.redirect : undefined
+    const code =
+      typeof payloadRecord?.code === 'string'
+        ? payloadRecord.code
+        : undefined
 
-    const error = new ApiError(message, response.status, errors, redirect)
+    const error = new ApiError(
+      message,
+      response.status,
+      errors,
+      redirect,
+      code
+    )
     if (response.status === 401 && error.redirect && sessionExpiredHandler) {
       await sessionExpiredHandler(error)
     }
@@ -146,7 +159,17 @@ export async function apiStream<T>(
       typeof payloadRecord?.redirect === 'string'
         ? payloadRecord.redirect
         : undefined
-    const error = new ApiError(message, response.status, errors, redirect)
+    const code =
+      typeof payloadRecord?.code === 'string'
+        ? payloadRecord.code
+        : undefined
+    const error = new ApiError(
+      message,
+      response.status,
+      errors,
+      redirect,
+      code
+    )
     if (response.status === 401 && redirect && sessionExpiredHandler) {
       await sessionExpiredHandler(error)
     }

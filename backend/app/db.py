@@ -73,7 +73,55 @@ CREATE TABLE IF NOT EXISTS onboarding_states (
 CREATE TABLE IF NOT EXISTS resumes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    education_json TEXT NOT NULL DEFAULT '[]',
+    work_experiences_json TEXT NOT NULL DEFAULT '[]',
+    skills_json TEXT NOT NULL DEFAULT '[]',
+    version INTEGER NOT NULL DEFAULT 0,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS resume_revisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    resume_id INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    version INTEGER NOT NULL CHECK (version > 0),
+    education_json TEXT NOT NULL,
+    work_experiences_json TEXT NOT NULL,
+    skills_json TEXT NOT NULL,
+    saved_at TEXT NOT NULL,
+    UNIQUE (resume_id, version)
+);
+
+CREATE TABLE IF NOT EXISTS resume_optimization_offers (
+    offer_id TEXT PRIMARY KEY,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    base_version INTEGER NOT NULL CHECK (base_version > 0),
+    suggestions_json TEXT NOT NULL,
+    rewritten_json TEXT,
+    status TEXT NOT NULL CHECK (status IN ('offered', 'adopted', 'discarded')),
+    created_at TEXT NOT NULL,
+    resolved_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS skill_visibility_settings (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    visible INTEGER NOT NULL CHECK (visible IN (0, 1)),
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, item_id)
+);
+
+CREATE TABLE IF NOT EXISTS job_favorites (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    job_id TEXT NOT NULL,
+    title_snapshot TEXT NOT NULL,
+    enterprise_name_snapshot TEXT NOT NULL,
+    salary_snapshot TEXT NOT NULL,
+    location_snapshot TEXT NOT NULL,
+    description_snapshot TEXT NOT NULL,
+    favorited_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (user_id, job_id)
 );
 
 CREATE TABLE IF NOT EXISTS courses (
@@ -976,6 +1024,24 @@ def _ensure_teacher_console_columns(db: sqlite3.Connection) -> None:
             db.execute(f"ALTER TABLE courses ADD COLUMN {name} {definition}")
 
 
+def _ensure_job_matching_columns(db: sqlite3.Connection) -> None:
+    columns = {
+        row["name"] for row in db.execute("PRAGMA table_info(resumes)")
+    }
+    additions = {
+        "education_json": "TEXT NOT NULL DEFAULT '[]'",
+        "work_experiences_json": "TEXT NOT NULL DEFAULT '[]'",
+        "skills_json": "TEXT NOT NULL DEFAULT '[]'",
+        "version": "INTEGER NOT NULL DEFAULT 0",
+        "updated_at": "TEXT",
+    }
+    for name, definition in additions.items():
+        if name not in columns:
+            db.execute(
+                f"ALTER TABLE resumes ADD COLUMN {name} {definition}"
+            )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
@@ -983,6 +1049,7 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_course_media_url_column(db)
     _ensure_points_consumed_units_column(db)
     _ensure_teacher_console_columns(db)
+    _ensure_job_matching_columns(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)

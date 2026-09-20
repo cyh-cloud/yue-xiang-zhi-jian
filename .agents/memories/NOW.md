@@ -1,5 +1,36 @@
 # Current Work
 
+## 007 Job Matching Specification and Plan
+
+- 2026-09-19: Specification frozen at
+  `specs/007-job-matching/spec.md`; feature pointer now resolves to
+  `specs/007-job-matching`.
+- Branch and worktree: `v2/lixKRT/007-job-matching` in
+  `.worktrees/007-job-matching`.
+- Implementation plan:
+  `.agents/memories/plans/2026-09-19-007-job-matching.md`.
+- Frozen contracts: 07 owns skill-profile aggregation, per-item visibility,
+  and submission snapshots; 03/04/05 remain outcome producers. The existing
+  09 `JobPositionProvider` and `JobApplicationIntakeProvider` are reused
+  unchanged. A new 09-owned `JobApplicationStatusProvider` supplies
+  student-side application reads.
+- Clarified decisions: resume snapshots freeze on successful submission;
+  AI adoption is explicit and atomic; closed handled applications retain the
+  latest manual status plus a closed marker; favorites retain a full display
+  snapshot until manual removal.
+- Independent plan review passed with no remaining High or Medium findings.
+- Implementation Tasks 1-18 completed on
+  `v2/lixKRT/007-job-matching`; reviewed baseline HEAD `a76a1db`.
+- Verification at `a76a1db`: backend `881/881`, frontend `535/535`,
+  TypeScript check and production build passed; Task 18 browser geometry
+  passed `18/18` seeded and `15/15` empty-state route/width checks.
+- Final whole-branch review found one Critical and five Important findings.
+  The single authorized fix wave addressed favorites controls, resume bounds,
+  in-flight UI safety, 07 provider error mapping, provider-backed seed reads,
+  and the provider-contract/NOW handoff documentation.
+- The final fix commit is the current branch tip at handoff; no merge or push
+  has been performed.
+
 ## 009 Enterprise Console
 
 - 2026-09-19: Feature source `0f5950c` merged into `v2/lixKRT/dev` as

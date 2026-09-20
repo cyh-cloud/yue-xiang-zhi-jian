@@ -28,11 +28,16 @@ from app.handcraft_inheritance.routes import (
     handcraft_inheritance_bp,
     register_handcraft_inheritance_error_handlers,
 )
+from app.job_matching import (
+    install_default_job_matching_services,
+    job_matching_bp,
+    register_job_matching_error_handlers,
+)
 from app.messaging.routes import messages_bp
 from app.messaging.source_provider import register_messaging_source_provider
 from app.onboarding.routes import onboarding_bp
 from app.profiles.routes import student_profile_bp
-from app.session_manager import load_session
+from app.session_manager import abort_session_required, load_session
 from app.tags.routes import interest_tags_bp
 from app.teacher_console import (
     install_default_teacher_console_services,
@@ -46,6 +51,7 @@ PROTECTED_API_PREFIXES = (
     "/api/student",
     "/api/teacher",
     "/api/enterprise",
+    "/api/job-matching",
     "/api/government",
     "/api/admin",
     "/api/onboarding",
@@ -54,6 +60,10 @@ PROTECTED_API_PREFIXES = (
     "/api/ecommerce-training",
     "/api/handcraft-inheritance",
 )
+
+PROTECTED_API_ROLES = {
+    "/api/job-matching": "student",
+}
 
 INTERNAL_API_PREFIXES = (
     "/api/handcraft-inheritance/internal/",
@@ -70,6 +80,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_agri_services(app)
     install_default_handcraft_services(app)
     install_default_enterprise_services(app)
+    install_default_job_matching_services(app)
     install_default_government_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
@@ -94,11 +105,22 @@ def create_app(test_config: dict | None = None) -> Flask:
             for prefix in INTERNAL_API_PREFIXES
         ):
             return None
-        if any(
-            path == prefix or path.startswith(f"{prefix}/")
-            for prefix in PROTECTED_API_PREFIXES
-        ):
-            load_session(required=True, allowed_states={"active"})
+        matched_prefix = next(
+            (
+                prefix
+                for prefix in PROTECTED_API_PREFIXES
+                if path == prefix or path.startswith(f"{prefix}/")
+            ),
+            None,
+        )
+        if matched_prefix is not None:
+            session = load_session(
+                required=True,
+                allowed_states={"active"},
+            )
+            required_role = PROTECTED_API_ROLES.get(matched_prefix)
+            if required_role is not None and session["role"] != required_role:
+                abort_session_required()
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(student_courses_bp)
@@ -109,6 +131,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(agri_skills_bp)
     app.register_blueprint(ecommerce_training_bp)
     app.register_blueprint(enterprise_console_bp)
+    app.register_blueprint(job_matching_bp)
     app.register_blueprint(handcraft_inheritance_bp)
     app.register_blueprint(government_bp)
     app.register_blueprint(teacher_console_bp)
@@ -116,6 +139,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_ecommerce_training_error_handlers(app)
     register_enterprise_console_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
+    register_job_matching_error_handlers(app)
     register_teacher_console_error_handlers(app)
 
     with app.app_context():

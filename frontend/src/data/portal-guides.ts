@@ -81,6 +81,12 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         title: '手工传承',
         description: '非遗技艺、学习积分、奖品兑换与手工课程。',
         href: '/student/handcraft-inheritance'
+      },
+      {
+        id: 'student-employment',
+        title: '就业对接',
+        description: '维护简历与技能档案，浏览岗位并跟踪投递。',
+        href: '/student/employment'
       }
     ],
     steps: [
@@ -108,6 +114,11 @@ export const portalDefinitions: Record<PortalId, PortalDefinition> = {
         selector: '#student-handcraft-inheritance',
         title: '手工传承',
         description: '从手工传承入口进入非遗技艺、积分、奖品和课程。'
+      },
+      {
+        selector: '#student-employment',
+        title: '就业对接',
+        description: '维护简历与技能档案，浏览岗位并跟踪投递。'
       }
     ]
   },

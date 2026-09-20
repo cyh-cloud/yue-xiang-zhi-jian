@@ -283,6 +283,50 @@ def serialize_application(row) -> dict:
     }
 
 
+def _student_application_query(db, student_id: int, application_id=None):
+    sql = """
+        SELECT ja.*, users.name AS enterprise_name
+        FROM job_applications AS ja
+        JOIN users ON users.id = ja.enterprise_id
+        WHERE ja.student_id = ?
+    """
+    parameters = [student_id]
+    if application_id is not None:
+        sql += " AND ja.application_id = ?"
+        parameters.append(application_id)
+    else:
+        sql += """
+            ORDER BY ja.submitted_at DESC, ja.application_id ASC
+        """
+    return db.execute(sql, parameters)
+
+
+def list_student_application_records(student_id: int) -> list[dict]:
+    normalized = _normalize_student_id(student_id)
+    rows = _student_application_query(get_db(), normalized).fetchall()
+    return [_serialize_student_application(row) for row in rows]
+
+
+def get_student_application_record(
+    student_id: int,
+    application_id: str,
+) -> dict | None:
+    normalized_student = _normalize_student_id(student_id)
+    normalized_application = _normalize_application_id(application_id)
+    row = _student_application_query(
+        get_db(),
+        normalized_student,
+        normalized_application,
+    ).fetchone()
+    return _serialize_student_application(row) if row else None
+
+
+def _serialize_student_application(row) -> dict:
+    record = serialize_application(row)
+    record["enterprise_name"] = str(row["enterprise_name"])
+    return record
+
+
 def record_application_submission(
     *,
     job_id: str,
@@ -805,7 +849,9 @@ __all__ = [
     "change_application_status",
     "close_applications_for_deleted_job",
     "get_application",
+    "get_student_application_record",
     "list_applications",
+    "list_student_application_records",
     "record_application_submission",
     "serialize_application",
 ]

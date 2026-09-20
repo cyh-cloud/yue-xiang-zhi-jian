@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { BookOpen, Radio, Scissors, Sprout, UserRound } from 'lucide-vue-next'
+import {
+  BookOpen,
+  BriefcaseBusiness,
+  Radio,
+  Scissors,
+  Sprout,
+  UserRound
+} from 'lucide-vue-next'
 import { RouterLink } from 'vue-router'
 
 import PortalShell from '@/components/PortalShell.vue'
@@ -45,6 +52,13 @@ import PortalShell from '@/components/PortalShell.vue'
           <small>非遗技艺、积分、奖品与课程</small>
         </span>
       </RouterLink>
+      <RouterLink to="/student/employment">
+        <BriefcaseBusiness :size="18" aria-hidden="true" />
+        <span>
+          <strong>进入就业对接</strong>
+          <small>简历、技能档案、岗位与投递</small>
+        </span>
+      </RouterLink>
     </nav>
   </div>
 </template>
@@ -71,7 +85,7 @@ import PortalShell from '@/components/PortalShell.vue'
   align-items: center;
   min-height: 82px;
   padding: 16px 18px;
-  background: rgb(255 255 255 / 0.94);
+  background: var(--ark-surface-0);
   text-decoration: none;
   transition:
     background var(--ark-transition),
@@ -80,7 +94,7 @@ import PortalShell from '@/components/PortalShell.vue'
 
 .student-actions a:hover,
 .student-actions a:focus-visible {
-  background: rgb(24 209 255 / 0.1);
+  background: var(--ark-surface-1);
   color: var(--ark-signal);
 }
 
