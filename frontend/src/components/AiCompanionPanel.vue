@@ -1,15 +1,49 @@
 <script setup lang="ts">
-import { X } from 'lucide-vue-next'
-import { onMounted, ref } from 'vue'
+import { Send, X } from 'lucide-vue-next'
+import { computed, nextTick, onMounted, ref } from 'vue'
+
+import type { LocalDialectCode } from '@/api/types'
+import { useAiCompanionStore } from '@/stores/aiCompanion'
+import { useAuthStore } from '@/stores/auth'
+
+import AiCompanionMessage from './AiCompanionMessage.vue'
+import VoiceInputButton from './VoiceInputButton.vue'
 
 type PanelView = 'chat' | 'history'
+
+const RECOGNITION_FAILURE_MESSAGE = '未能识别，请重说或改用文字'
+const MAX_QUESTION_LENGTH = 2000
+
+// 三个方言只作为语音提问的交互上下文，既不预选也不传给 ASR。
+const DIALECTS: ReadonlyArray<{ code: LocalDialectCode; label: string }> = [
+  { code: 'yue', label: '粤语' },
+  { code: 'hak', label: '客家话' },
+  { code: 'nan', label: '潮汕话' }
+]
 
 const emit = defineEmits<{
   close: []
 }>()
 
+const auth = useAuthStore()
+const companion = useAiCompanionStore()
+
 const rootRef = ref<HTMLElement | null>(null)
-const activeView = ref<PanelView>('chat')
+const draftRef = ref<HTMLTextAreaElement | null>(null)
+
+const draftModel = computed({
+  get: () => companion.draft,
+  set: (value: string) => companion.setDraft(value)
+})
+
+// 未显式选择方言前禁止录音；转写或回答进行中同样禁止并发录音。
+const voiceDisabled = computed(
+  () => companion.dialectCode === null || companion.loading
+)
+
+const canSubmit = computed(
+  () => companion.draft.trim().length > 0 && !companion.loading
+)
 
 function returnFocusToLauncher() {
   document
@@ -27,6 +61,48 @@ function handleKeydown(event: KeyboardEvent) {
     event.stopPropagation()
     requestClose()
   }
+}
+
+function selectView(view: PanelView) {
+  companion.activeView = view
+}
+
+function selectDialect(code: LocalDialectCode) {
+  companion.dialectCode = code
+}
+
+function handleRecordingChange(recording: boolean) {
+  companion.recording = recording
+}
+
+async function handleRecorded(blob: Blob, filename: string) {
+  // 零字节即空录音或被取消：不调用 ASR，只提示改用文字输入。
+  if (blob.size === 0) {
+    companion.recording = false
+    companion.error = RECOGNITION_FAILURE_MESSAGE
+    return
+  }
+  const recognized = await companion.transcribe(blob, filename)
+  if (!recognized) {
+    return
+  }
+  // transcribe 已把识别结果写入 store.recognizedText，面板从这里取值填入草稿，
+  // 由用户确认后才提交，识别文本始终保持可编辑。
+  companion.setDraft(companion.recognizedText)
+  await nextTick()
+  draftRef.value?.focus()
+}
+
+function handlePermissionDenied() {
+  companion.recording = false
+  companion.error = RECOGNITION_FAILURE_MESSAGE
+}
+
+async function submitQuestion() {
+  if (!canSubmit.value) {
+    return
+  }
+  await companion.sendQuestion(companion.draft)
 }
 
 onMounted(() => {
@@ -61,9 +137,9 @@ onMounted(() => {
         type="button"
         role="tab"
         class="ai-companion-panel-tab"
-        :aria-selected="activeView === 'chat'"
-        :data-active="activeView === 'chat'"
-        @click="activeView = 'chat'"
+        :aria-selected="companion.activeView === 'chat'"
+        :data-active="companion.activeView === 'chat'"
+        @click="selectView('chat')"
       >
         对话
       </button>
@@ -71,9 +147,9 @@ onMounted(() => {
         type="button"
         role="tab"
         class="ai-companion-panel-tab"
-        :aria-selected="activeView === 'history'"
-        :data-active="activeView === 'history'"
-        @click="activeView = 'history'"
+        :aria-selected="companion.activeView === 'history'"
+        :data-active="companion.activeView === 'history'"
+        @click="selectView('history')"
       >
         历史会话
       </button>
@@ -81,11 +157,28 @@ onMounted(() => {
 
     <div class="ai-companion-panel-body">
       <div
-        v-if="activeView === 'chat'"
+        v-if="companion.activeView === 'chat'"
         class="ai-companion-panel-scroll"
         data-test="ai-companion-chat-region"
       >
-        <slot name="chat" />
+        <slot name="chat">
+          <p v-if="companion.messages.length === 0" class="ai-companion-empty">
+            问一个平台使用问题，例如“怎么投简历”
+          </p>
+          <ul
+            v-else
+            class="ai-companion-messages"
+            data-test="ai-companion-messages"
+          >
+            <li
+              v-for="item in companion.messages"
+              :key="item.message_id"
+              class="ai-companion-messages-item"
+            >
+              <AiCompanionMessage :message="item" :role="auth.user?.role" />
+            </li>
+          </ul>
+        </slot>
       </div>
       <div
         v-else
@@ -97,7 +190,77 @@ onMounted(() => {
     </div>
 
     <footer class="ai-companion-panel-composer">
-      <slot name="composer" />
+      <slot name="composer">
+        <form class="ai-companion-composer" @submit.prevent="submitQuestion">
+          <p
+            v-if="companion.error"
+            class="ai-companion-composer-error"
+            data-test="ai-companion-error"
+            role="alert"
+          >
+            {{ companion.error }}
+          </p>
+          <div
+            class="ai-companion-dialects"
+            role="radiogroup"
+            aria-label="提问方言"
+          >
+            <button
+              v-for="dialect in DIALECTS"
+              :key="dialect.code"
+              type="button"
+              role="radio"
+              class="ai-companion-dialect"
+              :data-test="`ai-companion-dialect-${dialect.code}`"
+              :data-active="companion.dialectCode === dialect.code"
+              :aria-checked="companion.dialectCode === dialect.code"
+              @click="selectDialect(dialect.code)"
+            >
+              {{ dialect.label }}
+            </button>
+          </div>
+          <div class="ai-companion-composer-row">
+            <textarea
+              ref="draftRef"
+              v-model="draftModel"
+              class="ai-companion-composer-input"
+              data-test="ai-companion-draft"
+              rows="3"
+              :maxlength="MAX_QUESTION_LENGTH"
+              placeholder="输入平台使用问题"
+              aria-label="问题输入"
+            />
+            <!-- data-test 与禁用态挂在外层容器上，作为语音区整体状态钩子；
+                 permission-denied 同时接 DOM 事件与组件 emit，共用同一处理。 -->
+            <div
+              class="ai-companion-voice"
+              data-test="ai-companion-voice"
+              role="group"
+              aria-label="语音提问"
+              :aria-disabled="voiceDisabled"
+              :disabled="voiceDisabled ? '' : null"
+              @permission-denied="handlePermissionDenied"
+            >
+              <VoiceInputButton
+                :recording="companion.recording"
+                :disabled="voiceDisabled"
+                @update:recording="handleRecordingChange"
+                @recorded="handleRecorded"
+                @permission-denied="handlePermissionDenied"
+              />
+            </div>
+            <button
+              type="submit"
+              class="ai-companion-composer-submit"
+              data-test="ai-companion-submit"
+              :disabled="!canSubmit"
+            >
+              <Send :size="16" aria-hidden="true" />
+              发送
+            </button>
+          </div>
+        </form>
+      </slot>
     </footer>
   </section>
 </template>
@@ -210,6 +373,111 @@ onMounted(() => {
   padding: 12px 16px 14px;
   border-top: 1px solid var(--ark-line);
   background: var(--ark-surface-1);
+}
+
+.ai-companion-empty {
+  margin: 0;
+  color: var(--ark-muted);
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.ai-companion-messages {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-companion-messages-item {
+  display: block;
+  min-width: 0;
+}
+
+.ai-companion-composer {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.ai-companion-composer-error {
+  margin: 0;
+  color: var(--ark-paper);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.ai-companion-dialects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-companion-dialect {
+  padding: 5px 10px;
+  border: 1px solid var(--ark-line-strong);
+  border-radius: var(--ark-radius);
+  background: transparent;
+  color: var(--ark-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.ai-companion-dialect:hover {
+  color: var(--ark-paper);
+}
+
+.ai-companion-dialect[data-active='true'] {
+  border-color: var(--ark-signal);
+  color: var(--ark-signal);
+}
+
+.ai-companion-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.ai-companion-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid var(--ark-line-strong);
+  border-radius: var(--ark-radius);
+  background: var(--ark-surface-0);
+  color: var(--ark-paper);
+  font: inherit;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.ai-companion-voice {
+  flex: 0 0 auto;
+}
+
+.ai-companion-composer-submit {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--ark-signal);
+  border-radius: var(--ark-radius);
+  background: var(--ark-signal);
+  color: var(--ark-surface-0);
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.ai-companion-composer-submit:disabled {
+  border-color: var(--ark-line-strong);
+  background: transparent;
+  color: var(--ark-muted);
 }
 
 @media (min-width: 641px) {
