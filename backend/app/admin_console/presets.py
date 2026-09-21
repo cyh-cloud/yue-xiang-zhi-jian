@@ -2850,6 +2850,10 @@ def seed_agri_preset_content(connection) -> None:
                     now,
                 )
             )
+    # `item_id` is a deterministic function of (product_key, month), so
+    # ON CONFLICT(item_id) depends on that invariant: if the ID rule
+    # changes, UNIQUE(product_key, month) can bypass it and init_db raises
+    # IntegrityError.
     connection.executemany(
         """
         INSERT INTO admin_agri_calendar (

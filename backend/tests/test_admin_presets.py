@@ -1293,6 +1293,7 @@ class DemoCaseBoundaryTests(TestCase):
                 )
                 .fetchone()
             )
+        self.assertEqual(row["title"], "荔枝合作社的品牌化起步")
 
 
 class AgriPresetTests(TestCase):
@@ -1851,6 +1852,20 @@ class AgriPresetTests(TestCase):
                     "reminder": "试图改成九月",
                 },
                 "month_mismatch",
+            ),
+            (
+                "put",
+                "/api/admin/presets/agri_calendar/calendar-litchi-4",
+                {
+                    "expected_version": 1,
+                    "product_key": "longan",
+                    "month": 4,
+                    "tasks": [],
+                    "management": [],
+                    "solar_terms": [],
+                    "reminder": "试图挂到龙眼名下",
+                },
+                "product_key_mismatch",
             ),
             (
                 "put",
