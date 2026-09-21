@@ -196,6 +196,45 @@ def reject_review_route(content_type: str, content_id: str):
     return jsonify(success=True, item=item)
 
 
+@admin_console_bp.get("/comments")
+def list_moderation_comments_route():
+    from app.admin_console.moderation import list_moderation_comments
+
+    # Both admin roles: the permission matrix puts comment moderation in the
+    # shared content-operations row, and FR-071 names the ordinary admin as
+    # the patrolling role, so this guard follows the review and preset routes
+    # rather than the super-admin-only announcements and policy ones.
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_moderation_comments(
+        _admin_filters(
+            "content_type",
+            "content_id",
+            "author_id",
+            "keyword",
+            "is_visible",
+            "created_from",
+            "created_to",
+            "limit",
+            "offset",
+        )
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.delete("/comments/<comment_id>")
+def delete_comment_route(comment_id: str):
+    from app.admin_console.moderation import delete_comment
+
+    # Same dual-role guard as the patrol list, and the actor comes from the
+    # 01 session only: a body-supplied id or role is never read here.
+    session = require_admin_session(roles={"admin", "super_admin"})
+    result = delete_comment(int(session["id"]), comment_id)
+    # `changed`, `comment_id`, `is_visible` and `updated_at` sit at the top
+    # level so the console can tell a fresh decision from a repeat one
+    # without a second request.
+    return jsonify(success=True, **result)
+
+
 @admin_console_bp.get("/presets/handcraft_crafts")
 def list_handcraft_craft_presets_route():
     from app.admin_console.presets import list_craft_presets
