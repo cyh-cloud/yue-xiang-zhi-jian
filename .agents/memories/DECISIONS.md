@@ -56,3 +56,42 @@
 ## AI Companion Jump Target Validation
 
 - AI 学伴 jump_target 校验:空 meta.roles 数组视为无限制,对齐既有 authGuard(roleRoutes)。
+## AI Companion Knowledge Provider Ownership
+
+- 012 consumes the 011-owned `assistant_feature_knowledge_provider` contract
+  through `app/ai_companion/knowledge_provider.py`, which only imports and
+  re-exports the objects owned by `app/admin_console/providers.py`.
+- There is no second registry: the setter, the getter,
+  `AssistantFeatureKnowledgeProvider` and
+  `UnavailableAssistantFeatureKnowledgeProvider` are the same objects, and the
+  acceptance suite asserts identity (`is`) for all four.
+- A repository-wide AST scan finds exactly one
+  `def set_assistant_feature_knowledge_provider` and one
+  `def get_assistant_feature_knowledge_provider`, both in
+  `app/admin_console/providers.py`.
+
+## Missing 011 Assistant Feature Knowledge Table
+
+- On the `012-ai-companion` branch there is no `CREATE TABLE` for
+  `admin_assistant_feature_knowledge` anywhere under `backend/app`.
+- `DatabaseAssistantFeatureKnowledgeProvider.list_entries` reads
+  `FROM admin_assistant_feature_knowledge`, so the real provider raises
+  `sqlite3.OperationalError: no such table: admin_assistant_feature_knowledge`
+  on this branch. The acceptance suite asserts this fact instead of creating the
+  table or stubbing around it.
+- 012 must not create the 011 table and must not register admin routes; that is
+  cross-module work owned by 011.
+- End-to-end real answering requires, in order: 011 creates the
+  `admin_assistant_feature_knowledge` table, then the real
+  `DatabaseAssistantFeatureKnowledgeProvider` is registered in the shared
+  `assistant_feature_knowledge_provider` slot. Until then 012 keeps the
+  `UnavailableAssistantFeatureKnowledgeProvider` placeholder, which surfaces as
+  `暂无法回答，请稍后再试` (HTTP 422).
+
+## AI Companion Conversation Retention
+
+- 180-day retention is computed from `ai_companion_conversations.updated_at`:
+  a conversation whose `updated_at` is older than 180 days is pruned on the next
+  write for that user.
+- The conversation cap is 100 per user and the message cap is 200 per
+  conversation, both enforced inside the same write path.

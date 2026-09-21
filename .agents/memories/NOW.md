@@ -225,3 +225,36 @@ whole-branch review.
   `E:\Project\skipped_work\粤乡智匠项目\.superpowers\archive\runtime-data\yuexiang-004-batch-b-stop-20260917-124139.db`;
   SHA-256 `F384F4C1F200499CFE87EE6F09DCEB26C9324E5ED6FF27878C55E51A0C09DBE1`.
 - Both the feature worktree and integration worktree are clean.
+## 012 AI Companion
+
+- 2026-09-21: SDD Tasks 1-16 complete on branch `v2/lixKRT/012-ai-companion` in
+  `.worktrees/012-ai-companion`. Task 14/15 commits are `22bfebf` and `33031ac`;
+  the Task 16 acceptance commit is the tip (`test(ai-companion): 全 feature
+  验收、provider 对账与记忆交接`; read with `git rev-parse HEAD`) on top of the
+  Task 1-13 head `aa3118e`.
+  Stopped before merge: no push, no merge into `v2/lixKRT/dev`; worktree and
+  branch retained.
+- Verification: backend acceptance `20/20`; backend full suite `1018/1018`;
+  frontend whole-feature `12/12`; frontend full `110` files / `735` tests;
+  `npx vue-tsc --noEmit` silent; `npm run build` succeeded.
+- Browser acceptance is BLOCKED: port 5000 is held by PID 34676, which cannot be
+  identified (`tasklist` reports no such task), and the no-kill rule forbids
+  terminating it. No screenshots, no browser geometry, and image delegation is
+  not applicable.
+- Provider reconciliation: 012 consumes the 011-owned
+  `assistant_feature_knowledge_provider` contract by re-export only, asserted by
+  object identity for the setter, the getter and both provider classes. Exactly
+  one definition of each contract function exists, in
+  `app/admin_console/providers.py`.
+- The `admin_assistant_feature_knowledge` table is MISSING on this branch: no
+  `CREATE TABLE` for it exists under `backend/app`, so the real
+  `DatabaseAssistantFeatureKnowledgeProvider` raises
+  `no such table: admin_assistant_feature_knowledge`. 012 must not add the 011
+  table.
+- Deferred items (not fixed): business-proxy prefilter misjudging
+  "帮忙…怎么…" style questions (fail-safe direction);
+  `app/ai_companion/__init__.py` not re-exporting `AI_UNAVAILABLE_MESSAGE` and
+  `ASR_FAILURE_MESSAGE`; the 7-field knowledge whitelist test needing hardening;
+  180-day retention computed by `updated_at`; 011 real-provider assembly order.
+- The 012 worktree and branch are retained. No push, no merge and no worktree
+  cleanup has been performed.
