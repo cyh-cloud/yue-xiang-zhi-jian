@@ -83,7 +83,34 @@ class UnavailableFeedbackIntakeProvider:
 
 
 class DatabaseFeedbackIntakeProvider(UnavailableFeedbackIntakeProvider):
-    pass
+    """Feedback intake backed by the `feedback_records` table.
+
+    The table is owned by `moderation`, which also owns the canonical
+    record shape the admin console reads back through `list_feedback`, so
+    the intake lives there and this class is the slot-facing wrapper 07 and
+    12 install. That keeps one implementation and one shape: a field added
+    to a feedback record is visible to the submitter's provider and to the
+    console at the same time, and neither side can drift from the other.
+
+    Every failure is a `ProviderValidationError` from the 011 error
+    hierarchy, so a caller sees the same code whether it reached this
+    provider or the console route.
+    """
+
+    def submit_feedback(
+        self,
+        *,
+        submitter_id: int,
+        body: str,
+        idempotency_key: str,
+    ) -> dict:
+        from app.admin_console.moderation import submit_feedback
+
+        return submit_feedback(
+            submitter_id=submitter_id,
+            body=body,
+            idempotency_key=idempotency_key,
+        )
 
 
 def set_assistant_feature_knowledge_provider(

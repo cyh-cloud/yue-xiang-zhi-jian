@@ -235,6 +235,86 @@ def delete_comment_route(comment_id: str):
     return jsonify(success=True, **result)
 
 
+@admin_console_bp.get("/reports")
+def list_reports_route():
+    from app.admin_console.moderation import list_reports
+
+    # Same dual-role guard as the patrol list: the permission matrix keeps
+    # comment moderation, reports and feedback in the shared
+    # content-operations row, and FR-071 names the ordinary admin as the
+    # patrolling role for all three.
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_reports(
+        _admin_filters(
+            "status",
+            "comment_id",
+            "reporter_id",
+            "created_from",
+            "created_to",
+            "limit",
+            "offset",
+        )
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/reports/<report_id>/resolve")
+def resolve_report_route(report_id: str):
+    from app.admin_console.moderation import resolve_report
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    report = resolve_report(
+        int(session["id"]),
+        report_id,
+        payload.get("confirmed"),
+        payload.get("result"),
+    )
+    # `changed` sits at the top level next to the resolved report, so the
+    # console can tell a fresh decision from a repeat submission without a
+    # second request.
+    return jsonify(success=True, report=report, **report)
+
+
+@admin_console_bp.get("/feedback")
+def list_feedback_route():
+    from app.admin_console.moderation import list_feedback
+
+    # Feedback is intake plus an answer, both of which stay inside the
+    # console, so the same dual-role guard as the comment patrol applies.
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_feedback(
+        _admin_filters(
+            "status",
+            "submitter_id",
+            "created_from",
+            "created_to",
+            "limit",
+            "offset",
+        )
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.patch("/feedback/<feedback_id>")
+def update_feedback_route(feedback_id: str):
+    from app.admin_console.moderation import update_feedback
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    feedback = update_feedback(
+        int(session["id"]),
+        feedback_id,
+        payload.get("status"),
+        payload.get("result"),
+    )
+    return jsonify(success=True, feedback=feedback, **feedback)
+
+
 @admin_console_bp.get("/presets/handcraft_crafts")
 def list_handcraft_craft_presets_route():
     from app.admin_console.presets import list_craft_presets
