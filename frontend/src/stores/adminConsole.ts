@@ -385,6 +385,143 @@ export interface AdminPresetItemResponse {
   item: AdminPresetItem
 }
 
+// --- managed content (Task 25) ----------------------------------------------
+
+export type AdminManagedContentType =
+  | 'policy'
+  | 'news'
+  | 'course'
+  | 'job'
+  | 'handcraft_video'
+  | 'comment'
+  | 'preset'
+
+export interface AdminManagedPolicyItem {
+  content_type: 'policy'
+  id: string
+  title: string
+  content: string
+  category_code: string
+  status: string
+  view_count: number
+  version: number
+  published_at: string | null
+  updated_at: string
+}
+
+export interface AdminManagedNewsItem {
+  content_type: 'news'
+  id: string
+  title: string
+  content: string
+  category_code: string
+  view_count: number
+  version: number
+  published_at: string | null
+  updated_at: string
+}
+
+export interface AdminManagedCourseItem {
+  content_type: 'course'
+  id: number
+  title: string
+  direction: string
+  status: string
+  teacher_id: number | null
+  teacher_name: string
+  version: number
+  published_at: string | null
+  deleted_at: string | null
+  updated_at: string
+}
+
+export interface AdminManagedJobItem {
+  content_type: 'job'
+  job_id: string
+  title: string
+  enterprise_id: number
+  review_status: string
+  version: number
+  published_at: string | null
+  deleted_at: string | null
+  updated_at: string
+}
+
+export interface AdminManagedVideoItem {
+  content_type: 'handcraft_video'
+  video_id: string
+  craft_key: string
+  title: string
+  review_status: string
+  version: number
+  published_at: string | null
+  deleted_at: string | null
+  updated_at: string
+}
+
+export interface AdminManagedCommentItem {
+  content_type: 'comment'
+  comment_id: string
+  target_content_type: string
+  target_content_id: string
+  author_id: number
+  body: string
+  is_visible: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminManagedPresetItem {
+  content_type: 'preset'
+  // The managed-preset projection is widening from the handcraft crafts alone
+  // to all six preset families, so a row names its family and carries a stable
+  // id instead of the craft-only spellings. The craft-only fields stay
+  // optional until the widened projection lands.
+  preset_category?: AdminPresetCategory
+  id?: string
+  // The union projection keeps the family-encoded id and the bare stable id
+  // side by side, so the table can show the id a human reads and still
+  // address the row by the one the route decodes.
+  stable_id?: string
+  sort_order?: number
+  craft_key?: string
+  name?: string
+  title?: string
+  is_enabled: boolean
+  version: number
+  updated_at: string
+}
+
+export type AdminManagedContentItem =
+  | AdminManagedPolicyItem
+  | AdminManagedNewsItem
+  | AdminManagedCourseItem
+  | AdminManagedJobItem
+  | AdminManagedVideoItem
+  | AdminManagedCommentItem
+  | AdminManagedPresetItem
+
+// A correction only rewrites the copy of a row: policy and news name the body
+// `content`, a course a `summary`, a job a `description`, and a video carries
+// a title alone, so every spelling stays optional on the way out.
+export interface AdminManagedContentCorrectionPayload {
+  title: string
+  content?: string
+  summary?: string
+  description?: string
+}
+
+export interface AdminManagedContentListResponse {
+  success: true
+  items: AdminManagedContentItem[]
+  count: number
+}
+
+export interface AdminManagedContentItemResponse {
+  success: true
+  item: AdminManagedContentItem
+}
+
 // One page of every moderation queue. The backend caps `limit` at 200 and
 // answers with the rows the page actually carries, so the console never
 // claims a total it was not given.
@@ -1636,6 +1773,249 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     presetFormErrorCode.value = ''
   }
 
+  // Cross-platform data management is a super-admin surface: one content type
+  // is open at a time, the backend lists the whole table without paging, and
+  // every write answers with the stored row so the console re-reads the list
+  // instead of guessing the committed version.
+  const managedContentType = ref<AdminManagedContentType>('policy')
+  const managedContentItems = ref<AdminManagedContentItem[]>([])
+  const managedContentCount = ref(0)
+  const managedContentLoading = ref(false)
+  const managedContentError = ref('')
+  const managedContentActionLoading = ref(false)
+  const managedContentFormError = ref('')
+  const managedContentFormErrorCode = ref('')
+  const managedContentDetail = ref<AdminManagedContentItem | null>(null)
+  const managedContentDetailLoading = ref(false)
+  const managedContentDetailError = ref('')
+
+  // The data-management module reports a version conflict per content type and
+  // a state conflict for the rows whose current status blocks the action, so
+  // the console maps those codes to a sentence the operator can act on and
+  // lets the backend's own message through for everything else.
+  const MANAGED_CONTENT_ERROR_CODES: Record<string, string> = {
+    content_type_invalid: '内容类型不正确，请刷新页面后重试',
+    content_correct_unsupported: '该内容类型不支持纠错',
+    content_unpublish_unsupported: '该内容类型不支持下线',
+    content_not_found: '内容不存在或已被其他管理员删除',
+    policy_not_found: '政策不存在或已被其他管理员删除',
+    news_not_found: '新闻不存在或已被其他管理员删除',
+    course_not_found: '课程不存在或已被其他管理员删除',
+    job_not_found: '职位不存在或已被其他管理员删除',
+    video_not_found: '视频不存在或已被其他管理员删除',
+    comment_not_found: '评论不存在或已被其他管理员删除',
+    preset_not_found: '预置内容不存在或已被其他管理员删除',
+    craft_preset_not_found: '预置技艺不存在或已被其他管理员删除',
+    comment_already_hidden: '评论已被隐藏，列表已刷新',
+    policy_version_conflict:
+      '政策已被其他管理员修改，列表已刷新，请确认最新内容后重试',
+    news_version_conflict:
+      '新闻已被其他管理员修改，列表已刷新，请确认最新内容后重试',
+    course_version_conflict:
+      '课程已被其他管理员修改，列表已刷新，请确认最新内容后重试',
+    job_version_conflict:
+      '职位已被其他管理员修改，列表已刷新，请确认最新内容后重试',
+    video_version_conflict:
+      '视频已被其他管理员修改，列表已刷新，请确认最新内容后重试',
+    craft_preset_version_conflict:
+      '预置技艺已被其他管理员修改，列表已刷新，请确认最新内容后重试',
+    policy_state_conflict: '政策当前状态不允许下线，列表已刷新',
+    course_state_conflict: '课程当前状态不允许下线，列表已刷新',
+    job_state_conflict: '职位当前状态不允许下线，列表已刷新',
+    video_state_conflict: '视频当前状态不允许下线，列表已刷新'
+  }
+
+  function managedContentErrorMessage(
+    caught: unknown,
+    fallback: string
+  ): string {
+    if (caught instanceof ApiError && caught.code) {
+      const mapped = MANAGED_CONTENT_ERROR_CODES[caught.code]
+      if (mapped) {
+        return mapped
+      }
+    }
+    return errorMessage(caught, fallback)
+  }
+
+  function managedContentErrorCode(caught: unknown): string {
+    return caught instanceof ApiError && caught.code ? caught.code : ''
+  }
+
+  async function loadManagedContent(
+    contentType: AdminManagedContentType
+  ): Promise<boolean> {
+    managedContentLoading.value = true
+    managedContentError.value = ''
+    managedContentType.value = contentType
+    try {
+      const response = await apiFetch<AdminManagedContentListResponse>(
+        `/api/admin/content/${contentType}`
+      )
+      managedContentItems.value = response.items
+      managedContentCount.value = response.count
+      return true
+    } catch (caught) {
+      managedContentItems.value = []
+      managedContentCount.value = 0
+      managedContentError.value = managedContentErrorMessage(
+        caught,
+        '内容列表加载失败'
+      )
+      return false
+    } finally {
+      managedContentLoading.value = false
+    }
+  }
+
+  async function loadManagedContentDetail(
+    contentType: AdminManagedContentType,
+    contentId: string
+  ): Promise<boolean> {
+    managedContentDetailLoading.value = true
+    managedContentDetailError.value = ''
+    try {
+      const response = await apiFetch<AdminManagedContentItemResponse>(
+        `/api/admin/content/${encodeURIComponent(contentType)}/${encodeURIComponent(contentId)}`
+      )
+      managedContentDetail.value = response.item
+      return true
+    } catch (caught) {
+      managedContentDetail.value = null
+      managedContentDetailError.value = managedContentErrorMessage(
+        caught,
+        '内容详情加载失败'
+      )
+      return false
+    } finally {
+      managedContentDetailLoading.value = false
+    }
+  }
+
+  async function correctManagedContent(
+    contentType: AdminManagedContentType,
+    contentId: string,
+    expectedVersion: number,
+    payload: AdminManagedContentCorrectionPayload
+  ): Promise<AdminManagedContentItem | null> {
+    managedContentActionLoading.value = true
+    managedContentFormError.value = ''
+    managedContentFormErrorCode.value = ''
+    try {
+      const response = await apiFetch<AdminManagedContentItemResponse>(
+        `/api/admin/content/${contentType}/${encodeURIComponent(contentId)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            ...payload,
+            expected_version: expectedVersion
+          })
+        }
+      )
+      // A correction bumps the row's version, so the table is re-read to show
+      // the stored version instead of the one that was sent.
+      await loadManagedContent(contentType)
+      return response.item
+    } catch (caught) {
+      // A 409 means another admin already moved the row: reload so the form
+      // can re-seed its expected version from the server values, then keep
+      // the conflict text next to the form.
+      if (caught instanceof ApiError && caught.status === 409) {
+        await loadManagedContent(contentType)
+      }
+      managedContentFormError.value = managedContentErrorMessage(
+        caught,
+        '保存纠错失败'
+      )
+      managedContentFormErrorCode.value = managedContentErrorCode(caught)
+      return null
+    } finally {
+      managedContentActionLoading.value = false
+    }
+  }
+
+  async function unpublishManagedContent(
+    contentType: AdminManagedContentType,
+    contentId: string,
+    expectedVersion: number
+  ): Promise<AdminManagedContentItem | null> {
+    managedContentActionLoading.value = true
+    managedContentError.value = ''
+    try {
+      const response = await apiFetch<AdminManagedContentItemResponse>(
+        `/api/admin/content/${contentType}/${encodeURIComponent(contentId)}/unpublish`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ expected_version: expectedVersion })
+        }
+      )
+      await loadManagedContent(contentType)
+      return response.item
+    } catch (caught) {
+      // The reload clears the banner, so the message is captured first and
+      // written back afterwards.
+      const message = managedContentErrorMessage(caught, '下线内容失败')
+      if (caught instanceof ApiError && caught.status === 409) {
+        await loadManagedContent(contentType)
+      }
+      managedContentError.value = message
+      return null
+    } finally {
+      managedContentActionLoading.value = false
+    }
+  }
+
+  async function deleteManagedContent(
+    contentType: AdminManagedContentType,
+    contentId: string,
+    expectedVersion?: number
+  ): Promise<AdminManagedContentItem | null> {
+    managedContentActionLoading.value = true
+    managedContentError.value = ''
+    try {
+      // The comment projection carries no optimistic lock, so a version is
+      // only sent for the types that own one.
+      const body =
+        expectedVersion === undefined
+          ? {}
+          : { expected_version: expectedVersion }
+      const response = await apiFetch<AdminManagedContentItemResponse>(
+        `/api/admin/content/${contentType}/${encodeURIComponent(contentId)}`,
+        {
+          method: 'DELETE',
+          body: JSON.stringify(body)
+        }
+      )
+      await loadManagedContent(contentType)
+      return response.item
+    } catch (caught) {
+      // The reload clears the banner, so the message is captured first and
+      // written back afterwards.
+      const message = managedContentErrorMessage(caught, '删除内容失败')
+      if (caught instanceof ApiError && caught.status === 409) {
+        await loadManagedContent(contentType)
+      }
+      managedContentError.value = message
+      return null
+    } finally {
+      managedContentActionLoading.value = false
+    }
+  }
+
+  function clearManagedContentError() {
+    managedContentError.value = ''
+  }
+
+  function clearManagedContentFormError() {
+    managedContentFormError.value = ''
+    managedContentFormErrorCode.value = ''
+  }
+
+  function clearManagedContentDetail() {
+    managedContentDetail.value = null
+    managedContentDetailError.value = ''
+  }
+
   return {
     dashboard,
     loading,
@@ -1754,6 +2134,25 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     updatePreset,
     disablePreset,
     clearPresetsError,
-    clearPresetFormError
+    clearPresetFormError,
+    managedContentType,
+    managedContentItems,
+    managedContentCount,
+    managedContentLoading,
+    managedContentError,
+    managedContentActionLoading,
+    managedContentFormError,
+    managedContentFormErrorCode,
+    managedContentDetail,
+    managedContentDetailLoading,
+    managedContentDetailError,
+    loadManagedContent,
+    loadManagedContentDetail,
+    correctManagedContent,
+    unpublishManagedContent,
+    deleteManagedContent,
+    clearManagedContentError,
+    clearManagedContentFormError,
+    clearManagedContentDetail
   }
 })

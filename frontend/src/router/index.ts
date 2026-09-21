@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteComponent } from 'vue-router'
-import { defineComponent, h } from 'vue'
 
 import { useAuthStore } from '@/stores/auth'
 import AgriCalendarView from '@/views/AgriCalendarView.vue'
@@ -10,6 +9,7 @@ import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminAccountsView from '@/views/AdminAccountsView.vue'
 import AdminAnnouncementsView from '@/views/AdminAnnouncementsView.vue'
+import AdminContentManagementView from '@/views/AdminContentManagementView.vue'
 import AdminDashboardView from '@/views/AdminDashboardView.vue'
 import AdminModerationView from '@/views/AdminModerationView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
@@ -70,12 +70,6 @@ const superAdminMeta = {
   requiresAuth: true,
   roles: ['super_admin'] as const
 }
-const AdminRoutePlaceholder: RouteComponent = defineComponent({
-  name: 'AdminRoutePlaceholder',
-  setup() {
-    return () => h('div', { 'data-test': 'admin-route-placeholder' })
-  }
-})
 
 const localResourceViewLoaders = import.meta.glob<{
   default: RouteComponent
@@ -486,7 +480,7 @@ const router = createRouter({
         {
           path: 'content',
           name: 'admin-content',
-          component: AdminRoutePlaceholder,
+          component: AdminContentManagementView,
           meta: adminMeta
         },
         {
