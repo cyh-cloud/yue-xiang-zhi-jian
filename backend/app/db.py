@@ -1389,6 +1389,9 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     from app.admin_console.presets import seed_assistant_feature_knowledge
 
     seed_assistant_feature_knowledge(db)
+    from app.admin_console.presets import seed_agri_preset_content
+
+    seed_agri_preset_content(db)
     from app.admin_console.seed import seed_initial_super_admin
 
     seed_initial_super_admin()

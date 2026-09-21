@@ -453,6 +453,144 @@ def delete_assistant_knowledge_preset_route(knowledge_id: str):
     return jsonify(success=True, item=item)
 
 
+@admin_console_bp.get("/presets/agri_products")
+def list_agri_product_presets_route():
+    from app.admin_console.presets import list_agri_product_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_agri_product_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/agri_products")
+def create_agri_product_preset_route():
+    from app.admin_console.presets import create_agri_product_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_agri_product_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/agri_products/<product_key>")
+def update_agri_product_preset_route(product_key: str):
+    from app.admin_console.presets import update_agri_product_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_agri_product_preset(int(session["id"]), product_key, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/agri_products/<product_key>")
+def delete_agri_product_preset_route(product_key: str):
+    from app.admin_console.presets import disable_agri_product_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_agri_product_preset(
+        int(session["id"]),
+        product_key,
+        _preset_expected_version(),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/agri_calendar")
+def list_agri_calendar_presets_route():
+    from app.admin_console.presets import list_agri_calendar_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_agri_calendar_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/agri_calendar")
+def create_agri_calendar_preset_route():
+    from app.admin_console.presets import create_agri_calendar_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_agri_calendar_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/agri_calendar/<item_id>")
+def update_agri_calendar_preset_route(item_id: str):
+    from app.admin_console.presets import update_agri_calendar_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_agri_calendar_preset(int(session["id"]), item_id, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/agri_calendar/<item_id>")
+def delete_agri_calendar_preset_route(item_id: str):
+    from app.admin_console.presets import disable_agri_calendar_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_agri_calendar_preset(
+        int(session["id"]),
+        item_id,
+        _preset_expected_version(),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/pest_knowledge")
+def list_pest_knowledge_presets_route():
+    from app.admin_console.presets import list_pest_knowledge_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_pest_knowledge_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/pest_knowledge")
+def create_pest_knowledge_preset_route():
+    from app.admin_console.presets import create_pest_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_pest_knowledge_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/pest_knowledge/<item_id>")
+def update_pest_knowledge_preset_route(item_id: str):
+    from app.admin_console.presets import update_pest_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_pest_knowledge_preset(int(session["id"]), item_id, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/pest_knowledge/<item_id>")
+def delete_pest_knowledge_preset_route(item_id: str):
+    from app.admin_console.presets import disable_pest_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_pest_knowledge_preset(
+        int(session["id"]),
+        item_id,
+        _preset_expected_version(),
+    )
+    return jsonify(success=True, item=item)
+
+
 @admin_console_bp.get("/rewards")
 def list_rewards_route():
     from app.admin_console.rewards import list_rewards_admin

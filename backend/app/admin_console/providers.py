@@ -11,11 +11,13 @@ from app.admin_console.handcraft_review_adapter import (
 )
 from app.admin_console.presets import (
     AdminDatabaseLocalResourceCaseProvider,
+    DatabaseAgriPresetContentProvider,
     DatabaseAssistantFeatureKnowledgeProvider,
     DatabaseCraftPresetProvider,
 )
 from app.admin_console.points_policy import DatabasePointsPolicyProvider
 from app.admin_console.rewards import DatabaseRewardCatalogProvider
+from app.agri_skills.presets import set_preset_provider
 from app.content_review.providers import (
     ContentReviewProvider,
     UnavailableContentReviewProvider,
@@ -197,6 +199,16 @@ def install_default_admin_services(app: Flask) -> None:
         app,
         AdminDatabaseLocalResourceCaseProvider(),
     )
+    # This slot must be replaced unconditionally for the same reason. 03's
+    # `install_default_agri_services` runs before this function in
+    # `create_app` and already installed `PlaceholderPresetProvider`, so a
+    # `not in app.extensions` guard would leave 03's placeholder content in
+    # place and 011's authoritative `admin_agri_products`,
+    # `admin_agri_calendar` and `admin_pest_knowledge` rows would never
+    # reach 03's calendar, diagnosis or offline Q&A paths. 03's own setter
+    # is reused so the `agri_preset_provider` slot stays the single
+    # registry.
+    set_preset_provider(app, DatabaseAgriPresetContentProvider())
     # This slot must be replaced unconditionally for the same reason. 05's
     # `install_default_handcraft_services` runs before this function in
     # `create_app` and already installed `PlaceholderRewardCatalogProvider`,
@@ -230,6 +242,7 @@ def install_default_admin_services(app: Flask) -> None:
 __all__ = [
     "AdminDatabaseLocalResourceCaseProvider",
     "AssistantFeatureKnowledgeProvider",
+    "DatabaseAgriPresetContentProvider",
     "CompositeContentReviewProvider",
     "CraftPresetProvider",
     "DatabaseAssistantFeatureKnowledgeProvider",

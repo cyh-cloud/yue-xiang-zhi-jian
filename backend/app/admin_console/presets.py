@@ -13,6 +13,7 @@ from app.admin_console.errors import (
     ProviderValidationError,
 )
 from app.admin_console.time_utils import platform_now_iso
+from app.agri_skills.presets import PlaceholderPresetProvider
 from app.db import get_db
 from app.handcraft_inheritance.crafts import (
     CRAFT_SORT_ORDERS,
@@ -1671,28 +1672,1264 @@ def seed_craft_presets(connection) -> None:
     )
 
 
+AGRI_PRODUCT_COLUMNS = """
+    product_key, name, sort_order, is_enabled, version, created_at, updated_at
+"""
+AGRI_CALENDAR_COLUMNS = """
+    item_id, product_key, month, tasks_json, management_json,
+    solar_terms_json, reminder, sort_order, is_enabled, version,
+    created_at, updated_at
+"""
+AGRI_PEST_COLUMNS = """
+    item_id, sort_order, pest_name, product_names_json, symptoms_json,
+    aliases_json, answer, is_enabled, version, created_at, updated_at
+"""
+AGRI_TEXT_LIST_LIMIT = 30
+AGRI_TEXT_ITEM_MAXIMUM = 100
+
+
+def _serialize_agri_product(row: sqlite3.Row) -> dict:
+    """Mirror the frozen 03 product read shape (`key`, `name`, `sort_order`)."""
+    return {
+        "key": str(row["key"]),
+        "name": str(row["name"]),
+        "sort_order": int(row["sort_order"]),
+    }
+
+
+def _serialize_agri_product_item(row: sqlite3.Row) -> dict:
+    return {
+        "product_key": str(row["product_key"]),
+        "name": str(row["name"]),
+        "sort_order": int(row["sort_order"]),
+        "is_enabled": bool(row["is_enabled"]),
+        "version": int(row["version"]),
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
+    }
+
+
+def _serialize_agri_calendar_entry(row: sqlite3.Row) -> dict:
+    """Mirror the frozen 03 `list_calendar_entries` read shape."""
+    fields = _json_fields(dict(row))
+    return {
+        "month": int(fields["month"]),
+        "tasks": list(fields["tasks"]),
+        "management": list(fields["management"]),
+        "solar_terms": list(fields["solar_terms"]),
+        "reminder": str(fields["reminder"]),
+    }
+
+
+def _serialize_agri_calendar_item(row: sqlite3.Row) -> dict:
+    fields = _json_fields(dict(row))
+    return {
+        "item_id": str(fields["item_id"]),
+        "product_key": str(fields["product_key"]),
+        "month": int(fields["month"]),
+        "tasks": list(fields["tasks"]),
+        "management": list(fields["management"]),
+        "solar_terms": list(fields["solar_terms"]),
+        "reminder": str(fields["reminder"]),
+        "sort_order": int(fields["sort_order"]),
+        "is_enabled": bool(fields["is_enabled"]),
+        "version": int(fields["version"]),
+        "created_at": str(fields["created_at"]),
+        "updated_at": str(fields["updated_at"]),
+    }
+
+
+def _serialize_agri_pest_entry(row: sqlite3.Row) -> dict:
+    """Mirror the frozen 03 `list_pest_entries` read shape."""
+    fields = _json_fields(dict(row))
+    return {
+        "id": str(fields["id"]),
+        "sort_order": int(fields["sort_order"]),
+        "pest_name": str(fields["pest_name"]),
+        "product_names": list(fields["product_names"]),
+        "symptoms": list(fields["symptoms"]),
+        "aliases": list(fields["aliases"]),
+        "answer": str(fields["answer"]),
+    }
+
+
+def _serialize_agri_pest_item(row: sqlite3.Row) -> dict:
+    fields = _json_fields(dict(row))
+    return {
+        "item_id": str(fields["item_id"]),
+        "sort_order": int(fields["sort_order"]),
+        "pest_name": str(fields["pest_name"]),
+        "product_names": list(fields["product_names"]),
+        "symptoms": list(fields["symptoms"]),
+        "aliases": list(fields["aliases"]),
+        "answer": str(fields["answer"]),
+        "is_enabled": bool(fields["is_enabled"]),
+        "version": int(fields["version"]),
+        "created_at": str(fields["created_at"]),
+        "updated_at": str(fields["updated_at"]),
+    }
+
+
+class DatabaseAgriPresetContentProvider:
+    """03 preset content read from the 011 admin tables.
+
+    Implements the frozen `PresetContentProvider` protocol field for field:
+    reads are restricted to `is_enabled = 1` rows and every returned shape
+    matches `PlaceholderPresetProvider`, so 03's calendar, diagnosis and
+    offline Q&A consumers keep working unchanged once this provider owns
+    the `agri_preset_provider` slot. `admin_agri_products`,
+    `admin_agri_calendar` and `admin_pest_knowledge` are the single
+    authoritative source, and `seed_agri_preset_content` turns 03's
+    placeholder text into real manageable rows on first start.
+    """
+
+    def list_products(self) -> list[dict]:
+        rows = _fetch_all(
+            """
+            SELECT product_key AS key, name, sort_order
+            FROM admin_agri_products
+            WHERE is_enabled = 1
+            ORDER BY sort_order ASC, product_key ASC
+            """
+        )
+        return [_serialize_agri_product(row) for row in rows]
+
+    def get_product(self, product_key: str) -> dict | None:
+        row = _fetch_one(
+            """
+            SELECT product_key AS key, name, sort_order
+            FROM admin_agri_products
+            WHERE product_key = ? AND is_enabled = 1
+            """,
+            (product_key,),
+        )
+        return _serialize_agri_product(row) if row is not None else None
+
+    def get_calendar_entry(self, product_key: str, month: int) -> dict | None:
+        row = _fetch_one(
+            f"""
+            SELECT {AGRI_CALENDAR_COLUMNS}
+            FROM admin_agri_calendar
+            WHERE product_key = ? AND month = ? AND is_enabled = 1
+            """,
+            (product_key, month),
+        )
+        if row is None:
+            return None
+        # `get_calendar_entry` mirrors the placeholder exactly: the four
+        # content fields without `month`, because 03's `get_calendar`
+        # supplies the requested month itself when it merges the entry.
+        fields = _json_fields(dict(row))
+        return {
+            "tasks": list(fields["tasks"]),
+            "management": list(fields["management"]),
+            "solar_terms": list(fields["solar_terms"]),
+            "reminder": str(fields["reminder"]),
+        }
+
+    def list_calendar_entries(self, product_key: str) -> list[dict]:
+        rows = _fetch_all(
+            f"""
+            SELECT {AGRI_CALENDAR_COLUMNS}
+            FROM admin_agri_calendar
+            WHERE product_key = ? AND is_enabled = 1
+            ORDER BY sort_order ASC, month ASC
+            """,
+            (product_key,),
+        )
+        return [_serialize_agri_calendar_entry(row) for row in rows]
+
+    def list_pest_entries(self) -> list[dict]:
+        rows = _fetch_all(
+            """
+            SELECT item_id AS id, sort_order, pest_name, product_names_json,
+                   symptoms_json, aliases_json, answer
+            FROM admin_pest_knowledge
+            WHERE is_enabled = 1
+            ORDER BY sort_order ASC, item_id ASC
+            """
+        )
+        return [_serialize_agri_pest_entry(row) for row in rows]
+
+
+def _valid_month(value: object) -> int:
+    month = _integer(value, field="month")
+    if not 1 <= month <= 12:
+        raise _validation(
+            "month 必须在 1 到 12 之间",
+            field="month",
+            month=month,
+        )
+    return month
+
+
+def _validated_text_list(
+    value: object,
+    *,
+    field: str,
+    maximum: int = AGRI_TEXT_ITEM_MAXIMUM,
+    limit: int = AGRI_TEXT_LIST_LIMIT,
+) -> list[str]:
+    if not isinstance(value, list):
+        raise _validation(f"{field} 必须是数组", field=field)
+    if len(value) > limit:
+        raise _validation(
+            f"{field} 最多 {limit} 项",
+            field=field,
+            max_items=limit,
+        )
+    items: list[str] = []
+    for index, raw_item in enumerate(value):
+        normalized = _required_text(raw_item)
+        if normalized is None:
+            raise _validation(
+                f"{field} 不能包含空值",
+                field=field,
+                index=index,
+            )
+        if len(normalized) > maximum:
+            raise _validation(
+                f"{field} 单项目长度不能超过 {maximum} 个字符",
+                field=field,
+                index=index,
+                max_length=maximum,
+            )
+        items.append(normalized)
+    return items
+
+
+def _agri_calendar_item_id(product_key: str, month: int) -> str:
+    """Stable calendar ID, e.g. `calendar-litchi-4` for litchi in April."""
+    return f"calendar-{product_key}-{month}"
+
+
+def _agri_product_payload(
+    payload: dict,
+    *,
+    existing: sqlite3.Row | None = None,
+) -> dict:
+    if not isinstance(payload, dict):
+        raise _validation("请求内容格式不正确", field="payload")
+    if existing is None:
+        product_key = _stable_key(
+            payload.get("product_key"),
+            field="product_key",
+        )
+        enabled_default = True
+    else:
+        product_key = _matching_stable_id(
+            payload,
+            field="product_key",
+            existing=existing,
+        )
+        enabled_default = bool(existing["is_enabled"])
+    return {
+        "product_key": product_key,
+        "name": _bounded_text(payload.get("name"), field="name", maximum=60),
+        "sort_order": _optional_integer(
+            payload.get("sort_order"),
+            field="sort_order",
+            default=0,
+        ),
+        "is_enabled": _flag(
+            payload.get("is_enabled"),
+            field="is_enabled",
+            default=enabled_default,
+        ),
+    }
+
+
+def _agri_calendar_payload(
+    payload: dict,
+    *,
+    existing: sqlite3.Row | None = None,
+) -> dict:
+    if not isinstance(payload, dict):
+        raise _validation("请求内容格式不正确", field="payload")
+    if existing is None:
+        product_key = _stable_key(
+            payload.get("product_key"),
+            field="product_key",
+        )
+        month = _valid_month(payload.get("month"))
+        enabled_default = True
+        sort_order = _optional_integer(
+            payload.get("sort_order"),
+            field="sort_order",
+            default=month,
+        )
+    else:
+        product_key = _matching_stable_id(
+            payload,
+            field="product_key",
+            existing=existing,
+        )
+        month = int(existing["month"])
+        raw_month = payload.get("month")
+        if raw_month is not None and _valid_month(raw_month) != month:
+            # `product_key` and `month` form the stable `item_id`, so a PUT
+            # may not move an entry to another month: that is a new entry
+            # under a new stable ID, and this row keeps the old one.
+            raise _validation(
+                "month 与既有农时条目不一致，不可修改",
+                code="month_mismatch",
+                field="month",
+                current=month,
+            )
+        enabled_default = bool(existing["is_enabled"])
+        sort_order = _optional_integer(
+            payload.get("sort_order"),
+            field="sort_order",
+            default=int(existing["sort_order"]),
+        )
+    return {
+        "item_id": _agri_calendar_item_id(product_key, month),
+        "product_key": product_key,
+        "month": month,
+        "tasks": _validated_text_list(payload.get("tasks"), field="tasks"),
+        "management": _validated_text_list(
+            payload.get("management"),
+            field="management",
+        ),
+        "solar_terms": _validated_text_list(
+            payload.get("solar_terms"),
+            field="solar_terms",
+        ),
+        "reminder": _bounded_text(
+            payload.get("reminder"),
+            field="reminder",
+            maximum=200,
+        ),
+        "sort_order": sort_order,
+        "is_enabled": _flag(
+            payload.get("is_enabled"),
+            field="is_enabled",
+            default=enabled_default,
+        ),
+    }
+
+
+def _agri_pest_payload(
+    payload: dict,
+    *,
+    existing: sqlite3.Row | None = None,
+) -> dict:
+    if not isinstance(payload, dict):
+        raise _validation("请求内容格式不正确", field="payload")
+    if existing is None:
+        item_id = _stable_key(payload.get("item_id"), field="item_id")
+        enabled_default = True
+        sort_order = _optional_integer(
+            payload.get("sort_order"),
+            field="sort_order",
+            default=0,
+        )
+    else:
+        item_id = _matching_stable_id(
+            payload,
+            field="item_id",
+            existing=existing,
+        )
+        enabled_default = bool(existing["is_enabled"])
+        sort_order = _optional_integer(
+            payload.get("sort_order"),
+            field="sort_order",
+            default=int(existing["sort_order"]),
+        )
+    return {
+        "item_id": item_id,
+        "sort_order": sort_order,
+        "pest_name": _bounded_text(
+            payload.get("pest_name"),
+            field="pest_name",
+            maximum=60,
+        ),
+        "product_names": _validated_text_list(
+            payload.get("product_names"),
+            field="product_names",
+        ),
+        "symptoms": _validated_text_list(
+            payload.get("symptoms"),
+            field="symptoms",
+        ),
+        "aliases": _validated_text_list(
+            payload.get("aliases"),
+            field="aliases",
+        ),
+        "answer": _bounded_text(
+            payload.get("answer"),
+            field="answer",
+            maximum=2000,
+        ),
+        "is_enabled": _flag(
+            payload.get("is_enabled"),
+            field="is_enabled",
+            default=enabled_default,
+        ),
+    }
+
+
+def _agri_product_item(product_key: str) -> dict:
+    row = _fetch_one(
+        f"""
+        SELECT {AGRI_PRODUCT_COLUMNS}
+        FROM admin_agri_products
+        WHERE product_key = ?
+        """,
+        (product_key,),
+    )
+    if row is None:
+        raise _not_found(
+            "农产品不存在",
+            "agri_product_preset_not_found",
+            product_key=product_key,
+        )
+    return _serialize_agri_product_item(row)
+
+
+def list_agri_product_presets() -> list[dict]:
+    rows = _fetch_all(
+        f"""
+        SELECT {AGRI_PRODUCT_COLUMNS}
+        FROM admin_agri_products
+        ORDER BY sort_order ASC, product_key ASC
+        """
+    )
+    return [_serialize_agri_product_item(row) for row in rows]
+
+
+def create_agri_product_preset(actor_id: int, payload: dict) -> dict:
+    values = _agri_product_payload(payload)
+    now = platform_now_iso()
+    try:
+        with get_db() as db:
+            db.execute(
+                """
+                INSERT INTO admin_agri_products (
+                    product_key, name, sort_order, is_enabled, version,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    values["product_key"],
+                    values["name"],
+                    values["sort_order"],
+                    int(values["is_enabled"]),
+                    now,
+                    now,
+                ),
+            )
+            record_admin_audit(
+                db,
+                actor_id=actor_id,
+                action="create_agri_product_preset",
+                target_type="agri_product",
+                target_id=values["product_key"],
+                before=None,
+                after={
+                    "name": values["name"],
+                    "is_enabled": values["is_enabled"],
+                },
+                result="success",
+            )
+    except sqlite3.IntegrityError as error:
+        raise ProviderConflictError(
+            "农产品键已存在",
+            code="agri_product_preset_conflict",
+            details={"product_key": values["product_key"]},
+        ) from error
+    return _agri_product_item(values["product_key"])
+
+
+def update_agri_product_preset(
+    actor_id: int,
+    product_key: str,
+    payload: dict,
+) -> dict:
+    key = _stable_key(product_key, field="product_key")
+    expected_version = _expected_version(
+        payload.get("expected_version") if isinstance(payload, dict) else None
+    )
+    db = get_db()
+    _begin(db)
+    try:
+        row = db.execute(
+            f"""
+            SELECT {AGRI_PRODUCT_COLUMNS}
+            FROM admin_agri_products
+            WHERE product_key = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            raise _not_found(
+                "农产品不存在",
+                "agri_product_preset_not_found",
+                product_key=key,
+            )
+        values = _agri_product_payload(payload, existing=row)
+        current_version = int(row["version"])
+        if current_version != expected_version:
+            raise ProviderConflictError(
+                "农产品已被其他管理员修改",
+                code="agri_product_preset_version_conflict",
+                details={
+                    "product_key": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
+        now = platform_now_iso()
+        cursor = db.execute(
+            """
+            UPDATE admin_agri_products
+            SET name = ?, sort_order = ?, is_enabled = ?, version = ?,
+                updated_at = ?
+            WHERE product_key = ? AND version = ?
+            """,
+            (
+                values["name"],
+                values["sort_order"],
+                int(values["is_enabled"]),
+                current_version + 1,
+                now,
+                key,
+                current_version,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "农产品已被其他管理员修改",
+                code="agri_product_preset_version_conflict",
+                details={
+                    "product_key": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
+        record_admin_audit(
+            db,
+            actor_id=actor_id,
+            action="update_agri_product_preset",
+            target_type="agri_product",
+            target_id=key,
+            before={"version": current_version, "name": row["name"]},
+            after={"version": current_version + 1, "name": values["name"]},
+            result="success",
+        )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
+    return _agri_product_item(key)
+
+
+def disable_agri_product_preset(
+    actor_id: int,
+    product_key: str,
+    expected_version: object = None,
+) -> dict:
+    key = _stable_key(product_key, field="product_key")
+    locked_version = _optional_expected_version(expected_version)
+    db = get_db()
+    _begin(db)
+    try:
+        row = db.execute(
+            f"""
+            SELECT {AGRI_PRODUCT_COLUMNS}
+            FROM admin_agri_products
+            WHERE product_key = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            raise _not_found(
+                "农产品不存在",
+                "agri_product_preset_not_found",
+                product_key=key,
+            )
+        if not row["is_enabled"]:
+            db.commit()
+            return _serialize_agri_product_item(row)
+        current_version = int(row["version"])
+        if locked_version is not None and current_version != locked_version:
+            raise ProviderConflictError(
+                "农产品已被其他管理员修改",
+                code="agri_product_preset_version_conflict",
+                details={
+                    "product_key": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
+        now = platform_now_iso()
+        cursor = db.execute(
+            """
+            UPDATE admin_agri_products
+            SET is_enabled = 0, version = version + 1, updated_at = ?
+            WHERE product_key = ? AND version = ?
+            """,
+            (now, key, current_version),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "农产品已被其他管理员修改",
+                code="agri_product_preset_version_conflict",
+                details={
+                    "product_key": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
+        record_admin_audit(
+            db,
+            actor_id=actor_id,
+            action="disable_agri_product_preset",
+            target_type="agri_product",
+            target_id=key,
+            before={"is_enabled": True, "version": current_version},
+            after={"is_enabled": False, "version": current_version + 1},
+            result="success",
+        )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
+    return _agri_product_item(key)
+
+
+def _agri_calendar_item(item_id: str) -> dict:
+    row = _fetch_one(
+        f"""
+        SELECT {AGRI_CALENDAR_COLUMNS}
+        FROM admin_agri_calendar
+        WHERE item_id = ?
+        """,
+        (item_id,),
+    )
+    if row is None:
+        raise _not_found(
+            "农时条目不存在",
+            "agri_calendar_preset_not_found",
+            item_id=item_id,
+        )
+    return _serialize_agri_calendar_item(row)
+
+
+def list_agri_calendar_presets() -> list[dict]:
+    rows = _fetch_all(
+        f"""
+        SELECT {AGRI_CALENDAR_COLUMNS}
+        FROM admin_agri_calendar
+        ORDER BY sort_order ASC, item_id ASC
+        """
+    )
+    return [_serialize_agri_calendar_item(row) for row in rows]
+
+
+def create_agri_calendar_preset(actor_id: int, payload: dict) -> dict:
+    values = _agri_calendar_payload(payload)
+    now = platform_now_iso()
+    try:
+        with get_db() as db:
+            db.execute(
+                """
+                INSERT INTO admin_agri_calendar (
+                    item_id, product_key, month, tasks_json, management_json,
+                    solar_terms_json, reminder, sort_order, is_enabled,
+                    version, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    values["item_id"],
+                    values["product_key"],
+                    values["month"],
+                    json.dumps(values["tasks"], ensure_ascii=False),
+                    json.dumps(values["management"], ensure_ascii=False),
+                    json.dumps(values["solar_terms"], ensure_ascii=False),
+                    values["reminder"],
+                    values["sort_order"],
+                    int(values["is_enabled"]),
+                    now,
+                    now,
+                ),
+            )
+            record_admin_audit(
+                db,
+                actor_id=actor_id,
+                action="create_agri_calendar_preset",
+                target_type="agri_calendar",
+                target_id=values["item_id"],
+                before=None,
+                after={
+                    "product_key": values["product_key"],
+                    "month": values["month"],
+                    "is_enabled": values["is_enabled"],
+                },
+                result="success",
+            )
+    except sqlite3.IntegrityError as error:
+        # The stable `item_id` and the UNIQUE (product_key, month) pair both
+        # land here, so one conflict code covers a repeated month for the
+        # same product whichever constraint fires first.
+        raise ProviderConflictError(
+            "该农产品当月农时已存在",
+            code="agri_calendar_preset_conflict",
+            details={
+                "item_id": values["item_id"],
+                "product_key": values["product_key"],
+                "month": values["month"],
+            },
+        ) from error
+    return _agri_calendar_item(values["item_id"])
+
+
+def update_agri_calendar_preset(
+    actor_id: int,
+    item_id: str,
+    payload: dict,
+) -> dict:
+    key = _stable_key(item_id, field="item_id")
+    expected_version = _expected_version(
+        payload.get("expected_version") if isinstance(payload, dict) else None
+    )
+    db = get_db()
+    _begin(db)
+    try:
+        row = db.execute(
+            f"""
+            SELECT {AGRI_CALENDAR_COLUMNS}
+            FROM admin_agri_calendar
+            WHERE item_id = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            raise _not_found(
+                "农时条目不存在",
+                "agri_calendar_preset_not_found",
+                item_id=key,
+            )
+        values = _agri_calendar_payload(payload, existing=row)
+        current_version = int(row["version"])
+        if current_version != expected_version:
+            raise ProviderConflictError(
+                "农时条目已被其他管理员修改",
+                code="agri_calendar_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
+        now = platform_now_iso()
+        cursor = db.execute(
+            """
+            UPDATE admin_agri_calendar
+            SET tasks_json = ?, management_json = ?, solar_terms_json = ?,
+                reminder = ?, sort_order = ?, is_enabled = ?, version = ?,
+                updated_at = ?
+            WHERE item_id = ? AND version = ?
+            """,
+            (
+                json.dumps(values["tasks"], ensure_ascii=False),
+                json.dumps(values["management"], ensure_ascii=False),
+                json.dumps(values["solar_terms"], ensure_ascii=False),
+                values["reminder"],
+                values["sort_order"],
+                int(values["is_enabled"]),
+                current_version + 1,
+                now,
+                key,
+                current_version,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "农时条目已被其他管理员修改",
+                code="agri_calendar_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
+        record_admin_audit(
+            db,
+            actor_id=actor_id,
+            action="update_agri_calendar_preset",
+            target_type="agri_calendar",
+            target_id=key,
+            before={
+                "version": current_version,
+                "reminder": row["reminder"],
+            },
+            after={
+                "version": current_version + 1,
+                "reminder": values["reminder"],
+            },
+            result="success",
+        )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
+    return _agri_calendar_item(key)
+
+
+def disable_agri_calendar_preset(
+    actor_id: int,
+    item_id: str,
+    expected_version: object = None,
+) -> dict:
+    key = _stable_key(item_id, field="item_id")
+    locked_version = _optional_expected_version(expected_version)
+    db = get_db()
+    _begin(db)
+    try:
+        row = db.execute(
+            f"""
+            SELECT {AGRI_CALENDAR_COLUMNS}
+            FROM admin_agri_calendar
+            WHERE item_id = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            raise _not_found(
+                "农时条目不存在",
+                "agri_calendar_preset_not_found",
+                item_id=key,
+            )
+        if not row["is_enabled"]:
+            db.commit()
+            return _serialize_agri_calendar_item(row)
+        current_version = int(row["version"])
+        if locked_version is not None and current_version != locked_version:
+            raise ProviderConflictError(
+                "农时条目已被其他管理员修改",
+                code="agri_calendar_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
+        now = platform_now_iso()
+        cursor = db.execute(
+            """
+            UPDATE admin_agri_calendar
+            SET is_enabled = 0, version = version + 1, updated_at = ?
+            WHERE item_id = ? AND version = ?
+            """,
+            (now, key, current_version),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "农时条目已被其他管理员修改",
+                code="agri_calendar_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
+        record_admin_audit(
+            db,
+            actor_id=actor_id,
+            action="disable_agri_calendar_preset",
+            target_type="agri_calendar",
+            target_id=key,
+            before={"is_enabled": True, "version": current_version},
+            after={"is_enabled": False, "version": current_version + 1},
+            result="success",
+        )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
+    return _agri_calendar_item(key)
+
+
+def _agri_pest_item(item_id: str) -> dict:
+    row = _fetch_one(
+        f"""
+        SELECT {AGRI_PEST_COLUMNS}
+        FROM admin_pest_knowledge
+        WHERE item_id = ?
+        """,
+        (item_id,),
+    )
+    if row is None:
+        raise _not_found(
+            "病虫害条目不存在",
+            "pest_knowledge_preset_not_found",
+            item_id=item_id,
+        )
+    return _serialize_agri_pest_item(row)
+
+
+def list_pest_knowledge_presets() -> list[dict]:
+    rows = _fetch_all(
+        f"""
+        SELECT {AGRI_PEST_COLUMNS}
+        FROM admin_pest_knowledge
+        ORDER BY sort_order ASC, item_id ASC
+        """
+    )
+    return [_serialize_agri_pest_item(row) for row in rows]
+
+
+def create_pest_knowledge_preset(actor_id: int, payload: dict) -> dict:
+    values = _agri_pest_payload(payload)
+    now = platform_now_iso()
+    try:
+        with get_db() as db:
+            db.execute(
+                """
+                INSERT INTO admin_pest_knowledge (
+                    item_id, sort_order, pest_name, product_names_json,
+                    symptoms_json, aliases_json, answer, is_enabled, version,
+                    created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                """,
+                (
+                    values["item_id"],
+                    values["sort_order"],
+                    values["pest_name"],
+                    json.dumps(values["product_names"], ensure_ascii=False),
+                    json.dumps(values["symptoms"], ensure_ascii=False),
+                    json.dumps(values["aliases"], ensure_ascii=False),
+                    values["answer"],
+                    int(values["is_enabled"]),
+                    now,
+                    now,
+                ),
+            )
+            record_admin_audit(
+                db,
+                actor_id=actor_id,
+                action="create_pest_knowledge_preset",
+                target_type="pest_knowledge",
+                target_id=values["item_id"],
+                before=None,
+                after={
+                    "pest_name": values["pest_name"],
+                    "is_enabled": values["is_enabled"],
+                },
+                result="success",
+            )
+    except sqlite3.IntegrityError as error:
+        raise ProviderConflictError(
+            "病虫害条目 ID 已存在",
+            code="pest_knowledge_preset_conflict",
+            details={"item_id": values["item_id"]},
+        ) from error
+    return _agri_pest_item(values["item_id"])
+
+
+def update_pest_knowledge_preset(
+    actor_id: int,
+    item_id: str,
+    payload: dict,
+) -> dict:
+    key = _stable_key(item_id, field="item_id")
+    expected_version = _expected_version(
+        payload.get("expected_version") if isinstance(payload, dict) else None
+    )
+    db = get_db()
+    _begin(db)
+    try:
+        row = db.execute(
+            f"""
+            SELECT {AGRI_PEST_COLUMNS}
+            FROM admin_pest_knowledge
+            WHERE item_id = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            raise _not_found(
+                "病虫害条目不存在",
+                "pest_knowledge_preset_not_found",
+                item_id=key,
+            )
+        values = _agri_pest_payload(payload, existing=row)
+        current_version = int(row["version"])
+        if current_version != expected_version:
+            raise ProviderConflictError(
+                "病虫害条目已被其他管理员修改",
+                code="pest_knowledge_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
+        now = platform_now_iso()
+        cursor = db.execute(
+            """
+            UPDATE admin_pest_knowledge
+            SET sort_order = ?, pest_name = ?, product_names_json = ?,
+                symptoms_json = ?, aliases_json = ?, answer = ?,
+                is_enabled = ?, version = ?, updated_at = ?
+            WHERE item_id = ? AND version = ?
+            """,
+            (
+                values["sort_order"],
+                values["pest_name"],
+                json.dumps(values["product_names"], ensure_ascii=False),
+                json.dumps(values["symptoms"], ensure_ascii=False),
+                json.dumps(values["aliases"], ensure_ascii=False),
+                values["answer"],
+                int(values["is_enabled"]),
+                current_version + 1,
+                now,
+                key,
+                current_version,
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "病虫害条目已被其他管理员修改",
+                code="pest_knowledge_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": expected_version,
+                    "current_version": current_version,
+                },
+            )
+        record_admin_audit(
+            db,
+            actor_id=actor_id,
+            action="update_pest_knowledge_preset",
+            target_type="pest_knowledge",
+            target_id=key,
+            before={
+                "version": current_version,
+                "pest_name": row["pest_name"],
+            },
+            after={
+                "version": current_version + 1,
+                "pest_name": values["pest_name"],
+            },
+            result="success",
+        )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
+    return _agri_pest_item(key)
+
+
+def disable_pest_knowledge_preset(
+    actor_id: int,
+    item_id: str,
+    expected_version: object = None,
+) -> dict:
+    key = _stable_key(item_id, field="item_id")
+    locked_version = _optional_expected_version(expected_version)
+    db = get_db()
+    _begin(db)
+    try:
+        row = db.execute(
+            f"""
+            SELECT {AGRI_PEST_COLUMNS}
+            FROM admin_pest_knowledge
+            WHERE item_id = ?
+            """,
+            (key,),
+        ).fetchone()
+        if row is None:
+            raise _not_found(
+                "病虫害条目不存在",
+                "pest_knowledge_preset_not_found",
+                item_id=key,
+            )
+        if not row["is_enabled"]:
+            db.commit()
+            return _serialize_agri_pest_item(row)
+        current_version = int(row["version"])
+        if locked_version is not None and current_version != locked_version:
+            raise ProviderConflictError(
+                "病虫害条目已被其他管理员修改",
+                code="pest_knowledge_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
+        now = platform_now_iso()
+        cursor = db.execute(
+            """
+            UPDATE admin_pest_knowledge
+            SET is_enabled = 0, version = version + 1, updated_at = ?
+            WHERE item_id = ? AND version = ?
+            """,
+            (now, key, current_version),
+        )
+        if cursor.rowcount != 1:
+            raise ProviderConflictError(
+                "病虫害条目已被其他管理员修改",
+                code="pest_knowledge_preset_version_conflict",
+                details={
+                    "item_id": key,
+                    "expected_version": locked_version,
+                    "current_version": current_version,
+                },
+            )
+        record_admin_audit(
+            db,
+            actor_id=actor_id,
+            action="disable_pest_knowledge_preset",
+            target_type="pest_knowledge",
+            target_id=key,
+            before={"is_enabled": True, "version": current_version},
+            after={"is_enabled": False, "version": current_version + 1},
+            result="success",
+        )
+    except Exception:
+        db.rollback()
+        raise
+    db.commit()
+    return _agri_pest_item(key)
+
+
+def seed_agri_preset_content(connection) -> None:
+    """Seed 03's placeholder agri content as manageable admin rows.
+
+    The content is read from 03's `PlaceholderPresetProvider`, which stays
+    the single source of truth for the demo text, so nothing is copied by
+    hand. `ON CONFLICT ... DO NOTHING` keeps admin edits and logical
+    deletes across restarts, so the seed only fills an empty slot instead
+    of overwriting the console.
+    """
+    now = platform_now_iso()
+    placeholder = PlaceholderPresetProvider()
+    products = placeholder.list_products()
+    connection.executemany(
+        """
+        INSERT INTO admin_agri_products (
+            product_key, name, sort_order, is_enabled, version,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, 1, 1, ?, ?)
+        ON CONFLICT(product_key) DO NOTHING
+        """,
+        [
+            (
+                str(product["key"]),
+                str(product["name"]),
+                int(product["sort_order"]),
+                now,
+                now,
+            )
+            for product in products
+        ],
+    )
+    calendar_rows = []
+    for product in products:
+        product_key = str(product["key"])
+        for entry in placeholder.list_calendar_entries(product_key):
+            month = int(entry["month"])
+            calendar_rows.append(
+                (
+                    _agri_calendar_item_id(product_key, month),
+                    product_key,
+                    month,
+                    json.dumps(list(entry["tasks"]), ensure_ascii=False),
+                    json.dumps(list(entry["management"]), ensure_ascii=False),
+                    json.dumps(list(entry["solar_terms"]), ensure_ascii=False),
+                    str(entry["reminder"]),
+                    month,
+                    now,
+                    now,
+                )
+            )
+    connection.executemany(
+        """
+        INSERT INTO admin_agri_calendar (
+            item_id, product_key, month, tasks_json, management_json,
+            solar_terms_json, reminder, sort_order, is_enabled, version,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+        ON CONFLICT(item_id) DO NOTHING
+        """,
+        calendar_rows,
+    )
+    connection.executemany(
+        """
+        INSERT INTO admin_pest_knowledge (
+            item_id, sort_order, pest_name, product_names_json,
+            symptoms_json, aliases_json, answer, is_enabled, version,
+            created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?)
+        ON CONFLICT(item_id) DO NOTHING
+        """,
+        [
+            (
+                str(pest["id"]),
+                int(pest["sort_order"]),
+                str(pest["pest_name"]),
+                json.dumps(list(pest["product_names"]), ensure_ascii=False),
+                json.dumps(list(pest["symptoms"]), ensure_ascii=False),
+                json.dumps(list(pest["aliases"]), ensure_ascii=False),
+                str(pest["answer"]),
+                now,
+                now,
+            )
+            for pest in placeholder.list_pest_entries()
+        ],
+    )
+
+
 __all__ = [
+    "AGRI_TEXT_ITEM_MAXIMUM",
+    "AGRI_TEXT_LIST_LIMIT",
     "ASSISTANT_FEATURE_KEYS",
     "ASSISTANT_KNOWLEDGE_SEED",
     "AdminDatabaseLocalResourceCaseProvider",
+    "DatabaseAgriPresetContentProvider",
     "DatabaseAssistantFeatureKnowledgeProvider",
     "DatabaseCraftPresetProvider",
+    "create_agri_calendar_preset",
+    "create_agri_product_preset",
     "create_case_preset",
     "create_craft_preset",
     "create_knowledge_preset",
+    "create_pest_knowledge_preset",
+    "disable_agri_calendar_preset",
+    "disable_agri_product_preset",
     "disable_case_preset",
     "disable_craft_preset",
     "disable_knowledge_preset",
+    "disable_pest_knowledge_preset",
+    "list_agri_calendar_presets",
+    "list_agri_product_presets",
     "list_case_presets",
     "list_craft_presets",
     "list_knowledge_presets",
+    "list_pest_knowledge_presets",
+    "seed_agri_preset_content",
     "seed_assistant_feature_knowledge",
     "seed_craft_presets",
+    "update_agri_calendar_preset",
+    "update_agri_product_preset",
     "update_case_preset",
     "update_craft_preset",
     "update_knowledge_preset",
+    "update_pest_knowledge_preset",
     "_json_fields",
     "_required_text",
+    "_serialize_agri_calendar_entry",
+    "_serialize_agri_pest_entry",
+    "_serialize_agri_product",
     "_serialize_case",
     "_serialize_craft",
     "_serialize_knowledge_entry",
