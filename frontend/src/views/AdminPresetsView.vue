@@ -534,7 +534,7 @@ function startEdit(item: AdminPresetItem): void {
     next.sourceAvailable = item.source_available
     next.steps = item.steps.map(step => ({ ...step, tips: [...step.tips] }))
     next.materialGuide = item.material_guide.map(material => ({ ...material }))
-    editingDemo.value = item.is_demo
+    editingDemo.value = false
   } else if (isSuccessCasePreset(item)) {
     next.stableId = item.id
     next.title = item.title
@@ -1003,7 +1003,7 @@ onMounted(() => {
               data-test="preset-published-at"
             />
           </label>
-          <small>按平台时区（Asia/Shanghai）保存为带时区的 ISO 8601 时间。</small>
+          <small>必填；按平台时区（Asia/Shanghai）保存为带时区的 ISO 8601 时间，留空无法保存。</small>
         </div>
 
         <div v-if="activeCategory === 'assistant_knowledge'" class="preset-field preset-field--wide">
@@ -1641,8 +1641,8 @@ onMounted(() => {
                   <button
                     type="button"
                     :data-test="`preset-edit-${item.craft_key}`"
-                    :disabled="store.presetActionLoading || item.is_demo"
-                    :title="item.is_demo ? '演示技艺由平台种子维护，不可编辑' : '编辑该技艺'"
+                    :disabled="store.presetActionLoading"
+                    :title="'编辑该技艺'"
                     @click="startEdit(item)"
                   >
                     <Pencil :size="16" aria-hidden="true" />
@@ -1651,14 +1651,8 @@ onMounted(() => {
                   <button
                     type="button"
                     :data-test="`preset-delete-${item.craft_key}`"
-                    :disabled="!item.is_enabled || store.presetActionLoading || item.is_demo"
-                    :title="
-                      item.is_demo
-                        ? '演示技艺由平台种子维护，不可停用'
-                        : item.is_enabled
-                          ? '停用该技艺'
-                          : '该条目已停用'
-                    "
+                    :disabled="!item.is_enabled || store.presetActionLoading"
+                    :title="item.is_enabled ? '停用该技艺' : '该条目已停用'"
                     @click="openDelete(item)"
                   >
                     <Trash2 :size="16" aria-hidden="true" />

@@ -694,6 +694,62 @@ describe('AdminPresetsView', () => {
     ).toBeDefined()
   })
 
+  // The backend guards demo success cases but not demo crafts, and the seeded
+  // demo crafts are the rows trainees actually see, so they stay manageable.
+  it('lets a seeded demo craft be edited and saved with the expected version', async () => {
+    fixtures.handcraft_crafts = [craftFixture({ is_demo: true })]
+    const { wrapper } = await mountView()
+    await wrapper
+      .get('[data-test="preset-tab-handcraft_crafts"]')
+      .trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-test="preset-edit-guangxiu"]').attributes('disabled')
+    ).toBeUndefined()
+
+    await wrapper.get('[data-test="preset-edit-guangxiu"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="preset-demo-notice"]').exists()).toBe(
+      false
+    )
+    await wrapper.get('[data-test="preset-name"]').setValue('广绣（修订）')
+    await wrapper.get('[data-test="preset-save"]').trigger('click')
+    await flushPromises()
+
+    const putCall = callsWith('PUT')[0]
+    expect(putCall?.[0]).toBe('/api/admin/presets/handcraft_crafts/guangxiu')
+    const body = JSON.parse(String(putCall?.[1]?.body))
+    expect(body.craft_key).toBe('guangxiu')
+    expect(body.name).toBe('广绣（修订）')
+    expect(body.expected_version).toBe(2)
+    expect(wrapper.get('[data-test="preset-row"]').text()).toContain('v3')
+  })
+
+  it('lets a seeded demo craft be disabled', async () => {
+    fixtures.handcraft_crafts = [craftFixture({ is_demo: true })]
+    const { wrapper } = await mountView()
+    await wrapper
+      .get('[data-test="preset-tab-handcraft_crafts"]')
+      .trigger('click')
+    await flushPromises()
+
+    expect(
+      wrapper.get('[data-test="preset-delete-guangxiu"]').attributes('disabled')
+    ).toBeUndefined()
+
+    await wrapper.get('[data-test="preset-delete-guangxiu"]').trigger('click')
+    await wrapper.get('[data-test="preset-confirm-delete"]').trigger('click')
+    await flushPromises()
+
+    const deleteCall = callsWith('DELETE')[0]
+    expect(deleteCall?.[0]).toBe(
+      '/api/admin/presets/handcraft_crafts/guangxiu?expected_version=2'
+    )
+    expect(wrapper.get('[data-test="preset-row"]').text()).toContain('已停用')
+  })
+
   it('renders loading, error and empty states with a working retry', async () => {
     listHang = true
     const loading = await mountView()
