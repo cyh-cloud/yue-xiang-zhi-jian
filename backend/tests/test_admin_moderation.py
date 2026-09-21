@@ -1159,6 +1159,68 @@ class AdminModerationTests(TestCase):
             ["delete_comment", "resolve_comment_report"],
         )
 
+    def test_rejection_then_confirmation_changes_nothing_at_all(self):
+        # The mirror of the idempotence test above: the rejection lands
+        # first, so the comment is still visible when a confirmation
+        # arrives for the already-answered report. Refusing the repeat
+        # has to stop before the deletion it would have caused, or the
+        # comment silently disappears while the API reports no change.
+        first = self.resolve(
+            self.report_id,
+            confirmed=False,
+            result="经核实不属于违规内容",
+        )
+        visible_before = self.student_visible_comment_ids()
+        updated_at_before = self.stored_updated_at(self.comment_id)
+        hidden_before = self.processed_count()
+        reports_before = self.report_processed_count()
+
+        second = self.resolve(
+            self.report_id,
+            confirmed=True,
+            result="含有违规内容",
+        )
+
+        self.assertIs(first.get_json()["changed"], True)
+        self.assertEqual(second.status_code, 200)
+        self.assertIs(second.get_json()["changed"], False)
+        # The refusal echoes the stored decision, not the confirmation
+        # that was refused.
+        self.assertEqual(second.get_json()["report"]["status"], "rejected")
+        self.assertEqual(
+            second.get_json()["report"]["result"], "经核实不属于违规内容"
+        )
+        # The comment was never hidden: the stored flag is still set, the
+        # student still reads it, the row was not rewritten, and the
+        # hidden-comment count holds.
+        with self.app.app_context():
+            flag = (
+                get_db()
+                .execute(
+                    """
+                    SELECT is_visible
+                    FROM content_comments
+                    WHERE comment_id = ?
+                    """,
+                    (self.comment_id,),
+                )
+                .fetchone()["is_visible"]
+            )
+        self.assertEqual(flag, 1)
+        self.assertEqual(self.student_visible_comment_ids(), visible_before)
+        self.assertIn(self.comment_id, self.student_visible_comment_ids())
+        self.assertEqual(
+            self.stored_updated_at(self.comment_id), updated_at_before
+        )
+        self.assertEqual(self.processed_count(), hidden_before)
+        # No `delete_comment` row appeared, so the audit trail still
+        # explains exactly the one decision that was taken.
+        self.assertEqual(
+            [row["action"] for row in self.audit_rows()],
+            ["resolve_comment_report"],
+        )
+        self.assertEqual(self.report_processed_count(), reports_before)
+
     def test_resolution_writes_an_audit_row_per_decision(self):
         self.resolve(self.report_id, confirmed=True, result="含有违规内容")
 

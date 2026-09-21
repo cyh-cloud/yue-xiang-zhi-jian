@@ -798,9 +798,12 @@ def delete_comment(actor_id: int, comment_id: str) -> dict:
     told, which is the whole point of "silent".
 
     A comment that is already hidden reports `changed: False` instead of
-    raising. Task 19's report resolution calls this function and has to
-    count a confirmed report exactly once, and a second DELETE from a
+    raising, and writes no second audit row: a second DELETE from a
     double-submitted console must not look like a new decision either.
+    Task 19's report resolution shares this hide-and-audit body through
+    `_hide_comment` rather than calling this function, so a confirmed
+    report settles the comment and the report row in one transaction and
+    counts exactly once.
     """
     normalized = _bounded_text(
         comment_id,
@@ -810,57 +813,74 @@ def delete_comment(actor_id: int, comment_id: str) -> dict:
     )
     with get_db() as db:
         _begin_exclusive(db)
-        row = db.execute(
-            """
-            SELECT comment_id, content_type, content_id, author_id,
-                   is_visible, updated_at
-            FROM content_comments
-            WHERE comment_id = ?
-            """,
-            (normalized,),
-        ).fetchone()
-        if row is None:
-            raise _not_found(normalized)
-        if not bool(row["is_visible"]):
-            return {
-                "comment_id": normalized,
-                "is_visible": False,
-                "changed": False,
-                "updated_at": str(row["updated_at"]),
-            }
-        now = platform_now_iso()
-        db.execute(
-            """
-            UPDATE content_comments
-            SET is_visible = 0, updated_at = ?
-            WHERE comment_id = ?
-            """,
-            (now, normalized),
-        )
-        record_admin_audit(
-            db,
-            actor_id=actor_id,
-            action="delete_comment",
-            target_type="content_comment",
-            target_id=normalized,
-            before={
-                "is_visible": True,
-                "content_type": str(row["content_type"]),
-                "content_id": str(row["content_id"]),
-                "author_id": int(row["author_id"]),
-                "updated_at": str(row["updated_at"]),
-            },
-            after={
-                "is_visible": False,
-                "content_type": str(row["content_type"]),
-                "content_id": str(row["content_id"]),
-                "author_id": int(row["author_id"]),
-                "updated_at": now,
-            },
-            result="success",
-        )
+        return _hide_comment(db, actor_id, normalized)
+
+
+def _hide_comment(
+    db: sqlite3.Connection,
+    actor_id: int,
+    comment_id: str,
+) -> dict:
+    """Flip one comment to hidden on `db` and record the decision.
+
+    The caller owns the transaction: `delete_comment` opens its own, while
+    `resolve_report` keeps its pending check, this hide and the report
+    status write inside one `BEGIN IMMEDIATE`, so a confirmation can no
+    longer hide a comment whose report it refuses to re-decide. An already
+    hidden comment reports `changed: False` and writes nothing at all,
+    which is what keeps a repeated decision out of the audit trail.
+    """
+    row = db.execute(
+        """
+        SELECT comment_id, content_type, content_id, author_id,
+               is_visible, updated_at
+        FROM content_comments
+        WHERE comment_id = ?
+        """,
+        (comment_id,),
+    ).fetchone()
+    if row is None:
+        raise _not_found(comment_id)
+    if not bool(row["is_visible"]):
+        return {
+            "comment_id": comment_id,
+            "is_visible": False,
+            "changed": False,
+            "updated_at": str(row["updated_at"]),
+        }
+    now = platform_now_iso()
+    db.execute(
+        """
+        UPDATE content_comments
+        SET is_visible = 0, updated_at = ?
+        WHERE comment_id = ?
+        """,
+        (now, comment_id),
+    )
+    record_admin_audit(
+        db,
+        actor_id=actor_id,
+        action="delete_comment",
+        target_type="content_comment",
+        target_id=comment_id,
+        before={
+            "is_visible": True,
+            "content_type": str(row["content_type"]),
+            "content_id": str(row["content_id"]),
+            "author_id": int(row["author_id"]),
+            "updated_at": str(row["updated_at"]),
+        },
+        after={
+            "is_visible": False,
+            "content_type": str(row["content_type"]),
+            "content_id": str(row["content_id"]),
+            "author_id": int(row["author_id"]),
+            "updated_at": now,
+        },
+        result="success",
+    )
     return {
-        "comment_id": normalized,
+        "comment_id": comment_id,
         "is_visible": False,
         "changed": True,
         "updated_at": now,
@@ -936,17 +956,26 @@ def resolve_report(
     """Answer one report, deleting the comment only when it is confirmed.
 
     The two outcomes differ in exactly one place. A confirmed report hides
-    the reported comment through `delete_comment`, which is the silent path
-    Task 18 already proved emits nothing; a rejected one leaves visibility
-    untouched. Both write the resolution onto the report row.
+    the reported comment through the hide-and-audit write `delete_comment`
+    performs, which is the silent path Task 18 already proved emits
+    nothing; a rejected one leaves visibility untouched. Both write the
+    resolution onto the report row.
 
     Idempotence is reported, not raised: a report that is already
     `confirmed` or `rejected` answers `changed: False` with HTTP 200, the
     same contract `delete_comment` and `publish_announcement` use, because a
     double-submitted console must not look like a second decision. The
-    ordering matters for that: `delete_comment` runs before the report row
-    is written, so the second submission is the one that stops, never the
-    first half of a decision.
+    answer is side-effect free by construction: the pending check runs
+    first inside the `BEGIN IMMEDIATE`, and the deletion runs after it in
+    that same transaction, so the second submission stops before the first
+    half of a decision ever executes, whichever order the two submissions
+    arrive in. The comment stays visible, no audit row appears and both
+    counts hold.
+
+    One transaction carries the visibility rewrite and the status rewrite
+    together, so a crash can no longer leave a hidden comment behind a
+    still-pending report; the earlier two-transaction ordering relied on
+    the next resolve to self-heal that state.
 
     A report whose comment has already disappeared still resolves. The
     comment is gone, which is the outcome a confirmation asks for, and
@@ -973,11 +1002,6 @@ def resolve_report(
     )
     status = "confirmed" if confirmed else "rejected"
 
-    # The deletion runs first and in its own transaction. It takes the write
-    # lock itself, so opening one here would only make it fail.
-    deletion = _delete_reported_comment(normalized, actor_id) if confirmed else None
-
-    now = platform_now_iso()
     with get_db() as db:
         _begin_exclusive(db)
         row = db.execute(
@@ -992,8 +1016,18 @@ def resolve_report(
             raise _report_not_found(normalized)
         if str(row["status"]) != "pending":
             # Already answered by an earlier submission, so the count, the
-            # audit trail and the row all stay exactly as they were.
+            # audit trail, the comment and the row all stay exactly as
+            # they were, whichever outcome the first submission chose.
             return _resolved_report(row, changed=False)
+        now = platform_now_iso()
+        # The hide joins this transaction instead of opening its own, so
+        # the visibility rewrite, the status rewrite and both audit rows
+        # commit or roll back together as one decision.
+        deletion = (
+            _delete_reported_comment(db, normalized, actor_id)
+            if confirmed
+            else None
+        )
         db.execute(
             """
             UPDATE comment_reports
@@ -1059,8 +1093,12 @@ def resolve_report(
     return _resolved_report(resolved_row, changed=True)
 
 
-def _delete_reported_comment(report_id: str, actor_id: int) -> dict | None:
-    """Hide the comment a confirmed report names, if that row still exists.
+def _delete_reported_comment(
+    db: sqlite3.Connection,
+    report_id: str,
+    actor_id: int,
+) -> dict | None:
+    """Hide the comment a confirmed report names, on the caller's `db`.
 
     A report can outlive its comment: another path may have removed the row
     and `comment_reports` carries no foreign key back to it. The report
@@ -1068,7 +1106,7 @@ def _delete_reported_comment(report_id: str, actor_id: int) -> dict | None:
     is already true, and stranding it as `pending` would leave the reporter
     permanently unanswered.
     """
-    row = _fetch_one(
+    row = db.execute(
         """
         SELECT r.comment_id AS comment_id,
                c.comment_id IS NOT NULL AS comment_exists
@@ -1077,10 +1115,10 @@ def _delete_reported_comment(report_id: str, actor_id: int) -> dict | None:
         WHERE r.report_id = ?
         """,
         (report_id,),
-    )
+    ).fetchone()
     if row is None or not row["comment_exists"]:
         return None
-    return delete_comment(actor_id, str(row["comment_id"]))
+    return _hide_comment(db, actor_id, str(row["comment_id"]))
 
 
 def _resolved_report(row: sqlite3.Row, *, changed: bool) -> dict:
@@ -1248,13 +1286,17 @@ def update_feedback(
     status: str,
     result: str,
 ) -> dict:
-    """Move one feedback row along its three-state machine and record it.
+    """Move one feedback row between its three statuses and record it.
 
-    `pending` -> `processed` -> `closed`, with a direct `closed` allowed so a
-    duplicate or a spam submission can be shut without being worked. The
-    status is the only thing the state machine owns: the row keeps its
-    submitter, body and arrival time untouched, and the handler, the result
-    text and `updated_at` are what this write adds.
+    The three values flow freely in both directions, reopening included:
+    a `closed` or `processed` record can go back to `pending`, and a
+    `pending` one can jump straight to `closed`, so a duplicate or a spam
+    submission can be shut without being worked. FR-077 asks only for the
+    ability to handle a status, with no guarded transitions, and Task 20
+    renders the three values as a free menu. The status is the only thing
+    this write owns: the row keeps its submitter, body and arrival time
+    untouched, and the handler, the result text and `updated_at` are what
+    it adds.
 
     A status that equals the stored one reports `changed: False` with no
     audit row, matching `delete_comment` and `resolve_report`, so a
