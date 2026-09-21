@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,14 +18,19 @@ from app.admin_console import (
 from app.admin_console.errors import (
     ProviderConflictError,
     ProviderNotFoundError,
+    ProviderUnavailableError,
     ProviderValidationError,
 )
+from app.admin_console.points_policy import TRAINING_WEIGHT_KEYS
 from app.admin_console.providers import (
     get_points_policy_provider as get_admin_points_policy_provider,
 )
 from app.db import get_db
 from app.handcraft_inheritance import get_points_policy_provider
-from app.handcraft_inheritance.points import get_effective_policy
+from app.handcraft_inheritance.points import (
+    SUPPORTED_TRAINING_EVENT_TYPES,
+    get_effective_policy,
+)
 from app.handcraft_inheritance.presets import (
     PLACEHOLDER_POINTS_POLICY,
     PlaceholderPointsPolicyProvider,
@@ -630,6 +636,121 @@ class PointsPolicyRouteTests(PointsPolicyTestCase):
         self.assertFalse(body["success"])
         self.assertEqual(body["code"], "points_policy_version_conflict")
         self.assertEqual(body["details"]["current_version"], 2)
+
+
+class PointsPolicyConcurrencyTests(PointsPolicyTestCase):
+    def test_external_write_lock_blocks_the_update_instead_of_using_a_stale_version(
+        self,
+    ):
+        with self.app.app_context():
+            # Fail fast and deterministically when another connection holds
+            # the write lock, instead of relying on the default 5s wait.
+            get_db().execute("PRAGMA busy_timeout = 250")
+            before = _policy_row()
+            external = sqlite3.connect(self.database_path, timeout=30)
+            try:
+                external.execute("BEGIN IMMEDIATE")
+                external.execute(
+                    "UPDATE platform_points_policy SET version = 99 "
+                    "WHERE singleton = 1"
+                )
+                # Another writer holds the write lock with an uncommitted
+                # version bump. Taking the write lock has to fail, so the
+                # update can never read a stale version and silently succeed.
+                with self.assertRaises(sqlite3.OperationalError):
+                    update_points_policy(7, dict(POLICY_PAYLOAD), 1)
+                after = _policy_row()
+            finally:
+                external.rollback()
+                external.close()
+
+        self.assertEqual(after["version"], before["version"])
+        self.assertEqual(after["policy_json"], before["policy_json"])
+
+    def test_conflict_leaves_no_points_policy_audit_row(self):
+        with self.app.app_context():
+            with self.assertRaises(ProviderConflictError):
+                update_points_policy(7, dict(POLICY_PAYLOAD), 99)
+            audit_rows = get_db().execute(
+                """
+                SELECT id FROM admin_audit_log
+                WHERE action = 'update_points_policy'
+                """
+            ).fetchall()
+
+        self.assertEqual(audit_rows, [])
+
+    def test_write_lock_is_taken_before_the_version_read(self):
+        with self.app.app_context():
+            connection = get_db()
+            statements: list[str] = []
+            connection.set_trace_callback(statements.append)
+            try:
+                update_points_policy(7, dict(POLICY_PAYLOAD), 1)
+            finally:
+                connection.set_trace_callback(None)
+            normalized = [" ".join(sql.split()).upper() for sql in statements]
+
+        begin_index = next(
+            (i for i, sql in enumerate(normalized) if "BEGIN IMMEDIATE" in sql),
+            None,
+        )
+        read_index = next(
+            (
+                i
+                for i, sql in enumerate(normalized)
+                if sql.startswith("SELECT") and "PLATFORM_POINTS_POLICY" in sql
+            ),
+            None,
+        )
+
+        # The write lock must be acquired before the version SELECT, otherwise
+        # two super admins could both read the same version and both pass the
+        # optimistic check. The external-lock test above pins the same
+        # invariant behaviorally: with the lock taken first, the update cannot
+        # read any version at all while another writer holds it.
+        self.assertIsNotNone(begin_index)
+        self.assertIsNotNone(read_index)
+        self.assertLess(begin_index, read_index)
+
+
+class PointsPolicyWeightContractTests(PointsPolicyTestCase):
+    def test_training_weight_keys_match_the_05_supported_event_types(self):
+        # 011 hard-codes the weight keys, so pin them to 05's contract: if 05
+        # ever adds a sixth event type, this fails instead of the console
+        # silently refusing to configure it.
+        self.assertEqual(
+            set(TRAINING_WEIGHT_KEYS),
+            SUPPORTED_TRAINING_EVENT_TYPES | {"default"},
+        )
+
+    def test_stored_row_with_an_extra_weight_key_is_reported_unavailable(self):
+        with self.app.app_context():
+            # A valid read first, so 05 has a good snapshot to fall back to.
+            self.assertTrue(get_effective_policy()["source_available"])
+            corrupted = json.loads(json.dumps(PLACEHOLDER_POINTS_POLICY))
+            corrupted["training_weights"] = dict(
+                corrupted["training_weights"],
+                quiz=3,
+            )
+            get_db().execute(
+                """
+                UPDATE platform_points_policy
+                SET policy_json = ?
+                WHERE singleton = 1
+                """,
+                (json.dumps(corrupted, ensure_ascii=False),),
+            )
+            get_db().commit()
+            with self.assertRaises(ProviderUnavailableError) as console_caught:
+                get_points_policy()
+            with self.assertRaises(ProviderUnavailableError):
+                get_admin_points_policy_provider().get_policy()
+            effective = get_effective_policy()
+
+        self.assertEqual(console_caught.exception.code, "points_policy_corrupted")
+        self.assertNotIn("quiz", effective["training_weights"])
+        self.assertFalse(effective["source_available"])
 
 
 if __name__ == "__main__":

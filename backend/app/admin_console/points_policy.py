@@ -11,6 +11,7 @@ policy change only rewrites the one policy row and records an audit entry.
 from __future__ import annotations
 
 import json
+import sqlite3
 
 from app.admin_console.audit import record_admin_audit
 from app.admin_console.errors import (
@@ -18,11 +19,6 @@ from app.admin_console.errors import (
     ProviderNotFoundError,
     ProviderUnavailableError,
     ProviderValidationError,
-)
-from app.admin_console.presets import (
-    _begin,
-    _fetch_one,
-    _optional_expected_version,
 )
 from app.admin_console.time_utils import platform_now_iso
 from app.db import get_db
@@ -55,6 +51,10 @@ EXPIRY_MODES = frozenset({"permanent", "natural_year"})
 # The seed has no acting administrator and `platform_points_policy.updated_by`
 # carries no foreign key, so 0 marks the system seed itself.
 SEED_ACTOR_ID = 0
+
+
+def _fetch_one(sql: str, parameters: tuple = ()) -> sqlite3.Row | None:
+    return get_db().execute(sql, parameters).fetchone()
 
 
 def _validation(
@@ -100,11 +100,32 @@ def _positive_integer(value: object, *, field: str) -> int:
     return int(value)
 
 
-def _required_expected_version(value: object) -> int:
-    version = _optional_expected_version(value)
-    if version is None:
+def _expected_version(value: object) -> int:
+    """Read the required optimistic-lock token for the policy update.
+
+    The platform policy has no delete path: the update is the only write, so
+    the token is mandatory here. A missing value is refused up front instead
+    of being treated as "skip the optimistic check" the way the preset delete
+    paths treat their optional token.
+    """
+    if value is None:
         raise _validation("expected_version 不能为空", field="expected_version")
-    return version
+    return _positive_integer(value, field="expected_version")
+
+
+def _begin_exclusive(db: sqlite3.Connection) -> None:
+    """Take the write lock before the policy row is read.
+
+    `load_session`/`require_admin_session` leave an empty deferred
+    transaction open on the request connection, and a deferred transaction
+    does not serialize writers, so two super admins could both read the same
+    version and both pass the optimistic check. Committing the pending work
+    and opening `BEGIN IMMEDIATE` is what makes the second update observe the
+    first one's commit.
+    """
+    if db.in_transaction:
+        db.commit()
+    db.execute("BEGIN IMMEDIATE")
 
 
 def _loaded_policy(raw: object) -> dict:
@@ -145,6 +166,7 @@ def _decoded_policy(raw: object) -> dict:
         and _is_positive_integer(seconds_per_point)
         and _is_positive_integer(daily_limit)
         and isinstance(weights, dict)
+        and set(weights).issubset(set(TRAINING_WEIGHT_KEYS))
         and all(
             _is_positive_integer(weights.get(key)) for key in TRAINING_WEIGHT_KEYS
         )
@@ -313,9 +335,9 @@ def update_points_policy(
 ) -> dict:
     """Validate, version and store the platform policy in one transaction."""
     values = _validated_policy(payload)
-    locked_version = _required_expected_version(expected_version)
+    locked_version = _expected_version(expected_version)
     db = get_db()
-    _begin(db)
+    _begin_exclusive(db)
     try:
         row = db.execute(
             """
