@@ -459,10 +459,12 @@ describe('语音失败与输入保留验收', () => {
     const { wrapper } = mountPanel()
     wrapper.findComponent(VoiceInputButton).vm.$emit('permission-denied')
     await flushPromises()
-    expect(apiFetch).not.toHaveBeenCalledWith(
-      TRANSCRIPTIONS_PATH,
-      expect.anything()
-    )
+    // 参数形状无关的否定：只按 URL 扫描每次调用，不看参数个数。
+    // not.toHaveBeenCalledWith(PATH, expect.anything()) 只挡双参数调用，
+    // 单参数 apiFetch(PATH) 会漏过，会让"权限拒绝不触发 ASR"这条保证失明。
+    expect(
+      mockedApiFetch.mock.calls.some(([url]) => url === TRANSCRIPTIONS_PATH)
+    ).toBe(false)
     expect(wrapper.text()).toContain('未能识别，请重说或改用文字')
     wrapper.unmount()
   })
