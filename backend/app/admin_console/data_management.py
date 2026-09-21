@@ -1441,9 +1441,11 @@ def _get_preset(content_id: object) -> dict | None:
     entry = _preset_entry(category, stable_id)
     if entry is None:
         return None
-    # The union keys come first so a family field can never shadow them; the
-    # family entry follows so the detail projection keeps every domain field.
-    return {**_preset_row(category, entry), **entry}
+    # The union keys are merged last so a family field can never shadow them;
+    # the family entry comes first so the detail projection keeps every domain
+    # field, e.g. the case family's frozen `id`, which the union key replaces
+    # with the family-encoded addressable form.
+    return {**entry, **_preset_row(category, entry)}
 
 
 def _disable_preset(

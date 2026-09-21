@@ -945,3 +945,72 @@ class AdminDataManagementTests(TestCase):
         self.assertFalse(detail["is_enabled"])
         self.assertEqual(detail["version"], 2)
         self.assertIsNone(visible_after)
+
+    def test_preset_success_case_detail_id_matches_family_encoded_address(self):
+        with self.app.app_context():
+            case_id = self._make_success_case()
+            content_id = f"success_cases:{case_id}"
+            list_row = {
+                row["id"]: row
+                for row in list_managed_content("preset", {})
+            }[content_id]
+            detail = get_managed_content("preset", content_id)
+        self.assertEqual(detail["preset_category"], "success_cases")
+        self.assertEqual(detail["stable_id"], case_id)
+        # The case family keeps 06's frozen read shape, which spells its
+        # stable id `id`, so the union key has to win the merge or the detail
+        # hands back a bare id that decodes as a craft family address.
+        self.assertEqual(detail["id"], content_id)
+        self.assertEqual(detail["id"], list_row["id"])
+
+        # The detail id addresses the write endpoints exactly as handed back:
+        # a stale version is a 409 conflict, never a craft-family 404.
+        conflict = self.super_admin.delete(
+            f"/api/admin/content/preset/{detail['id']}",
+            json={"expected_version": 999},
+        )
+        self.assertEqual(conflict.status_code, 409, msg=conflict.get_json())
+
+        response = self.super_admin.delete(
+            f"/api/admin/content/preset/{detail['id']}",
+            json={"expected_version": 1},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.get_json())
+
+        with self.app.app_context():
+            disabled = get_managed_content("preset", detail["id"])
+        self.assertFalse(disabled["is_enabled"])
+        self.assertEqual(disabled["version"], 2)
+
+    def test_preset_success_case_detail_id_addresses_unpublish(self):
+        with self.app.app_context():
+            case_id = self._make_success_case()
+            content_id = f"success_cases:{case_id}"
+            detail = get_managed_content("preset", content_id)
+        response = self.super_admin.post(
+            f"/api/admin/content/preset/{detail['id']}/unpublish",
+            json={"expected_version": 1},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.get_json())
+
+        with self.app.app_context():
+            disabled = get_managed_content("preset", detail["id"])
+        self.assertFalse(disabled["is_enabled"])
+        self.assertEqual(disabled["version"], 2)
+
+    def test_preset_craft_detail_id_stays_bare_stable_id(self):
+        with self.app.app_context():
+            craft_key = self._make_craft()
+            detail = get_managed_content("preset", craft_key)
+        self.assertEqual(detail["preset_category"], "handcraft_crafts")
+        # The craft family keeps its bare stable id in the detail projection;
+        # the union keys must not double-encode it into a prefixed address.
+        self.assertEqual(detail["id"], craft_key)
+        self.assertEqual(detail["stable_id"], craft_key)
+        self.assertNotIn(":", detail["id"])
+
+        response = self.super_admin.delete(
+            f"/api/admin/content/preset/{detail['id']}",
+            json={"expected_version": 1},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.get_json())
