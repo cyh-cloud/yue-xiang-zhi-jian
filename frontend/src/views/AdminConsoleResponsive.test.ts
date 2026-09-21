@@ -94,7 +94,11 @@ describe('admin console routes', () => {
 
   it('registers the admin children with the required role metadata', () => {
     const routes = router.getRoutes()
-    const superAdminOnlyPaths = ['/admin/accounts', '/admin/announcements']
+    const superAdminOnlyPaths = [
+      '/admin/accounts',
+      '/admin/announcements',
+      '/admin/points-policy'
+    ]
     const adminPaths = [
       '/admin/dashboard',
       '/admin/review',

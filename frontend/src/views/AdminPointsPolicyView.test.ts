@@ -17,13 +17,21 @@ import policyViewSource from './AdminPointsPolicyView.vue?raw'
 vi.mock('@/api/client', () => {
   class MockApiError extends Error {
     readonly status: number
+    readonly code: string
     readonly errors: Record<string, string>
 
-    constructor(message: string, status = 400) {
+    constructor(
+      message: string,
+      status = 400,
+      errors: Record<string, string> = {},
+      _redirect?: string,
+      code = ''
+    ) {
       super(message)
       this.name = 'ApiError'
       this.status = status
-      this.errors = {}
+      this.code = code
+      this.errors = errors
     }
   }
 
@@ -54,7 +62,7 @@ function policyFixture(): AdminPointsPolicy {
 }
 
 let currentPolicy: AdminPointsPolicy = policyFixture()
-let nextPutStatus: 'ok' | 'conflict' = 'ok'
+let nextPutStatus: 'ok' | 'conflict' | 'rejected' = 'ok'
 
 function installDefaultFetch() {
   apiFetchMock.mockImplementation(
@@ -70,6 +78,17 @@ function installDefaultFetch() {
             updated_at: '2026-09-21T16:00:00+08:00'
           }
           throw new ApiError('积分规则已被其他管理员修改', 409)
+        }
+        if (nextPutStatus === 'rejected') {
+          // A rejected payload is a validation failure, not a version
+          // conflict: the optimistic lock the form holds is still current.
+          throw new ApiError(
+            '积分规则校验失败',
+            400,
+            {},
+            undefined,
+            'points_policy_validation_failed'
+          )
         }
         const body = JSON.parse(
           String(options?.body)
@@ -129,6 +148,12 @@ function putBodies(): AdminPointsPolicyPayload[] {
         call[0] === '/api/admin/points-policy' && call[1]?.method === 'PUT'
     )
     .map(call => JSON.parse(String(call[1]?.body)) as AdminPointsPolicyPayload)
+}
+
+function policyReadCount(): number {
+  return apiFetchMock.mock.calls.filter(
+    call => call[0] === '/api/admin/points-policy' && call[1]?.method !== 'PUT'
+  ).length
 }
 
 describe('AdminPointsPolicyView', () => {
@@ -203,29 +228,43 @@ describe('AdminPointsPolicyView', () => {
     )
   })
 
-  it('blocks non-integer or sub-one inputs with inline errors and no request', async () => {
+  it('blocks non-numeric, non-integer and sub-one inputs with inline errors and no request', async () => {
     const { wrapper } = await mountView()
     apiFetchMock.mockClear()
 
+    // A `type="number"` input sanitizes typed text, so `setValue('abc')`
+    // reaches the model as an empty string and never exercises the validator's
+    // string gate. Writing the value onto the element and raising input is the
+    // only way to drive that branch from the DOM.
+    const simulation = wrapper.get('[data-test="weight-simulation"]')
+      .element as HTMLInputElement
+    Object.defineProperty(simulation, 'value', {
+      configurable: true,
+      writable: true,
+      value: 'abc'
+    })
+    simulation.dispatchEvent(new Event('input'))
+
     await wrapper.get('[data-test="weight-default"]').setValue('1.5')
     await wrapper.get('[data-test="weight-live-script"]').setValue('0')
+    await wrapper.get('[data-test="weight-copy-training"]').setValue('-3')
     await wrapper.get('[data-test="daily-limit"]').setValue('')
     await wrapper.get('[data-test="points-policy-submit"]').trigger('click')
     await flushPromises()
 
-    expect(
-      apiFetchMock.mock.calls.filter(
-        call =>
-          call[0] === '/api/admin/points-policy' && call[1]?.method === 'PUT'
-      )
-    ).toHaveLength(0)
-    expect(wrapper.find('[data-test="weight-default-error"]').exists()).toBe(
-      true
-    )
-    expect(wrapper.find('[data-test="weight-live-script-error"]').exists()).toBe(
-      true
-    )
-    expect(wrapper.find('[data-test="daily-limit-error"]').exists()).toBe(true)
+    expect(putBodies()).toHaveLength(0)
+    for (const testId of [
+      'weight-simulation',
+      'weight-default',
+      'weight-live-script',
+      'weight-copy-training',
+      'daily-limit'
+    ]) {
+      expect(
+        wrapper.find(`[data-test="${testId}-error"]`).exists(),
+        `${testId} inline error`
+      ).toBe(true)
+    }
     expect(wrapper.find('[data-test="seconds-per-point-error"]').exists()).toBe(
       false
     )
@@ -262,6 +301,39 @@ describe('AdminPointsPolicyView', () => {
     )
   })
 
+  it('keeps the typed values and skips the reload when a save fails without a conflict', async () => {
+    nextPutStatus = 'rejected'
+    const { wrapper } = await mountView()
+    const readsBefore = policyReadCount()
+
+    await wrapper.get('[data-test="seconds-per-point"]').setValue('300')
+    await wrapper.get('[data-test="daily-limit"]').setValue('77')
+    await wrapper.get('[data-test="points-policy-submit"]').trigger('click')
+    await flushPromises()
+
+    // A 400 rejects the payload but leaves the optimistic lock the form holds
+    // current, so the row must not be re-read: a reload would hand the admin
+    // back the committed values and silently drop this edit.
+    expect(inputValue(wrapper, 'seconds-per-point')).toBe('300')
+    expect(inputValue(wrapper, 'daily-limit')).toBe('77')
+    expect(policyReadCount()).toBe(readsBefore)
+    expect(wrapper.get('[data-test="points-policy-form-error"]').text()).toContain(
+      '积分规则校验失败'
+    )
+    expect(
+      wrapper.get('[data-test="points-policy-form-error-code"]').text()
+    ).toBe('points_policy_validation_failed')
+
+    // Editing again starts a fresh attempt, so the stale banner retires itself
+    // while the typed values survive.
+    await wrapper.get('[data-test="seconds-per-point"]').setValue('310')
+    await flushPromises()
+    expect(wrapper.find('[data-test="points-policy-form-error"]').exists()).toBe(
+      false
+    )
+    expect(inputValue(wrapper, 'seconds-per-point')).toBe('310')
+  })
+
   it('surfaces a load error and reloads the policy on retry', async () => {
     let failLoad = true
     apiFetchMock.mockImplementation(
@@ -279,6 +351,12 @@ describe('AdminPointsPolicyView', () => {
     const { wrapper } = await mountView()
     expect(wrapper.get('[data-test="points-policy-error"]').text()).toContain(
       '积分规则加载失败'
+    )
+    // The form stays out of the tree until the row loads, so the hard-coded
+    // `expiryMode` default never preselects a mode for a policy that has not
+    // been read yet.
+    expect(wrapper.find('[data-test="points-policy-form"]').exists()).toBe(
+      false
     )
 
     failLoad = false

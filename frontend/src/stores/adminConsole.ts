@@ -116,6 +116,7 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
   const pointsPolicyError = ref('')
   const pointsPolicyActionLoading = ref(false)
   const pointsPolicyFormError = ref('')
+  const pointsPolicyFormErrorCode = ref('')
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -725,6 +726,7 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
   ): Promise<boolean> {
     pointsPolicyActionLoading.value = true
     pointsPolicyFormError.value = ''
+    pointsPolicyFormErrorCode.value = ''
     try {
       const response = await apiFetch<AdminPointsPolicyResponse>(
         '/api/admin/points-policy',
@@ -736,12 +738,17 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
       pointsPolicy.value = response.policy
       return true
     } catch (caught) {
-      // A 409 means another admin already moved the single policy row: reload
-      // so the form re-seeds its expected version from the fresh server values,
-      // then keep the conflict message visible so a resubmit can win.
-      const conflictMessage = errorMessage(caught, '保存积分规则失败')
-      await loadPointsPolicy()
-      pointsPolicyFormError.value = conflictMessage
+      pointsPolicyFormError.value = errorMessage(caught, '保存积分规则失败')
+      pointsPolicyFormErrorCode.value =
+        caught instanceof ApiError && caught.code ? caught.code : ''
+      // Only a version conflict invalidates the optimistic lock the form was
+      // built on, so only that case reloads the row and re-seeds the controls.
+      // A 400, 500, 503 or a dropped connection leaves the admin's typed
+      // values alone: reloading would replace them with the last committed
+      // policy and discard the edit behind a single banner.
+      if (caught instanceof ApiError && caught.status === 409) {
+        await loadPointsPolicy()
+      }
       return false
     } finally {
       pointsPolicyActionLoading.value = false
@@ -750,6 +757,7 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
 
   function clearPointsPolicyFormError() {
     pointsPolicyFormError.value = ''
+    pointsPolicyFormErrorCode.value = ''
   }
 
   return {
@@ -829,6 +837,7 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     pointsPolicyError,
     pointsPolicyActionLoading,
     pointsPolicyFormError,
+    pointsPolicyFormErrorCode,
     loadPointsPolicy,
     savePointsPolicy,
     clearPointsPolicyFormError

@@ -108,6 +108,15 @@ function seedForm(policy: AdminPointsPolicy): void {
   policyVersion.value = policy.version
 }
 
+function clearFormError(): void {
+  // A failed save leaves its banner up, but the next keystroke starts a new
+  // attempt: retire the stale conflict or validation message so it never
+  // outlives the edit it described. Re-seeding from the server assigns the
+  // refs directly and raises no input event, so the 409 reload keeps its
+  // banner.
+  store.clearPointsPolicyFormError()
+}
+
 async function submitPolicy(): Promise<void> {
   if (policyVersion.value === null) return
   successMessage.value = ''
@@ -233,6 +242,7 @@ onMounted(() => {
       class="pp-form"
       data-test="points-policy-form"
       novalidate
+      v-if="store.pointsPolicy"
       @submit.prevent="submitPolicy"
     >
       <header class="pp-form__heading">
@@ -251,6 +261,7 @@ onMounted(() => {
             step="1"
             data-test="seconds-per-point"
             inputmode="numeric"
+            @input="clearFormError"
           />
           <span
             v-if="fieldErrors.seconds_per_point"
@@ -269,6 +280,7 @@ onMounted(() => {
             step="1"
             data-test="daily-limit"
             inputmode="numeric"
+            @input="clearFormError"
           />
           <span
             v-if="fieldErrors.daily_limit"
@@ -292,6 +304,7 @@ onMounted(() => {
               step="1"
               :data-test="`weight-${field.slug}`"
               inputmode="numeric"
+              @input="clearFormError"
             />
             <span
               v-if="fieldErrors[`training_weights.${field.key}`]"
@@ -323,6 +336,7 @@ onMounted(() => {
               :value="option.value"
               v-model="expiryMode"
               :data-test="`expiry-${option.slug}`"
+              @change="clearFormError"
             />
             <span>{{ option.label }}</span>
           </label>
@@ -350,6 +364,13 @@ onMounted(() => {
     >
       <ShieldAlert :size="17" aria-hidden="true" />
       <span>{{ store.pointsPolicyFormError }}</span>
+      <span
+        v-if="store.pointsPolicyFormErrorCode"
+        class="pp-form__code ark-data"
+        data-test="points-policy-form-error-code"
+      >
+        {{ store.pointsPolicyFormErrorCode }}
+      </span>
     </p>
 
     <p
@@ -697,6 +718,15 @@ onMounted(() => {
   line-break: strict;
   overflow-wrap: anywhere;
   text-wrap: pretty;
+  word-break: keep-all;
+}
+
+.pp-form__code {
+  min-width: 0;
+  color: var(--ark-muted);
+  font-size: 0.72rem;
+  line-break: strict;
+  overflow-wrap: anywhere;
   word-break: keep-all;
 }
 
