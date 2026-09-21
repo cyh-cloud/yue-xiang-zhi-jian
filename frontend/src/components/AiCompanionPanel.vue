@@ -231,7 +231,7 @@ onMounted(() => {
               aria-label="问题输入"
             />
             <!-- data-test 与禁用态挂在外层容器上，作为语音区整体状态钩子；
-                 permission-denied 同时接 DOM 事件与组件 emit，共用同一处理。 -->
+                 麦克风拒绝由 VoiceInputButton 的 emit 处理。 -->
             <div
               class="ai-companion-voice"
               data-test="ai-companion-voice"
@@ -239,7 +239,6 @@ onMounted(() => {
               aria-label="语音提问"
               :aria-disabled="voiceDisabled"
               :disabled="voiceDisabled ? '' : null"
-              @permission-denied="handlePermissionDenied"
             >
               <VoiceInputButton
                 :recording="companion.recording"

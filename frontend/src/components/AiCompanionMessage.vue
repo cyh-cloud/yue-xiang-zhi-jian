@@ -101,7 +101,7 @@ function jumpToTarget() {
           {{ block.text }}
         </p>
         <ul v-else class="ai-companion-message-list">
-          <li v-for="item in block.items" :key="item">
+          <li v-for="(item, index) in block.items" :key="`bullet-${index}`">
             {{ item }}
           </li>
         </ul>

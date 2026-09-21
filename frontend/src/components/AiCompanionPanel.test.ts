@@ -152,14 +152,19 @@ describe('AiCompanionPanel', () => {
     const wrapper = mountPanel()
     expect(wrapper.get('[data-test="ai-companion-voice"]').attributes('disabled'))
       .toBeDefined()
+    expect(wrapper.findComponent(VoiceInputButton).props('disabled')).toBe(true)
     await wrapper.get('[data-test="ai-companion-dialect-yue"]').trigger('click')
     expect(wrapper.get('[data-test="ai-companion-voice"]').attributes('disabled'))
       .toBeUndefined()
+    expect(wrapper.findComponent(VoiceInputButton).props('disabled')).toBe(
+      false
+    )
   })
 
   it('maps microphone denial to retry-or-type copy', async () => {
     const wrapper = mountPanel()
-    await wrapper.get('[data-test="ai-companion-voice"]').trigger('permission-denied')
+    wrapper.findComponent(VoiceInputButton).vm.$emit('permission-denied')
+    await flushPromises()
     expect(wrapper.text()).toContain('未能识别，请重说或改用文字')
     expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
   })
@@ -197,6 +202,7 @@ describe('AiCompanionPanel', () => {
 
   it('keeps the microphone usable after a permission denial emit', async () => {
     const wrapper = mountPanel()
+    expect(wrapper.findComponent(VoiceInputButton).props('disabled')).toBe(true)
     wrapper.findComponent(VoiceInputButton).vm.$emit('permission-denied')
     await flushPromises()
     expect(wrapper.text()).toContain('未能识别，请重说或改用文字')
@@ -204,6 +210,7 @@ describe('AiCompanionPanel', () => {
     expect(
       wrapper.get('[data-test="ai-companion-voice"]').attributes('disabled')
     ).toBeDefined()
+    expect(wrapper.findComponent(VoiceInputButton).props('disabled')).toBe(true)
   })
 
   it('submits the confirmed draft and blocks a blank one', async () => {
