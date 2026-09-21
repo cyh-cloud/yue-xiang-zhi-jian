@@ -44,6 +44,147 @@ import type {
 } from '@/api/types'
 import { useAuthStore } from '@/stores/auth'
 
+export type AdminModerationContentType =
+  | 'course_video'
+  | 'handcraft_teaching_video'
+
+export type AdminModerationContentTypeFilter =
+  | AdminModerationContentType
+  | 'all'
+
+export type AdminModerationVisibilityFilter = 'all' | 'visible' | 'hidden'
+
+export type AdminCommentReportStatus = 'pending' | 'confirmed' | 'rejected'
+
+export type AdminCommentReportStatusFilter = AdminCommentReportStatus | 'all'
+
+export type AdminFeedbackStatus = 'pending' | 'processed' | 'closed'
+
+export type AdminFeedbackStatusFilter = AdminFeedbackStatus | 'all'
+
+export interface AdminModerationPerson {
+  username: string
+  name: string
+}
+
+export interface AdminModerationComment {
+  comment_id: string
+  content_type: AdminModerationContentType
+  content_id: string
+  author_id: number
+  author: AdminModerationPerson
+  parent_comment_id: string | null
+  body: string
+  is_teacher_reply: boolean
+  is_visible: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminCommentReport {
+  report_id: string
+  comment_id: string
+  reporter_id: number
+  reporter: AdminModerationPerson
+  reason: string
+  status: AdminCommentReportStatus
+  resolver_id: number | null
+  resolver: AdminModerationPerson
+  result: string | null
+  comment_is_visible: boolean | null
+  created_at: string
+  updated_at: string
+  resolved_at: string | null
+}
+
+export interface AdminFeedbackRecord {
+  feedback_id: string
+  submitter_id: number
+  submitter: AdminModerationPerson
+  body: string
+  status: AdminFeedbackStatus
+  idempotency_key: string
+  handler_id: number | null
+  handler: AdminModerationPerson
+  result: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminModerationCommentQuery {
+  content_type: AdminModerationContentTypeFilter
+  content_id: string
+  author_id: string
+  keyword: string
+  is_visible: AdminModerationVisibilityFilter
+  created_from: string
+  created_to: string
+}
+
+export interface AdminModerationReportQuery {
+  status: AdminCommentReportStatusFilter
+  comment_id: string
+  reporter_id: string
+  created_from: string
+  created_to: string
+}
+
+export interface AdminModerationFeedbackQuery {
+  status: AdminFeedbackStatusFilter
+  submitter_id: string
+  created_from: string
+  created_to: string
+}
+
+export interface AdminModerationCommentsResponse {
+  success: true
+  items: AdminModerationComment[]
+  count: number
+}
+
+export interface AdminCommentDeleteResponse {
+  success: true
+  comment_id: string
+  is_visible: boolean
+  changed: boolean
+  updated_at: string
+}
+
+export interface AdminCommentReportsResponse {
+  success: true
+  items: AdminCommentReport[]
+  count: number
+}
+
+export interface AdminResolvedCommentReport extends AdminCommentReport {
+  changed: boolean
+}
+
+export interface AdminCommentReportResolveResponse {
+  success: true
+  report: AdminResolvedCommentReport
+}
+
+export interface AdminFeedbackListResponse {
+  success: true
+  items: AdminFeedbackRecord[]
+  count: number
+}
+
+export interface AdminUpdatedFeedbackRecord extends AdminFeedbackRecord {
+  changed: boolean
+}
+
+export interface AdminFeedbackUpdateResponse {
+  success: true
+  feedback: AdminUpdatedFeedbackRecord
+}
+
+// One page of every moderation queue. The backend caps `limit` at 200 and
+// answers with the rows the page actually carries, so the console never
+// claims a total it was not given.
+const MODERATION_PAGE_SIZE = 20
+
 function emptyReviewCounts(): AdminReviewCounts {
   return {
     course_video: 0,
@@ -117,6 +258,44 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
   const pointsPolicyActionLoading = ref(false)
   const pointsPolicyFormError = ref('')
   const pointsPolicyFormErrorCode = ref('')
+
+  const moderationComments = ref<AdminModerationComment[]>([])
+  const moderationCommentCount = ref(0)
+  const moderationCommentsLoading = ref(false)
+  const moderationCommentsError = ref('')
+  const moderationCommentActionLoading = ref(false)
+  const moderationCommentQuery = ref<AdminModerationCommentQuery>({
+    content_type: 'all',
+    content_id: '',
+    author_id: '',
+    keyword: '',
+    is_visible: 'all',
+    created_from: '',
+    created_to: ''
+  })
+  const moderationReports = ref<AdminCommentReport[]>([])
+  const moderationReportCount = ref(0)
+  const moderationReportsLoading = ref(false)
+  const moderationReportsError = ref('')
+  const moderationReportActionLoading = ref(false)
+  const moderationReportQuery = ref<AdminModerationReportQuery>({
+    status: 'all',
+    comment_id: '',
+    reporter_id: '',
+    created_from: '',
+    created_to: ''
+  })
+  const moderationFeedback = ref<AdminFeedbackRecord[]>([])
+  const moderationFeedbackCount = ref(0)
+  const moderationFeedbackLoading = ref(false)
+  const moderationFeedbackError = ref('')
+  const moderationFeedbackActionLoading = ref(false)
+  const moderationFeedbackQuery = ref<AdminModerationFeedbackQuery>({
+    status: 'all',
+    submitter_id: '',
+    created_from: '',
+    created_to: ''
+  })
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -760,6 +939,314 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     pointsPolicyFormErrorCode.value = ''
   }
 
+  // The console owns the wording for the four codes the moderation module
+  // raises, so a 404 and a rejected query string read as decisions rather
+  // than as the backend's raw message text.
+  const MODERATION_ERROR_CODES: Record<string, string> = {
+    comment_not_found: '评论不存在或已被删除',
+    comment_report_not_found: '举报不存在或已处理',
+    feedback_not_found: '反馈不存在',
+    moderation_filter_invalid: '筛选条件不正确，请检查后重试',
+    moderation_validation_failed: '处理内容校验失败，请检查处理备注'
+  }
+
+  function moderationErrorMessage(caught: unknown, fallback: string): string {
+    if (caught instanceof ApiError && caught.code) {
+      const mapped = MODERATION_ERROR_CODES[caught.code]
+      if (mapped) {
+        return mapped
+      }
+    }
+    return errorMessage(caught, fallback)
+  }
+
+  function moderationQueueQuery(
+    params: Record<string, string>,
+    offset: number,
+    limit: number
+  ): string {
+    const search = new URLSearchParams()
+    for (const [field, value] of Object.entries(params)) {
+      if (value) {
+        search.set(field, value)
+      }
+    }
+    search.set('limit', String(limit))
+    search.set('offset', String(offset))
+    return `?${search.toString()}`
+  }
+
+  async function loadModerationComments(
+    query: AdminModerationCommentQuery = moderationCommentQuery.value,
+    offset = 0,
+    limit = MODERATION_PAGE_SIZE
+  ): Promise<boolean> {
+    moderationCommentsLoading.value = true
+    moderationCommentsError.value = ''
+    moderationCommentQuery.value = query
+    try {
+      const response = await apiFetch<AdminModerationCommentsResponse>(
+        `/api/admin/comments${moderationQueueQuery(
+          {
+            content_type:
+              query.content_type === 'all' ? '' : query.content_type,
+            content_id: query.content_id.trim(),
+            author_id: query.author_id.trim(),
+            keyword: query.keyword.trim(),
+            is_visible:
+              query.is_visible === 'all'
+                ? ''
+                : query.is_visible === 'visible'
+                  ? '1'
+                  : '0',
+            created_from: query.created_from,
+            created_to: query.created_to
+          },
+          offset,
+          limit
+        )}`
+      )
+      // `count` is how many rows this page carries, not how many rows the
+      // filters match, so the console can only ever say "this page holds N".
+      moderationComments.value = response.items
+      moderationCommentCount.value = response.count
+      return true
+    } catch (caught) {
+      moderationComments.value = []
+      moderationCommentCount.value = 0
+      moderationCommentsError.value = moderationErrorMessage(
+        caught,
+        '评论列表加载失败'
+      )
+      return false
+    } finally {
+      moderationCommentsLoading.value = false
+    }
+  }
+
+  function applyHiddenComment(result: AdminCommentDeleteResponse): void {
+    const index = moderationComments.value.findIndex(
+      item => item.comment_id === result.comment_id
+    )
+    if (index === -1) return
+    const current = moderationComments.value[index]
+    if (!current) return
+    // A repeat delete answers `changed: false` with the row untouched, so the
+    // same merge renders the stored visibility instead of guessing one.
+    moderationComments.value = [
+      ...moderationComments.value.slice(0, index),
+      {
+        ...current,
+        is_visible: result.is_visible,
+        updated_at: result.updated_at
+      },
+      ...moderationComments.value.slice(index + 1)
+    ]
+  }
+
+  async function deleteModerationComment(
+    commentId: string
+  ): Promise<AdminCommentDeleteResponse | null> {
+    moderationCommentActionLoading.value = true
+    moderationCommentsError.value = ''
+    try {
+      const response = await apiFetch<AdminCommentDeleteResponse>(
+        `/api/admin/comments/${encodeURIComponent(commentId)}`,
+        { method: 'DELETE' }
+      )
+      applyHiddenComment(response)
+      return response
+    } catch (caught) {
+      moderationCommentsError.value = moderationErrorMessage(
+        caught,
+        '隐藏评论失败'
+      )
+      return null
+    } finally {
+      moderationCommentActionLoading.value = false
+    }
+  }
+
+  async function loadModerationReports(
+    query: AdminModerationReportQuery = moderationReportQuery.value,
+    offset = 0,
+    limit = MODERATION_PAGE_SIZE
+  ): Promise<boolean> {
+    moderationReportsLoading.value = true
+    moderationReportsError.value = ''
+    moderationReportQuery.value = query
+    try {
+      const response = await apiFetch<AdminCommentReportsResponse>(
+        `/api/admin/reports${moderationQueueQuery(
+          {
+            status: query.status === 'all' ? '' : query.status,
+            comment_id: query.comment_id.trim(),
+            reporter_id: query.reporter_id.trim(),
+            created_from: query.created_from,
+            created_to: query.created_to
+          },
+          offset,
+          limit
+        )}`
+      )
+      moderationReports.value = response.items
+      moderationReportCount.value = response.count
+      return true
+    } catch (caught) {
+      moderationReports.value = []
+      moderationReportCount.value = 0
+      moderationReportsError.value = moderationErrorMessage(
+        caught,
+        '举报队列加载失败'
+      )
+      return false
+    } finally {
+      moderationReportsLoading.value = false
+    }
+  }
+
+  function replaceModerationReport(report: AdminResolvedCommentReport): void {
+    // The answer is read back from the table by the backend, so the row is
+    // replaced with the stored decision rather than with what the operator
+    // typed: a `changed: false` repeat shows the decision that is on file.
+    moderationReports.value = moderationReports.value.map(item =>
+      item.report_id === report.report_id
+        ? {
+            ...item,
+            status: report.status,
+            resolver_id: report.resolver_id,
+            resolver: report.resolver,
+            result: report.result,
+            comment_is_visible: report.comment_is_visible,
+            updated_at: report.updated_at,
+            resolved_at: report.resolved_at
+          }
+        : item
+    )
+  }
+
+  async function resolveModerationReport(
+    reportId: string,
+    confirmed: boolean,
+    result: string
+  ): Promise<AdminResolvedCommentReport | null> {
+    moderationReportActionLoading.value = true
+    moderationReportsError.value = ''
+    try {
+      const response = await apiFetch<AdminCommentReportResolveResponse>(
+        `/api/admin/reports/${encodeURIComponent(reportId)}/resolve`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ confirmed, result })
+        }
+      )
+      replaceModerationReport(response.report)
+      return response.report
+    } catch (caught) {
+      moderationReportsError.value = moderationErrorMessage(
+        caught,
+        '处理举报失败'
+      )
+      return null
+    } finally {
+      moderationReportActionLoading.value = false
+    }
+  }
+
+  async function loadModerationFeedback(
+    query: AdminModerationFeedbackQuery = moderationFeedbackQuery.value,
+    offset = 0,
+    limit = MODERATION_PAGE_SIZE
+  ): Promise<boolean> {
+    moderationFeedbackLoading.value = true
+    moderationFeedbackError.value = ''
+    moderationFeedbackQuery.value = query
+    try {
+      const response = await apiFetch<AdminFeedbackListResponse>(
+        `/api/admin/feedback${moderationQueueQuery(
+          {
+            status: query.status === 'all' ? '' : query.status,
+            submitter_id: query.submitter_id.trim(),
+            created_from: query.created_from,
+            created_to: query.created_to
+          },
+          offset,
+          limit
+        )}`
+      )
+      moderationFeedback.value = response.items
+      moderationFeedbackCount.value = response.count
+      return true
+    } catch (caught) {
+      moderationFeedback.value = []
+      moderationFeedbackCount.value = 0
+      moderationFeedbackError.value = moderationErrorMessage(
+        caught,
+        '反馈队列加载失败'
+      )
+      return false
+    } finally {
+      moderationFeedbackLoading.value = false
+    }
+  }
+
+  function replaceModerationFeedback(
+    feedback: AdminUpdatedFeedbackRecord
+  ): void {
+    moderationFeedback.value = moderationFeedback.value.map(item =>
+      item.feedback_id === feedback.feedback_id
+        ? {
+            ...item,
+            status: feedback.status,
+            handler_id: feedback.handler_id,
+            handler: feedback.handler,
+            result: feedback.result,
+            updated_at: feedback.updated_at
+          }
+        : item
+    )
+  }
+
+  async function updateModerationFeedback(
+    feedbackId: string,
+    status: AdminFeedbackStatus,
+    result: string
+  ): Promise<AdminUpdatedFeedbackRecord | null> {
+    moderationFeedbackActionLoading.value = true
+    moderationFeedbackError.value = ''
+    try {
+      const response = await apiFetch<AdminFeedbackUpdateResponse>(
+        `/api/admin/feedback/${encodeURIComponent(feedbackId)}`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ status, result })
+        }
+      )
+      replaceModerationFeedback(response.feedback)
+      return response.feedback
+    } catch (caught) {
+      moderationFeedbackError.value = moderationErrorMessage(
+        caught,
+        '更新反馈状态失败'
+      )
+      return null
+    } finally {
+      moderationFeedbackActionLoading.value = false
+    }
+  }
+
+  function clearModerationCommentsError() {
+    moderationCommentsError.value = ''
+  }
+
+  function clearModerationReportsError() {
+    moderationReportsError.value = ''
+  }
+
+  function clearModerationFeedbackError() {
+    moderationFeedbackError.value = ''
+  }
+
   return {
     dashboard,
     loading,
@@ -840,6 +1327,30 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     pointsPolicyFormErrorCode,
     loadPointsPolicy,
     savePointsPolicy,
-    clearPointsPolicyFormError
+    clearPointsPolicyFormError,
+    moderationComments,
+    moderationCommentCount,
+    moderationCommentsLoading,
+    moderationCommentsError,
+    moderationCommentActionLoading,
+    moderationReports,
+    moderationReportCount,
+    moderationReportsLoading,
+    moderationReportsError,
+    moderationReportActionLoading,
+    moderationFeedback,
+    moderationFeedbackCount,
+    moderationFeedbackLoading,
+    moderationFeedbackError,
+    moderationFeedbackActionLoading,
+    loadModerationComments,
+    deleteModerationComment,
+    clearModerationCommentsError,
+    loadModerationReports,
+    resolveModerationReport,
+    clearModerationReportsError,
+    loadModerationFeedback,
+    updateModerationFeedback,
+    clearModerationFeedbackError
   }
 })

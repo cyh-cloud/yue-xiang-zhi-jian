@@ -11,6 +11,7 @@ import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
 import AdminAccountsView from '@/views/AdminAccountsView.vue'
 import AdminAnnouncementsView from '@/views/AdminAnnouncementsView.vue'
 import AdminDashboardView from '@/views/AdminDashboardView.vue'
+import AdminModerationView from '@/views/AdminModerationView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
 import AdminPointsPolicyView from '@/views/AdminPointsPolicyView.vue'
 import AdminRedemptionsView from '@/views/AdminRedemptionsView.vue'
@@ -448,7 +449,7 @@ const router = createRouter({
         {
           path: 'moderation',
           name: 'admin-moderation',
-          component: AdminRoutePlaceholder,
+          component: AdminModerationView,
           meta: adminMeta
         },
         {
