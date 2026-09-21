@@ -11,10 +11,49 @@ from app.admin_console.data_management import (
     get_managed_content,
     list_managed_content,
 )
+from app.admin_console.presets import (
+    DatabaseAgriPresetContentProvider,
+    DatabaseCraftPresetProvider,
+)
 from app.db import get_db
+from app.handcraft_inheritance.providers import set_teaching_video_provider
+from app.handcraft_inheritance.videos import (
+    VIDEO_UNAVAILABLE,
+    get_video_playback,
+    list_student_videos,
+)
 
 
 NOW = "2026-09-21T10:00:00+08:00"
+
+
+class DatabaseMirrorTeachingVideoProvider:
+    """Serve the `heritage_videos` rows as 05's provider side.
+
+    05's placeholder catalogue knows nothing about a console-created video, so
+    every playback read would end on a media mismatch instead of on the state
+    under test. Mirroring the database keeps the provider half of the playback
+    contract in step, the way the demo provider does for its own rows.
+    """
+
+    def list_videos(self, craft_key=None):
+        rows = get_db().execute("SELECT * FROM heritage_videos").fetchall()
+        return [
+            dict(row)
+            for row in rows
+            if craft_key is None or row["craft_key"] == craft_key
+        ]
+
+    def get_video(self, video_id):
+        row = get_db().execute(
+            "SELECT * FROM heritage_videos WHERE video_id = ?",
+            (video_id,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+    def get_review_status(self, video_id):
+        video = self.get_video(video_id)
+        return video["review_status"] if video is not None else None
 
 
 class AdminDataManagementTests(TestCase):
@@ -211,6 +250,69 @@ class AdminDataManagementTests(TestCase):
         )
         get_db().commit()
         return craft_key
+
+    def _make_agri_product(self, *, enabled: bool = True) -> str:
+        product_key = f"product_{self._next_id()}"
+        get_db().execute(
+            """
+            INSERT INTO admin_agri_products (
+                product_key, name, sort_order, is_enabled, version,
+                created_at, updated_at
+            )
+            VALUES (?, ?, 5, ?, 1, ?, ?)
+            """,
+            (product_key, "农产品名称", 1 if enabled else 0, NOW, NOW),
+        )
+        get_db().commit()
+        return product_key
+
+    def _make_success_case(self, *, enabled: bool = True) -> str:
+        case_id = f"case_{self._next_id()}"
+        get_db().execute(
+            """
+            INSERT INTO local_resource_success_cases (
+                case_id, title, summary, background, journey, lessons,
+                sort_order, published_at, updated_at, is_demo, is_enabled,
+                version
+            )
+            VALUES (?, ?, ?, ?, ?, ?, 5, ?, ?, 0, ?, 1)
+            """,
+            (
+                case_id,
+                "案例标题",
+                "案例摘要",
+                "案例背景",
+                "案例历程",
+                "案例启示",
+                NOW,
+                NOW,
+                1 if enabled else 0,
+            ),
+        )
+        get_db().commit()
+        return case_id
+
+    def _make_knowledge(self, *, enabled: bool = True) -> str:
+        knowledge_id = f"knowledge_{self._next_id()}"
+        get_db().execute(
+            """
+            INSERT INTO admin_assistant_feature_knowledge (
+                knowledge_id, title, body, feature_key, jump_target,
+                is_enabled, sort_order, version, created_at, updated_at
+            )
+            VALUES (?, ?, ?, 'course_catalog', '/courses', ?, 5, 1, ?, ?)
+            """,
+            (
+                knowledge_id,
+                "功能说明标题",
+                "功能说明正文",
+                1 if enabled else 0,
+                NOW,
+                NOW,
+            ),
+        )
+        get_db().commit()
+        return knowledge_id
 
     def _make_review_record(
         self,
@@ -662,3 +764,184 @@ class AdminDataManagementTests(TestCase):
             }
         self.assertIn(kept_course, course_ids)
         self.assertNotIn(dropped_course, course_ids)
+
+    def test_tombstoned_video_disappears_from_student_reads(self):
+        video_id = self._create_content("handcraft_video", "approved")
+        set_teaching_video_provider(
+            self.app, DatabaseMirrorTeachingVideoProvider()
+        )
+        with self.app.app_context():
+            self.assertIn(
+                video_id,
+                {item["video_id"] for item in list_student_videos("test_craft")},
+            )
+            self.assertTrue(get_video_playback(video_id)["available"])
+
+        response = self.super_admin.delete(
+            f"/api/admin/content/handcraft_video/{video_id}",
+            json={"expected_version": 1},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.get_json())
+
+        with self.app.app_context():
+            self.assertNotIn(
+                video_id,
+                {
+                    item["video_id"]
+                    for item in list_student_videos("test_craft")
+                },
+            )
+            playback = get_video_playback(video_id)
+            self.assertFalse(playback["available"])
+            self.assertEqual(
+                playback["unavailable_reason"], VIDEO_UNAVAILABLE
+            )
+            row = get_db().execute(
+                """
+                SELECT review_status, published_at, deleted_at
+                FROM heritage_videos WHERE video_id = ?
+                """,
+                (video_id,),
+            ).fetchone()
+        self.assertEqual(row["review_status"], "offline")
+        self.assertIsNone(row["published_at"])
+        self.assertIsNotNone(row["deleted_at"])
+
+    def test_managed_video_list_projection_carries_content_type(self):
+        video_id = self._create_content("handcraft_video", "approved")
+        with self.app.app_context():
+            rows = list_managed_content("handcraft_video", {})
+            detail = get_managed_content("handcraft_video", video_id)
+        row = next(item for item in rows if item["video_id"] == video_id)
+        self.assertEqual(row["content_type"], "handcraft_video")
+        self.assertEqual(row["content_type"], detail["content_type"])
+        # The list projection keeps every field the detail projection sends.
+        self.assertEqual(set(detail) - set(row), set())
+
+    def test_managed_preset_list_covers_every_preset_family(self):
+        with self.app.app_context():
+            craft_key = self._create_content("preset", "enabled")
+            product_key = self._make_agri_product()
+            case_id = self._make_success_case()
+            knowledge_id = self._make_knowledge()
+            rows = list_managed_content("preset", {})
+        by_id = {row["id"]: row for row in rows}
+        self.assertEqual(
+            {row["preset_category"] for row in rows},
+            {
+                "agri_products",
+                "agri_calendar",
+                "pest_knowledge",
+                "handcraft_crafts",
+                "success_cases",
+                "assistant_knowledge",
+            },
+        )
+        addressed = {
+            "agri_products": f"agri_products:{product_key}",
+            "success_cases": f"success_cases:{case_id}",
+            "assistant_knowledge": f"assistant_knowledge:{knowledge_id}",
+            "handcraft_crafts": craft_key,
+        }
+        for category, content_id in addressed.items():
+            row = by_id[content_id]
+            self.assertEqual(row["content_type"], "preset")
+            self.assertEqual(row["preset_category"], category)
+            self.assertTrue(row["name"])
+            self.assertTrue(row["is_enabled"])
+            self.assertEqual(row["version"], 1)
+            self.assertEqual(row["updated_at"], NOW)
+        # Every family except the craft one encodes its family in the id.
+        for row in rows:
+            if row["preset_category"] == "handcraft_crafts":
+                self.assertEqual(row["craft_key"], row["id"])
+                self.assertNotIn(":", row["id"])
+            else:
+                self.assertTrue(
+                    row["id"].startswith(f"{row['preset_category']}:")
+                )
+
+    def test_preset_delete_dispatches_to_non_craft_family_disable(self):
+        with self.app.app_context():
+            product_key = self._make_agri_product()
+            content_id = f"agri_products:{product_key}"
+            provider = DatabaseAgriPresetContentProvider()
+            visible_before = provider.get_product(product_key)
+            detail_before = get_managed_content("preset", content_id)
+        self.assertIsNotNone(visible_before)
+        self.assertTrue(detail_before["is_enabled"])
+        self.assertEqual(detail_before["preset_category"], "agri_products")
+
+        conflict = self.super_admin.delete(
+            f"/api/admin/content/preset/{content_id}",
+            json={"expected_version": 999},
+        )
+        self.assertEqual(conflict.status_code, 409, msg=conflict.get_json())
+
+        response = self.super_admin.delete(
+            f"/api/admin/content/preset/{content_id}",
+            json={"expected_version": 1},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.get_json())
+
+        with self.app.app_context():
+            rows = {row["id"]: row for row in list_managed_content("preset", {})}
+            detail_after = get_managed_content("preset", content_id)
+            row = get_db().execute(
+                """
+                SELECT is_enabled, version FROM admin_agri_products
+                WHERE product_key = ?
+                """,
+                (product_key,),
+            ).fetchone()
+            provider = DatabaseAgriPresetContentProvider()
+            visible_after = provider.get_product(product_key)
+            consumer_keys = {item["key"] for item in provider.list_products()}
+            audit = int(
+                get_db()
+                .execute(
+                    """
+                    SELECT COUNT(*) FROM admin_audit_log
+                    WHERE action = 'disable_agri_product_preset'
+                      AND target_type = 'agri_product' AND target_id = ?
+                    """,
+                    (product_key,),
+                )
+                .fetchone()[0]
+            )
+        # The console keeps listing the disabled row; the consumer does not.
+        self.assertIn(content_id, rows)
+        self.assertFalse(rows[content_id]["is_enabled"])
+        self.assertFalse(detail_after["is_enabled"])
+        self.assertEqual(detail_after["version"], 2)
+        # The stable id survives the logical delete, version bumped.
+        self.assertEqual(row["is_enabled"], 0)
+        self.assertEqual(row["version"], 2)
+        self.assertIsNone(visible_after)
+        self.assertNotIn(product_key, consumer_keys)
+        self.assertEqual(audit, 1)
+
+    def test_preset_craft_family_still_disables_through_bare_stable_id(self):
+        with self.app.app_context():
+            craft_key = self._create_content("preset", "enabled")
+            row = {
+                item["id"]: item
+                for item in list_managed_content("preset", {})
+            }[craft_key]
+            visible_before = DatabaseCraftPresetProvider().get_craft(craft_key)
+        self.assertEqual(row["id"], craft_key)
+        self.assertEqual(row["craft_key"], craft_key)
+        self.assertIsNotNone(visible_before)
+
+        response = self.super_admin.delete(
+            f"/api/admin/content/preset/{craft_key}",
+            json={"expected_version": 1},
+        )
+        self.assertEqual(response.status_code, 200, msg=response.get_json())
+
+        with self.app.app_context():
+            detail = get_managed_content("preset", craft_key)
+            visible_after = DatabaseCraftPresetProvider().get_craft(craft_key)
+        self.assertFalse(detail["is_enabled"])
+        self.assertEqual(detail["version"], 2)
+        self.assertIsNone(visible_after)

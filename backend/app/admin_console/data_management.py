@@ -153,13 +153,6 @@ def _comment_row(db: sqlite3.Connection, comment_id: str) -> sqlite3.Row | None:
     ).fetchone()
 
 
-def _craft_row(db: sqlite3.Connection, craft_key: str) -> sqlite3.Row | None:
-    return db.execute(
-        "SELECT * FROM admin_handcraft_crafts WHERE craft_key = ?",
-        (craft_key,),
-    ).fetchone()
-
-
 # --- payload serializers -----------------------------------------------------
 
 
@@ -250,17 +243,6 @@ def _comment_payload(row: sqlite3.Row) -> dict:
     }
 
 
-def _craft_payload(row: sqlite3.Row) -> dict:
-    return {
-        "content_type": "preset",
-        "craft_key": str(row["craft_key"]),
-        "name": str(row["name"]),
-        "is_enabled": bool(row["is_enabled"]),
-        "version": int(row["version"]),
-        "updated_at": str(row["updated_at"]),
-    }
-
-
 # --- read surface ------------------------------------------------------------
 
 
@@ -303,7 +285,14 @@ def list_managed_content(content_type: str, filters: dict) -> list[dict]:
         ).fetchall()
         items = [_job_payload(row) for row in rows]
     elif normalized_type == "handcraft_video":
-        items = list_active_teaching_videos()
+        # 05's `_active_video_payload` has no `content_type` key, so the list
+        # projection would not match the get projection built from
+        # `_video_payload`. The key is added here instead of in 05 because this
+        # console owns the managed read surface; every provider field is kept.
+        items = [
+            {"content_type": "handcraft_video", **video}
+            for video in list_active_teaching_videos()
+        ]
     elif normalized_type == "comment":
         rows = db.execute(
             """
@@ -313,13 +302,7 @@ def list_managed_content(content_type: str, filters: dict) -> list[dict]:
         ).fetchall()
         items = [_comment_payload(row) for row in rows]
     else:  # preset
-        rows = db.execute(
-            """
-            SELECT * FROM admin_handcraft_crafts
-            ORDER BY sort_order ASC, craft_key ASC
-            """
-        ).fetchall()
-        items = [_craft_payload(row) for row in rows]
+        items = _list_preset_rows()
     return _apply_filters(items, resolved)
 
 
@@ -379,8 +362,7 @@ def get_managed_content(content_type: str, content_id: str) -> dict | None:
     if normalized_type == "comment":
         row = _comment_row(db, content_id)
         return _comment_payload(row) if row is not None else None
-    row = _craft_row(db, content_id)
-    return _craft_payload(row) if row is not None else None
+    return _get_preset(content_id)
 
 
 class _VideoRowAdapter:
@@ -1214,11 +1196,19 @@ def _tombstone_video(
             code="video_version_conflict",
             video_id=video_id,
         )
+        # Soft delete: the row survives for history, but 05's student read
+        # path (`list_student_videos`, `get_video_playback`) filters on
+        # `review_status = 'approved'` alone and never looks at `deleted_at`,
+        # so a tombstone that only set `deleted_at` would still be listed and
+        # played for learners. Moving the row to the `offline` enum and
+        # clearing `published_at` closes that hole, while `deleted_at` drops it
+        # from the admin list, queue and dashboard.
         now = platform_now_iso()
         cursor = db.execute(
             """
             UPDATE heritage_videos
-            SET deleted_at = ?, version = version + 1, updated_at = ?
+            SET review_status = 'offline', published_at = NULL,
+                deleted_at = ?, version = version + 1, updated_at = ?
             WHERE video_id = ? AND version = ? AND deleted_at IS NULL
             """,
             (now, now, video_id, expected_version),
@@ -1286,19 +1276,186 @@ def _hide_comment(
     }
 
 
-# --- preset (handcraft craft presets) ----------------------------------------
+# --- preset (six managed families) -------------------------------------------
+
+
+PRESET_CATEGORIES = frozenset(
+    {
+        "agri_products",
+        "agri_calendar",
+        "pest_knowledge",
+        "handcraft_crafts",
+        "success_cases",
+        "assistant_knowledge",
+    }
+)
+
+# A fixed order keeps the union projection stable for the console.
+PRESET_CATEGORY_ORDER = (
+    "agri_products",
+    "agri_calendar",
+    "pest_knowledge",
+    "handcraft_crafts",
+    "success_cases",
+    "assistant_knowledge",
+)
+
+# Every family spells its stable key differently, so the union projection and
+# the addressing of one row need to know each spelling.
+PRESET_ID_FIELDS = {
+    "agri_products": "product_key",
+    "agri_calendar": "item_id",
+    "pest_knowledge": "item_id",
+    "handcraft_crafts": "craft_key",
+    # A success case keeps 06's frozen read shape, which spells its stable id
+    # `id` instead of `case_id`.
+    "success_cases": "id",
+    "assistant_knowledge": "knowledge_id",
+}
+
+# `handcraft_crafts` is the family this console started from, and it keeps its
+# bare `craft_key`: the craft-only projection, its routes and its tests already
+# address a craft that way, so prefixing it would break them for no gain. Every
+# other family encodes `<family>:<stable_id>`, which keeps one mixed list
+# addressable while resolving back to exactly one family on the way in.
+PRESET_ID_SEPARATOR = ":"
+PRESET_BARE_CATEGORY = "handcraft_crafts"
+
+
+def _preset_family_apis() -> dict[str, tuple]:
+    """Map each preset family to its list and logical-disable entry points.
+
+    Both halves stay in `presets.py`: the console reads through the same
+    projections the consumer modules read, and a delete still delegates to the
+    Task 21/22 disable that owns the optimistic lock, the stable-id retention
+    and the before/after audit row.
+    """
+    from app.admin_console.presets import (
+        disable_agri_calendar_preset,
+        disable_agri_product_preset,
+        disable_case_preset,
+        disable_craft_preset,
+        disable_knowledge_preset,
+        disable_pest_knowledge_preset,
+        list_agri_calendar_presets,
+        list_agri_product_presets,
+        list_case_presets,
+        list_craft_presets,
+        list_knowledge_presets,
+        list_pest_knowledge_presets,
+    )
+
+    return {
+        "agri_products": (
+            list_agri_product_presets,
+            disable_agri_product_preset,
+        ),
+        "agri_calendar": (
+            list_agri_calendar_presets,
+            disable_agri_calendar_preset,
+        ),
+        "pest_knowledge": (
+            list_pest_knowledge_presets,
+            disable_pest_knowledge_preset,
+        ),
+        "handcraft_crafts": (list_craft_presets, disable_craft_preset),
+        "success_cases": (list_case_presets, disable_case_preset),
+        "assistant_knowledge": (
+            list_knowledge_presets,
+            disable_knowledge_preset,
+        ),
+    }
+
+
+def _encode_preset_id(category: str, stable_id: str) -> str:
+    if category == PRESET_BARE_CATEGORY:
+        return stable_id
+    return f"{category}{PRESET_ID_SEPARATOR}{stable_id}"
+
+
+def _decode_preset_id(content_id: object) -> tuple[str, str]:
+    """Split a preset content id into its family and bare stable id."""
+    raw = str(content_id or "").strip()
+    if PRESET_ID_SEPARATOR not in raw:
+        # No prefix means the craft family, which never carried one.
+        return PRESET_BARE_CATEGORY, raw
+    category, _, stable_id = raw.partition(PRESET_ID_SEPARATOR)
+    if category in PRESET_CATEGORIES and stable_id:
+        return category, stable_id
+    raise _not_found("预置内容不存在", "preset_not_found", content_id=raw)
+
+
+def _preset_label(entry: dict) -> str:
+    for field in ("name", "title", "pest_name"):
+        value = entry.get(field)
+        if value:
+            return str(value)
+    # A calendar row has no label of its own: it is one month of one product.
+    product_key = entry.get("product_key")
+    if product_key is not None and entry.get("month") is not None:
+        return f"{product_key} {entry['month']}月"
+    return ""
+
+
+def _preset_row(category: str, entry: dict) -> dict:
+    stable_id = str(entry[PRESET_ID_FIELDS[category]])
+    row = {
+        "content_type": "preset",
+        "preset_category": category,
+        "id": _encode_preset_id(category, stable_id),
+        "stable_id": stable_id,
+        # Each family spells its label differently, so the union projection
+        # normalizes it to `name` for the console table and the keyword filter.
+        "name": _preset_label(entry),
+        "sort_order": int(entry["sort_order"]),
+        "is_enabled": bool(entry["is_enabled"]),
+        "version": int(entry["version"]),
+        "updated_at": str(entry["updated_at"]),
+    }
+    if category == PRESET_BARE_CATEGORY:
+        row["craft_key"] = stable_id
+    return row
+
+
+def _list_preset_rows() -> list[dict]:
+    apis = _preset_family_apis()
+    rows: list[dict] = []
+    for category in PRESET_CATEGORY_ORDER:
+        entries = apis[category][0]()
+        rows.extend(_preset_row(category, entry) for entry in entries)
+    return rows
+
+
+def _preset_entry(category: str, stable_id: str) -> dict | None:
+    entries = _preset_family_apis()[category][0]()
+    field = PRESET_ID_FIELDS[category]
+    return next(
+        (entry for entry in entries if str(entry[field]) == stable_id),
+        None,
+    )
+
+
+def _get_preset(content_id: object) -> dict | None:
+    """Read one preset row of any family, disabled rows included."""
+    category, stable_id = _decode_preset_id(content_id)
+    entry = _preset_entry(category, stable_id)
+    if entry is None:
+        return None
+    # The union keys come first so a family field can never shadow them; the
+    # family entry follows so the detail projection keeps every domain field.
+    return {**_preset_row(category, entry), **entry}
 
 
 def _disable_preset(
     actor_id: int,
-    craft_key: str,
+    content_id: str,
     expected_version: int,
 ) -> dict:
-    from app.admin_console.presets import disable_craft_preset
-
-    # Delegates to Task 21/22 logical disable, which owns the optimistic
+    category, stable_id = _decode_preset_id(content_id)
+    disabler = _preset_family_apis()[category][1]
+    # Delegates to the family's logical disable, which owns the optimistic
     # lock, the stable-id retention and the before/after audit row.
-    return disable_craft_preset(actor_id, craft_key, expected_version)
+    return disabler(actor_id, stable_id, expected_version)
 
 
 _CORRECT_HANDLERS = {
