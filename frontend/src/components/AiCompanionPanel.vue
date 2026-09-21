@@ -1,15 +1,37 @@
 <script setup lang="ts">
 import { Send, X } from 'lucide-vue-next'
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 
 import type { LocalDialectCode } from '@/api/types'
 import { useAiCompanionStore } from '@/stores/aiCompanion'
 import { useAuthStore } from '@/stores/auth'
 
+import AiCompanionHistory from './AiCompanionHistory.vue'
 import AiCompanionMessage from './AiCompanionMessage.vue'
 import VoiceInputButton from './VoiceInputButton.vue'
 
 type PanelView = 'chat' | 'history'
+
+// tab / tabpanel 成对绑定，供 aria-controls 与 aria-labelledby 引用。
+const PANEL_TABS: ReadonlyArray<{
+  view: PanelView
+  tabId: string
+  panelId: string
+  label: string
+}> = [
+  {
+    view: 'chat',
+    tabId: 'ai-companion-tab-chat',
+    panelId: 'ai-companion-chat-panel',
+    label: '对话'
+  },
+  {
+    view: 'history',
+    tabId: 'ai-companion-tab-history',
+    panelId: 'ai-companion-history-panel',
+    label: '历史会话'
+  }
+]
 
 const RECOGNITION_FAILURE_MESSAGE = '未能识别，请重说或改用文字'
 const MAX_QUESTION_LENGTH = 2000
@@ -30,6 +52,18 @@ const companion = useAiCompanionStore()
 
 const rootRef = ref<HTMLElement | null>(null)
 const draftRef = ref<HTMLTextAreaElement | null>(null)
+const tablistRef = ref<HTMLElement | null>(null)
+
+// 每次面板打开只从服务端取一次历史；切 tab 不重复请求，关闭再打开重新加载。
+const historyLoaded = ref(false)
+
+async function ensureConversationsLoaded() {
+  if (historyLoaded.value) {
+    return
+  }
+  historyLoaded.value = true
+  await companion.loadConversations()
+}
 
 const draftModel = computed({
   get: () => companion.draft,
@@ -65,7 +99,42 @@ function handleKeydown(event: KeyboardEvent) {
 
 function selectView(view: PanelView) {
   companion.activeView = view
+  if (view === 'history') {
+    void ensureConversationsLoaded()
+  }
 }
+
+// 左右方向键在 tablist 内移动并选中相邻视图，未选中的 tab 移出 tab 序列。
+function handleTabKeydown(event: KeyboardEvent) {
+  const offset =
+    event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
+  if (offset === 0) {
+    return
+  }
+  event.preventDefault()
+  const currentIndex = PANEL_TABS.findIndex(
+    tab => tab.view === companion.activeView
+  )
+  const nextTab =
+    PANEL_TABS[(currentIndex + offset + PANEL_TABS.length) % PANEL_TABS.length]
+  selectView(nextTab.view)
+  void nextTick(() => {
+    tablistRef.value
+      ?.querySelector<HTMLButtonElement>(`#${nextTab.tabId}`)
+      ?.focus()
+  })
+}
+
+watch(
+  () => companion.panelOpen,
+  open => {
+    if (!open) {
+      return
+    }
+    historyLoaded.value = false
+    void ensureConversationsLoaded()
+  }
+)
 
 function selectDialect(code: LocalDialectCode) {
   companion.dialectCode = code
@@ -107,6 +176,9 @@ async function submitQuestion() {
 
 onMounted(() => {
   rootRef.value?.focus()
+  if (companion.panelOpen) {
+    void ensureConversationsLoaded()
+  }
 })
 </script>
 
@@ -132,26 +204,27 @@ onMounted(() => {
       </button>
     </header>
 
-    <div class="ai-companion-panel-tabs" role="tablist" aria-label="AI 学伴视图">
+    <div
+      ref="tablistRef"
+      class="ai-companion-panel-tabs"
+      role="tablist"
+      aria-label="AI 学伴视图"
+      @keydown="handleTabKeydown"
+    >
       <button
+        v-for="tab in PANEL_TABS"
+        :id="tab.tabId"
+        :key="tab.view"
         type="button"
         role="tab"
         class="ai-companion-panel-tab"
-        :aria-selected="companion.activeView === 'chat'"
-        :data-active="companion.activeView === 'chat'"
-        @click="selectView('chat')"
+        :aria-selected="companion.activeView === tab.view"
+        :aria-controls="tab.panelId"
+        :tabindex="companion.activeView === tab.view ? 0 : -1"
+        :data-active="companion.activeView === tab.view"
+        @click="selectView(tab.view)"
       >
-        对话
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="ai-companion-panel-tab"
-        :aria-selected="companion.activeView === 'history'"
-        :data-active="companion.activeView === 'history'"
-        @click="selectView('history')"
-      >
-        历史会话
+        {{ tab.label }}
       </button>
     </div>
 
@@ -160,6 +233,9 @@ onMounted(() => {
         v-if="companion.activeView === 'chat'"
         class="ai-companion-panel-scroll"
         data-test="ai-companion-chat-region"
+        role="tabpanel"
+        id="ai-companion-chat-panel"
+        aria-labelledby="ai-companion-tab-chat"
       >
         <slot name="chat">
           <p v-if="companion.messages.length === 0" class="ai-companion-empty">
@@ -184,8 +260,13 @@ onMounted(() => {
         v-else
         class="ai-companion-panel-scroll"
         data-test="ai-companion-history-region"
+        role="tabpanel"
+        id="ai-companion-history-panel"
+        aria-labelledby="ai-companion-tab-history"
       >
-        <slot name="history" />
+        <slot name="history">
+          <AiCompanionHistory />
+        </slot>
       </div>
     </div>
 
@@ -273,6 +354,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   width: min(420px, calc(100vw - 32px));
+  /* 旧 Safari 不识别 svh，先给一条 vh 兜底，再用 svh 覆盖。 */
+  height: min(680px, calc(100vh - 96px));
   height: min(680px, calc(100svh - 96px));
   border: 1px solid var(--ark-line-strong);
   border-radius: var(--ark-radius);
