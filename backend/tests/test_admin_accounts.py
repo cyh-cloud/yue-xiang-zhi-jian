@@ -169,6 +169,80 @@ class AdminAccountTests(TestCase):
         self.assertNotIn("password", audits[0]["after_json"])
         self.assertNotIn("password_hash", audits[0]["after_json"])
 
+    def test_password_reset_survives_notification_failure_then_retries(self):
+        actor_id = self._create_user("root-admin", "super_admin")
+        target_id = self._create_user(
+            "enterprise-reset",
+            "enterprise",
+            password="password8",
+        )
+        self.app.config["INITIAL_SUPER_ADMIN_PASSWORD"] = "resetpass8"
+        client, _ = self._login("root-admin")
+
+        # The first delivery fails, yet the reset is committed: the version is
+        # bumped and the new password logs in; only the shared outbox row is
+        # left pending, so the failure is never surfaced as an error.
+        with patch(
+            "app.messaging.events.emit_password_reset",
+            side_effect=OSError("gateway unreachable"),
+        ):
+            response = client.post(
+                f"/api/admin/accounts/{target_id}/password-reset",
+                json={"actor_id": actor_id + 100},
+            )
+        self.assertEqual(response.status_code, 200)
+        reset = response.get_json()
+        self.assertTrue(reset["success"])
+        self.assertEqual(
+            reset["event_id"],
+            f"admin-password-reset:{target_id}:2",
+        )
+
+        _, old_login = self._login("enterprise-reset", "password8")
+        self.assertEqual(old_login.status_code, 401)
+        _, new_login = self._login("enterprise-reset", "resetpass8")
+        self.assertEqual(new_login.status_code, 200)
+
+        with self.app.app_context():
+            row = get_db().execute(
+                """
+                SELECT status, attempts, event_id
+                FROM admin_notification_outbox
+                WHERE event_type = 'password_reset'
+                """,
+            ).fetchone()
+        self.assertEqual(row["status"], "pending")
+        self.assertEqual(row["attempts"], 1)
+        self.assertEqual(row["event_id"], reset["event_id"])
+
+        # After the deliverer recovers, the shared retry delivers it exactly
+        # once on the frozen event id.
+        from app.admin_console.outbox import retry_admin_notifications
+
+        with self.app.app_context():
+            summary = retry_admin_notifications()
+        self.assertEqual(summary["delivered"], 1)
+
+        with self.app.app_context():
+            row = get_db().execute(
+                """
+                SELECT status, attempts
+                FROM admin_notification_outbox
+                WHERE event_type = 'password_reset'
+                """,
+            ).fetchone()
+            notifications = get_db().execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM system_notifications
+                WHERE recipient_id = ? AND event_type = 'password_reset'
+                """,
+                (target_id,),
+            ).fetchone()["count"]
+        self.assertEqual(row["status"], "sent")
+        self.assertEqual(row["attempts"], 2)
+        self.assertEqual(notifications, 1)
+
     def test_account_list_and_detail_apply_role_keyword_filters_without_secrets(self):
         actor_id = self._create_user("root-admin", "super_admin")
         enterprise_id = self._create_user(

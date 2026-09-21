@@ -746,18 +746,121 @@ class AdminAnnouncementTests(TestCase):
         created = self._create_announcement(target_roles=["government"])
         response = self._publish(created["announcement_id"])
 
+        # The publish is committed regardless; only the frozen, empty recipient
+        # list drives the outbox row to a terminal failure, so the retry sweep
+        # never keeps re-attempting a row that can no longer succeed.
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["changed"])
         self.assertEqual(response.get_json()["delivery"]["recipient_count"], 0)
+        self.assertEqual(response.get_json()["delivery"]["failed"], 1)
         self.assertEqual(self.notification_count("system_announcement"), 0)
 
         outbox = self.outbox_rows(created["event_id"])
         self.assertEqual(len(outbox), 1)
-        self.assertEqual(outbox[0]["status"], "pending")
+        self.assertEqual(outbox[0]["status"], "failed")
+        self.assertEqual(outbox[0]["attempts"], 1)
+        self.assertIsNone(outbox[0]["sent_at"])
+        self.assertIn("收件人", outbox[0]["last_error"])
         self.assertEqual(
             json.loads(outbox[0]["payload_json"])["recipient_ids"],
             [],
         )
+
+    def test_retry_sweep_delivers_pending_announcement_exactly_once(self):
+        from app.admin_console.outbox import retry_admin_notifications
+
+        created = self._create_announcement()
+        with patch.object(
+            system_announcements,
+            "emit_system_announcement",
+            side_effect=OSError("gateway unreachable"),
+        ):
+            response = self._publish(created["announcement_id"])
+        self.assertEqual(response.status_code, 200)
+
+        outbox = self.outbox_rows(created["event_id"])
+        self.assertEqual(outbox[0]["status"], "pending")
+        self.assertEqual(outbox[0]["attempts"], 1)
+        self.assertEqual(self.notification_count("system_announcement"), 0)
+
+        # The event id is frozen in the payload, so a scan retry delivers the
+        # same event to the recipient side exactly once and marks the row sent.
+        with self.app.app_context():
+            summary = retry_admin_notifications()
+        self.assertEqual(summary["delivered"], 1)
+        self.assertEqual(self.notification_count("system_announcement"), 1)
+
+        resent = self.outbox_rows(created["event_id"])
+        self.assertEqual(resent[0]["status"], "sent")
+        self.assertEqual(resent[0]["attempts"], 2)
+
+        # A second sweep finds nothing pending and re-notifies nobody.
+        with self.app.app_context():
+            retry_admin_notifications()
+        self.assertEqual(self.notification_count("system_announcement"), 1)
+
+    def test_outbox_accounting_db_error_does_not_fail_publish(self):
+        from app.admin_console import outbox
+
+        created = self._create_announcement()
+
+        class _AccountingFailureConnection:
+            def __init__(self, real):
+                self._real = real
+
+            def execute(self, sql, *args, **kwargs):
+                if "status = 'sent'" in sql:
+                    raise sqlite3.OperationalError("simulated accounting failure")
+                return self._real.execute(sql, *args, **kwargs)
+
+            def __enter__(self):
+                self._real.__enter__()
+                return self
+
+            def __exit__(self, *exc):
+                return self._real.__exit__(*exc)
+
+        with self.app.app_context():
+            proxy = _AccountingFailureConnection(get_db())
+            with patch.object(outbox, "get_db", return_value=proxy):
+                result = system_announcements.publish_announcement(
+                    self.super_admin_id,
+                    created["announcement_id"],
+                )
+
+        # The emit reached 02 and the notification was persisted, but only the
+        # sent-mark accounting write failed: the publish still reports success
+        # and the row stays pending, instead of escaping as a spurious 500.
+        self.assertTrue(result["changed"])
+        self.assertEqual(result["delivery"]["delivered"], 1)
+        self.assertEqual(self.notification_count("system_announcement"), 1)
+        self.assertEqual(
+            self.outbox_rows(created["event_id"])[0]["status"], "pending"
+        )
+
+    def test_announcements_list_flushes_pending_outbox_via_hook(self):
+        created = self._create_announcement()
+        with patch.object(
+            system_announcements,
+            "emit_system_announcement",
+            side_effect=OSError("gateway unreachable"),
+        ):
+            self._publish(created["announcement_id"])
+
+        self.assertEqual(self.notification_count("system_announcement"), 0)
+        self.assertEqual(
+            self.outbox_rows(created["event_id"])[0]["status"], "pending"
+        )
+
+        # No manual retry call: reading the announcements list as a super admin
+        # lets the endpoint's automatic-retry hook deliver the pending row --
+        # exactly the self-driven retry the publish-failure UI copy promises.
+        listed = self.super_admin.get("/api/admin/announcements")
+        self.assertEqual(listed.status_code, 200)
+        self.assertEqual(
+            self.outbox_rows(created["event_id"])[0]["status"], "sent"
+        )
+        self.assertEqual(self.notification_count("system_announcement"), 1)
 
     def test_create_and_publish_write_audit_rows(self):
         created = self._create_announcement()

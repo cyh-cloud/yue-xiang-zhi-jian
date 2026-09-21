@@ -13,9 +13,16 @@ from app.admin_console.errors import (
     ProviderNotFoundError,
     ProviderValidationError,
 )
+from app.admin_console.outbox import (
+    deliver_admin_notification,
+    enqueue_admin_notification,
+)
 from app.admin_console.time_utils import platform_now_iso
 from app.db import get_db
-from app.messaging.events import emit_system_announcement
+# `system_announcements` stays the announcement emit seam: the shared outbox
+# resolves this module global at delivery time, so a test that patches it still
+# governs announcement delivery (FR-111).
+from app.messaging.events import emit_system_announcement  # noqa: F401
 
 
 LOGGER = logging.getLogger(__name__)
@@ -63,14 +70,6 @@ def _not_found(announcement_id: str) -> ProviderNotFoundError:
         "公告不存在",
         code="announcement_not_found",
         details={"announcement_id": announcement_id},
-    )
-
-
-def _outbox_not_found(outbox_id: int) -> ProviderNotFoundError:
-    return ProviderNotFoundError(
-        "公告通知任务不存在",
-        code="announcement_outbox_not_found",
-        details={"outbox_id": outbox_id},
     )
 
 
@@ -325,42 +324,6 @@ def _outbox_payload(announcement: dict, recipient_ids: list[int]) -> dict:
     }
 
 
-def _enqueue_announcement_outbox(db: sqlite3.Connection, payload: dict) -> int:
-    """Write the one outbox row inside the caller's transaction.
-
-    `ON CONFLICT (event_type, event_id) DO NOTHING` plus the following
-    SELECT keeps the row count at one per announcement even when the
-    insert is attempted twice, so the idempotency key lives in the
-    database and not only in this function. Task 26 extracts this helper
-    into `admin_console/outbox.py` unchanged.
-    """
-    db.execute(
-        """
-        INSERT INTO admin_notification_outbox (
-            event_type, event_id, payload_json, status, attempts, last_error,
-            created_at, sent_at
-        )
-        VALUES (?, ?, ?, 'pending', 0, NULL, ?, NULL)
-        ON CONFLICT (event_type, event_id) DO NOTHING
-        """,
-        (
-            OUTBOX_EVENT_TYPE,
-            payload["event_id"],
-            json.dumps(payload, ensure_ascii=False),
-            platform_now_iso(),
-        ),
-    )
-    row = db.execute(
-        """
-        SELECT id
-        FROM admin_notification_outbox
-        WHERE event_type = ? AND event_id = ?
-        """,
-        (OUTBOX_EVENT_TYPE, payload["event_id"]),
-    ).fetchone()
-    return int(row["id"])
-
-
 def publish_announcement(actor_id: int, announcement_id: str) -> dict:
     """Publish one announcement through 02 and audit it (FR-113, FR-116).
 
@@ -399,9 +362,11 @@ def publish_announcement(actor_id: int, announcement_id: str) -> dict:
                 ),
             }
         recipient_ids = _active_recipient_ids(db, announcement["target_roles"])
-        outbox_id = _enqueue_announcement_outbox(
+        outbox_id = enqueue_admin_notification(
             db,
-            _outbox_payload(announcement, recipient_ids),
+            event_type=OUTBOX_EVENT_TYPE,
+            event_id=announcement["event_id"],
+            payload=_outbox_payload(announcement, recipient_ids),
         )
         db.execute(
             """
@@ -463,104 +428,21 @@ def list_announcements() -> list[dict]:
     return ordered
 
 
-def _load_outbox(outbox_id: int) -> sqlite3.Row | None:
-    return get_db().execute(
-        """
-        SELECT id, event_type, event_id, payload_json, status, attempts
-        FROM admin_notification_outbox
-        WHERE id = ?
-        """,
-        (outbox_id,),
-    ).fetchone()
-
-
-def _decode_outbox_payload(row: sqlite3.Row) -> dict | None:
-    try:
-        payload = json.loads(row["payload_json"])
-    except (TypeError, ValueError):
-        return None
-    return payload if isinstance(payload, dict) else None
-
-
-def _record_delivery_failure(outbox_id: int, error: Exception) -> None:
-    """Keep the row pending and retryable after a failed delivery."""
-    with get_db() as db:
-        db.execute(
-            """
-            UPDATE admin_notification_outbox
-            SET attempts = attempts + 1, last_error = ?
-            WHERE id = ? AND status = 'pending'
-            """,
-            (str(error)[:500], outbox_id),
-        )
-
-
-def _mark_delivery_sent(outbox_id: int) -> bool:
-    with get_db() as db:
-        cursor = db.execute(
-            """
-            UPDATE admin_notification_outbox
-            SET status = 'sent', attempts = attempts + 1, sent_at = ?,
-                last_error = NULL
-            WHERE id = ? AND status = 'pending'
-            """,
-            (platform_now_iso(), outbox_id),
-        )
-        return cursor.rowcount == 1
-
-
-def _emit_announcement(payload: dict) -> dict:
-    """Hand the broadcast to 02, the only notification boundary (FR-111)."""
-    return emit_system_announcement(
-        event_id=str(payload["event_id"]),
-        recipient_ids=[int(value) for value in payload.get("recipient_ids", [])],
-        announcement_id=str(payload["announcement_id"]),
-        title=str(payload["title"]),
-        body=str(payload["body"]),
-    )
 
 
 def deliver_announcement_notification(outbox_id: int) -> dict:
     """Deliver one queued announcement broadcast after the business commit.
 
-    This is the only place 011 talks to 02 for announcements. A failure is
-    recorded on the outbox row and reported in the summary instead of
-    raised, so an already committed publish survives it (FR-113). A row
-    whose target roles currently match nobody stays pending, because a
-    retry after such an account appears still has to reach it.
+    011 keeps this entry point importable for its existing callers and tests;
+    it now delegates to the shared outbox, which is the only place 011 talks
+    to 02 for announcements. Delivery failures are recorded on the outbox row
+    and reported through the summary instead of raised, so an already
+    committed publish survives them (FR-113). An announcement published with
+    no matching recipient reaches a terminal ``failed`` state, while a
+    transient failure leaves the row ``pending`` for
+    :func:`outbox.retry_admin_notifications`.
     """
-    row = _load_outbox(outbox_id)
-    if row is None:
-        raise _outbox_not_found(outbox_id)
-    if str(row["status"]) == "sent":
-        return _delivery_summary(delivered=0, recipient_count=0, failed=0)
-    payload = _decode_outbox_payload(row)
-    if payload is None:
-        _record_delivery_failure(int(row["id"]), ValueError("通知内容格式不正确"))
-        return _delivery_summary(delivered=0, recipient_count=0, failed=1)
-    recipient_ids = [int(value) for value in payload.get("recipient_ids", [])]
-    if not recipient_ids:
-        return _delivery_summary(delivered=0, recipient_count=0, failed=0)
-    try:
-        result = _emit_announcement(payload)
-    except Exception as error:
-        _record_delivery_failure(int(row["id"]), error)
-        LOGGER.warning(
-            "System announcement delivery deferred for outbox %s: %s",
-            outbox_id,
-            type(error).__name__,
-        )
-        return _delivery_summary(
-            delivered=0,
-            recipient_count=len(recipient_ids),
-            failed=1,
-        )
-    _mark_delivery_sent(int(row["id"]))
-    return _delivery_summary(
-        delivered=1,
-        recipient_count=int(result.get("created_count", len(recipient_ids))),
-        failed=0,
-    )
+    return deliver_admin_notification(outbox_id)
 
 
 __all__ = [

@@ -569,11 +569,39 @@ class AdminContentReviewTests(unittest.TestCase):
                 )
 
             self.assertEqual(approved["review_status"], "approved")
+            self.assertGreater(approved["outbox_id"], 0)
             self.assertEqual(self._job_row()["review_status"], "approved")
             outbox = self._outbox_rows()[0]
-            self.assertEqual(outbox["status"], "failed")
+            # A shared-outbox delivery failure stays retryable (pending), never
+            # terminal, because a later scan can still reach the submitter.
+            self.assertEqual(outbox["status"], "pending")
             self.assertEqual(outbox["attempts"], 1)
             self.assertIn("delivery unavailable", outbox["last_error"])
+
+            # Once the deliverer recovers, the scan retry pushes the same row to
+            # sent on the frozen event id and the submitter is notified once.
+            from app.admin_console.outbox import retry_admin_notifications
+
+            retry_admin_notifications()
+            resent = self._outbox_rows()[0]
+            self.assertEqual(resent["status"], "sent")
+            self.assertEqual(
+                resent["event_id"],
+                "review:job_position:job-1:v1:approve",
+            )
+            notifications = (
+                get_db()
+                .execute(
+                    """
+                    SELECT COUNT(*) AS count
+                    FROM system_notifications
+                    WHERE recipient_id = ?
+                    """,
+                    (self.enterprise_id,),
+                )
+                .fetchone()["count"]
+            )
+            self.assertEqual(notifications, 1)
 
     def test_stale_version_conflicts_without_state_or_outbox_change(self):
         with self.app.app_context():

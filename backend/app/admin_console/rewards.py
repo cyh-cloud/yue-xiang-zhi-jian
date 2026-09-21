@@ -1132,6 +1132,11 @@ def apply_fulfillment_action(
     the action name, records one admin audit row and projects 05's errors
     into its own boundary types; it never enqueues or delivers a second
     fulfillment notification.
+
+    Deliberately separate from the shared `admin_notification_outbox` sweep
+    in `admin_console/outbox.py`: 05's fulfillment outbox is a different table
+    with its own delivery and retry, so fulfillment events must never be
+    folded into the unified admin drain and risk a duplicate notification.
     """
     _admin_actor(actor)
     normalized_action = _required_text(action)

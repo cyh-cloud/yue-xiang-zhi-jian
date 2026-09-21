@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from flask import Blueprint, Flask, jsonify, request
 
 from app.admin_console.errors import (
@@ -11,6 +13,9 @@ from app.admin_console.errors import (
 )
 from app.db import get_db
 from app.session_manager import load_session
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 admin_console_bp = Blueprint(
@@ -36,6 +41,22 @@ def require_admin_session(*, roles: set[str]) -> dict:
             details={},
         )
     return session
+
+
+def _drain_notification_outbox() -> None:
+    """Best-effort sweep of pending 011 notifications, run after a role guard.
+
+    The announcements surface promises the platform retries a failed send on
+    its own, so reaching it flushes any row a delivery left pending. The sweep
+    is fully isolated: a failure here is logged and never changes the request
+    response.
+    """
+    try:
+        from app.admin_console.outbox import retry_admin_notifications
+
+        retry_admin_notifications()
+    except Exception:
+        LOGGER.exception("Notification outbox retry sweep failed")
 
 
 def _preset_expected_version():
@@ -816,6 +837,7 @@ def list_announcements_route():
     # and unoperable for an ordinary admin, so the guard runs before any
     # announcement row is read.
     require_admin_session(roles={"super_admin"})
+    _drain_notification_outbox()
     items = list_announcements()
     return jsonify(success=True, items=items, count=len(items))
 
@@ -866,6 +888,7 @@ def publish_announcement_route(announcement_id: str):
     from app.admin_console.system_announcements import publish_announcement
 
     session = require_admin_session(roles={"super_admin"})
+    _drain_notification_outbox()
     result = publish_announcement(int(session["id"]), announcement_id)
     return jsonify(success=True, **result)
 
