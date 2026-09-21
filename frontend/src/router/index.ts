@@ -13,6 +13,7 @@ import AdminAnnouncementsView from '@/views/AdminAnnouncementsView.vue'
 import AdminDashboardView from '@/views/AdminDashboardView.vue'
 import AdminModerationView from '@/views/AdminModerationView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
+import AdminPresetsView from '@/views/AdminPresetsView.vue'
 import AdminPointsPolicyView from '@/views/AdminPointsPolicyView.vue'
 import AdminRedemptionsView from '@/views/AdminRedemptionsView.vue'
 import AdminReviewView from '@/views/AdminReviewView.vue'
@@ -455,7 +456,7 @@ const router = createRouter({
         {
           path: 'presets',
           name: 'admin-presets',
-          component: AdminRoutePlaceholder,
+          component: AdminPresetsView,
           meta: adminMeta
         },
         {

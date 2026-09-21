@@ -180,6 +180,211 @@ export interface AdminFeedbackUpdateResponse {
   feedback: AdminUpdatedFeedbackRecord
 }
 
+export type AdminPresetCategory =
+  | 'agri_products'
+  | 'agri_calendar'
+  | 'pest_knowledge'
+  | 'handcraft_crafts'
+  | 'success_cases'
+  | 'assistant_knowledge'
+
+export interface AdminAgriProductPreset {
+  product_key: string
+  name: string
+  sort_order: number
+  is_enabled: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminAgriCalendarPreset {
+  item_id: string
+  product_key: string
+  month: number
+  tasks: string[]
+  management: string[]
+  solar_terms: string[]
+  reminder: string
+  sort_order: number
+  is_enabled: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminPestKnowledgePreset {
+  item_id: string
+  sort_order: number
+  pest_name: string
+  product_names: string[]
+  symptoms: string[]
+  aliases: string[]
+  answer: string
+  is_enabled: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminCraftPresetStep {
+  step_no: number
+  step_key: string
+  title: string
+  description: string
+  tips: string[]
+}
+
+export interface AdminCraftMaterialGuide {
+  name: string
+  reference_price: string
+  purchase_channel: string
+  precautions: string
+  taobao_keyword: string
+}
+
+export interface AdminHandcraftCraftPreset {
+  craft_key: string
+  name: string
+  introduction: string
+  steps: AdminCraftPresetStep[]
+  material_guide: AdminCraftMaterialGuide[]
+  is_demo: boolean
+  source_available: boolean
+  available: boolean
+  sort_order: number
+  is_enabled: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+// The 06 read shape names the stable id `id`, while the console write paths
+// call the same value `case_id`, so both spellings are kept apart here.
+export interface AdminSuccessCasePreset {
+  id: string
+  title: string
+  summary: string
+  background: string
+  journey: string
+  lessons: string
+  published_at: string
+  updated_at: string
+  is_demo: boolean
+  sort_order: number
+  is_enabled: boolean
+  source_available: boolean
+  version: number
+}
+
+export interface AdminAssistantKnowledgePreset {
+  knowledge_id: string
+  title: string
+  body: string
+  feature_key: string
+  jump_target: string
+  is_enabled: boolean
+  sort_order: number
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export type AdminPresetItem =
+  | AdminAgriProductPreset
+  | AdminAgriCalendarPreset
+  | AdminPestKnowledgePreset
+  | AdminHandcraftCraftPreset
+  | AdminSuccessCasePreset
+  | AdminAssistantKnowledgePreset
+
+export interface AdminAgriProductPresetPayload {
+  product_key?: string
+  name: string
+  sort_order?: number
+  is_enabled?: boolean
+  expected_version?: number
+}
+
+export interface AdminAgriCalendarPresetPayload {
+  product_key?: string
+  month?: number
+  tasks: string[]
+  management: string[]
+  solar_terms: string[]
+  reminder: string
+  sort_order?: number
+  is_enabled?: boolean
+  expected_version?: number
+}
+
+export interface AdminPestKnowledgePresetPayload {
+  item_id?: string
+  sort_order?: number
+  pest_name: string
+  product_names: string[]
+  symptoms: string[]
+  aliases: string[]
+  answer: string
+  is_enabled?: boolean
+  expected_version?: number
+}
+
+export interface AdminHandcraftCraftPresetPayload {
+  craft_key?: string
+  name: string
+  introduction: string
+  steps: AdminCraftPresetStep[]
+  material_guide: AdminCraftMaterialGuide[]
+  source_available?: boolean
+  sort_order?: number
+  is_enabled?: boolean
+  expected_version?: number
+}
+
+export interface AdminSuccessCasePresetPayload {
+  case_id?: string
+  title: string
+  summary: string
+  background: string
+  journey: string
+  lessons: string
+  sort_order?: number
+  published_at: string
+  is_enabled?: boolean
+  expected_version?: number
+}
+
+export interface AdminAssistantKnowledgePresetPayload {
+  knowledge_id?: string
+  title: string
+  body: string
+  feature_key: string
+  jump_target?: string
+  sort_order?: number
+  is_enabled?: boolean
+  expected_version?: number
+}
+
+export type AdminPresetPayload =
+  | AdminAgriProductPresetPayload
+  | AdminAgriCalendarPresetPayload
+  | AdminPestKnowledgePresetPayload
+  | AdminHandcraftCraftPresetPayload
+  | AdminSuccessCasePresetPayload
+  | AdminAssistantKnowledgePresetPayload
+
+export interface AdminPresetListResponse {
+  success: true
+  items: AdminPresetItem[]
+  count: number
+}
+
+export interface AdminPresetItemResponse {
+  success: true
+  item: AdminPresetItem
+}
+
 // One page of every moderation queue. The backend caps `limit` at 200 and
 // answers with the rows the page actually carries, so the console never
 // claims a total it was not given.
@@ -296,6 +501,18 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     created_from: '',
     created_to: ''
   })
+
+  // One category of presets is open at a time, so a single row set covers all
+  // six: the backend lists the whole table without paging, and every write
+  // answers with the stored row so the console can refresh what it shows.
+  const presetCategory = ref<AdminPresetCategory>('agri_products')
+  const presetItems = ref<AdminPresetItem[]>([])
+  const presetCount = ref(0)
+  const presetsLoading = ref(false)
+  const presetsError = ref('')
+  const presetActionLoading = ref(false)
+  const presetFormError = ref('')
+  const presetFormErrorCode = ref('')
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -1247,6 +1464,178 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     moderationFeedbackError.value = ''
   }
 
+  // The preset module reports a validation failure against the field that
+  // failed and a conflict against the stable id that already exists, so the
+  // console maps those codes to a sentence the operator can act on and lets
+  // the backend's own message through for everything else.
+  const PRESET_ERROR_CODES: Record<string, string> = {
+    agri_product_preset_conflict: '农产品稳定 ID 已存在，请更换后重试',
+    agri_calendar_preset_conflict: '该农产品当月农时已存在，请改月或改用既有条目',
+    pest_knowledge_preset_conflict: '病虫害条目 ID 已存在，请更换后重试',
+    craft_preset_conflict: '技艺键已存在，请更换后重试',
+    case_preset_conflict: '案例 ID 已存在，请更换后重试',
+    knowledge_preset_conflict: '知识条目 ID 已存在，请更换后重试',
+    agri_product_preset_not_found: '农产品条目不存在或已被其他管理员删除',
+    agri_calendar_preset_not_found: '农时条目不存在或已被其他管理员删除',
+    pest_knowledge_preset_not_found: '病虫害条目不存在或已被其他管理员删除',
+    craft_preset_not_found: '技艺内容不存在或已被其他管理员删除',
+    case_preset_not_found: '成功案例不存在或已被其他管理员删除',
+    knowledge_preset_not_found: '知识条目不存在或已被其他管理员删除',
+    agri_product_preset_version_conflict:
+      '农产品已被其他管理员修改，列表已刷新，请确认最新内容后重新保存',
+    agri_calendar_preset_version_conflict:
+      '农时条目已被其他管理员修改，列表已刷新，请确认最新内容后重新保存',
+    pest_knowledge_preset_version_conflict:
+      '病虫害条目已被其他管理员修改，列表已刷新，请确认最新内容后重新保存',
+    craft_preset_version_conflict:
+      '技艺内容已被其他管理员修改，列表已刷新，请确认最新内容后重新保存',
+    case_preset_version_conflict:
+      '成功案例已被其他管理员修改，列表已刷新，请确认最新内容后重新保存',
+    knowledge_preset_version_conflict:
+      '知识条目已被其他管理员修改，列表已刷新，请确认最新内容后重新保存',
+    demo_case_not_editable:
+      '演示案例由平台种子维护，每次启动都会被还原；请新建案例后再编辑或停用',
+    product_key_mismatch: '农产品稳定 ID 与请求路径不一致，不可修改',
+    item_id_mismatch: '条目稳定 ID 与请求路径不一致，不可修改',
+    craft_key_mismatch: '技艺键与请求路径不一致，不可修改',
+    case_id_mismatch: '案例稳定 ID 与请求路径不一致，不可修改',
+    knowledge_id_mismatch: '知识条目稳定 ID 与请求路径不一致，不可修改',
+    month_mismatch: '月份与既有农时条目不一致，不可修改'
+  }
+
+  function presetErrorMessage(caught: unknown, fallback: string): string {
+    if (caught instanceof ApiError && caught.code) {
+      const mapped = PRESET_ERROR_CODES[caught.code]
+      if (mapped) {
+        return mapped
+      }
+    }
+    return errorMessage(caught, fallback)
+  }
+
+  function presetErrorCode(caught: unknown): string {
+    return caught instanceof ApiError && caught.code ? caught.code : ''
+  }
+
+  async function loadPresets(
+    category: AdminPresetCategory
+  ): Promise<boolean> {
+    presetsLoading.value = true
+    presetsError.value = ''
+    presetCategory.value = category
+    try {
+      const response = await apiFetch<AdminPresetListResponse>(
+        `/api/admin/presets/${category}`
+      )
+      presetItems.value = response.items
+      presetCount.value = response.count
+      return true
+    } catch (caught) {
+      presetItems.value = []
+      presetCount.value = 0
+      presetsError.value = presetErrorMessage(caught, '预置内容加载失败')
+      return false
+    } finally {
+      presetsLoading.value = false
+    }
+  }
+
+  async function createPreset(
+    category: AdminPresetCategory,
+    payload: AdminPresetPayload
+  ): Promise<AdminPresetItem | null> {
+    presetActionLoading.value = true
+    presetFormError.value = ''
+    presetFormErrorCode.value = ''
+    try {
+      const response = await apiFetch<AdminPresetItemResponse>(
+        `/api/admin/presets/${category}`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        }
+      )
+      await loadPresets(category)
+      return response.item
+    } catch (caught) {
+      presetFormError.value = presetErrorMessage(caught, '创建预置内容失败')
+      presetFormErrorCode.value = presetErrorCode(caught)
+      return null
+    } finally {
+      presetActionLoading.value = false
+    }
+  }
+
+  async function updatePreset(
+    category: AdminPresetCategory,
+    itemId: string,
+    payload: AdminPresetPayload
+  ): Promise<AdminPresetItem | null> {
+    presetActionLoading.value = true
+    presetFormError.value = ''
+    presetFormErrorCode.value = ''
+    try {
+      const response = await apiFetch<AdminPresetItemResponse>(
+        `/api/admin/presets/${category}/${encodeURIComponent(itemId)}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        }
+      )
+      await loadPresets(category)
+      return response.item
+    } catch (caught) {
+      // A 409 means another admin already moved the row: reload so the edit
+      // form can re-seed its expected version from the server values, then
+      // keep the conflict text next to the form.
+      presetFormError.value = presetErrorMessage(caught, '保存预置内容失败')
+      presetFormErrorCode.value = presetErrorCode(caught)
+      if (caught instanceof ApiError && caught.status === 409) {
+        await loadPresets(category)
+      }
+      return null
+    } finally {
+      presetActionLoading.value = false
+    }
+  }
+
+  async function disablePreset(
+    category: AdminPresetCategory,
+    itemId: string,
+    expectedVersion: number
+  ): Promise<AdminPresetItem | null> {
+    presetActionLoading.value = true
+    presetsError.value = ''
+    try {
+      const search = new URLSearchParams({
+        expected_version: String(expectedVersion)
+      })
+      const response = await apiFetch<AdminPresetItemResponse>(
+        `/api/admin/presets/${category}/${encodeURIComponent(itemId)}?${search.toString()}`,
+        { method: 'DELETE' }
+      )
+      await loadPresets(category)
+      return response.item
+    } catch (caught) {
+      presetsError.value = presetErrorMessage(caught, '停用预置内容失败')
+      if (caught instanceof ApiError && caught.status === 409) {
+        await loadPresets(category)
+      }
+      return null
+    } finally {
+      presetActionLoading.value = false
+    }
+  }
+
+  function clearPresetsError() {
+    presetsError.value = ''
+  }
+
+  function clearPresetFormError() {
+    presetFormError.value = ''
+    presetFormErrorCode.value = ''
+  }
+
   return {
     dashboard,
     loading,
@@ -1351,6 +1740,20 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     clearModerationReportsError,
     loadModerationFeedback,
     updateModerationFeedback,
-    clearModerationFeedbackError
+    clearModerationFeedbackError,
+    presetCategory,
+    presetItems,
+    presetCount,
+    presetsLoading,
+    presetsError,
+    presetActionLoading,
+    presetFormError,
+    presetFormErrorCode,
+    loadPresets,
+    createPreset,
+    updatePreset,
+    disablePreset,
+    clearPresetsError,
+    clearPresetFormError
   }
 })
