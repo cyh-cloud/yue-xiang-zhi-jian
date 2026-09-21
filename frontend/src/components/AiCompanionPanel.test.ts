@@ -362,12 +362,40 @@ describe('AiCompanionPanel', () => {
 
     store.panelOpen = true
     await flushPromises()
-    // 重开面板本身不发请求，只有再次切到历史 tab 才重新拉取。
-    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+    // 重开时仍停留在历史 tab：watcher 复位 historyLoaded 后立即重新拉取一次。
+    expect(mockedApiFetch).toHaveBeenCalledTimes(2)
 
+    // 紧接着再点历史 tab 不重复请求：historyLoaded 已为 true。
     await wrapper.get('#ai-companion-tab-history').trigger('click')
     await flushPromises()
     expect(mockedApiFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('reloads history on reopen while on the history tab and preserves the conversation', async () => {
+    const { wrapper, store } = mountPanel()
+    store.conversationId = 'conversation-1'
+    store.messages = [message('user', '怎么投简历', 'platform_usage', null)]
+    store.error = 'AI 服务暂时不可用'
+
+    // 首次切到历史 tab 才加载一次。
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
+    await flushPromises()
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+
+    store.panelOpen = false
+    await flushPromises()
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+
+    // 关闭再打开且始终停留在历史 tab：不点击任何 tab，也应恰好再请求一次。
+    store.panelOpen = true
+    await flushPromises()
+    expect(mockedApiFetch).toHaveBeenCalledTimes(2)
+    expect(mockedApiFetch).toHaveBeenCalledWith(CONVERSATIONS_PATH)
+
+    // 重载只触及历史列表域，当前会话/消息/对话失败提示保持不变。
+    expect(store.conversationId).toBe('conversation-1')
+    expect(store.messages).toHaveLength(1)
+    expect(store.error).toBe('AI 服务暂时不可用')
   })
 
   it('retries the history load after a failure', async () => {

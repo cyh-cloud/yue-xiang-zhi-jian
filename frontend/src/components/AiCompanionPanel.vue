@@ -140,8 +140,12 @@ watch(
     if (!open) {
       return
     }
-    // 每次打开都允许重新拉取一次历史，但只在用户切到历史 tab 时才真正发请求。
+    // 每次打开都允许重新拉取一次历史；若打开时已停留在历史 tab，则立即重载，
+    // 满足"关闭再打开会从服务端重载历史"，无需用户再次点击 tab。
     historyLoaded.value = false
+    if (companion.activeView === 'history') {
+      void ensureConversationsLoaded()
+    }
   }
 )
 
