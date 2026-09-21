@@ -3,7 +3,7 @@ import { createPinia, setActivePinia, type Pinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import { apiFetch } from '@/api/client'
+import { ApiError, apiFetch } from '@/api/client'
 import type {
   AiCompanionConversation,
   AiCompanionIntent,
@@ -116,7 +116,8 @@ beforeEach(() => {
   pinia = createPinia()
   setActivePinia(pinia)
   sessionStorage.clear()
-  vi.clearAllMocks()
+  // reset 而不是 clear：清掉上一个用例可能残留的一次性返回值，避免泄漏。
+  vi.resetAllMocks()
   mockedApiFetch.mockResolvedValue({
     success: true,
     conversations: [],
@@ -293,7 +294,7 @@ describe('AiCompanionPanel', () => {
     )
   })
 
-  it('loads history once per open and keeps the current conversation', async () => {
+  it('loads history lazily on the first history tab and keeps the conversation', async () => {
     const conversations = [
       conversation('conversation-1', '怎么投简历', '2026-09-20T10:00:00+08:00')
     ]
@@ -304,40 +305,54 @@ describe('AiCompanionPanel', () => {
     const { wrapper, store } = mountPanel()
     store.conversationId = 'conversation-1'
     store.messages = [message('user', '怎么投简历', 'platform_usage', null)]
+    // 对话域已有失败提示：打开面板既不能清掉它，也不该顺手请求历史。
+    store.error = 'AI 服务暂时不可用'
     await flushPromises()
 
+    expect(mockedApiFetch).not.toHaveBeenCalled()
+
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
+    await flushPromises()
     expect(store.conversations).toEqual(conversations)
     expect(mockedApiFetch).toHaveBeenCalledTimes(1)
     expect(mockedApiFetch).toHaveBeenCalledWith(CONVERSATIONS_PATH)
-
-    // 再次切到历史会话不重复请求，重开面板也保留当前会话。
-    await wrapper.get('#ai-companion-tab-history').trigger('click')
-    await flushPromises()
     expect(mockedApiFetch).toHaveBeenCalledTimes(1)
     expect(
       wrapper.findAll('[data-test="ai-companion-history-item"]')
     ).toHaveLength(1)
+    expect(store.error).toBe('AI 服务暂时不可用')
     expect(store.conversationId).toBe('conversation-1')
     expect(store.messages).toHaveLength(1)
     expect(wrapper.find('[data-test="ai-companion-chat-region"]').exists()).toBe(
       false
     )
+
+    // 切回对话再切历史不重复请求，当前会话也不被重开动作替换。
+    await wrapper.get('#ai-companion-tab-chat').trigger('click')
+    await flushPromises()
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
+    await flushPromises()
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+    expect(store.conversationId).toBe('conversation-1')
   })
 
   it('reloads history from the server when the panel is remounted', async () => {
     const first = mountPanel()
+    await first.wrapper.get('#ai-companion-tab-history').trigger('click')
     await flushPromises()
     expect(mockedApiFetch).toHaveBeenCalledTimes(1)
     first.wrapper.unmount()
 
     const second = mountPanel()
+    await second.wrapper.get('#ai-companion-tab-history').trigger('click')
     await flushPromises()
     expect(mockedApiFetch).toHaveBeenCalledTimes(2)
     second.wrapper.unmount()
   })
 
   it('reloads history when a kept-mounted panel is reopened', async () => {
-    const { store } = mountPanel()
+    const { wrapper, store } = mountPanel()
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
     await flushPromises()
     expect(mockedApiFetch).toHaveBeenCalledTimes(1)
 
@@ -347,7 +362,32 @@ describe('AiCompanionPanel', () => {
 
     store.panelOpen = true
     await flushPromises()
+    // 重开面板本身不发请求，只有再次切到历史 tab 才重新拉取。
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
+    await flushPromises()
     expect(mockedApiFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries the history load after a failure', async () => {
+    mockedApiFetch.mockRejectedValueOnce(new ApiError('历史读取失败', 500))
+    const { wrapper, store } = mountPanel()
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
+    await flushPromises()
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+    expect(store.historyError).toBe('历史读取失败')
+    expect(store.error).toBe('')
+    expect(wrapper.find('[role="alert"]').text()).toContain('历史读取失败')
+
+    // 失败后切走再切回可以重新发起，成功后错误域清零。
+    await wrapper.get('#ai-companion-tab-chat').trigger('click')
+    await flushPromises()
+    await wrapper.get('#ai-companion-tab-history').trigger('click')
+    await flushPromises()
+    expect(mockedApiFetch).toHaveBeenCalledTimes(2)
+    expect(store.historyError).toBe('')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
   })
 
   it('lets a provided history slot replace the built-in view', async () => {

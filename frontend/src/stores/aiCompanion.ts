@@ -38,6 +38,8 @@ interface AiCompanionState {
   loading: boolean
   loadingHistory: boolean
   error: string
+  // 历史列表域的失败与对话域的失败分开：列表加载失败不能顶掉正在进行的对话。
+  historyError: string
   pendingRequest: PendingRequest | null
 }
 
@@ -123,6 +125,7 @@ export const useAiCompanionStore = defineStore('aiCompanion', {
     loading: false,
     loadingHistory: false,
     error: '',
+    historyError: '',
     pendingRequest: null
   }),
   actions: {
@@ -192,14 +195,14 @@ export const useAiCompanionStore = defineStore('aiCompanion', {
     },
     async loadConversations(): Promise<AiCompanionConversation[]> {
       this.loadingHistory = true
-      this.error = ''
+      this.historyError = ''
 
       try {
         const response = await apiFetch<ConversationsResponse>(CONVERSATIONS_PATH)
         this.conversations = response.conversations
         return this.conversations
       } catch (error) {
-        this.error = resolveRequestError(error)
+        this.historyError = resolveRequestError(error)
         return this.conversations
       } finally {
         this.loadingHistory = false

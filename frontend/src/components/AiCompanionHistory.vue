@@ -45,9 +45,12 @@ function intentLabel(intent: AiCompanionIntent): string {
 }
 
 async function selectConversation(conversationId: string) {
-  await companion.openConversation(conversationId)
-  // 重开只读本人会话，无论详情是否取回都回到对话视图，失败由 store.error 提示。
-  companion.activeView = 'chat'
+  const messages = await companion.openConversation(conversationId)
+  // openConversation 失败时会写 error 并原样返回既有消息；此时留在历史态，
+  // 让用户继续看到列表与失败提示，而不是被一篇旧会话顶掉。
+  if (messages.length > 0 && !companion.error) {
+    companion.activeView = 'chat'
+  }
 }
 </script>
 
@@ -61,11 +64,11 @@ async function selectConversation(conversationId: string) {
       正在加载历史会话
     </p>
     <div
-      v-else-if="companion.error"
+      v-else-if="companion.historyError"
       class="ai-companion-history-state ai-companion-history-state--error"
       role="alert"
     >
-      {{ companion.error }}
+      {{ companion.historyError }}
     </div>
     <p v-else-if="!hasConversations" class="ai-companion-history-state">
       暂无历史会话
@@ -87,7 +90,10 @@ async function selectConversation(conversationId: string) {
             <span class="ai-companion-history-item-intent">
               {{ intentLabel(item.last_intent) }}
             </span>
-            <time class="ai-companion-history-item-updated">
+            <time
+              :datetime="item.updated_at"
+              class="ai-companion-history-item-updated"
+            >
               {{ formatUpdated(item.updated_at) }}
             </time>
           </span>

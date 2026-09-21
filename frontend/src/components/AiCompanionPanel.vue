@@ -54,7 +54,7 @@ const rootRef = ref<HTMLElement | null>(null)
 const draftRef = ref<HTMLTextAreaElement | null>(null)
 const tablistRef = ref<HTMLElement | null>(null)
 
-// 每次面板打开只从服务端取一次历史；切 tab 不重复请求，关闭再打开重新加载。
+// 历史懒加载：每次面板打开复位标记，首次切到历史 tab 才向服务端取一次。
 const historyLoaded = ref(false)
 
 async function ensureConversationsLoaded() {
@@ -62,7 +62,16 @@ async function ensureConversationsLoaded() {
     return
   }
   historyLoaded.value = true
-  await companion.loadConversations()
+  try {
+    await companion.loadConversations()
+    // historyError 非空说明本次加载没成功，复位后允许再次切 tab 时重试。
+    if (companion.historyError) {
+      historyLoaded.value = false
+    }
+  } catch {
+    // loadConversations 自己已吞掉错误，这里只是防止将来改动把异常外溢。
+    historyLoaded.value = false
+  }
 }
 
 const draftModel = computed({
@@ -131,8 +140,8 @@ watch(
     if (!open) {
       return
     }
+    // 每次打开都允许重新拉取一次历史，但只在用户切到历史 tab 时才真正发请求。
     historyLoaded.value = false
-    void ensureConversationsLoaded()
   }
 )
 
@@ -176,9 +185,6 @@ async function submitQuestion() {
 
 onMounted(() => {
   rootRef.value?.focus()
-  if (companion.panelOpen) {
-    void ensureConversationsLoaded()
-  }
 })
 </script>
 
