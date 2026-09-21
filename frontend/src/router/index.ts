@@ -12,6 +12,7 @@ import AdminAccountsView from '@/views/AdminAccountsView.vue'
 import AdminAnnouncementsView from '@/views/AdminAnnouncementsView.vue'
 import AdminDashboardView from '@/views/AdminDashboardView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
+import AdminPointsPolicyView from '@/views/AdminPointsPolicyView.vue'
 import AdminRedemptionsView from '@/views/AdminRedemptionsView.vue'
 import AdminReviewView from '@/views/AdminReviewView.vue'
 import AdminRewardsView from '@/views/AdminRewardsView.vue'
@@ -477,8 +478,8 @@ const router = createRouter({
         {
           path: 'points-policy',
           name: 'admin-points-policy',
-          component: AdminRoutePlaceholder,
-          meta: adminMeta
+          component: AdminPointsPolicyView,
+          meta: superAdminMeta
         },
         {
           path: 'content',

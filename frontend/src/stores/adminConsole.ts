@@ -13,6 +13,9 @@ import type {
   AdminAnnouncementResponse,
   AdminAnnouncementPublishResponse,
   AdminAnnouncementsResponse,
+  AdminPointsPolicy,
+  AdminPointsPolicyPayload,
+  AdminPointsPolicyResponse,
   AdminPasswordResetResponse,
   AdminConsoleRole,
   AdminDashboardPayload,
@@ -108,6 +111,11 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
   const announcementPublishResult = ref<AdminAnnouncementPublishResponse | null>(
     null
   )
+  const pointsPolicy = ref<AdminPointsPolicy | null>(null)
+  const pointsPolicyLoading = ref(false)
+  const pointsPolicyError = ref('')
+  const pointsPolicyActionLoading = ref(false)
+  const pointsPolicyFormError = ref('')
 
   const role = computed<AdminConsoleRole>(() =>
     auth.user?.role === 'super_admin' ? 'super_admin' : 'admin'
@@ -694,6 +702,56 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     announcementPublishResult.value = null
   }
 
+  async function loadPointsPolicy(): Promise<boolean> {
+    pointsPolicyLoading.value = true
+    pointsPolicyError.value = ''
+    try {
+      const response = await apiFetch<AdminPointsPolicyResponse>(
+        '/api/admin/points-policy'
+      )
+      pointsPolicy.value = response.policy
+      return true
+    } catch (caught) {
+      pointsPolicyError.value = errorMessage(caught, '积分规则加载失败')
+      pointsPolicy.value = null
+      return false
+    } finally {
+      pointsPolicyLoading.value = false
+    }
+  }
+
+  async function savePointsPolicy(
+    payload: AdminPointsPolicyPayload
+  ): Promise<boolean> {
+    pointsPolicyActionLoading.value = true
+    pointsPolicyFormError.value = ''
+    try {
+      const response = await apiFetch<AdminPointsPolicyResponse>(
+        '/api/admin/points-policy',
+        {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        }
+      )
+      pointsPolicy.value = response.policy
+      return true
+    } catch (caught) {
+      // A 409 means another admin already moved the single policy row: reload
+      // so the form re-seeds its expected version from the fresh server values,
+      // then keep the conflict message visible so a resubmit can win.
+      const conflictMessage = errorMessage(caught, '保存积分规则失败')
+      await loadPointsPolicy()
+      pointsPolicyFormError.value = conflictMessage
+      return false
+    } finally {
+      pointsPolicyActionLoading.value = false
+    }
+  }
+
+  function clearPointsPolicyFormError() {
+    pointsPolicyFormError.value = ''
+  }
+
   return {
     dashboard,
     loading,
@@ -765,6 +823,14 @@ export const useAdminConsoleStore = defineStore('adminConsole', () => {
     publishAnnouncement,
     clearAnnouncementFormError,
     clearAnnouncementsError,
-    clearAnnouncementPublishResult
+    clearAnnouncementPublishResult,
+    pointsPolicy,
+    pointsPolicyLoading,
+    pointsPolicyError,
+    pointsPolicyActionLoading,
+    pointsPolicyFormError,
+    loadPointsPolicy,
+    savePointsPolicy,
+    clearPointsPolicyFormError
   }
 })

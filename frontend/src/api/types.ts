@@ -1622,3 +1622,40 @@ export interface AdminAnnouncementPublishResponse {
   announcement: AdminAnnouncement
   delivery: AdminAnnouncementDelivery
 }
+
+export type AdminTrainingWeightKey =
+  | 'default'
+  | 'live_script'
+  | 'simulation'
+  | 'copy_training'
+  | 'customer_service'
+
+export type AdminTrainingWeights = Record<AdminTrainingWeightKey, number>
+
+export type AdminPointsExpiryMode = 'permanent' | 'natural_year'
+
+export interface AdminPointsPolicy {
+  version: number
+  rule_version: string
+  seconds_per_point: number
+  training_weights: AdminTrainingWeights
+  daily_limit: number
+  expiry_mode: AdminPointsExpiryMode
+  is_demo: boolean
+  source_available: boolean
+  updated_by: number
+  updated_at: string
+}
+
+export interface AdminPointsPolicyResponse {
+  success: true
+  policy: AdminPointsPolicy
+}
+
+export interface AdminPointsPolicyPayload {
+  expected_version: number
+  seconds_per_point: number
+  training_weights: AdminTrainingWeights
+  daily_limit: number
+  expiry_mode: AdminPointsExpiryMode
+}
