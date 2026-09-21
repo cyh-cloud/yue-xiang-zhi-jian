@@ -22,6 +22,7 @@ from app.admin_console.presets import (
 from app.admin_console.providers import (
     AdminDatabaseLocalResourceCaseProvider,
     AssistantFeatureKnowledgeProvider,
+    ContentReviewProvider,
     CraftPresetProvider,
     DatabaseAssistantFeatureKnowledgeProvider,
     DatabasePointsPolicyProvider,
@@ -30,6 +31,8 @@ from app.admin_console.providers import (
     FeedbackIntakeProvider,
     LocalResourceCaseProvider,
     PointsPolicyProvider,
+    PresetContentProvider,
+    RewardCatalogProvider,
     UnavailableAssistantFeatureKnowledgeProvider,
     UnavailableFeedbackIntakeProvider,
     UnavailablePointsPolicyProvider,
@@ -71,6 +74,7 @@ from app.local_resources.cases import (
 __all__ = [
     "ASSISTANT_FEATURE_KEYS",
     "AdminDatabaseLocalResourceCaseProvider",
+    "ContentReviewProvider",
     "AssistantFeatureKnowledgeProvider",
     "CraftPresetProvider",
     "DatabaseAssistantFeatureKnowledgeProvider",
@@ -81,6 +85,8 @@ __all__ = [
     "FeedbackIntakeProvider",
     "LocalResourceCaseProvider",
     "PointsPolicyProvider",
+    "PresetContentProvider",
+    "RewardCatalogProvider",
     "UnavailableAssistantFeatureKnowledgeProvider",
     "UnavailableFeedbackIntakeProvider",
     "UnavailablePointsPolicyProvider",

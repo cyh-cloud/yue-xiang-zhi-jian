@@ -18,6 +18,7 @@ from app.admin_console.presets import (
 from app.admin_console.points_policy import DatabasePointsPolicyProvider
 from app.admin_console.rewards import DatabaseRewardCatalogProvider
 from app.agri_skills.presets import set_preset_provider
+from app.agri_skills.providers import PresetContentProvider
 from app.content_review.providers import (
     ContentReviewProvider,
     UnavailableContentReviewProvider,
@@ -27,6 +28,7 @@ from app.handcraft_inheritance.providers import (
     PointsPolicyProvider,
     UnavailablePointsPolicyProvider,
     CraftPresetProvider,
+    RewardCatalogProvider,
     set_reward_catalog_provider,
     set_craft_preset_provider,
     # Aliased because this module exports its own `set_points_policy_provider`
@@ -162,21 +164,36 @@ def configure_admin_providers(
     app: Flask,
     *,
     content_review: ContentReviewProvider | None = None,
+    points_policy: PointsPolicyProvider | None = None,
+    reward_catalog: RewardCatalogProvider | None = None,
+    agri_preset: PresetContentProvider | None = None,
     craft_preset: CraftPresetProvider | None = None,
     local_case: LocalResourceCaseProvider | None = None,
     knowledge: AssistantFeatureKnowledgeProvider | None = None,
     feedback_intake: FeedbackIntakeProvider | None = None,
 ) -> None:
-    if content_review is not None:
-        set_content_review_provider(app, content_review)
-    if craft_preset is not None:
-        set_craft_preset_provider(app, craft_preset)
-    if local_case is not None:
-        set_local_resource_case_provider(app, local_case)
-    if knowledge is not None:
-        set_assistant_feature_knowledge_provider(app, knowledge)
-    if feedback_intake is not None:
-        set_feedback_intake_provider(app, feedback_intake)
+    """Install explicit providers into the eight slots 011 owns.
+
+    One setter per slot, so a caller can swap a single slot without touching
+    the others. Every parameter defaults to `None` and a `None` value leaves
+    whatever is already installed in place, which keeps `create_app`'s
+    database defaults and lets a later feature (012 and beyond) override one
+    slot after the fact. `points_policy` writes the 011 management read slot;
+    05's own read slot has its own setter, exactly as in
+    `install_default_admin_services`.
+    """
+    for setter, provider in (
+        (set_content_review_provider, content_review),
+        (set_points_policy_provider, points_policy),
+        (set_reward_catalog_provider, reward_catalog),
+        (set_preset_provider, agri_preset),
+        (set_craft_preset_provider, craft_preset),
+        (set_local_resource_case_provider, local_case),
+        (set_assistant_feature_knowledge_provider, knowledge),
+        (set_feedback_intake_provider, feedback_intake),
+    ):
+        if provider is not None:
+            setter(app, provider)
 
 
 def install_default_admin_services(app: Flask) -> None:
@@ -227,16 +244,25 @@ def install_default_admin_services(app: Flask) -> None:
     points_policy = DatabasePointsPolicyProvider()
     set_handcraft_points_policy_provider(app, points_policy)
     set_points_policy_provider(app, points_policy)
-    if "assistant_feature_knowledge_provider" not in app.extensions:
-        set_assistant_feature_knowledge_provider(
-            app,
-            DatabaseAssistantFeatureKnowledgeProvider(),
-        )
-    if "feedback_intake_provider" not in app.extensions:
-        set_feedback_intake_provider(
-            app,
-            DatabaseFeedbackIntakeProvider(),
-        )
+    # These last two slots follow the same unconditional pattern and must
+    # never grow a `not in app.extensions` guard. On this branch nothing
+    # installs either slot before `create_app` reaches this function, so a
+    # guard is a no-op today and therefore invisible in review. The risk is
+    # cross-branch: once 011 merges, any feature (012 and later) whose
+    # `create_app` or test assembly installs its own provider - or an
+    # `Unavailable` default - earlier in the sequence would keep that value
+    # here, and 011's authoritative
+    # `DatabaseAssistantFeatureKnowledgeProvider` and
+    # `DatabaseFeedbackIntakeProvider` rows would silently never reach the AI
+    # companion's feature knowledge or the feedback intake path. Providers
+    # stay overridable because a caller writes `app.extensions` (or calls
+    # `configure_admin_providers`) after `create_app`, which unconditional
+    # replacement preserves.
+    set_assistant_feature_knowledge_provider(
+        app,
+        DatabaseAssistantFeatureKnowledgeProvider(),
+    )
+    set_feedback_intake_provider(app, DatabaseFeedbackIntakeProvider())
 
 
 __all__ = [
@@ -254,6 +280,8 @@ __all__ = [
     "HandcraftTeachingVideoReviewAdapter",
     "LocalResourceCaseProvider",
     "PointsPolicyProvider",
+    "PresetContentProvider",
+    "RewardCatalogProvider",
     "UnavailablePointsPolicyProvider",
     "UnavailableAssistantFeatureKnowledgeProvider",
     "UnavailableFeedbackIntakeProvider",
