@@ -14,6 +14,7 @@ from app.admin_console.presets import (
     DatabaseAssistantFeatureKnowledgeProvider,
     DatabaseCraftPresetProvider,
 )
+from app.admin_console.points_policy import DatabasePointsPolicyProvider
 from app.admin_console.rewards import DatabaseRewardCatalogProvider
 from app.content_review.providers import (
     ContentReviewProvider,
@@ -21,9 +22,15 @@ from app.content_review.providers import (
     set_content_review_provider,
 )
 from app.handcraft_inheritance.providers import (
+    PointsPolicyProvider,
+    UnavailablePointsPolicyProvider,
     CraftPresetProvider,
     set_reward_catalog_provider,
     set_craft_preset_provider,
+    # Aliased because this module exports its own `set_points_policy_provider`
+    # for the 011 `admin_points_policy_provider` slot; the 05 setter writes
+    # the `handcraft_points_policy_provider` slot that 05 itself reads.
+    set_points_policy_provider as set_handcraft_points_policy_provider,
 )
 from app.local_resources.cases import (
     LocalResourceCaseProvider,
@@ -108,6 +115,20 @@ def get_feedback_intake_provider() -> FeedbackIntakeProvider:
     )
 
 
+def set_points_policy_provider(
+    app: Flask,
+    provider: PointsPolicyProvider,
+) -> None:
+    app.extensions["admin_points_policy_provider"] = provider
+
+
+def get_points_policy_provider() -> PointsPolicyProvider:
+    return current_app.extensions.get(
+        "admin_points_policy_provider",
+        UnavailablePointsPolicyProvider(),
+    )
+
+
 def configure_admin_providers(
     app: Flask,
     *,
@@ -156,6 +177,17 @@ def install_default_admin_services(app: Flask) -> None:
     # catalog in place and 011's authoritative `admin_rewards` would never
     # reach the mall.
     set_reward_catalog_provider(app, DatabaseRewardCatalogProvider())
+    # The points-policy slots follow the same unconditional pattern. 05's
+    # `install_default_handcraft_services` runs before this function in
+    # `create_app` and already installed `PlaceholderPointsPolicyProvider`,
+    # so a `not in app.extensions` guard would leave 05's demo rule in place
+    # and 011's authoritative `platform_points_policy` would never reach 05's
+    # points, expiry or fulfillment paths. One instance is installed into
+    # both the 05 read slot and the 011 management read entry, so replacing
+    # the provider through either setter is visible to both consumers.
+    points_policy = DatabasePointsPolicyProvider()
+    set_handcraft_points_policy_provider(app, points_policy)
+    set_points_policy_provider(app, points_policy)
     if "assistant_feature_knowledge_provider" not in app.extensions:
         set_assistant_feature_knowledge_provider(
             app,
@@ -175,17 +207,22 @@ __all__ = [
     "CraftPresetProvider",
     "DatabaseAssistantFeatureKnowledgeProvider",
     "DatabaseCraftPresetProvider",
+    "DatabasePointsPolicyProvider",
     "DatabaseRewardCatalogProvider",
     "DatabaseFeedbackIntakeProvider",
     "FeedbackIntakeProvider",
     "HandcraftTeachingVideoReviewAdapter",
     "LocalResourceCaseProvider",
+    "PointsPolicyProvider",
+    "UnavailablePointsPolicyProvider",
     "UnavailableAssistantFeatureKnowledgeProvider",
     "UnavailableFeedbackIntakeProvider",
     "configure_admin_providers",
     "get_assistant_feature_knowledge_provider",
     "get_feedback_intake_provider",
+    "get_points_policy_provider",
     "install_default_admin_services",
     "set_assistant_feature_knowledge_provider",
     "set_feedback_intake_provider",
+    "set_points_policy_provider",
 ]

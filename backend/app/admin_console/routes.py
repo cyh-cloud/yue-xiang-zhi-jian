@@ -481,6 +481,35 @@ def list_announcements_route():
     return jsonify(success=True, items=items, count=len(items))
 
 
+@admin_console_bp.get("/points-policy")
+def get_points_policy_route():
+    from app.admin_console.points_policy import get_points_policy
+
+    # Super admin only: the permission matrix keeps the whole points-policy
+    # surface, read included, out of the ordinary admin's console, so the
+    # guard runs before any policy row is read.
+    require_admin_session(roles={"super_admin"})
+    return jsonify(success=True, policy=get_points_policy())
+
+
+@admin_console_bp.put("/points-policy")
+def update_points_policy_route():
+    from app.admin_console.points_policy import update_points_policy
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    # The optimistic-lock token travels inside the body; the service refuses
+    # a body that is missing it instead of defaulting to the stored version.
+    policy = update_points_policy(
+        int(session["id"]),
+        payload,
+        payload.get("expected_version"),
+    )
+    return jsonify(success=True, policy=policy)
+
+
 @admin_console_bp.post("/announcements")
 def create_announcement_route():
     from app.admin_console.system_announcements import create_announcement

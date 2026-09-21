@@ -1383,6 +1383,9 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     from app.admin_console.rewards import seed_demo_rewards
 
     seed_demo_rewards(db)
+    from app.admin_console.points_policy import seed_demo_points_policy
+
+    seed_demo_points_policy(db)
     from app.admin_console.presets import seed_assistant_feature_knowledge
 
     seed_assistant_feature_knowledge(db)
