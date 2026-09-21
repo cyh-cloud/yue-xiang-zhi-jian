@@ -33,6 +33,7 @@ function closePanel() {
       class="ai-companion-launcher"
       data-test="ai-companion-launcher"
       aria-label="打开 AI 学伴"
+      :aria-expanded="companion.panelOpen ? 'true' : 'false'"
       @click="openPanel"
     >
       <Sparkles class="ai-companion-launcher-icon" :size="20" aria-hidden="true" />
