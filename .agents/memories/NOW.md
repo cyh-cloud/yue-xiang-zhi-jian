@@ -233,11 +233,17 @@ whole-branch review.
   (`test(ai-companion): 全 feature 验收、provider 对账与记忆交接`), then two
   deepseek-flash review-hardening commits (`test(ai-companion): 权限拒绝零调用断言改为按
   URL 扫描`, `test(ai-companion): 响应式断言剥离 CSS 注释以消除误报`). Branch tip is the
-  latest hardening commit (read with `git rev-parse HEAD`).
+  latest hardening commit (read with `git rev-parse HEAD`). A subsequent
+  strictly-scoped `基元律动/deepseek-flash` review of Tasks 1-13 found 1 in-scope
+  issue (Task 13: reopening the panel while parked on the history tab did not
+  reload history, contradicting the plan criterion) fixed by
+  `fix(ai-companion): 重开面板停留在历史 tab 时从服务端重载历史`; the other 12 tasks were
+  APPROVE with zero findings.
   Stopped before merge: no push, no merge into `v2/lixKRT/dev`; worktree and
   branch retained.
 - Verification: backend acceptance `20/20`; backend full suite `1018/1018`;
-  frontend whole-feature `12/12`; frontend full `110` files / `735` tests;
+  frontend whole-feature `12/12`; frontend full `110` files / `736` tests
+  (includes the Task 13 reopen-reload regression test);
   `npx vue-tsc --noEmit` silent; `npm run build` succeeded.
 - Browser acceptance is BLOCKED: port 5000 is held by PID 34676, which cannot be
   identified (`tasklist` reports no such task), and the no-kill rule forbids
