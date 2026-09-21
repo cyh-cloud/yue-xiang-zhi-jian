@@ -228,10 +228,12 @@ whole-branch review.
 ## 012 AI Companion
 
 - 2026-09-21: SDD Tasks 1-16 complete on branch `v2/lixKRT/012-ai-companion` in
-  `.worktrees/012-ai-companion`. Task 14/15 commits are `22bfebf` and `33031ac`;
-  the Task 16 acceptance commit is the tip (`test(ai-companion): 全 feature
-  验收、provider 对账与记忆交接`; read with `git rev-parse HEAD`) on top of the
-  Task 1-13 head `aa3118e`.
+  `.worktrees/012-ai-companion`. Commit sequence on top of the Task 1-13 head
+  `aa3118e`: Task 14 `22bfebf`, Task 15 `33031ac`, Task 16 acceptance
+  (`test(ai-companion): 全 feature 验收、provider 对账与记忆交接`), then two
+  deepseek-flash review-hardening commits (`test(ai-companion): 权限拒绝零调用断言改为按
+  URL 扫描`, `test(ai-companion): 响应式断言剥离 CSS 注释以消除误报`). Branch tip is the
+  latest hardening commit (read with `git rev-parse HEAD`).
   Stopped before merge: no push, no merge into `v2/lixKRT/dev`; worktree and
   branch retained.
 - Verification: backend acceptance `20/20`; backend full suite `1018/1018`;
