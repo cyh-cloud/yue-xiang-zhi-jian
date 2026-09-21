@@ -36,7 +36,10 @@ function styleSource(source: string): string {
     return ''
   }
   const close = source.indexOf('</style>', open)
-  return source.slice(open + 1, close === -1 ? undefined : close)
+  const styleBody = source.slice(open + 1, close === -1 ? undefined : close)
+  // 注释里的声明不是真实规则：去掉注释后，overflow-wrap/min-width 等断言
+  // 才不会在真实声明被注释掉、只剩注释文本时仍然通过。
+  return styleBody.replace(/\/\*[\s\S]*?\*\//g, '')
 }
 
 function escapeSelector(selector: string): string {
