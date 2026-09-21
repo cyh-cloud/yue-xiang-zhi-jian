@@ -324,6 +324,88 @@ def list_handcraft_craft_presets_route():
     return jsonify(success=True, items=items, count=len(items))
 
 
+@admin_console_bp.get("/content/<content_type>")
+def list_managed_content_route(content_type: str):
+    from app.admin_console.data_management import list_managed_content
+
+    # Cross-platform data management is a super-admin capability: the
+    # permission matrix (Task 28) keeps ordinary admins out of every
+    # /api/admin/content route, mirroring accounts and dashboard.
+    require_admin_session(roles={"super_admin"})
+    items = list_managed_content(
+        content_type,
+        _admin_filters("status", "review_status", "is_visible", "keyword"),
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.get("/content/<content_type>/<content_id>")
+def get_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import get_managed_content
+
+    require_admin_session(roles={"super_admin"})
+    item = get_managed_content(content_type, content_id)
+    if item is None:
+        raise ProviderNotFoundError(
+            "内容不存在",
+            code="content_not_found",
+            details={"content_type": content_type, "content_id": content_id},
+        )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.put("/content/<content_type>/<content_id>")
+def correct_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import correct_managed_content
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = correct_managed_content(
+        int(session["id"]),
+        content_type,
+        content_id,
+        payload.get("expected_version"),
+        payload,
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.post("/content/<content_type>/<content_id>/unpublish")
+def unpublish_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import unpublish_managed_content
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = unpublish_managed_content(
+        int(session["id"]),
+        content_type,
+        content_id,
+        payload.get("expected_version"),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/content/<content_type>/<content_id>")
+def delete_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import delete_managed_content
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = delete_managed_content(
+        int(session["id"]),
+        content_type,
+        content_id,
+        payload.get("expected_version"),
+    )
+    return jsonify(success=True, item=item)
+
+
 @admin_console_bp.post("/presets/handcraft_crafts")
 def create_handcraft_craft_preset_route():
     from app.admin_console.presets import create_craft_preset

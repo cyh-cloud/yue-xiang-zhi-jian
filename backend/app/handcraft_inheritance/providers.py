@@ -182,3 +182,56 @@ def set_fulfillment_action_provider(
 
 def get_fulfillment_action_provider() -> FulfillmentAdminActionProvider:
     return current_app.extensions["handcraft_fulfillment_action"]
+
+
+def _active_video_payload(row) -> dict:
+    return {
+        "video_id": str(row["video_id"]),
+        "craft_key": str(row["craft_key"]),
+        "title": str(row["title"]),
+        "review_status": str(row["review_status"]),
+        "source_available": bool(row["source_available"]),
+        "media_url": str(row["media_url"] or ""),
+        "version": int(row["version"]),
+        "rejection_opinion": row["rejection_opinion"],
+        "published_at": row["published_at"],
+        "deleted_at": row["deleted_at"],
+        "created_at": str(row["created_at"]),
+        "updated_at": str(row["updated_at"]),
+    }
+
+
+def list_active_teaching_videos() -> list[dict]:
+    """Read teaching videos for admin data management, hiding tombstones.
+
+    The review queue reads the placeholder media provider, but the 011 data
+    console owns the durable `heritage_videos` rows, so a soft-deleted video
+    must not resurface here. The `deleted_at IS NULL` filter is the only
+    behaviour this helper adds over a plain table scan.
+    """
+    from app.db import get_db
+
+    rows = get_db().execute(
+        """
+        SELECT *
+        FROM heritage_videos
+        WHERE deleted_at IS NULL
+        ORDER BY updated_at DESC, video_id
+        """
+    ).fetchall()
+    return [_active_video_payload(row) for row in rows]
+
+
+def get_active_teaching_video(video_id: str) -> dict | None:
+    """Read one teaching video for admin data management; tombstones read absent."""
+    from app.db import get_db
+
+    row = get_db().execute(
+        """
+        SELECT *
+        FROM heritage_videos
+        WHERE video_id = ? AND deleted_at IS NULL
+        """,
+        (video_id,),
+    ).fetchone()
+    return _active_video_payload(row) if row is not None else None

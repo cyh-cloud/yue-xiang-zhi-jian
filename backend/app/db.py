@@ -1359,6 +1359,38 @@ def _ensure_admin_reward_is_demo_column(db: sqlite3.Connection) -> None:
         )
 
 
+def _ensure_content_tombstone_columns(db: sqlite3.Connection) -> None:
+    """Add soft-delete tombstones to course and video content (Task 24).
+
+    `job_positions` already carries `deleted_at`; `courses` and
+    `heritage_videos` only gain the nullable column here. Existing rows keep
+    `NULL` (never deleted), so every read that adds `deleted_at IS NULL`
+    behaves exactly as before the column existed.
+    """
+    course_columns = {
+        row["name"] for row in db.execute("PRAGMA table_info(courses)")
+    }
+    if "deleted_at" not in course_columns:
+        db.execute("ALTER TABLE courses ADD COLUMN deleted_at TEXT")
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_courses_deleted
+            ON courses(deleted_at, status)
+        """
+    )
+    video_columns = {
+        row["name"] for row in db.execute("PRAGMA table_info(heritage_videos)")
+    }
+    if "deleted_at" not in video_columns:
+        db.execute("ALTER TABLE heritage_videos ADD COLUMN deleted_at TEXT")
+    db.execute(
+        """
+        CREATE INDEX IF NOT EXISTS idx_heritage_videos_deleted
+            ON heritage_videos(deleted_at, review_status)
+        """
+    )
+
+
 def init_db(connection: sqlite3.Connection | None = None) -> None:
     db = connection or get_db()
     db.executescript(SCHEMA_SQL)
@@ -1371,6 +1403,7 @@ def init_db(connection: sqlite3.Connection | None = None) -> None:
     _ensure_local_resource_case_admin_columns(db)
     _ensure_handcraft_craft_is_demo_column(db)
     _ensure_admin_reward_is_demo_column(db)
+    _ensure_content_tombstone_columns(db)
     seed_interest_tags(db)
     seed_ecommerce_course_fixtures(db)
     seed_handcraft_fixtures(db)
