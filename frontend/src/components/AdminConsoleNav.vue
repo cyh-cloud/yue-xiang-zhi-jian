@@ -84,7 +84,9 @@ const links: AdminNavLink[] = [
     label: '数据管理',
     icon: Files,
     testId: 'admin-nav-content',
-    superAdminOnly: true
+    // 数据管理对普通管理员只读开放：路由 /admin/content 挂 adminMeta（双角色），
+    // 后端对普管该路由返回 200 只读，故导航不标 superAdminOnly，与路由/后端一致。
+    // accounts / points-policy / announcements 仍为超管专属。
   },
   {
     to: '/admin/announcements',

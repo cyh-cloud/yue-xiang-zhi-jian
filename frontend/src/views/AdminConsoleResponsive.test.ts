@@ -56,10 +56,12 @@ describe('AdminConsoleNav', () => {
     expect(
       wrapper.find('[data-test="admin-nav-points-policy"]').exists()
     ).toBe(false)
-    expect(wrapper.find('[data-test="admin-nav-content"]').exists()).toBe(false)
     expect(
       wrapper.find('[data-test="admin-nav-announcements"]').exists()
     ).toBe(false)
+    // 数据管理为双角色只读开放：普通管理员应看到该入口（与路由 /admin/content 的
+    // adminMeta 及后端 200 只读一致），但看不到超管专属的账号/积分规则/系统公告。
+    expect(wrapper.find('[data-test="admin-nav-content"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="admin-nav-review"]').exists()).toBe(true)
     expect(wrapper.find('[data-test="admin-nav-rewards"]').exists()).toBe(true)
   })
