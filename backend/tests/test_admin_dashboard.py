@@ -9,20 +9,27 @@ from unittest.mock import patch
 from werkzeug.security import generate_password_hash
 
 from app import create_app
+from app.admin_console.moderation import FEEDBACK_STATUS_VALUES
 from app.db import get_db
 from app.enterprise_console.providers import (
     set_employment_statistics_provider,
 )
+from app.handcraft_inheritance.presets import PLACEHOLDER_REWARDS
 
 
 FORBIDDEN_ADMIN_DASHBOARD_KEYS = {
     "total_users",
     "role_distribution",
+    "region_distribution",
+    "direction_distribution",
     "student_total",
     "student_count",
     "user_details",
+    "course_count",
     "average_progress",
     "completion_rate",
+    "progress",
+    "certificate_count",
     "quiz_attempt_count",
     "quiz_average_score",
     "training_progress",
@@ -287,6 +294,15 @@ class AdminDashboardTests(TestCase):
                 ),
             )
 
+        # `reward_stock` is a real SUM over `admin_rewards`, so its
+        # expected value is owned by the seeders, not by this test: Task
+        # 10's `seed_demo_rewards` turned 05's PLACEHOLDER_REWARDS into
+        # rows during database init (stock 10 + 8 + 6 + 8 = 32), and the
+        # loop below adds this fixture's own rows.
+        self.demo_reward_stock = sum(
+            int(reward["stock"]) for reward in PLACEHOLDER_REWARDS
+        )
+        self.seeded_reward_stock = 0
         for index, stock in enumerate((5, 4), start=1):
             db.execute(
                 """
@@ -304,6 +320,7 @@ class AdminDashboardTests(TestCase):
                     "2026-09-20T10:00:00+08:00",
                 ),
             )
+            self.seeded_reward_stock += stock
 
         for index, status in enumerate(
             ("pending", "issued", "canceled"),
@@ -441,7 +458,12 @@ class AdminDashboardTests(TestCase):
                 "comment_processed_count": 2,
                 "report_processed_count": 2,
                 "feedback_processed_count": 2,
-                "reward_stock": 9,
+                # 05's PLACEHOLDER_REWARDS (32, seeded by Task 10's
+                # `seed_demo_rewards`) plus this fixture's reward-1 (5)
+                # and reward-2 (4).
+                "reward_stock": (
+                    self.demo_reward_stock + self.seeded_reward_stock
+                ),
                 "pending_fulfillment_count": 1,
             },
         )
@@ -511,6 +533,34 @@ class AdminDashboardTests(TestCase):
         with self.assertRaises(AssertionError):
             assert_admin_dashboard_boundary(dashboard)
 
+    def test_assert_boundary_rejects_forbidden_keys_at_any_depth(self):
+        from app.admin_console.dashboard import (
+            assert_admin_dashboard_boundary,
+        )
+
+        dashboard = {"pending_review": [{"nested": {"total_users": 1}}]}
+
+        with self.assertRaises(AssertionError) as raised:
+            assert_admin_dashboard_boundary(dashboard)
+
+        self.assertIn("total_users", str(raised.exception))
+
+        # Recursion is the contract, so every exclusion key must be
+        # rejected from inside a nested list of dicts, not only from the
+        # dashboard surface.
+        for key in sorted(FORBIDDEN_ADMIN_DASHBOARD_KEYS):
+            nested = {"pending_review": [{"nested": {key: 0}}]}
+            with self.assertRaises(AssertionError, msg=key):
+                assert_admin_dashboard_boundary(nested)
+
+    def test_walk_keys_descends_into_nested_dicts_and_lists(self):
+        nested = {"pending_review": [{"nested": {"total_users": 1}}]}
+
+        self.assertEqual(
+            set(walk_keys(nested)),
+            {"pending_review", "nested", "total_users"},
+        )
+
     def test_source_failures_are_unavailable_not_zero(self):
         set_employment_statistics_provider(
             self.app,
@@ -536,6 +586,60 @@ class AdminDashboardTests(TestCase):
             unavailable,
         )
         self.assertEqual(dashboard["active_job_count"], unavailable)
+        self.assertEqual(dashboard["reward_stock"], unavailable)
+        self.assertEqual(
+            dashboard["pending_fulfillment_count"],
+            unavailable,
+        )
+
+    def test_processed_feedback_predicates_cover_the_same_statuses(self):
+        """Pin the feedback "handled" reading while the column is CHECK-less.
+
+        `feedback_records.status` is a bare `TEXT NOT NULL DEFAULT
+        'pending'` (db.py), so nothing in the schema polices the value
+        space. The dashboard counts a handled row with `status IN
+        ('processed', 'closed')`, and the console's other reading of
+        "answered" is exactly "left pending". The fixture seeds one row
+        per canonical status from `FEEDBACK_STATUS_VALUES`, so both
+        predicates must classify every stored status alike: the counted
+        set has to equal the canonical set minus `pending`. Adding a
+        fourth status without teaching it to the dashboard predicate
+        turns this red.
+        """
+        with self.app.app_context():
+            stored_statuses = {
+                str(row["status"])
+                for row in get_db().execute(
+                    "SELECT DISTINCT status FROM feedback_records"
+                ).fetchall()
+            }
+            counted_by_dashboard = {
+                str(row["status"])
+                for row in get_db().execute(
+                    """
+                    SELECT DISTINCT status
+                    FROM feedback_records
+                    WHERE status IN ('processed', 'closed')
+                    """
+                ).fetchall()
+            }
+            counted_as_handled = {
+                str(row["status"])
+                for row in get_db().execute(
+                    """
+                    SELECT DISTINCT status
+                    FROM feedback_records
+                    WHERE status <> 'pending'
+                    """
+                ).fetchall()
+            }
+
+        self.assertEqual(stored_statuses, set(FEEDBACK_STATUS_VALUES))
+        self.assertEqual(counted_by_dashboard, counted_as_handled)
+        self.assertEqual(
+            counted_by_dashboard,
+            set(FEEDBACK_STATUS_VALUES) - {"pending"},
+        )
 
 
 if __name__ == "__main__":
