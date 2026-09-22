@@ -21,10 +21,11 @@
 - 合并后全量回归：后端 `unittest discover` `Ran 1357 tests ... OK`（3419.881s）；
   前端 `npm test` 123 文件 / 921 测试全过；`npx tsc -b --noEmit` exit 0；`npm run build`
   成功；真实 `create_app` 装配冒烟（`test_admin_integration`）19/19 OK。
-- 残余风险：011 最终全分支审查 4 个 Minor 登记项未修（routes.py:846 注释归因、
-  providers.py:199 条件装配、AdminPortalView.vue 未列入共享清单、db.py +324 行纯新增）；
-  27 项 deferred minor 分布见本文件 011 段（Task 19×3、20×1、25×2、26×2、27×4、28×4、
-  29×4、30×3、31×4）。012 的 deferred 项"011 real-provider assembly order"已随本次合并闭环。
+- 残余风险：011 最终审查 4 个 Minor 已全部处置（`3d31ec6`：routes.py 注释归因改 FR-005、
+  providers.py:199 条件装配补注释、AdminPortalView.vue 补登共享清单、db.py +324 行增量
+  核实落在 T001/T024 schema 边界；行为均不变）；27 项 deferred minor 分布见本文件 011 段
+  （Task 19×3、20×1、25×2、26×2、27×4、28×4、29×4、30×3、31×4）。012 的 deferred 项
+  "011 real-provider assembly order"已随本次合并闭环。
 - 下一步：push 需单独授权；后续 feature 从 `v2/lixKRT/dev` 顶端的真实 011 代码继续。
 
 ## 012 AI Companion (SDD CHECKPOINT - RESUME from Task 14)
