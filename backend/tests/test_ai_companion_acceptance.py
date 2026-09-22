@@ -28,6 +28,7 @@ from app.admin_console.presets import (
     DatabaseAssistantFeatureKnowledgeProvider,
     _serialize_knowledge_entry,
 )
+from app.admin_console.routes import admin_console_bp
 from app.agri_skills.ai_client import set_ai_client
 from app.agri_skills.errors import (
     AgriValidationError,
@@ -841,6 +842,31 @@ class ProviderReconciliationTests(unittest.TestCase):
         self.assertIsInstance(
             provider,
             admin_providers.UnavailableAssistantFeatureKnowledgeProvider,
+        )
+
+    def test_create_app_registers_no_admin_console_routes(self):
+        # 011 快照只服务于 provider 契约：create_app 不得注册 admin_console
+        # 蓝图，也不得挂出其路由前缀下的任何 rule，否则 012 就替 011 开了
+        # 管理端入口。这是"不得注册管理路由"约束的行为守卫。
+        self.assertEqual(admin_console_bp.url_prefix, "/api/admin")
+        self.assertNotIn("admin_console", self.app.blueprints)
+        self.assertEqual(
+            [
+                rule.rule
+                for rule in self.app.url_map.iter_rules()
+                if rule.rule == admin_console_bp.url_prefix
+                or rule.rule.startswith(f"{admin_console_bp.url_prefix}/")
+            ],
+            [],
+        )
+        # 端点名前缀兜底：即使蓝图换个名字注册，端点仍带 admin_console. 前缀。
+        self.assertEqual(
+            [
+                rule.endpoint
+                for rule in self.app.url_map.iter_rules()
+                if rule.endpoint.startswith("admin_console.")
+            ],
+            [],
         )
 
 

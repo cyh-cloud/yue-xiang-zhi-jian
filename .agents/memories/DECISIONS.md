@@ -88,6 +88,40 @@
   `UnavailableAssistantFeatureKnowledgeProvider` placeholder, which surfaces as
   `暂无法回答，请稍后再试` (HTTP 422).
 
+## AI Companion Vendored 011 admin_console Snapshot
+
+- The `012-ai-companion` branch vendors `backend/app/admin_console/` as a
+  verbatim snapshot of 011 taken at commit `e5d70f2` (13 files, 4837 lines:
+  routes, accounts, dashboard, presets, content_review_provider,
+  handcraft_review_adapter, content_review_service, seed, audit, time_utils,
+  providers, errors, `__init__`). It satisfies the plan Task 1 hard
+  prerequisite (the 011 provider contract) while 011 has not merged into
+  `v2/lixKRT/dev`, keeping the two branches independent. This is a conscious
+  replacement of the plan Task 16 Step 3 "011 missing -> BLOCKED" branch.
+- The snapshot is intentionally larger than the knowledge provider dependency
+  (only the four objects re-exported by
+  `app/ai_companion/knowledge_provider.py` are used). No minimal slicing was
+  performed: the knowledge provider chain in `providers.py` is entangled with
+  `presets.py` (`DatabaseAssistantFeatureKnowledgeProvider` is defined in
+  `presets.py` and imported by `providers.py`) and the package `__init__.py`
+  actively imports presets and routes, so importing the provider loads the
+  whole tree; slicing would require refactoring 011-owned code and would widen
+  the divergence, making the 011 merge reconciliation harder. A verbatim
+  snapshot keeps that merge a path-by-path reconciliation.
+- Accepted cost: importing `app.admin_console.providers` transitively loads
+  presets, routes and their dependencies (larger runtime import surface), but
+  `create_app` registers no admin routes and
+  `install_default_ai_companion_services` only fills the
+  `assistant_feature_knowledge_provider` slot with the 011 placeholder.
+- Constraints: the snapshot files must not be edited on this branch (change 011
+  and re-snapshot instead), no admin route may be registered, and no 011 table
+  (`admin_assistant_feature_knowledge`) may be created here.
+  `backend/tests/test_ai_companion_acceptance.py` guards these as facts.
+- Reclaim plan: when 011 merges into `v2/lixKRT/dev`, replace this snapshot
+  wholesale with 011's own code during the same merge reconciliation, then
+  register the real `DatabaseAssistantFeatureKnowledgeProvider` and mark this
+  section reclaimed.
+
 ## AI Companion Conversation Retention
 
 - 180-day retention is computed from `ai_companion_conversations.updated_at`:
