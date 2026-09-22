@@ -1260,6 +1260,73 @@ export interface AiCompanionConversation {
   updated_at: string
 }
 
+export type AdminConsoleRole = Extract<UserRole, 'super_admin' | 'admin'>
+
+export interface AdminDashboardResponse {
+  scope: 'platform' | 'content_operations'
+  metrics: Record<string, number>
+}
+
+export type AdminDashboard = AdminDashboardResponse
+
+export type AdminReviewContentType =
+  | 'course_video'
+  | 'job_position'
+  | 'handcraft_teaching_video'
+
+export type AdminReviewStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'offline'
+
+export interface AdminReviewItem {
+  content_type: AdminReviewContentType
+  content_id: string
+  title?: string | null
+  submitter_id: number | null
+  submitter_name?: string | null
+  owner_id?: number | null
+  owner_name?: string | null
+  review_status: AdminReviewStatus
+  version: number | null
+  rejection_opinion: string | null
+  published_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type AdminReviewCounts = Record<AdminReviewContentType, number>
+
+export interface AdminReviewQueueResponse {
+  success: true
+  items: AdminReviewItem[]
+  counts: AdminReviewCounts
+}
+
+export interface AdminReviewActionResponse {
+  success: true
+  item: AdminReviewItem
+}
+
+export type AdminManagedRole =
+  | 'enterprise'
+  | 'government'
+  | 'admin'
+  | 'super_admin'
+
+export type AdminAccountRoleFilter = AdminManagedRole | 'all'
+
+export interface AdminAccount {
+  id: number
+  username: string
+  name: string
+  role: AdminManagedRole
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface AiCompanionConversationDetail {
   conversation: AiCompanionConversation
   messages: AiCompanionMessage[]
@@ -1279,4 +1346,360 @@ export interface AiCompanionConversationDetailResponse {
   success: true
   // 后端把 messages 内嵌在 conversation 记录内(repository.get_conversation)。
   conversation: AiCompanionConversation & { messages: AiCompanionMessage[] }
+}
+
+export interface AdminAccountsResponse {
+  success: true
+  accounts: AdminAccount[]
+}
+
+export interface AdminAccountResponse {
+  success: true
+  account: AdminAccount
+}
+
+export interface AdminAccountCreatePayload {
+  role: AdminManagedRole
+  username: string
+  name: string
+  password: string
+}
+
+export interface AdminAccountStatusPayload {
+  enabled: boolean
+}
+
+export interface AdminPasswordResetResponse {
+  success: true
+  event_id: string
+  account: AdminAccount
+}
+
+export type AdminRewardStatusFilter = 'all' | 'online' | 'offline'
+
+export type AdminFulfillmentStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'issued'
+  | 'verified'
+  | 'canceled'
+
+export type AdminRedemptionStatusFilter =
+  | 'all'
+  | 'pending'
+  | 'issued'
+  | 'verified'
+  | 'canceled'
+
+export type AdminReservationStatus = 'reserved' | 'released'
+
+export interface AdminReward {
+  reward_id: string
+  name: string
+  points_cost: number
+  stock: number
+  reserved: number
+  available: number
+  is_online: boolean
+  is_demo: boolean
+  source_available: boolean
+  version: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminRewardsResponse {
+  success: true
+  items: AdminReward[]
+  count: number
+}
+
+export interface AdminRewardWritePayload {
+  name: string
+  points_cost: number
+  stock: number
+}
+
+export type AdminRewardCreatePayload = AdminRewardWritePayload
+
+export interface AdminRewardUpdatePayload extends AdminRewardWritePayload {
+  expected_version: number
+}
+
+export interface AdminRewardOnlinePayload {
+  expected_version: number
+  online: boolean
+}
+
+export interface AdminRewardResponse {
+  success: true
+  reward: AdminReward
+}
+
+export interface AdminRewardUserContext {
+  id: number
+  username: string
+  name: string
+  role: string
+  contact: string
+}
+
+export interface AdminRewardReference {
+  reward_id: string
+  name: string
+  points_cost: number
+  snapshot?: Record<string, unknown>
+}
+
+export interface AdminStockReservation {
+  reservation_id: string
+  status: AdminReservationStatus | null
+  quantity: number
+  created_at: string | null
+  released_at: string | null
+}
+
+export interface AdminFulfillmentTimestamps {
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AdminRedemptionTimestamps {
+  created_at: string | null
+  updated_at: string | null
+  canceled_at: string | null
+}
+
+export interface AdminFulfillment extends AdminFulfillmentTimestamps {
+  id: number
+  redemption_id: number
+  user_id: number
+  user: AdminRewardUserContext
+  reward: AdminRewardReference
+  points_cost: number
+  request_id: string
+  status: AdminFulfillmentStatusFilter
+  redemption_status: AdminFulfillmentStatusFilter
+  stock_reservation: AdminStockReservation | null
+  restored_points: number
+}
+
+export interface AdminFulfillmentsResponse {
+  success: true
+  items: AdminFulfillment[]
+  count: number
+}
+
+export interface AdminFulfillmentActionResult {
+  fulfillment_id: number
+  redemption_id: number
+  user_id: number
+  status: AdminFulfillmentStatusFilter
+  changed: boolean
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  points_cost: number
+  restored_points: number
+}
+
+export interface AdminFulfillmentActionResponse {
+  success: true
+  fulfillment: AdminFulfillmentActionResult
+}
+
+export interface AdminRedemption extends AdminRedemptionTimestamps {
+  id: number
+  user_id: number
+  user: AdminRewardUserContext
+  reward: AdminRewardReference
+  points_cost: number
+  request_id: string
+  status: AdminRedemptionStatusFilter
+  fulfillment_id: number | null
+  fulfillment_status: AdminFulfillmentStatusFilter | null
+  stock_reservation: AdminStockReservation | null
+  restored_points: number
+}
+
+export interface AdminRedemptionsResponse {
+  success: true
+  items: AdminRedemption[]
+  count: number
+}
+
+export interface AdminRedemptionFulfillment {
+  id: number
+  status: AdminFulfillmentStatusFilter
+  issued_at: string | null
+  verified_at: string | null
+  canceled_at: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AdminPointsLedgerEntry {
+  id: number
+  user_id: number
+  transaction_type: string
+  source_module: string
+  source_event_id: string
+  delta: number
+  balance_after: number
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface AdminRedemptionDetail extends AdminRedemption {
+  fulfillment: AdminRedemptionFulfillment | null
+  points_ledger: AdminPointsLedgerEntry[]
+}
+
+export interface AdminRedemptionDetailResponse extends AdminRedemptionDetail {
+  success: true
+}
+
+export interface AdminRewardQueueQuery {
+  user: string
+  reward: string
+  status: AdminFulfillmentStatusFilter
+  fulfillment_status: AdminFulfillmentStatusFilter
+  created_from: string
+  created_to: string
+}
+
+export type AdminAnnouncementTargetRole = Extract<
+  UserRole,
+  | 'student'
+  | 'teacher'
+  | 'enterprise'
+  | 'government'
+  | 'admin'
+  | 'super_admin'
+>
+
+export type AdminAnnouncementStatus = 'draft' | 'published'
+
+export interface AdminDashboardUnavailableMetric {
+  available: false
+  value: null
+}
+
+export type AdminDashboardMetric =
+  | number
+  | AdminDashboardUnavailableMetric
+
+export interface AdminDashboardPendingReview {
+  course_video: AdminDashboardMetric
+  job_position: AdminDashboardMetric
+  handcraft_teaching_video: AdminDashboardMetric
+}
+
+export interface AdminDashboardSnapshot {
+  pending_review: AdminDashboardPendingReview
+  published_course_count: AdminDashboardMetric
+  active_job_count: AdminDashboardMetric
+  comment_processed_count: AdminDashboardMetric
+  report_processed_count: AdminDashboardMetric
+  feedback_processed_count: AdminDashboardMetric
+  reward_stock: AdminDashboardMetric
+  pending_fulfillment_count: AdminDashboardMetric
+  total_users?: AdminDashboardMetric
+  role_distribution?: Partial<
+    Record<AdminAnnouncementTargetRole, AdminDashboardMetric>
+  >
+  student_count?: AdminDashboardMetric
+  policy_count?: AdminDashboardMetric
+  policy_view_count?: AdminDashboardMetric
+  news_count?: AdminDashboardMetric
+  news_view_count?: AdminDashboardMetric
+  points_issued?: AdminDashboardMetric
+  redemption_count?: AdminDashboardMetric
+}
+
+export interface AdminDashboardPayload {
+  success: true
+  dashboard: AdminDashboardSnapshot
+}
+
+export interface AdminAnnouncement {
+  announcement_id: string
+  title: string
+  body: string
+  target_roles: AdminAnnouncementTargetRole[]
+  status: AdminAnnouncementStatus
+  event_id: string
+  created_by: number
+  created_at: string | null
+  published_at: string | null
+}
+
+export interface AdminAnnouncementDelivery {
+  delivered: number
+  recipient_count: number
+  failed: number
+}
+
+export interface AdminAnnouncementsResponse {
+  success: true
+  items: AdminAnnouncement[]
+  count: number
+}
+
+export interface AdminAnnouncementCreatePayload {
+  title: string
+  body: string
+  target_roles: AdminAnnouncementTargetRole[]
+}
+
+export interface AdminAnnouncementResponse {
+  success: true
+  announcement: AdminAnnouncement
+}
+
+export interface AdminAnnouncementPublishResponse {
+  success: true
+  changed: boolean
+  announcement: AdminAnnouncement
+  delivery: AdminAnnouncementDelivery
+}
+
+export type AdminTrainingWeightKey =
+  | 'default'
+  | 'live_script'
+  | 'simulation'
+  | 'copy_training'
+  | 'customer_service'
+
+export type AdminTrainingWeights = Record<AdminTrainingWeightKey, number>
+
+export type AdminPointsExpiryMode = 'permanent' | 'natural_year'
+
+export interface AdminPointsPolicy {
+  version: number
+  rule_version: string
+  seconds_per_point: number
+  training_weights: AdminTrainingWeights
+  daily_limit: number
+  expiry_mode: AdminPointsExpiryMode
+  is_demo: boolean
+  source_available: boolean
+  updated_by: number
+  updated_at: string
+}
+
+export interface AdminPointsPolicyResponse {
+  success: true
+  policy: AdminPointsPolicy
+}
+
+export interface AdminPointsPolicyPayload {
+  expected_version: number
+  seconds_per_point: number
+  training_weights: AdminTrainingWeights
+  daily_limit: number
+  expiry_mode: AdminPointsExpiryMode
 }

@@ -338,13 +338,6 @@ class TestHandcraftRewards(unittest.TestCase):
         self.use_points_policy()
         self.fund_user(1, 100)
         self.fund_user(2, 100)
-        one_stock_rewards = (
-            {
-                **copy.deepcopy(PLACEHOLDER_REWARDS[0]),
-                "stock": 1,
-            },
-            *copy.deepcopy(PLACEHOLDER_REWARDS[1:]),
-        )
         barrier = threading.Barrier(2)
 
         def redeem(user_id: int, request_id: str):
@@ -360,10 +353,16 @@ class TestHandcraftRewards(unittest.TestCase):
                 except AgriValidationError as error:
                     return "error", str(error)
 
+        # Stock now lives in `admin_rewards`, so the one-unit-left
+        # precondition is built through the authoritative table.
+        with self.app.app_context():
+            get_db().execute(
+                "UPDATE admin_rewards SET stock = 1 WHERE reward_id = ?",
+                (PLACEHOLDER_REWARDS[0]["reward_id"],),
+            )
+            get_db().commit()
+
         with patch(
-            "app.handcraft_inheritance.presets.PLACEHOLDER_REWARDS",
-            one_stock_rewards,
-        ), patch(
             "app.handcraft_inheritance.outbox."
             "emit_redemption_succeeded"
         ):

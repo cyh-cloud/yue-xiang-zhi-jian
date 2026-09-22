@@ -14,10 +14,13 @@ from app.admin_console.errors import (
     ProviderUnavailableError,
     ProviderValidationError,
 )
+from app.admin_console.outbox import (
+    deliver_admin_notification,
+    enqueue_admin_notification,
+)
 from app.admin_console.time_utils import platform_now_iso
 from app.auth.validators import validate_registration
 from app.db import get_db
-from app.messaging.events import emit_password_reset
 
 
 MANAGED_ROLES = frozenset(
@@ -290,8 +293,17 @@ def reset_account_password(actor_id: int, user_id: int) -> dict:
             after={"password_version": password_version},
             result="success",
         )
-        emit_password_reset(event_id=event_id, user_id=user_id)
+        outbox_id = enqueue_admin_notification(
+            db,
+            event_type="password_reset",
+            event_id=event_id,
+            payload={"event_id": event_id, "user_id": user_id},
+        )
 
+    # The reset is already committed when delivery runs; a notification failure
+    # must not roll it back, so any failure only leaves the outbox row pending
+    # for a later retry.
+    deliver_admin_notification(outbox_id)
     return {
         "event_id": event_id,
         "account": get_account(user_id),

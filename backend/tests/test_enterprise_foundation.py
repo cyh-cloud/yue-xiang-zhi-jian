@@ -4,11 +4,12 @@ import unittest
 from pathlib import Path
 
 from app import create_app
+from app.admin_console.errors import ProviderNotFoundError
+from app.admin_console.handcraft_review_adapter import (
+    CompositeContentReviewProvider,
+)
 from app.db import get_db
 from app.enterprise_console.errors import ProviderUnavailableError
-from app.teacher_console.errors import (
-    ProviderUnavailableError as SharedProviderUnavailableError,
-)
 from app.enterprise_console.providers import (
     DatabaseJobApplicationIntakeProvider,
     EmptyJobApplicationIntakeProvider,
@@ -20,7 +21,6 @@ from app.enterprise_console.providers import (
     set_job_position_provider,
 )
 from app.enterprise_console.review import (
-    UnavailableContentReviewProvider,
     get_content_review_provider,
     set_content_review_provider,
 )
@@ -615,7 +615,7 @@ class TestEnterpriseFoundation(unittest.TestCase):
             )
             self.assertIsInstance(
                 get_content_review_provider(),
-                UnavailableContentReviewProvider,
+                CompositeContentReviewProvider,
             )
 
     def test_default_providers_expose_placeholder_behavior(self):
@@ -645,7 +645,7 @@ class TestEnterpriseFoundation(unittest.TestCase):
                     content_id="job-1",
                 )
             )
-            with self.assertRaises(SharedProviderUnavailableError):
+            with self.assertRaises(ProviderNotFoundError):
                 get_content_review_provider().submit_for_review(
                     content_type="job_position",
                     content_id="job-1",

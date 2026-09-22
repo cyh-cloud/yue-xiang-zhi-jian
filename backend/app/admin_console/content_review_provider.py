@@ -9,6 +9,10 @@ from app.admin_console.errors import (
     ProviderNotFoundError,
     ProviderValidationError,
 )
+from app.admin_console.outbox import (
+    deliver_admin_notification,
+    enqueue_admin_notification,
+)
 from app.admin_console.time_utils import platform_now_iso
 from app.db import get_db
 
@@ -125,12 +129,6 @@ def _rollback(db: sqlite3.Connection, owns_transaction: bool) -> None:
     else:
         db.execute(f"ROLLBACK TO SAVEPOINT {SAVEPOINT_NAME}")
         db.execute(f"RELEASE SAVEPOINT {SAVEPOINT_NAME}")
-
-
-def emit_review_result(**payload) -> dict:
-    from app.messaging.events import emit_review_result as emit
-
-    return emit(**payload)
 
 
 class DatabaseContentReviewProvider:
@@ -549,20 +547,11 @@ class DatabaseContentReviewProvider:
                 "approved": action == "approve",
                 "opinion": opinion,
             }
-            db.execute(
-                """
-                INSERT INTO admin_notification_outbox (
-                    event_type, event_id, payload_json, created_at
-                )
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (event_type, event_id) DO NOTHING
-                """,
-                (
-                    event_type,
-                    event_id,
-                    _payload_json(outbox_payload),
-                    now,
-                ),
+            outbox_id = enqueue_admin_notification(
+                db,
+                event_type=event_type,
+                event_id=event_id,
+                payload=outbox_payload,
             )
             _finish(db, owns_transaction)
         except Exception:
@@ -570,15 +559,8 @@ class DatabaseContentReviewProvider:
             raise
 
         if owns_transaction:
-            self._deliver_notification(
-                event_id=event_id,
-                submitter_id=normalized_submitter,
-                content_type=normalized_type,
-                content_id=normalized_id,
-                approved=action == "approve",
-                opinion=opinion,
-            )
-        return record
+            deliver_admin_notification(outbox_id)
+        return {**record, "outbox_id": outbox_id}
 
     @staticmethod
     def _load_record(
@@ -805,56 +787,3 @@ class DatabaseContentReviewProvider:
                 record["content_id"],
             ),
         )
-
-    @staticmethod
-    def _deliver_notification(
-        *,
-        event_id: str,
-        submitter_id: int,
-        content_type: str,
-        content_id: str,
-        approved: bool,
-        opinion: str | None,
-    ) -> None:
-        db = get_db()
-        event_type = "review_approved" if approved else "review_rejected"
-        try:
-            emit_review_result(
-                event_id=event_id,
-                submitter_id=submitter_id,
-                content_type=content_type,
-                content_id=content_id,
-                approved=approved,
-                opinion=opinion,
-            )
-        except Exception as error:
-            try:
-                with db:
-                    db.execute(
-                        """
-                        UPDATE admin_notification_outbox
-                        SET status = 'failed',
-                            attempts = attempts + 1,
-                            last_error = ?
-                        WHERE event_type = ? AND event_id = ?
-                        """,
-                        (str(error), event_type, event_id),
-                    )
-            except sqlite3.Error:
-                pass
-            return
-
-        try:
-            with db:
-                db.execute(
-                    """
-                    UPDATE admin_notification_outbox
-                    SET status = 'sent',
-                        attempts = attempts + 1,
-                        sent_at = ?
-                    WHERE event_type = ? AND event_id = ?
-                    """,
-                    (platform_now_iso(), event_type, event_id),
-                )
-        except sqlite3.Error:
-            pass

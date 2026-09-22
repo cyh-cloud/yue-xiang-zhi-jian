@@ -4,8 +4,6 @@ from typing import Protocol
 
 from flask import Flask, current_app
 
-from app.teacher_console.errors import ProviderUnavailableError
-
 
 class ContentReviewProvider(Protocol):
     def submit_for_review(
@@ -116,6 +114,8 @@ class UnavailableContentReviewProvider:
         self._unavailable()
 
     def _unavailable(self):
+        from app.admin_console.errors import ProviderUnavailableError
+
         raise ProviderUnavailableError(
             "内容审核服务暂不可用",
             code="review_unavailable",

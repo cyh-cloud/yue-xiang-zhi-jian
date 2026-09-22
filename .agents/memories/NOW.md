@@ -157,6 +157,74 @@
   Visual content is `待人工复核` because image inspection was not delegated.
 - Task 19 report:
   `.superpowers/sdd/2026-09-18-008-teacher-console/task-19-report.md`.
+## 011 Admin Console
+
+- 2026-09-22: Specification `specs/011-admin-console/spec.md` (Frozen);
+  implementation plan
+  `.agents/memories/plans/2026-09-20-011-admin-console.md`; execution ledger
+  `.superpowers/sdd/2026-09-20-011-admin-console/progress.md` (local only).
+- Branch and worktree: `v2/lixKRT/011-admin-console` in
+  `.worktrees/011-admin-console` (the directory sits inside the main repo, not
+  as a sibling). No merge, push, or worktree cleanup has been performed; the
+  final whole-branch review was run in session 7 over `1a62cf9..12e59b4`:
+  APPROVE (0 Critical / 0 Important / 4 Minor). Task 32 closed at `12e59b4`.
+- Tasks 1-28 closed in earlier sessions. Session 6 (2026-09-22) closed Task
+  29-31 in commit range `356e187..10791eb`:
+  - Task 29 (ordinary-admin dashboard exclusions and metric semantics):
+    `0461dca`, `ef26a19`; task review PASS. The pre-existing
+    `reward_stock 41 vs 9` failure is cleared by deriving the expectation from
+    05 `PLACEHOLDER_REWARDS` stock plus the test's own rows; `seed_demo_rewards`
+    is untouched. Forbidden-key sets are the union of spec FR-102 and the 010
+    historical list (16 keys), asserted recursively on both backend and the
+    Task 13 frontend three-way assertions. The `feedback_records.status`
+    predicate split is closed with a regression test (single counting
+    predicate today; `moderation.py`'s `status <> 'pending'` reads
+    `comment_reports`, which has a CHECK constraint).
+  - Task 30 (frontend permissions, interaction, responsive 320/375/1280):
+    `159a0d9`, `e407aa5`, `9841f37`, `e04cb18`, `f5c7e1a`; task review PASS.
+    Five frontend deferred minors were fixed (nav/route/backend gate split for
+    `/admin/content`, duplicated inline gate predicate, missing
+    responsive/typography assertions, non-idempotent moderation day widening,
+    whole-multiple empty page) and one was verified already compliant (h1
+    mobile font size).
+  - Task 31 (cross-module end-to-end integration with a real `create_app()`):
+    `10791eb`; task review PASS. Production code is unchanged because the
+    install order and unconditional replacement were already correct; 17 new
+    tests drive real authenticated HTTP through 03/05/06/08/09 consumers.
+- Verification at `10791eb`: backend full `unittest discover`
+  `Ran 1277 tests ... OK`; frontend `vitest run` `113 files / 806 tests`
+  passed; `npx tsc -b --noEmit` exit 0.
+- Closing regression at `cd3a93c` (after removing a Task 20 unused type import
+  that `vue-tsc` in `npm run build` flagged and `tsc -b` had missed): backend
+  full `unittest discover` `Ran 1277 tests in 2825.341s ... OK`; frontend
+  `113 files / 806 tests` passed; `tsc -b --noEmit` exit 0; `npm run build`
+  success.
+- Task 32 closed in session 7 at `12e59b4` (full regression + browser acceptance):
+  - 9-area acceptance assertions added (backend `admin_section_names()` derived
+    from the live URL map; frontend role-matrix/route coverage). No production
+    code changed.
+  - Full four-piece at `12e59b4`: backend `Ran 1279 tests in 2881.807s ... OK`
+    (1277 + 2); frontend `113 files / 809 tests` (806 + 3); `tsc -b --noEmit`
+    exit 0; `npm run build` success.
+  - Real browser (agent-browser vs dev :5173 + backend :5000): super-admin 10
+    routes x 320/375/1280 = 30/30 no overflow; ordinary-admin 7 routes x 3 =
+    21/21; the 3 super-admin-only routes redirect ordinary admins at the guard;
+    console errors empty for both roles. 22 screenshots, image-agent OVERALL PASS
+    (2 cosmetic MINOR). Evidence: `.superpowers/.../browser-report.md` (local only).
+- Deferred minor/Info items registered at Task 33 convergence: 27 total
+  (26 open hardening items plus 1 verified-compliant), spread across Task 19
+  (3), Task 20 (1), Task 25 (2), Task 26 (2), Task 27 (4), Task 28 (4),
+  Task 29 (4), Task 30 (3), and Task 31 (4); five further frontend minors were
+  fixed during Task 30. Structural registrations: 06/010 share the
+  `government_employment_statistics_provider` slot key, handcraft's
+  `set_video_review_provider` is a fan-out assembler, the
+  `handcraft_teaching_video` dashboard count is permanently 0 (Task 8 split),
+  and cross-console 401/403 rejection semantics are intentionally not unified.
+- Session 7 additions (all non-blocking, recorded in the plan handoff): one
+  Task-32 cosmetic minor (presets/rewards "新建奖品" heading 3+1 wrap at 320px)
+  plus the final-review minors O1-O4 (comment attribution, conditional
+  content_review slot, AdminPortalView not in the shared list, db.py additive).
+
 ## Integration Branch
 
 - 2026-09-18: `v2/lixKRT/dev` fast-forwarded `e527d34 -> 8e27da8`,

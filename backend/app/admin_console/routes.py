@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from flask import Blueprint, Flask, jsonify, request
 
 from app.admin_console.errors import (
@@ -9,7 +11,11 @@ from app.admin_console.errors import (
     ProviderUnavailableError,
     ProviderValidationError,
 )
+from app.db import get_db
 from app.session_manager import load_session
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 admin_console_bp = Blueprint(
@@ -21,6 +27,13 @@ admin_console_bp = Blueprint(
 
 def require_admin_session(*, roles: set[str]) -> dict:
     session = load_session(required=True, allowed_states={"active"})
+    # `load_session` runs a session-cleanup DELETE that opens a deferred
+    # transaction and only commits it when rows were removed, so the
+    # connection can still hold an empty transaction here. 05's domain
+    # functions open `BEGIN IMMEDIATE` themselves, which fails inside an
+    # open transaction, so the empty transaction is closed the same way 05's
+    # `_student_session` closes it before calling into a domain function.
+    get_db().commit()
     if session["role"] not in roles:
         raise ProviderAccessDeniedError(
             "无管理权限",
@@ -28,6 +41,22 @@ def require_admin_session(*, roles: set[str]) -> dict:
             details={},
         )
     return session
+
+
+def _drain_notification_outbox() -> None:
+    """Best-effort sweep of pending 011 notifications, run after a role guard.
+
+    The announcements surface promises the platform retries a failed send on
+    its own, so reaching it flushes any row a delivery left pending. The sweep
+    is fully isolated: a failure here is logged and never changes the request
+    response.
+    """
+    try:
+        from app.admin_console.outbox import retry_admin_notifications
+
+        retry_admin_notifications()
+    except Exception:
+        LOGGER.exception("Notification outbox retry sweep failed")
 
 
 def _preset_expected_version():
@@ -38,6 +67,25 @@ def _preset_expected_version():
         if isinstance(payload, dict):
             raw = payload.get("expected_version")
     return raw
+
+
+def _admin_actor(session: dict) -> dict:
+    """Build the actor from the 01 session only.
+
+    A client supplied role or id is never read here: the session is the only
+    authorization source, so a forged body cannot widen an action.
+    """
+    return {"id": int(session["id"]), "role": str(session["role"])}
+
+
+def _admin_filters(*names: str) -> dict:
+    """Read the declared filter keys from the query string, ignoring the rest."""
+    filters: dict = {}
+    for name in names:
+        value = request.args.get(name)
+        if value is not None:
+            filters[name] = value
+    return filters
 
 
 @admin_console_bp.get("/dashboard")
@@ -169,6 +217,125 @@ def reject_review_route(content_type: str, content_id: str):
     return jsonify(success=True, item=item)
 
 
+@admin_console_bp.get("/comments")
+def list_moderation_comments_route():
+    from app.admin_console.moderation import list_moderation_comments
+
+    # Both admin roles: the permission matrix puts comment moderation in the
+    # shared content-operations row, and FR-071 names the ordinary admin as
+    # the patrolling role, so this guard follows the review and preset routes
+    # rather than the super-admin-only announcements and policy ones.
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_moderation_comments(
+        _admin_filters(
+            "content_type",
+            "content_id",
+            "author_id",
+            "keyword",
+            "is_visible",
+            "created_from",
+            "created_to",
+            "limit",
+            "offset",
+        )
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.delete("/comments/<comment_id>")
+def delete_comment_route(comment_id: str):
+    from app.admin_console.moderation import delete_comment
+
+    # Same dual-role guard as the patrol list, and the actor comes from the
+    # 01 session only: a body-supplied id or role is never read here.
+    session = require_admin_session(roles={"admin", "super_admin"})
+    result = delete_comment(int(session["id"]), comment_id)
+    # `changed`, `comment_id`, `is_visible` and `updated_at` sit at the top
+    # level so the console can tell a fresh decision from a repeat one
+    # without a second request.
+    return jsonify(success=True, **result)
+
+
+@admin_console_bp.get("/reports")
+def list_reports_route():
+    from app.admin_console.moderation import list_reports
+
+    # Same dual-role guard as the patrol list: the permission matrix keeps
+    # comment moderation, reports and feedback in the shared
+    # content-operations row, and FR-071 names the ordinary admin as the
+    # patrolling role for all three.
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_reports(
+        _admin_filters(
+            "status",
+            "comment_id",
+            "reporter_id",
+            "created_from",
+            "created_to",
+            "limit",
+            "offset",
+        )
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/reports/<report_id>/resolve")
+def resolve_report_route(report_id: str):
+    from app.admin_console.moderation import resolve_report
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    report = resolve_report(
+        int(session["id"]),
+        report_id,
+        payload.get("confirmed"),
+        payload.get("result"),
+    )
+    # `changed` sits at the top level next to the resolved report, so the
+    # console can tell a fresh decision from a repeat submission without a
+    # second request.
+    return jsonify(success=True, report=report, **report)
+
+
+@admin_console_bp.get("/feedback")
+def list_feedback_route():
+    from app.admin_console.moderation import list_feedback
+
+    # Feedback is intake plus an answer, both of which stay inside the
+    # console, so the same dual-role guard as the comment patrol applies.
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_feedback(
+        _admin_filters(
+            "status",
+            "submitter_id",
+            "created_from",
+            "created_to",
+            "limit",
+            "offset",
+        )
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.patch("/feedback/<feedback_id>")
+def update_feedback_route(feedback_id: str):
+    from app.admin_console.moderation import update_feedback
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    feedback = update_feedback(
+        int(session["id"]),
+        feedback_id,
+        payload.get("status"),
+        payload.get("result"),
+    )
+    return jsonify(success=True, feedback=feedback, **feedback)
+
+
 @admin_console_bp.get("/presets/handcraft_crafts")
 def list_handcraft_craft_presets_route():
     from app.admin_console.presets import list_craft_presets
@@ -176,6 +343,88 @@ def list_handcraft_craft_presets_route():
     require_admin_session(roles={"admin", "super_admin"})
     items = list_craft_presets()
     return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.get("/content/<content_type>")
+def list_managed_content_route(content_type: str):
+    from app.admin_console.data_management import list_managed_content
+
+    # Cross-platform data management is a super-admin capability: the
+    # permission matrix (Task 28) keeps ordinary admins out of every
+    # /api/admin/content route, mirroring accounts and dashboard.
+    require_admin_session(roles={"super_admin"})
+    items = list_managed_content(
+        content_type,
+        _admin_filters("status", "review_status", "is_visible", "keyword"),
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.get("/content/<content_type>/<content_id>")
+def get_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import get_managed_content
+
+    require_admin_session(roles={"super_admin"})
+    item = get_managed_content(content_type, content_id)
+    if item is None:
+        raise ProviderNotFoundError(
+            "内容不存在",
+            code="content_not_found",
+            details={"content_type": content_type, "content_id": content_id},
+        )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.put("/content/<content_type>/<content_id>")
+def correct_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import correct_managed_content
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = correct_managed_content(
+        int(session["id"]),
+        content_type,
+        content_id,
+        payload.get("expected_version"),
+        payload,
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.post("/content/<content_type>/<content_id>/unpublish")
+def unpublish_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import unpublish_managed_content
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = unpublish_managed_content(
+        int(session["id"]),
+        content_type,
+        content_id,
+        payload.get("expected_version"),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/content/<content_type>/<content_id>")
+def delete_managed_content_route(content_type: str, content_id: str):
+    from app.admin_console.data_management import delete_managed_content
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = delete_managed_content(
+        int(session["id"]),
+        content_type,
+        content_id,
+        payload.get("expected_version"),
+    )
+    return jsonify(success=True, item=item)
 
 
 @admin_console_bp.post("/presets/handcraft_crafts")
@@ -305,6 +554,343 @@ def delete_assistant_knowledge_preset_route(knowledge_id: str):
         _preset_expected_version(),
     )
     return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/agri_products")
+def list_agri_product_presets_route():
+    from app.admin_console.presets import list_agri_product_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_agri_product_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/agri_products")
+def create_agri_product_preset_route():
+    from app.admin_console.presets import create_agri_product_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_agri_product_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/agri_products/<product_key>")
+def update_agri_product_preset_route(product_key: str):
+    from app.admin_console.presets import update_agri_product_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_agri_product_preset(int(session["id"]), product_key, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/agri_products/<product_key>")
+def delete_agri_product_preset_route(product_key: str):
+    from app.admin_console.presets import disable_agri_product_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_agri_product_preset(
+        int(session["id"]),
+        product_key,
+        _preset_expected_version(),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/agri_calendar")
+def list_agri_calendar_presets_route():
+    from app.admin_console.presets import list_agri_calendar_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_agri_calendar_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/agri_calendar")
+def create_agri_calendar_preset_route():
+    from app.admin_console.presets import create_agri_calendar_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_agri_calendar_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/agri_calendar/<item_id>")
+def update_agri_calendar_preset_route(item_id: str):
+    from app.admin_console.presets import update_agri_calendar_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_agri_calendar_preset(int(session["id"]), item_id, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/agri_calendar/<item_id>")
+def delete_agri_calendar_preset_route(item_id: str):
+    from app.admin_console.presets import disable_agri_calendar_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_agri_calendar_preset(
+        int(session["id"]),
+        item_id,
+        _preset_expected_version(),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/presets/pest_knowledge")
+def list_pest_knowledge_presets_route():
+    from app.admin_console.presets import list_pest_knowledge_presets
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_pest_knowledge_presets()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/presets/pest_knowledge")
+def create_pest_knowledge_preset_route():
+    from app.admin_console.presets import create_pest_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = create_pest_knowledge_preset(int(session["id"]), payload)
+    return jsonify(success=True, item=item), 201
+
+
+@admin_console_bp.put("/presets/pest_knowledge/<item_id>")
+def update_pest_knowledge_preset_route(item_id: str):
+    from app.admin_console.presets import update_pest_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    item = update_pest_knowledge_preset(int(session["id"]), item_id, payload)
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.delete("/presets/pest_knowledge/<item_id>")
+def delete_pest_knowledge_preset_route(item_id: str):
+    from app.admin_console.presets import disable_pest_knowledge_preset
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    item = disable_pest_knowledge_preset(
+        int(session["id"]),
+        item_id,
+        _preset_expected_version(),
+    )
+    return jsonify(success=True, item=item)
+
+
+@admin_console_bp.get("/rewards")
+def list_rewards_route():
+    from app.admin_console.rewards import list_rewards_admin
+
+    require_admin_session(roles={"admin", "super_admin"})
+    items = list_rewards_admin()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.post("/rewards")
+def create_reward_route():
+    from app.admin_console.rewards import create_reward
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    reward = create_reward(int(session["id"]), payload)
+    return jsonify(success=True, reward=reward), 201
+
+
+@admin_console_bp.put("/rewards/<reward_id>")
+def update_reward_route(reward_id: str):
+    from app.admin_console.rewards import update_reward
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    reward = update_reward(
+        int(session["id"]),
+        reward_id,
+        payload.get("expected_version"),
+        payload,
+    )
+    return jsonify(success=True, reward=reward)
+
+
+@admin_console_bp.post("/rewards/<reward_id>/online")
+def set_reward_online_route(reward_id: str):
+    from app.admin_console.rewards import set_reward_online
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    # An omitted flag means "put it online", matching the route name.
+    reward = set_reward_online(
+        int(session["id"]),
+        reward_id,
+        payload.get("expected_version"),
+        payload.get("online", True),
+    )
+    return jsonify(success=True, reward=reward)
+
+
+@admin_console_bp.get("/redemptions")
+def list_redemptions_route():
+    from app.admin_console.rewards import list_redemptions
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    items = list_redemptions(
+        _admin_actor(session),
+        _admin_filters(
+            "user",
+            "reward",
+            "status",
+            "fulfillment_status",
+            "created_from",
+            "created_to",
+        ),
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.get("/redemptions/<int:redemption_id>")
+def get_redemption_route(redemption_id: int):
+    from app.admin_console.rewards import get_redemption_detail
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    redemption = get_redemption_detail(
+        _admin_actor(session),
+        redemption_id,
+    )
+    # The redemption context is the response body itself, so the console
+    # reads `user`, `points_ledger` and the redemption fields directly.
+    return jsonify(success=True, **redemption)
+
+
+@admin_console_bp.get("/fulfillments")
+def list_fulfillments_route():
+    from app.admin_console.rewards import list_fulfillments
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    items = list_fulfillments(
+        _admin_actor(session),
+        _admin_filters(
+            "user",
+            "reward",
+            "status",
+            "fulfillment_status",
+            "created_from",
+            "created_to",
+        ),
+    )
+    return jsonify(success=True, items=items, count=len(items))
+
+
+def _fulfillment_action_response(fulfillment_id: int, action: str):
+    from app.admin_console.rewards import apply_fulfillment_action
+
+    session = require_admin_session(roles={"admin", "super_admin"})
+    result = apply_fulfillment_action(
+        _admin_actor(session),
+        fulfillment_id,
+        action,
+    )
+    return jsonify(success=True, fulfillment=result)
+
+
+@admin_console_bp.post("/fulfillments/<int:fulfillment_id>/issue")
+def issue_fulfillment_route(fulfillment_id: int):
+    return _fulfillment_action_response(fulfillment_id, "issue")
+
+
+@admin_console_bp.post("/fulfillments/<int:fulfillment_id>/cancel")
+def cancel_fulfillment_route(fulfillment_id: int):
+    return _fulfillment_action_response(fulfillment_id, "cancel")
+
+
+@admin_console_bp.post("/fulfillments/<int:fulfillment_id>/verify")
+def verify_fulfillment_route(fulfillment_id: int):
+    return _fulfillment_action_response(fulfillment_id, "verify")
+
+
+@admin_console_bp.get("/announcements")
+def list_announcements_route():
+    from app.admin_console.system_announcements import list_announcements
+
+    # Super admin only: the permission matrix keeps announcements invisible
+    # and unoperable for an ordinary admin, so the guard runs before any
+    # announcement row is read.
+    require_admin_session(roles={"super_admin"})
+    _drain_notification_outbox()
+    items = list_announcements()
+    return jsonify(success=True, items=items, count=len(items))
+
+
+@admin_console_bp.get("/points-policy")
+def get_points_policy_route():
+    from app.admin_console.points_policy import get_points_policy
+
+    # Super admin only: the permission matrix keeps the whole points-policy
+    # surface, read included, out of the ordinary admin's console, so the
+    # guard runs before any policy row is read.
+    require_admin_session(roles={"super_admin"})
+    return jsonify(success=True, policy=get_points_policy())
+
+
+@admin_console_bp.put("/points-policy")
+def update_points_policy_route():
+    from app.admin_console.points_policy import update_points_policy
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    # The optimistic-lock token travels inside the body; the service refuses
+    # a body that is missing it instead of defaulting to the stored version.
+    policy = update_points_policy(
+        int(session["id"]),
+        payload,
+        payload.get("expected_version"),
+    )
+    return jsonify(success=True, policy=policy)
+
+
+@admin_console_bp.post("/announcements")
+def create_announcement_route():
+    from app.admin_console.system_announcements import create_announcement
+
+    session = require_admin_session(roles={"super_admin"})
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        payload = {}
+    announcement = create_announcement(int(session["id"]), payload)
+    return jsonify(success=True, announcement=announcement), 201
+
+
+@admin_console_bp.post("/announcements/<announcement_id>/publish")
+def publish_announcement_route(announcement_id: str):
+    from app.admin_console.system_announcements import publish_announcement
+
+    session = require_admin_session(roles={"super_admin"})
+    _drain_notification_outbox()
+    result = publish_announcement(int(session["id"]), announcement_id)
+    return jsonify(success=True, **result)
 
 
 def _error_response(error, status: int):

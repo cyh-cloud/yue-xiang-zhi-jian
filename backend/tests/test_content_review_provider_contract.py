@@ -156,7 +156,7 @@ class TestContentReviewProviderContract(unittest.TestCase):
 
     def test_placeholder_implements_complete_protocol(self):
         with self.app.app_context():
-            provider = get_content_review_provider()
+            provider = UnavailableContentReviewProvider()
             self.assertIsInstance(provider, UnavailableContentReviewProvider)
             self.assertIsNone(
                 provider.get_review_status(

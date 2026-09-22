@@ -10,6 +10,11 @@ from app.ai_companion.routes import (
 from app.agri_skills import install_default_agri_services
 from app.agri_skills.messaging_provider import AgriMessagingProvider
 from app.agri_skills.routes import agri_skills_bp
+from app.admin_console import (
+    admin_console_bp,
+    install_default_admin_services,
+    register_admin_console_error_handlers,
+)
 from app.auth.routes import auth_bp
 from app.config import build_config
 from app.courses.routes import student_courses_bp
@@ -96,6 +101,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     install_default_government_services(app)
     install_default_local_resource_services(app)
     install_default_ai_companion_services(app)
+    install_default_admin_services(app)
     existing_messaging_provider = app.extensions.get("messaging_source_provider")
     register_messaging_source_provider(
         app,
@@ -153,6 +159,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     app.register_blueprint(handcraft_inheritance_bp)
     app.register_blueprint(government_bp)
     app.register_blueprint(local_resources_bp)
+    app.register_blueprint(admin_console_bp)
     app.register_blueprint(teacher_console_bp)
     app.register_blueprint(teacher_media_bp)
     app.register_blueprint(ai_companion_bp)
@@ -160,6 +167,7 @@ def create_app(test_config: dict | None = None) -> Flask:
     register_enterprise_console_error_handlers(app)
     register_handcraft_inheritance_error_handlers(app)
     register_job_matching_error_handlers(app)
+    register_admin_console_error_handlers(app)
     register_teacher_console_error_handlers(app)
     register_ai_companion_error_handlers(app)
 

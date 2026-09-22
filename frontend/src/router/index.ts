@@ -7,7 +7,17 @@ import AgriCoursesView from '@/views/AgriCoursesView.vue'
 import AgriDiagnosisView from '@/views/AgriDiagnosisView.vue'
 import AgriQaView from '@/views/AgriQaView.vue'
 import AgriSkillsHomeView from '@/views/AgriSkillsHomeView.vue'
+import AdminAccountsView from '@/views/AdminAccountsView.vue'
+import AdminAnnouncementsView from '@/views/AdminAnnouncementsView.vue'
+import AdminContentManagementView from '@/views/AdminContentManagementView.vue'
+import AdminDashboardView from '@/views/AdminDashboardView.vue'
+import AdminModerationView from '@/views/AdminModerationView.vue'
 import AdminPortalView from '@/views/AdminPortalView.vue'
+import AdminPresetsView from '@/views/AdminPresetsView.vue'
+import AdminPointsPolicyView from '@/views/AdminPointsPolicyView.vue'
+import AdminRedemptionsView from '@/views/AdminRedemptionsView.vue'
+import AdminReviewView from '@/views/AdminReviewView.vue'
+import AdminRewardsView from '@/views/AdminRewardsView.vue'
 import CourseCatalogView from '@/views/CourseCatalogView.vue'
 import EcommerceCopyTrainingView from '@/views/EcommerceCopyTrainingView.vue'
 import EcommerceCoursesView from '@/views/EcommerceCoursesView.vue'
@@ -52,6 +62,14 @@ import TeacherPortalView from '@/views/TeacherPortalView.vue'
 import { authGuard } from './roleRoutes'
 
 const teacherMeta = { requiresAuth: true, roles: ['teacher'] as const }
+const adminMeta = {
+  requiresAuth: true,
+  roles: ['super_admin', 'admin'] as const
+}
+const superAdminMeta = {
+  requiresAuth: true,
+  roles: ['super_admin'] as const
+}
 
 const localResourceViewLoaders = import.meta.glob<{
   default: RouteComponent
@@ -403,9 +421,75 @@ const router = createRouter({
     },
     {
       path: '/admin',
-      name: 'admin-portal',
       component: AdminPortalView,
-      meta: { requiresAuth: true, roles: ['super_admin', 'admin'] }
+      meta: adminMeta,
+      children: [
+        {
+          path: '',
+          name: 'admin-portal',
+          redirect: '/admin/dashboard'
+        },
+        {
+          path: 'dashboard',
+          name: 'admin-dashboard',
+          component: AdminDashboardView,
+          meta: adminMeta
+        },
+        {
+          path: 'review',
+          name: 'admin-review',
+          component: AdminReviewView,
+          meta: adminMeta
+        },
+        {
+          path: 'moderation',
+          name: 'admin-moderation',
+          component: AdminModerationView,
+          meta: adminMeta
+        },
+        {
+          path: 'presets',
+          name: 'admin-presets',
+          component: AdminPresetsView,
+          meta: adminMeta
+        },
+        {
+          path: 'rewards',
+          name: 'admin-rewards',
+          component: AdminRewardsView,
+          meta: adminMeta
+        },
+        {
+          path: 'redemptions',
+          name: 'admin-redemptions',
+          component: AdminRedemptionsView,
+          meta: adminMeta
+        },
+        {
+          path: 'accounts',
+          name: 'admin-accounts',
+          component: AdminAccountsView,
+          meta: superAdminMeta
+        },
+        {
+          path: 'points-policy',
+          name: 'admin-points-policy',
+          component: AdminPointsPolicyView,
+          meta: superAdminMeta
+        },
+        {
+          path: 'content',
+          name: 'admin-content',
+          component: AdminContentManagementView,
+          meta: adminMeta
+        },
+        {
+          path: 'announcements',
+          name: 'admin-announcements',
+          component: AdminAnnouncementsView,
+          meta: superAdminMeta
+        }
+      ]
     }
   ]
 })

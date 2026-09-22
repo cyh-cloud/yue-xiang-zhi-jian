@@ -536,7 +536,7 @@ class EmploymentStatisticsProvider(Protocol):
 | 11 → 05 | 履约管理 | 已存在 | 11 spec | 11 实现生产来源；05 现行 `FulfillmentAdminActionProvider` 是消费契约 |
 | 11 → 05 | 积分规则（含离散行为权重） | 已存在 | 11 spec | 11 实现规则源；05 现行 `PointsPolicyProvider` 是消费契约 |
 | 11 → 06/12 | 预置内容、功能说明知识库 | 未定义 | 11 spec | 11 实现 producer；06/12 接入 |
-| 11 → 10/11 | 全平台统计读取 | 未定义 | 11 spec | 11 实现 producer；10/11 为 consumer |
+| 11 → 11 | 全平台统计读取 | 已冻结：011 内部服务 | 11 spec | 11 内部看板读取；010 当前无 11 统计 provider 槽；若未来 010 需要，先修订 010 consumer spec 再新增槽 |
 | 03/04/05 → 07 | 技能档案读取 | outcome 读取函数已存在；跨模块聚合 provider 未定义 | 07 spec | 03/04/05 保持现有 outcome 产出；07 定义聚合、可见范围和投递快照；09 消费 |
 | 01 → 全部 | 会话与角色 | 已存在 | 01 spec | 全部模块复用，不建立第二套会话或角色 |
 | 02 → 全部 | 通知投递 | 已存在 | 02 spec | 全部模块经 02 投递，不建立第二套通知 |
@@ -609,3 +609,26 @@ class EmploymentStatisticsProvider(Protocol):
   全平台统计的生产者。
 - 07 拥有技能档案聚合契约，09 只消费，03/04/05 不新造第二套档案结构。
 - 01 会话/角色与 02 通知永远直接复用，不建立旁路。
+
+## 011 Provider Additions
+
+- `assistant_feature_knowledge_provider`: Protocol and consumer 12 contract.
+  011 冻结并实现 `DatabaseAssistantFeatureKnowledgeProvider`；消费者 12 尚未
+  落地，接入时只依赖 Protocol 签名。
+- `feedback_intake_provider`: Protocol and consumer 07/12 intake contract.
+  011 冻结并实现 `DatabaseFeedbackIntakeProvider`，写 `feedback_records`；
+  提交入口归 07/12，11 只提供接收契约与管理列表。
+- 011 落定后其余槽的最终形状（Task 27/31 验收证据）：
+  `content_review_provider` = `CompositeContentReviewProvider`（三类统一审核
+  真实现，08/09 直连，05 走视频适配器）；
+  `agri_preset_provider` / `handcraft_craft_preset_provider` /
+  `local_resource_case_provider` / `handcraft_reward_catalog_provider` 在
+  `create_app` 中被无条件替换为 011 数据库实现（03/05/06 的占位或默认实现
+  不保留）；`handcraft_points_policy_provider` 与 `admin_points_policy_provider`
+  由同一 `DatabasePointsPolicyProvider` 实例扇出。
+- 共享槽登记（Task 27，不动代码）：06/010 的
+  `set_employment_statistics_provider` 写同一槽键
+  `government_employment_statistics_provider`（全仓唯一多写者共享槽）；
+  handcraft 的 `set_video_review_provider` 是扇出装配器，不写槽键。
+- 已知割裂登记：`handcraft_teaching_video` 的普管看板待审核计数恒为 0
+  （Task 8 既有的 05 视频状态与 11 通用审核投影割裂，未在本分支修复）。
