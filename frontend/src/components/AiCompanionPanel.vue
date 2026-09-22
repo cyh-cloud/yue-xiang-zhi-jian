@@ -505,6 +505,9 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  /* grid item 默认 min-width:auto 会把隐式轨道撑到 min-content；显式归零后
+     轨道才收缩到面板内容宽，方言按钮按 flex-wrap 换行。 */
+  min-width: 0;
 }
 
 .ai-companion-dialect {
@@ -530,6 +533,9 @@ onMounted(() => {
   display: flex;
   align-items: flex-end;
   gap: 8px;
+  /* 同上：320px 下该行 min-content≈304 超过面板内容宽 254，不归零会把
+     发送按钮推出视口右缘。 */
+  min-width: 0;
 }
 
 .ai-companion-composer-input {

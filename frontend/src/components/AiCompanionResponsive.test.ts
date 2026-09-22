@@ -197,6 +197,22 @@ describe('AiCompanion responsive CSS contract', () => {
       expect(body).toContain('flex: 1 1 auto')
       expect(body).toContain('min-height: 0')
     })
+
+    // 320px 浏览器验收实证：面板内容宽 254，composer 行的 min-content≈304，
+    // grid item 默认 min-width:auto 会把隐式轨道撑到 304，发送按钮因此越过
+    // 面板右边框并被视口裁切。两个 grid item 显式归零后轨道随容器收缩。
+    it('lets the composer grid items shrink past their min-content', () => {
+      expect(cssRule(panelSource, '.ai-companion-dialects')).toContain(
+        'min-width: 0'
+      )
+      expect(cssRule(panelSource, '.ai-companion-composer-row')).toContain(
+        'min-width: 0'
+      )
+      // textarea 是行内唯一可压缩项，仍须保持归零，轨道收缩才会传导到它。
+      expect(cssRule(panelSource, '.ai-companion-composer-input')).toContain(
+        'min-width: 0'
+      )
+    })
   })
 })
 
