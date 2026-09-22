@@ -205,7 +205,7 @@
 - Consumes: `app.db.get_db`, existing SQLite connection helpers.
 - Produces: `ProviderError`, `ProviderValidationError`, `ProviderNotFoundError`, `ProviderConflictError`, `ProviderUnavailableError`, `ProviderAccessDeniedError`; `platform_now_iso() -> str`; `record_admin_audit(db, *, actor_id: int, action: str, target_type: str, target_id: str, before: dict | None, after: dict | None, result: str) -> int`; tables `admin_audit_log`, `admin_notification_outbox`, `content_review_records`, `platform_points_policy`, `admin_rewards`, `comment_reports`, `feedback_records`, `admin_assistant_feature_knowledge`, `admin_agri_products`, `admin_agri_calendar`, `admin_pest_knowledge`, `admin_handcraft_crafts`, `system_announcements`.
 
-- [ ] **Step 1: Write failing schema and error tests**
+- [x] **Step 1: Write failing schema and error tests**
 
 ```python
 def test_admin_foundation_tables_and_provider_errors(self):
@@ -221,13 +221,13 @@ def test_admin_foundation_tables_and_provider_errors(self):
     self.assertEqual(ProviderConflictError("x", code="c", details={}).code, "c")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation -v`
 
 Expected: FAIL with `ModuleNotFoundError: app.admin_console`.
 
-- [ ] **Step 3: Add schema and foundation implementation**
+- [x] **Step 3: Add schema and foundation implementation**
 
 ```python
 class ProviderError(RuntimeError):
@@ -260,13 +260,13 @@ CREATE TABLE IF NOT EXISTS content_review_records (
 
 `admin_audit_log` stores `actor_id`, `action`, `target_type`, `target_id`, `before_json`, `after_json`, `result`, `created_at`. `admin_notification_outbox` stores `event_type`, `event_id`, `payload_json`, `status`, `attempts`, `last_error`, `created_at`, `sent_at` with unique `(event_type, event_id)`.
 
-- [ ] **Step 4: Run foundation tests**
+- [x] **Step 4: Run foundation tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console backend/app/db.py backend/tests/test_admin_console_foundation.py
@@ -285,7 +285,7 @@ git commit -m "实现 011 后台基础表与错误层级"
 - Consumes: Task 1 errors and table constants.
 - Produces: `AssistantFeatureKnowledgeProvider`, `FeedbackIntakeProvider`, `DatabaseAssistantFeatureKnowledgeProvider`, `DatabaseFeedbackIntakeProvider`, `UnavailableAssistantFeatureKnowledgeProvider`, `UnavailableFeedbackIntakeProvider`; `set_assistant_feature_knowledge_provider`, `get_assistant_feature_knowledge_provider`, `set_feedback_intake_provider`, `get_feedback_intake_provider`, `configure_admin_providers`, `install_default_admin_services`.
 
-- [ ] **Step 1: Write failing registration tests**
+- [x] **Step 1: Write failing registration tests**
 
 ```python
 def test_admin_provider_slots_use_single_registry(self):
@@ -302,13 +302,13 @@ def test_admin_provider_slots_use_single_registry(self):
     )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation.AdminConsoleFoundationTests.test_admin_provider_slots_use_single_registry -v`
 
 Expected: FAIL because provider functions do not exist.
 
-- [ ] **Step 3: Implement provider registration**
+- [x] **Step 3: Implement provider registration**
 
 ```python
 def set_assistant_feature_knowledge_provider(app: Flask, provider) -> None:
@@ -328,13 +328,13 @@ feedback default slots. T007/T008/T010/T016/T021/T022 extend that same function
 to replace the known 03/05 placeholder slots with admin true providers; this is
 the single producer replacement point required by the provider contract.
 
-- [ ] **Step 4: Run registration tests**
+- [x] **Step 4: Run registration tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/providers.py backend/app/admin_console/__init__.py backend/app/__init__.py backend/tests/test_admin_console_foundation.py
@@ -353,7 +353,7 @@ git commit -m "注册 011 管理后台 provider 槽"
 - Consumes: `load_session`, Task 1 errors.
 - Produces: `admin_console_bp` at `/api/admin`; `require_admin_session(*, roles: set[str]) -> dict`; `register_admin_console_error_handlers(app) -> None`; JSON error shape `{success:false, code, message, details}`.
 
-- [ ] **Step 1: Write failing role and error tests**
+- [x] **Step 1: Write failing role and error tests**
 
 ```python
 def test_anonymous_admin_request_is_rejected(self):
@@ -369,13 +369,13 @@ def test_provider_conflict_maps_to_409(self):
     self.assertEqual(response.status_code, 409)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_permissions -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement blueprint and handlers**
+- [x] **Step 3: Implement blueprint and handlers**
 
 ```python
 admin_console_bp = Blueprint("admin_console", __name__, url_prefix="/api/admin")
@@ -394,13 +394,13 @@ def require_admin_session(*, roles: set[str]) -> dict:
 
 Register handlers for `ProviderValidationError -> 400`, `ProviderAccessDeniedError -> 403`, `ProviderNotFoundError -> 404`, `ProviderConflictError -> 409`, `ProviderUnavailableError -> 503`.
 
-- [ ] **Step 4: Run permission tests**
+- [x] **Step 4: Run permission tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_permissions -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/routes.py backend/app/admin_console/__init__.py backend/app/__init__.py backend/tests/test_admin_permissions.py
@@ -424,7 +424,7 @@ git commit -m "建立 011 管理后台路由与权限边界"
 - Consumes: existing `apiFetch`, `ApiError`, `useAuthStore`, Ark CSS variables.
 - Produces: admin DTO types; `useAdminConsoleStore`; nav links `/admin`, `/admin/review`, `/admin/moderation`, `/admin/presets`, `/admin/rewards`, `/admin/redemptions`, `/admin/accounts`, `/admin/points-policy`, `/admin/content`, `/admin/announcements`; role-filtered nav.
 
-- [ ] **Step 1: Write failing route/nav tests**
+- [x] **Step 1: Write failing route/nav tests**
 
 ```ts
 it('hides super-admin-only links from ordinary admins', async () => {
@@ -437,13 +437,13 @@ it('hides super-admin-only links from ordinary admins', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/stores/adminConsole.test.ts src/views/AdminConsoleResponsive.test.ts`
 
 Expected: FAIL because files do not exist.
 
-- [ ] **Step 3: Implement shell and route scaffolding**
+- [x] **Step 3: Implement shell and route scaffolding**
 
 ```ts
 export interface AdminDashboardResponse {
@@ -456,13 +456,13 @@ const adminMeta = { requiresAuth: true, roles: ['super_admin', 'admin'] as const
 
 `AdminPortalView.vue` renders `AdminConsoleNav` and `<RouterView />`; `/admin` redirects to `/admin/dashboard`; each child route uses `adminMeta`. `AdminMetricGroup.vue` renders stable metric tiles with `data-test` per metric.
 
-- [ ] **Step 4: Run frontend unit tests**
+- [x] **Step 4: Run frontend unit tests**
 
 Run: `cd frontend; npm test -- --run src/stores/adminConsole.test.ts src/views/AdminConsoleResponsive.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/components/AdminConsoleNav.vue frontend/src/components/AdminMetricGroup.vue frontend/src/stores/adminConsole.ts frontend/src/stores/adminConsole.test.ts frontend/src/views/AdminPortalView.vue frontend/src/views/AdminConsoleResponsive.test.ts frontend/src/router/index.ts frontend/src/api/types.ts frontend/src/data/portal-guides.ts
@@ -480,7 +480,7 @@ git commit -m "搭建 011 管理后台前端壳"
 - Consumes: `get_db`, `get_employment_statistics_provider`, existing course/job/policy/news/comments/points/reward/fulfillment tables.
 - Produces: `get_super_admin_dashboard() -> dict`; `get_content_operations_dashboard() -> dict`; `assert_admin_dashboard_boundary(dashboard: dict) -> None`; routes `GET /api/admin/dashboard` and `GET /api/admin/content-dashboard`.
 
-- [ ] **Step 1: Write failing metric and exclusion tests**
+- [x] **Step 1: Write failing metric and exclusion tests**
 
 ```python
 def test_content_dashboard_recursively_excludes_user_and_training_keys(self):
@@ -496,13 +496,13 @@ def test_content_dashboard_recursively_excludes_user_and_training_keys(self):
     self.assertEqual(dashboard["pending_review"]["course_video"], 2)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_dashboard -v`
 
 Expected: FAIL with 404 or missing keys.
 
-- [ ] **Step 3: Implement both dashboard projections**
+- [x] **Step 3: Implement both dashboard projections**
 
 ```python
 def get_content_operations_dashboard() -> dict:
@@ -526,13 +526,13 @@ def get_content_operations_dashboard() -> dict:
 
 `get_super_admin_dashboard()` additionally returns role counts, student count, pending review counts, policy/news counts and views, points issued, redemption count, and pending fulfillment count. Source failures return `{"available": false, "value": None}` for that metric.
 
-- [ ] **Step 4: Run dashboard tests**
+- [x] **Step 4: Run dashboard tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_dashboard -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/dashboard.py backend/app/admin_console/routes.py backend/tests/test_admin_dashboard.py
@@ -552,7 +552,7 @@ git commit -m "实现 011 双角色看板"
 - Consumes: `generate_password_hash`, `validate_registration`, `record_admin_audit`, `emit_password_reset`.
 - Produces: `list_accounts(role: str | None = None, keyword: str | None = None) -> list[dict]`; `get_account(user_id: int) -> dict`; `create_managed_account(actor_id: int, payload: dict) -> dict`; `set_account_enabled(actor_id: int, user_id: int, enabled: bool) -> dict`; `reset_account_password(actor_id: int, user_id: int) -> dict`; `seed_initial_super_admin() -> int | None`.
 
-- [ ] **Step 1: Write failing account lifecycle tests**
+- [x] **Step 1: Write failing account lifecycle tests**
 
 ```python
 def test_create_disable_reset_and_login_with_initial_password(self):
@@ -576,13 +576,13 @@ def test_create_disable_reset_and_login_with_initial_password(self):
     self.assertTrue(reset["success"])
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_accounts -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement account operations and seed**
+- [x] **Step 3: Implement account operations and seed**
 
 ```python
 MANAGED_ROLES = {"enterprise", "government", "admin", "super_admin"}
@@ -626,13 +626,13 @@ def create_managed_account(actor_id: int, payload: dict) -> dict:
 
 `reset_account_password()` writes a hash of the configured initial password, enqueues `password_reset` with event ID `admin-password-reset:{user_id}:{version}`, and returns the event ID. `seed_initial_super_admin()` inserts `superadmin` only when `COUNT(*) FROM users WHERE role='super_admin'` is zero; password comes from `INITIAL_SUPER_ADMIN_PASSWORD` and is never persisted in plaintext.
 
-- [ ] **Step 4: Run account tests**
+- [x] **Step 4: Run account tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_accounts -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/accounts.py backend/app/admin_console/seed.py backend/app/admin_console/routes.py backend/app/db.py backend/tests/test_admin_accounts.py
@@ -651,7 +651,7 @@ git commit -m "实现 011 账户与权限管理"
 - Consumes: Task 1 `content_review_records`, Task 2 provider registry, Task 3 errors.
 - Produces: `DatabaseContentReviewProvider` implementing `ContentReviewProvider` for `course_video` and `job_position`, plus internal `list_review_items(content_type: str | None = None) -> list[dict]`; internal `_sync_course_projection(db, record)` and `_sync_job_projection(db, record)`.
 
-- [ ] **Step 1: Write failing state-machine tests**
+- [x] **Step 1: Write failing state-machine tests**
 
 ```python
 def test_rejected_can_be_edited_back_to_pending_without_stale_opinion(self):
@@ -694,13 +694,13 @@ def test_provider_lists_course_and_job_review_items_with_counts(self):
     )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_content_review -v`
 
 Expected: FAIL because `DatabaseContentReviewProvider` does not exist.
 
-- [ ] **Step 3: Implement provider methods and projections**
+- [x] **Step 3: Implement provider methods and projections**
 
 ```python
 class DatabaseContentReviewProvider:
@@ -726,13 +726,13 @@ class DatabaseContentReviewProvider:
 domain tombstones, and returns deterministic `(updated_at, content_id)` order.
 It never returns payload-only records for deleted content.
 
-- [ ] **Step 4: Run content-review tests**
+- [x] **Step 4: Run content-review tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_content_review tests.test_content_review_provider_contract -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/content_review_provider.py backend/app/admin_console/providers.py backend/app/content_review/providers.py backend/tests/test_admin_content_review.py
@@ -751,7 +751,7 @@ git commit -m "实现 011 课程职位审核 provider"
 - Consumes: 05 `get_teaching_video_provider()`, `apply_video_review()`, `AgriValidationError`, `AgriNotFoundError`, `AgriAccessError`, Task 1 errors.
 - Produces: `HandcraftTeachingVideoReviewAdapter` implementing all `ContentReviewProvider` methods plus internal `list_review_items(content_type: str) -> list[dict]`; `CompositeContentReviewProvider` routing course/job to `DatabaseContentReviewProvider`, video actions to the adapter, and `list_review_items()` to the matching producer; default `content_review_provider` registration.
 
-- [ ] **Step 1: Write failing mapping and unsupported-capability tests**
+- [x] **Step 1: Write failing mapping and unsupported-capability tests**
 
 ```python
 def test_adapter_maps_approve_and_reject_to_05_apply(self):
@@ -813,13 +813,13 @@ def test_adapter_distinguishes_validation_not_found_and_access_errors(self):
                 )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_handcraft_review_adapter -v`
 
 Expected: FAIL because adapter does not exist.
 
-- [ ] **Step 3: Implement exact 05 mapping**
+- [x] **Step 3: Implement exact 05 mapping**
 
 ```python
 def approve(self, *, content_type, content_id, submitter_id,
@@ -852,13 +852,13 @@ def approve(self, *, content_type, content_id, submitter_id,
 
 `submit_for_review()` calls `get_video(video_id)`, rejects missing or `rejected` records, and maps only `pending`/`approved` records with changed payload to `apply_video_review(action="edit")`. It never inserts into `heritage_videos`. `list_review_items()` calls `get_teaching_video_provider().list_videos()` and normalizes records for the queue without direct database access.
 
-- [ ] **Step 4: Run adapter tests**
+- [x] **Step 4: Run adapter tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_handcraft_review_adapter tests.test_handcraft_admin_actions -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/handcraft_review_adapter.py backend/app/admin_console/providers.py backend/app/handcraft_inheritance/providers.py backend/tests/test_admin_handcraft_review_adapter.py
@@ -880,7 +880,7 @@ git commit -m "适配 011 与 05 非遗视频审核"
 - Consumes: Task 7 provider, Task 8 composite provider, Task 3 session helper.
 - Produces: `list_review_queue(content_type: str | None = None) -> dict` with `items` and `counts`; `approve_review(actor: dict, *, content_type, content_id, expected_version) -> dict`; `reject_review(actor: dict, *, content_type, content_id, expected_version, opinion) -> dict`; routes `GET /api/admin/review`, `POST /api/admin/review/<content_type>/<content_id>/approve`, `POST .../reject`.
 
-- [ ] **Step 1: Write failing queue and action tests**
+- [x] **Step 1: Write failing queue and action tests**
 
 ```python
 def test_queue_lists_three_content_types_with_counts(self):
@@ -895,13 +895,13 @@ def test_queue_lists_three_content_types_with_counts(self):
     )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_content_review -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement queue, routes, and view**
+- [x] **Step 3: Implement queue, routes, and view**
 
 ```python
 def list_review_queue(content_type: str | None = None) -> dict:
@@ -920,7 +920,7 @@ service never reads `heritage_videos` or 05 tables directly.
 
 `AdminReviewView.vue` renders a segmented `content_type` filter, three counts, a table with status/version/submitter/updated time, and approve/reject dialogs. Reject dialog uses a 500-character counter and disables submit when trimmed length is zero.
 
-- [ ] **Step 4: Run backend and frontend review tests**
+- [x] **Step 4: Run backend and frontend review tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_content_review -v`
 
@@ -928,7 +928,7 @@ Run: `cd frontend; npm test -- --run src/views/AdminReviewView.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/content_review_service.py backend/app/admin_console/routes.py backend/tests/test_admin_content_review.py frontend/src/views/AdminReviewView.vue frontend/src/views/AdminReviewView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -948,7 +948,7 @@ git commit -m "实现 011 统一审核队列与页面"
 - Consumes: Task 1 `admin_rewards` and existing `reward_stock_reservations`, Task 2 registry.
 - Produces: `DatabaseRewardCatalogProvider.list_rewards()`, `reserve_stock(reward_id, quantity, reservation_id) -> str | None`, `release_stock(reservation_id) -> bool`; `list_rewards_admin()`, `create_reward(actor_id, payload)`, `update_reward(actor_id, reward_id, expected_version, payload)`, `set_reward_online(actor_id, reward_id, expected_version, online)`; routes `GET/POST /api/admin/rewards`, `PUT /api/admin/rewards/<reward_id>`, `POST /api/admin/rewards/<reward_id>/online`.
 
-- [ ] **Step 1: Write failing catalog and stock tests**
+- [x] **Step 1: Write failing catalog and stock tests**
 
 ```python
 def test_admin_created_reward_is_immediately_visible_to_05(self):
@@ -968,13 +968,13 @@ def test_offline_reward_cannot_reserve_stock(self):
     )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_rewards_fulfillment -v`
 
 Expected: FAIL because admin reward routes/provider do not exist.
 
-- [ ] **Step 3: Implement reward table and provider**
+- [x] **Step 3: Implement reward table and provider**
 
 ```python
 class DatabaseRewardCatalogProvider:
@@ -1000,13 +1000,13 @@ class DatabaseRewardCatalogProvider:
 
 `admin_rewards` columns are `reward_id TEXT PRIMARY KEY`, `name`, `points_cost INTEGER CHECK(points_cost > 0)`, `stock INTEGER CHECK(stock >= 0)`, `is_online INTEGER`, `source_available INTEGER`, `version INTEGER`, `created_at`, `updated_at`. Reservation and release use `BEGIN IMMEDIATE`; reserved rows count against stock.
 
-- [ ] **Step 4: Run reward tests**
+- [x] **Step 4: Run reward tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_rewards_fulfillment -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/rewards.py backend/app/admin_console/providers.py backend/app/admin_console/routes.py backend/app/db.py backend/tests/test_admin_rewards_fulfillment.py
@@ -1024,7 +1024,7 @@ git commit -m "实现 011 奖品目录与库存 provider"
 - Consumes: Task 10 reward provider, 05 `apply_fulfillment_admin_action()`, `get_points_ledger()`, existing `redemptions`/`fulfillments`.
 - Produces: `list_redemptions(actor: dict, filters: dict) -> list[dict]`; `get_redemption_detail(actor: dict, redemption_id: int) -> dict`; `list_fulfillments(actor: dict, filters: dict) -> list[dict]`; `apply_fulfillment_action(actor: dict, fulfillment_id: int, action: str) -> dict`; routes `GET /api/admin/redemptions`, `GET /api/admin/redemptions/<int:id>`, `GET /api/admin/fulfillments`, `POST /api/admin/fulfillments/<int:id>/issue|cancel|verify`.
 
-- [ ] **Step 1: Write failing cancellation and context tests**
+- [x] **Step 1: Write failing cancellation and context tests**
 
 ```python
 def test_cancel_restores_points_stock_and_returns_user_context(self):
@@ -1037,13 +1037,13 @@ def test_cancel_restores_points_stock_and_returns_user_context(self):
     self.assertTrue(detail["points_ledger"])
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_rewards_fulfillment.AdminRewardFulfillmentTests.test_cancel_restores_points_stock_and_returns_user_context -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement read models and action delegation**
+- [x] **Step 3: Implement read models and action delegation**
 
 ```python
 def apply_fulfillment_action(actor: dict, fulfillment_id: int, action: str) -> dict:
@@ -1083,13 +1083,13 @@ def apply_fulfillment_action(actor: dict, fulfillment_id: int, action: str) -> d
 response projection for these actions; it MUST NOT enqueue or deliver a second
 fulfillment notification through `admin_notification_outbox`.
 
-- [ ] **Step 4: Run fulfillment tests**
+- [x] **Step 4: Run fulfillment tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_rewards_fulfillment tests.test_handcraft_fulfillment -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/rewards.py backend/app/admin_console/routes.py backend/tests/test_admin_rewards_fulfillment.py
@@ -1109,7 +1109,7 @@ git commit -m "实现 011 兑换查询与履约管理"
 - Consumes: `emit_notifications`, Task 1 `admin_notification_outbox`, `system_announcements`.
 - Produces: `create_announcement(actor_id: int, payload: dict) -> dict`; `publish_announcement(actor_id: int, announcement_id: str) -> dict`; `list_announcements() -> list[dict]`; `emit_system_announcement(...) -> dict`; routes `GET/POST /api/admin/announcements`, `POST /api/admin/announcements/<id>/publish`.
 
-- [ ] **Step 1: Write failing idempotent broadcast test**
+- [x] **Step 1: Write failing idempotent broadcast test**
 
 ```python
 def test_publishing_announcement_twice_notifies_once(self):
@@ -1124,13 +1124,13 @@ def test_publishing_announcement_twice_notifies_once(self):
     self.assertEqual(self.notification_count("system_announcement"), 1)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement announcement state and event**
+- [x] **Step 3: Implement announcement state and event**
 
 ```python
 def emit_system_announcement(
@@ -1154,13 +1154,13 @@ def emit_system_announcement(
 
 `system_announcements` columns are `announcement_id TEXT PRIMARY KEY`, `title`, `body`, `target_roles_json`, `status` (`draft`/`published`), `event_id`, `created_by`, `created_at`, `published_at`. Publish selects active user IDs for target roles, writes one outbox row, then delivers after commit.
 
-- [ ] **Step 4: Run announcement tests**
+- [x] **Step 4: Run announcement tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation tests.test_notification_broadcasts -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/system_announcements.py backend/app/admin_console/routes.py backend/app/messaging/events.py backend/app/db.py backend/tests/test_admin_console_foundation.py
@@ -1181,7 +1181,7 @@ git commit -m "实现 011 系统公告与 02 群发"
 - Consumes: Task 4 store/route shell, Task 5 dashboard APIs, Task 12 announcement APIs.
 - Produces: role-selected dashboard rendering; announcement list/create/publish UI; store actions `loadDashboard`, `loadAnnouncements`, `createAnnouncement`, `publishAnnouncement`.
 
-- [ ] **Step 1: Write failing dashboard visibility tests**
+- [x] **Step 1: Write failing dashboard visibility tests**
 
 ```ts
 it('ordinary admin renders only content operations metrics', async () => {
@@ -1194,13 +1194,13 @@ it('ordinary admin renders only content operations metrics', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminDashboardView.test.ts src/views/AdminAnnouncementsView.test.ts`
 
 Expected: FAIL because views do not exist.
 
-- [ ] **Step 3: Implement views and store actions**
+- [x] **Step 3: Implement views and store actions**
 
 ```ts
 async function loadDashboard(): Promise<boolean> {
@@ -1215,13 +1215,13 @@ async function loadDashboard(): Promise<boolean> {
 
 `AdminDashboardView.vue` groups metrics by review, content, moderation, and rewards. `AdminAnnouncementsView.vue` is only routed for `super_admin`; ordinary admin receives a 403 page if it calls the API directly.
 
-- [ ] **Step 4: Run frontend tests**
+- [x] **Step 4: Run frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminDashboardView.test.ts src/views/AdminAnnouncementsView.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminDashboardView.vue frontend/src/views/AdminDashboardView.test.ts frontend/src/views/AdminAnnouncementsView.vue frontend/src/views/AdminAnnouncementsView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -1240,7 +1240,7 @@ git commit -m "实现 011 双看板与公告页面"
 - Consumes: Task 4 shell/store, Task 6 account APIs.
 - Produces: account filters/search/table/detail/create/disable/enable/reset UI; store actions `loadAccounts`, `createAccount`, `setAccountEnabled`, `resetPassword`.
 
-- [ ] **Step 1: Write failing account UI tests**
+- [x] **Step 1: Write failing account UI tests**
 
 ```ts
 it('creates an enterprise account and resets its password', async () => {
@@ -1255,13 +1255,13 @@ it('creates an enterprise account and resets its password', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminAccountsView.test.ts`
 
 Expected: FAIL because view does not exist.
 
-- [ ] **Step 3: Implement account screen**
+- [x] **Step 3: Implement account screen**
 
 ```vue
 <template>
@@ -1279,13 +1279,13 @@ Expected: FAIL because view does not exist.
 
 The route is super-admin only. No delete control exists. Reset confirmation states that the password will be delivered by 02 or offline and never renders a password.
 
-- [ ] **Step 4: Run account frontend tests**
+- [x] **Step 4: Run account frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminAccountsView.test.ts src/stores/adminConsole.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminAccountsView.vue frontend/src/views/AdminAccountsView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -1306,7 +1306,7 @@ git commit -m "实现 011 账户管理页面"
 - Consumes: Task 10/11 APIs, Task 4 shell/store.
 - Produces: reward CRUD/online toggle, fulfillment queue actions, redemption search/detail with user context and points ledger; store actions for all reward/fulfillment/redemption operations.
 
-- [ ] **Step 1: Write failing reward and fulfillment UI tests**
+- [x] **Step 1: Write failing reward and fulfillment UI tests**
 
 ```ts
 it('cancels a pending fulfillment and refreshes redemption detail', async () => {
@@ -1321,13 +1321,13 @@ it('cancels a pending fulfillment and refreshes redemption detail', async () => 
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminRewardsView.test.ts src/views/AdminRedemptionsView.test.ts`
 
 Expected: FAIL because views do not exist.
 
-- [ ] **Step 3: Implement reward/fulfillment/redemption screens**
+- [x] **Step 3: Implement reward/fulfillment/redemption screens**
 
 ```ts
 async function cancelFulfillment(id: number): Promise<boolean> {
@@ -1342,13 +1342,13 @@ async function cancelFulfillment(id: number): Promise<boolean> {
 
 `AdminRewardsView.vue` uses icon buttons for issue/cancel/verify with accessible labels and tooltips. `AdminRedemptionsView.vue` shows user identity/contact only inside redemption/fulfillment detail, and never renders account status or points-policy controls.
 
-- [ ] **Step 4: Run reward frontend tests**
+- [x] **Step 4: Run reward frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminRewardsView.test.ts src/views/AdminRedemptionsView.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminRewardsView.vue frontend/src/views/AdminRewardsView.test.ts frontend/src/views/AdminRedemptionsView.vue frontend/src/views/AdminRedemptionsView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -1368,7 +1368,7 @@ git commit -m "实现 011 奖品履约与兑换页面"
 - Consumes: Task 1 `platform_points_policy`, Task 2 registry, 05 `_normalize_policy`-compatible fields.
 - Produces: `DatabasePointsPolicyProvider.get_policy() -> dict | None`; `get_points_policy() -> dict`; `update_points_policy(actor_id: int, payload: dict, expected_version: int) -> dict`; routes `GET/PUT /api/admin/points-policy`.
 
-- [ ] **Step 1: Write failing policy validation and immediacy tests**
+- [x] **Step 1: Write failing policy validation and immediacy tests**
 
 ```python
 def test_updated_training_weight_is_used_by_05_on_next_event(self):
@@ -1393,13 +1393,13 @@ def test_updated_training_weight_is_used_by_05_on_next_event(self):
     self.assertEqual(get_effective_policy()["training_weights"]["live_script"], 4)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_points_policy -v`
 
 Expected: FAIL with 404 or placeholder policy.
 
-- [ ] **Step 3: Implement policy storage and provider**
+- [x] **Step 3: Implement policy storage and provider**
 
 ```python
 class DatabasePointsPolicyProvider:
@@ -1416,13 +1416,13 @@ class DatabasePointsPolicyProvider:
 
 `platform_points_policy` has one row with `singleton=1`, `version`, `policy_json`, `updated_by`, `updated_at`. `update_points_policy()` validates exact keys and positive integer weights, checks expected version, writes a new version, and records audit. Existing points snapshots remain untouched.
 
-- [ ] **Step 4: Run points policy tests**
+- [x] **Step 4: Run points policy tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_points_policy tests.test_handcraft_points tests.test_handcraft_points_expiry -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/points_policy.py backend/app/admin_console/providers.py backend/app/admin_console/routes.py backend/app/db.py backend/tests/test_admin_points_policy.py
@@ -1441,7 +1441,7 @@ git commit -m "实现 011 平台积分规则 provider"
 - Consumes: Task 16 API, Task 4 shell/store.
 - Produces: super-admin-only form with exact five weight keys, positive integer controls, daily limit, expiry segmented control, version conflict handling.
 
-- [ ] **Step 1: Write failing policy form test**
+- [x] **Step 1: Write failing policy form test**
 
 ```ts
 it('submits all five training weight keys and expiry mode', async () => {
@@ -1458,13 +1458,13 @@ it('submits all five training weight keys and expiry mode', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminPointsPolicyView.test.ts`
 
 Expected: FAIL because view does not exist.
 
-- [ ] **Step 3: Implement policy form**
+- [x] **Step 3: Implement policy form**
 
 ```ts
 const trainingWeights = reactive({
@@ -1480,13 +1480,13 @@ const expiryMode = ref<'permanent' | 'natural_year'>('permanent')
 
 All numeric fields use `min=1`, integer parsing, inline errors, and preserve server values on conflict. The route is super-admin only.
 
-- [ ] **Step 4: Run points frontend tests**
+- [x] **Step 4: Run points frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminPointsPolicyView.test.ts src/stores/adminConsole.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminPointsPolicyView.vue frontend/src/views/AdminPointsPolicyView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -1504,7 +1504,7 @@ git commit -m "实现 011 积分规则页面"
 - Consumes: existing `content_comments` table, Task 1 audit.
 - Produces: `list_moderation_comments(filters: dict) -> list[dict]`; `delete_comment(actor_id: int, comment_id: str) -> dict`; `processed_comment_count() -> int`; routes `GET /api/admin/comments`, `DELETE /api/admin/comments/<comment_id>`.
 
-- [ ] **Step 1: Write failing silent-delete test**
+- [x] **Step 1: Write failing silent-delete test**
 
 ```python
 def test_delete_comment_hides_it_without_notification(self):
@@ -1515,13 +1515,13 @@ def test_delete_comment_hides_it_without_notification(self):
     self.assertEqual(self.notification_count(self.student_id), 0)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_moderation -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement moderation service**
+- [x] **Step 3: Implement moderation service**
 
 ```python
 def delete_comment(actor_id: int, comment_id: str) -> dict:
@@ -1556,13 +1556,13 @@ def delete_comment(actor_id: int, comment_id: str) -> dict:
 
 No notification event is emitted for comment deletion.
 
-- [ ] **Step 4: Run moderation comment tests**
+- [x] **Step 4: Run moderation comment tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_moderation tests.test_teacher_comments -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/moderation.py backend/app/admin_console/routes.py backend/tests/test_admin_moderation.py
@@ -1582,7 +1582,7 @@ git commit -m "实现 011 评论巡查与静默删除"
 - Consumes: Task 18 comment service, Task 1 `comment_reports`, `feedback_records`, Task 2 registry.
 - Produces: `list_reports(filters)`, `resolve_report(actor_id, report_id, confirmed: bool, result: str)`, `list_feedback(filters)`, `update_feedback(actor_id, feedback_id, status, result)`, `DatabaseFeedbackIntakeProvider.submit_feedback(...)`; routes `GET /api/admin/reports`, `POST /api/admin/reports/<id>/resolve`, `GET /api/admin/feedback`, `PATCH /api/admin/feedback/<id>`.
 
-- [ ] **Step 1: Write failing report and feedback tests**
+- [x] **Step 1: Write failing report and feedback tests**
 
 ```python
 def test_confirmed_report_deletes_comment_and_counts_once(self):
@@ -1614,13 +1614,13 @@ def test_feedback_intake_is_idempotent(self):
     self.assertEqual(first["feedback_id"], second["feedback_id"])
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_moderation -v`
 
 Expected: FAIL with 404 or missing provider.
 
-- [ ] **Step 3: Implement report and feedback persistence**
+- [x] **Step 3: Implement report and feedback persistence**
 
 ```python
 class DatabaseFeedbackIntakeProvider:
@@ -1654,13 +1654,13 @@ class DatabaseFeedbackIntakeProvider:
 
 `comment_reports` uses unique `report_id`, comment/reporter IDs, reason, status (`pending`/`confirmed`/`rejected`), resolver, result and timestamps. Confirmed resolution calls `delete_comment()`; rejected resolution leaves visibility unchanged. Both paths increment processed count only when status changes from `pending`.
 
-- [ ] **Step 4: Run report/feedback tests**
+- [x] **Step 4: Run report/feedback tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_moderation -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/moderation.py backend/app/admin_console/providers.py backend/app/admin_console/routes.py backend/app/db.py backend/tests/test_admin_moderation.py
@@ -1679,7 +1679,7 @@ git commit -m "实现 011 举报与反馈接收"
 - Consumes: Task 18/19 APIs, Task 4 shell/store.
 - Produces: tabs for comments/reports/feedback, filters, delete confirmation, report resolution, feedback status update; ordinary-admin access only.
 
-- [ ] **Step 1: Write failing moderation UI tests**
+- [x] **Step 1: Write failing moderation UI tests**
 
 ```ts
 it('confirms a report and refreshes the processed count', async () => {
@@ -1695,13 +1695,13 @@ it('confirms a report and refreshes the processed count', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminModerationView.test.ts`
 
 Expected: FAIL because view does not exist.
 
-- [ ] **Step 3: Implement moderation screen**
+- [x] **Step 3: Implement moderation screen**
 
 ```ts
 const activeTab = ref<'comments' | 'reports' | 'feedback'>('comments')
@@ -1710,13 +1710,13 @@ const reportAction = ref<'confirm' | 'reject' | null>(null)
 
 The delete confirmation explicitly states that no notification is sent. Report resolution requires a result note. Feedback actions use a status menu with `pending`/`processed`/`closed`.
 
-- [ ] **Step 4: Run moderation frontend tests**
+- [x] **Step 4: Run moderation frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminModerationView.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminModerationView.vue frontend/src/views/AdminModerationView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -1736,7 +1736,7 @@ git commit -m "实现 011 评论举报反馈页面"
 - Consumes: Task 1 agri preset tables, Task 2 registry, 03 `PresetContentProvider`.
 - Produces: `DatabaseAgriPresetContentProvider` implementing `list_products`, `get_product`, `get_calendar_entry`, `list_calendar_entries`, `list_pest_entries`; admin CRUD `list_preset_items(category)`, `create_preset_item`, `update_preset_item`, `delete_preset_item` for `agri_products`, `agri_calendar`, `pest_knowledge`.
 
-- [ ] **Step 1: Write failing agri provider tests**
+- [x] **Step 1: Write failing agri provider tests**
 
 ```python
 def test_agri_calendar_edit_is_visible_to_03_on_next_read(self):
@@ -1756,13 +1756,13 @@ def test_agri_calendar_edit_is_visible_to_03_on_next_read(self):
     self.assertEqual(entry["reminder"], "更新后的提示")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_presets -v`
 
 Expected: FAIL because tables/provider do not exist.
 
-- [ ] **Step 3: Implement agri preset provider and CRUD**
+- [x] **Step 3: Implement agri preset provider and CRUD**
 
 ```python
 class DatabaseAgriPresetContentProvider:
@@ -1792,13 +1792,13 @@ class DatabaseAgriPresetContentProvider:
 
 `admin_agri_products` stores product key/name/order/enabled/version. `admin_agri_calendar` has unique `(product_key, month)` and JSON arrays. `admin_pest_knowledge` has stable `item_id`, JSON product/symptom/alias arrays, answer, order/enabled/version. Delete is logical disable.
 
-- [ ] **Step 4: Run agri preset tests**
+- [x] **Step 4: Run agri preset tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_presets tests.test_agri_calendar tests.test_agri_qa -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/presets.py backend/app/admin_console/providers.py backend/app/admin_console/routes.py backend/app/db.py backend/tests/test_admin_presets.py
@@ -1818,7 +1818,7 @@ git commit -m "实现 011 农业预置内容 provider"
 - Consumes: Task 1 tables, Task 2 knowledge provider registry, 05 `CraftPresetProvider`, 06 `LocalResourceCaseProvider`.
 - Produces: `DatabaseCraftPresetProvider`; `AdminDatabaseLocalResourceCaseProvider` implementing the 06 protocol with enabled filtering; `DatabaseAssistantFeatureKnowledgeProvider.list_entries(enabled_only: bool = True) -> list[dict]`; CRUD for `handcraft_crafts`, `success_cases`, `assistant_knowledge`.
 
-- [ ] **Step 1: Write failing craft/case/knowledge tests**
+- [x] **Step 1: Write failing craft/case/knowledge tests**
 
 ```python
 def test_craft_provider_keeps_stable_key_and_steps(self):
@@ -1920,13 +1920,13 @@ def test_assistant_knowledge_provider_returns_enabled_entries(self):
     self.assertTrue(entries[0]["jump_target"])
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_presets -v`
 
 Expected: FAIL because providers do not exist.
 
-- [ ] **Step 3: Implement providers and CRUD**
+- [x] **Step 3: Implement providers and CRUD**
 
 ```python
 class DatabaseAssistantFeatureKnowledgeProvider:
@@ -1946,13 +1946,13 @@ class DatabaseAssistantFeatureKnowledgeProvider:
 
 `admin_handcraft_crafts` stores `craft_key`, name, introduction, `steps_json`, `material_guide_json`, `source_available`, sort/order/enabled/version. `DatabaseCraftPresetProvider.get_craft()` returns `None` when `is_enabled = 0`; `list_crafts()` returns enabled crafts and derives `available=false` when the source is unavailable or fewer than six valid steps exist. Success cases reuse `local_resource_success_cases`; `AdminDatabaseLocalResourceCaseProvider.list_success_cases()` and `get_success_case()` return only `is_enabled = 1`, while historical records retain the stable case ID and show source unavailable instead of redirecting. `admin_assistant_feature_knowledge` stores stable knowledge ID, title/body/feature key/jump target/enabled/sort/version/timestamps.
 
-- [ ] **Step 4: Run preset provider tests**
+- [x] **Step 4: Run preset provider tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_presets tests.test_handcraft_presets tests.test_local_resources_cases -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/presets.py backend/app/admin_console/providers.py backend/app/admin_console/routes.py backend/app/db.py backend/tests/test_admin_presets.py
@@ -1971,7 +1971,7 @@ git commit -m "实现 011 非遗案例与知识库 provider"
 - Consumes: Task 21/22 APIs and Task 4 shell/store.
 - Produces: category tabs, data tables/forms for six content types, JSON-array subeditors for calendar/pest/craft fields, validation errors, immediate refresh.
 
-- [ ] **Step 1: Write failing preset UI test**
+- [x] **Step 1: Write failing preset UI test**
 
 ```ts
 it('edits a pest entry and refreshes the category list', async () => {
@@ -1988,13 +1988,13 @@ it('edits a pest entry and refreshes the category list', async () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminPresetsView.test.ts`
 
 Expected: FAIL because view does not exist.
 
-- [ ] **Step 3: Implement six-category preset screen**
+- [x] **Step 3: Implement six-category preset screen**
 
 ```ts
 const categories = [
@@ -2009,13 +2009,13 @@ const categories = [
 
 Each category has a focused form component inside the view file. Stable IDs are read-only after creation. Delete actions display whether the item is only disabled or retains a historical stable ID.
 
-- [ ] **Step 4: Run preset frontend tests**
+- [x] **Step 4: Run preset frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminPresetsView.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminPresetsView.vue frontend/src/views/AdminPresetsView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -2035,7 +2035,7 @@ git commit -m "实现 011 六类预置内容页面"
 - Consumes: Task 7/8 review providers, Task 10 rewards, existing government/course/job/video/comment/preset tables.
 - Produces: `list_managed_content(content_type: str, filters: dict) -> list[dict]`; `get_managed_content(content_type: str, content_id: str) -> dict`; `correct_managed_content(actor_id: int, content_type: str, content_id: str, expected_version: int, payload: dict) -> dict`; `unpublish_managed_content(...)`; `delete_managed_content(...)`; routes under `/api/admin/content/<content_type>`.
 
-- [ ] **Step 1: Write failing semantics tests**
+- [x] **Step 1: Write failing semantics tests**
 
 ```python
 def test_policy_correction_does_not_repush_or_change_status(self):
@@ -2086,13 +2086,13 @@ def test_deleted_course_and_job_are_absent_from_review_queue(self):
     self.assertNotIn(self.job_id, {item["content_id"] for item in queue})
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_data_management -v`
 
 Expected: FAIL with 404.
 
-- [ ] **Step 3: Implement per-type management semantics**
+- [x] **Step 3: Implement per-type management semantics**
 
 ```python
 CONTENT_TYPES = {
@@ -2133,13 +2133,13 @@ Per-type semantics are fixed as follows:
 
 Policy correction updates only title/content and never emits a publication event. News delete is hard delete. Course delete sets `courses.deleted_at` and `DatabaseTeacherCourseProvider` filters it. Job delete sets `deleted_at`; unpublish uses the existing review state. Video delete sets `heritage_videos.deleted_at` and the read provider filters it. All admin queue and dashboard queries must join or filter domain tombstones so deleted content cannot leak through `content_review_records`. Comment delete delegates to Task 18. Preset delete delegates to Task 21/22 logical disable. Every handler uses `expected_version` and writes before/after audit.
 
-- [ ] **Step 4: Run data management tests**
+- [x] **Step 4: Run data management tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_data_management tests.test_teacher_course_provider tests.test_enterprise_jobs tests.test_government_policy tests.test_government_news -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/data_management.py backend/app/admin_console/routes.py backend/app/db.py backend/app/handcraft_inheritance/providers.py backend/tests/test_admin_data_management.py
@@ -2158,7 +2158,7 @@ git commit -m "实现 011 全平台数据管理"
 - Consumes: Task 24 APIs and Task 4 shell/store.
 - Produces: type-filtered content table, detail drawer/page, correction form, unpublish/delete confirmations, ordinary-admin read-only review view and super-admin actions.
 
-- [ ] **Step 1: Write failing content-management UI tests**
+- [x] **Step 1: Write failing content-management UI tests**
 
 ```ts
 it('shows correction and delete to super admin and hides them from ordinary admin', async () => {
@@ -2171,13 +2171,13 @@ it('shows correction and delete to super admin and hides them from ordinary admi
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminContentManagementView.test.ts`
 
 Expected: FAIL because view does not exist.
 
-- [ ] **Step 3: Implement content-management screen**
+- [x] **Step 3: Implement content-management screen**
 
 ```ts
 const contentTypes = [
@@ -2189,13 +2189,13 @@ const canManage = computed(() => auth.user?.role === 'super_admin')
 
 The confirmation text distinguishes reversible unpublish from tombstone/hard delete. Policy correction is labeled as correction, not publishing. Ordinary admin sees review status and moderation context but no production/edit controls.
 
-- [ ] **Step 4: Run content-management frontend tests**
+- [x] **Step 4: Run content-management frontend tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminContentManagementView.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminContentManagementView.vue frontend/src/views/AdminContentManagementView.test.ts frontend/src/stores/adminConsole.ts frontend/src/router/index.ts
@@ -2217,7 +2217,7 @@ git commit -m "实现 011 全平台数据管理页面"
 - Consumes: Task 1 `admin_notification_outbox`, existing 02 emit functions.
 - Produces: `enqueue_admin_notification(db, *, event_type: str, event_id: str, payload: dict) -> int`; `deliver_admin_notification(outbox_id: int) -> dict`; `retry_admin_notifications(limit: int = 100) -> dict`.
 
-- [ ] **Step 1: Write failing commit/retry tests**
+- [x] **Step 1: Write failing commit/retry tests**
 
 ```python
 def test_review_state_commits_when_notification_delivery_fails(self):
@@ -2234,13 +2234,13 @@ def test_review_state_commits_when_notification_delivery_fails(self):
     self.assertEqual(self.outbox_status(result["outbox_id"]), "pending")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_content_review -v`
 
 Expected: FAIL because outbox helper does not exist.
 
-- [ ] **Step 3: Implement outbox delivery and retry**
+- [x] **Step 3: Implement outbox delivery and retry**
 
 ```python
 DELIVERERS = {
@@ -2270,13 +2270,13 @@ Fulfillment issue/cancel/verify are intentionally absent from this table:
 05 `apply_fulfillment_admin_action()` owns that domain outbox and delivery, so
 11 only audits the returned result and never creates a duplicate event.
 
-- [ ] **Step 4: Run notification tests**
+- [x] **Step 4: Run notification tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_console_foundation tests.test_admin_content_review tests.test_handcraft_fulfillment tests.test_notification_broadcasts -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/outbox.py backend/app/admin_console/accounts.py backend/app/admin_console/content_review_provider.py backend/app/admin_console/rewards.py backend/app/admin_console/system_announcements.py backend/tests/test_admin_console_foundation.py backend/tests/test_admin_content_review.py
@@ -2294,7 +2294,7 @@ git commit -m "统一 011 通知 outbox 与失败重试"
 - Consumes: Tasks 7, 8, 10, 16, 19, 21, 22.
 - Produces: replacement tests proving 03/05/06/08/09/12 consumers need no code changes when 11 registers defaults.
 
-- [ ] **Step 1: Write failing provider acceptance tests**
+- [x] **Step 1: Write failing provider acceptance tests**
 
 ```python
 def test_all_admin_provider_slots_replace_without_consumer_changes(self):
@@ -2313,13 +2313,13 @@ def test_all_admin_provider_slots_replace_without_consumer_changes(self):
         self.assertIs(self.app.extensions[key], provider)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_provider_acceptance -v`
 
 Expected: FAIL until all provider shapes and default registrations are exact.
 
-- [ ] **Step 3: Fix only the provider boundary**
+- [x] **Step 3: Fix only the provider boundary**
 
 ```python
 def configure_admin_providers(app: Flask, *, content_review=None,
@@ -2343,13 +2343,13 @@ def configure_admin_providers(app: Flask, *, content_review=None,
 
 Do not change any consumer method signature to make this test pass.
 
-- [ ] **Step 4: Run cross-module provider tests**
+- [x] **Step 4: Run cross-module provider tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_provider_acceptance tests.test_teacher_console_provider_replacement tests.test_handcraft_presets tests.test_local_resources_cases tests.test_enterprise_jobs tests.test_agri_integration -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/providers.py backend/app/admin_console/__init__.py backend/tests/test_admin_provider_acceptance.py
@@ -2366,7 +2366,7 @@ git commit -m "验收 011 跨模块 provider 契约"
 - Consumes: all admin routes and Task 3 session helper.
 - Produces: explicit positive and negative assertions for every matrix row.
 
-- [ ] **Step 1: Write failing matrix tests**
+- [x] **Step 1: Write failing matrix tests**
 
 ```python
 def test_ordinary_admin_can_run_content_operations_but_not_accounts_or_points(self):
@@ -2432,13 +2432,13 @@ def test_ordinary_admin_reads_user_context_only_from_redemption_or_fulfillment(s
     self.assertEqual(self.admin.get("/api/admin/accounts?keyword=x").status_code, 403)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_permissions -v`
 
 Expected: FAIL for any route that has a missing or overly broad role check.
 
-- [ ] **Step 3: Apply exact role sets to routes**
+- [x] **Step 3: Apply exact role sets to routes**
 
 ```python
 SUPER_ADMIN = {"super_admin"}
@@ -2453,13 +2453,13 @@ def list_accounts_route():
 
 All routes that expose account management, points-policy writes, or system announcements use `SUPER_ADMIN`. Review, moderation, presets, rewards, fulfillment, and redemption context use `ADMIN_OPERATIONS`.
 
-- [ ] **Step 4: Run permission tests**
+- [x] **Step 4: Run permission tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_permissions -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/routes.py backend/tests/test_admin_permissions.py
@@ -2476,7 +2476,7 @@ git commit -m "验收 011 双角色权限矩阵"
 - Consumes: Tasks 5, 18, 19, 21, 22, 24.
 - Produces: recursive forbidden-key test, metric formula tests, unavailable-source tests.
 
-- [ ] **Step 1: Write failing exclusion and formula tests**
+- [x] **Step 1: Write failing exclusion and formula tests**
 
 ```python
 def test_admin_dashboard_exact_allowed_metrics_and_no_forbidden_keys(self):
@@ -2490,13 +2490,13 @@ def test_admin_dashboard_exact_allowed_metrics_and_no_forbidden_keys(self):
     self.assertEqual(dashboard["pending_fulfillment_count"], 1)
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_dashboard -v`
 
 Expected: FAIL for any metric mismatch or forbidden key leak.
 
-- [ ] **Step 3: Correct dashboard aggregation**
+- [x] **Step 3: Correct dashboard aggregation**
 
 ```python
 FORBIDDEN_ADMIN_DASHBOARD_KEYS = frozenset(
@@ -2518,13 +2518,13 @@ FORBIDDEN_ADMIN_DASHBOARD_KEYS = frozenset(
 
 Every aggregation calls the owning table/provider and returns either a real integer or `{"available": False, "value": None}`. It never returns a fabricated zero on source failure.
 
-- [ ] **Step 4: Run dashboard tests**
+- [x] **Step 4: Run dashboard tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_dashboard tests.test_enterprise_employment_statistics -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/dashboard.py backend/tests/test_admin_dashboard.py
@@ -2543,7 +2543,7 @@ git commit -m "验收 011 普管看板排除项"
 - Consumes: all admin views and store actions.
 - Produces: role-based navigation/route assertions, form validation, loading/error/empty states, and `clientWidth == scrollWidth` geometry tests at 320/375/1280.
 
-- [ ] **Step 1: Write failing acceptance tests**
+- [x] **Step 1: Write failing acceptance tests**
 
 ```ts
 it.each([320, 375, 1280])('admin console has no horizontal overflow at %spx', async width => {
@@ -2561,13 +2561,13 @@ it('ordinary admin cannot see account or points-policy navigation', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd frontend; npm test -- --run src/views/AdminConsoleAcceptance.test.ts src/views/AdminConsoleResponsive.test.ts`
 
 Expected: FAIL for missing selectors, route visibility, or overflow.
 
-- [ ] **Step 3: Fix UI states and responsive constraints**
+- [x] **Step 3: Fix UI states and responsive constraints**
 
 ```css
 .admin-console {
@@ -2583,13 +2583,13 @@ Expected: FAIL for missing selectors, route visibility, or overflow.
 
 Tables use horizontal scroll containers only inside the table region. Forms use stable grid tracks and `minmax(0, 1fr)`. Long Chinese text uses `line-break: strict`, `word-break: keep-all`, and `overflow-wrap: anywhere`. Icon buttons have accessible labels and tooltips.
 
-- [ ] **Step 4: Run frontend acceptance tests**
+- [x] **Step 4: Run frontend acceptance tests**
 
 Run: `cd frontend; npm test -- --run src/views/AdminConsoleAcceptance.test.ts src/views/AdminConsoleResponsive.test.ts src/stores/adminConsole.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add frontend/src/views/AdminConsoleAcceptance.test.ts frontend/src/views/AdminConsoleResponsive.test.ts frontend/src/stores/adminConsole.test.ts frontend/src/views/AdminDashboardView.vue frontend/src/views/AdminAccountsView.vue frontend/src/views/AdminPointsPolicyView.vue frontend/src/views/AdminReviewView.vue frontend/src/views/AdminModerationView.vue frontend/src/views/AdminPresetsView.vue frontend/src/views/AdminRewardsView.vue frontend/src/views/AdminRedemptionsView.vue frontend/src/views/AdminContentManagementView.vue frontend/src/views/AdminAnnouncementsView.vue
@@ -2607,7 +2607,7 @@ git commit -m "验收 011 前端权限与响应式"
 - Consumes: all backend tasks and existing 01/02/03/05/06/08/09/10.
 - Produces: one real `create_app()` integration test proving the installed admin providers replace placeholders without changing consumers.
 
-- [ ] **Step 1: Write failing integration test**
+- [x] **Step 1: Write failing integration test**
 
 ```python
 def test_real_app_uses_admin_providers_for_all_consumer_paths(self):
@@ -2631,13 +2631,13 @@ def test_real_app_uses_admin_providers_for_all_consumer_paths(self):
         )
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_integration -v`
 
 Expected: FAIL until `create_app()` installs the real defaults in the correct order.
 
-- [ ] **Step 3: Correct app initialization order**
+- [x] **Step 3: Correct app initialization order**
 
 ```python
 install_default_handcraft_services(app)
@@ -2650,13 +2650,13 @@ register_messaging_source_provider(app, ...)
 
 `install_default_admin_services()` replaces placeholder slots only after all consumer defaults are installed. It never replaces a provider explicitly configured by tests before app initialization.
 
-- [ ] **Step 4: Run backend integration tests**
+- [x] **Step 4: Run backend integration tests**
 
 Run: `uv run --directory backend python -m unittest tests.test_admin_integration tests.test_admin_provider_acceptance tests.test_teacher_console_integration tests.test_local_resources_integration tests.test_enterprise_employment_statistics -v`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/app/admin_console/__init__.py backend/app/__init__.py backend/tests/test_admin_integration.py
@@ -2730,13 +2730,13 @@ git commit -m "验收 011 全量与浏览器回归"
 - Consumes: final implementation and verification evidence.
 - Produces: `$speckit-converge` result against `specs/011-admin-console/spec.md`; provider contract updates only for differences discovered during implementation.
 
-- [ ] **Step 1: Run convergence comparison**
+- [x] **Step 1: Run convergence comparison**
 
 Run: `$speckit-converge` against `specs/011-admin-console/spec.md`.
 
 Expected: zero untracked gaps, or each gap has a concrete remediation task.
 
-- [ ] **Step 2: Reconcile the provider contract with the frozen 011 result**
+- [x] **Step 2: Reconcile the provider contract with the frozen 011 result**
 
 ```markdown
 ## 011 Provider Additions
@@ -2750,17 +2750,17 @@ Expected: zero untracked gaps, or each gap has a concrete remediation task.
 
 Do not create a second requirements source. `spec.md` remains authoritative.
 
-- [ ] **Step 3: Update project memory**
+- [x] **Step 3: Update project memory**
 
 Update `NOW.md` with implementation status, commits, tests, and retained worktree. Update `DECISIONS.md` with any durable provider decisions.
 
-- [ ] **Step 4: Re-run checklist validation**
+- [x] **Step 4: Re-run checklist validation**
 
 Run: `rg -n "NEEDS CLARIFICATION|待定未决|未决占位" specs/011-admin-console/spec.md`
 
 Expected: no matches in `spec.md`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add .agents/memories/NOW.md .agents/memories/DECISIONS.md .agents/memories/guides/provider-contract.md specs/011-admin-console/checklists/requirements.md
@@ -2777,7 +2777,7 @@ git commit -m "收敛 011 规格与跨模块契约"
 - Consumes: Task 33 convergence result and final test evidence.
 - Produces: execution handoff with task completion state, retained worktree path, commit range, and deferred items.
 
-- [ ] **Step 1: Record final handoff**
+- [x] **Step 1: Record final handoff**
 
 Append a handoff section with:
 
@@ -2791,7 +2791,7 @@ Append a handoff section with:
 - Deferred: exact unresolved items from convergence.
 ```
 
-- [ ] **Step 2: Run worktree hygiene checks**
+- [x] **Step 2: Run worktree hygiene checks**
 
 Run: `git status --short --branch`
 
@@ -2799,19 +2799,61 @@ Run: `git diff --check`
 
 Expected: no unclassified source changes; only intentional plan/handoff edits remain.
 
-- [ ] **Step 3: Check task checklist completion**
+- [x] **Step 3: Check task checklist completion**
 
 Run: `rg -n "^- \[ \]" .agents/memories/plans/2026-09-20-011-admin-console.md`
 
 Expected: no unchecked implementation steps for completed work; unfinished tasks are explicitly marked in handoff.
 
-- [ ] **Step 4: Commit final handoff**
+- [x] **Step 4: Commit final handoff**
 
 ```powershell
 git add .agents/memories/plans/2026-09-20-011-admin-console.md .agents/memories/NOW.md
 git commit -m "交接 011 实现计划执行状态"
 ```
 
-- [ ] **Step 5: Stop before merge**
+- [x] **Step 5: Stop before merge**
 
 Do not merge, push, clean worktrees, or enter SDD execution without explicit authorization. Report branch, worktree, commit range, verification, and remaining work.
+
+## Execution Handoff
+
+- Branch: `v2/lixKRT/011-admin-console`
+- Worktree: `.worktrees/011-admin-console`（位于主仓库目录内；提示词写的同级
+  路径 `粤乡智匠项目.worktrees\011-admin-console` 不存在，按 `git worktree list` 解析）
+- Base spec commit: `1a62cf9`
+- Session 6 commit range: `356e187..cd3a93c`
+  - Task 29: `0461dca`, `ef26a19`（任务级审查 PASS）
+  - Task 30: `159a0d9`, `e407aa5`, `9841f37`, `e04cb18`, `f5c7e1a`（任务级审查 PASS）
+  - Task 31: `10791eb`（任务级审查 PASS，生产代码零改动）
+  - Task 33: `e83c778`（规格与跨模块契约收敛）
+  - 收尾修复: `cd3a93c`（移除 Task 20 遗留的未使用类型导入，修复 `npm run build`）
+- Verification:
+  - backend full `unittest discover` at `10791eb`: `Ran 1277 tests ... OK`；
+    closing re-run at `cd3a93c`: `Ran 1277 tests in 2825.341s ... OK`。
+  - frontend `npx vitest run`: `113 files / 806 tests` passed（改动前后各一遍）。
+  - frontend `npx tsc -b --noEmit`: exit 0。
+  - frontend `npm run build`: success at `cd3a93c`（`cd3a93c` 之前失败于
+    `vue-tsc` TS6196 未使用导入，属 `tsc -b` 与 build 校验范围差异）。
+  - browser matrix at 320/375/1280: NOT produced（Task 32 被派单阻塞，
+    见下）。jsdom 几何断言已由 Task 30 全覆盖 10 个 admin 视图。
+- Remaining work（唯一未完成任务）:
+  - Task 32: Step 1 两个测试增量（`test_all_nine_admin_areas_are_covered` 与前端
+    最终验收断言）、Step 3 真实浏览器 10 路由 × 3 宽度几何/交互/console 检查、
+    Step 4 `browser-report.md` 与 `screenshots/`（本地）、Step 5 提交。
+    阻塞原因：平台 agent thread limit reached 持续约 60 分钟不释放，且本环境
+    无 close_agent 调用手段。Step 2 的全量回归实质上已由收尾回归完成（数字同上），
+    续跑时只需补 Step 1/3/4/5。
+  - 最终全分支审查：未跑（按硬约束停在合并之前）。
+- Deferred（Task 33 收敛登记，共 27 项 minor/Info，26 开放 + 1 核实免改）:
+  Task 19 (3)、Task 20 (1，h1 移动端核实免改；另 2 项已在 Task 30 修复)、
+  Task 25 (2 Info；3 项 minor 已在 Task 30 修复)、Task 26 (2)、Task 27 (4)、
+  Task 28 (4)、Task 29 (4)、Task 30 (3)、Task 31 (4)。明细见
+  `.superpowers/sdd/2026-09-20-011-admin-console/progress.md` 各审查段（本地文件）。
+  结构性登记：06/010 共享 `government_employment_statistics_provider` 槽键；
+  handcraft `set_video_review_provider` 为扇出装配器；
+  `handcraft_teaching_video` 看板计数恒 0（Task 8 割裂）；
+  跨控制台 401/403 语义分裂有意不统一。
+- Deviations recorded: Task 33 由主代理以记账身份完成（派单阻塞；纯文档工件）；
+  收尾回归发现的 build 阻塞修复 `cd3a93c` 由主代理执行（一行删除未使用导入）。
+- Stop before merge: 未 merge、未 push、未清理 worktree、未跑最终全分支审查。

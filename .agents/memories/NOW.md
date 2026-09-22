@@ -177,6 +177,11 @@
 - Verification at `10791eb`: backend full `unittest discover`
   `Ran 1277 tests ... OK`; frontend `vitest run` `113 files / 806 tests`
   passed; `npx tsc -b --noEmit` exit 0.
+- Closing regression at `cd3a93c` (after removing a Task 20 unused type import
+  that `vue-tsc` in `npm run build` flagged and `tsc -b` had missed): backend
+  full `unittest discover` `Ran 1277 tests in 2825.341s ... OK`; frontend
+  `113 files / 806 tests` passed; `tsc -b --noEmit` exit 0; `npm run build`
+  success.
 - Task 32 (full regression plus browser acceptance at 320/375/1280) is the
   remaining implementation task; it was blocked in session 6 by the agent
   thread limit and is recorded as the first item of the handoff. Browser
