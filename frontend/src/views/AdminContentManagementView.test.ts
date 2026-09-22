@@ -12,6 +12,7 @@ import type {
 import { useAuthStore } from '@/stores/auth'
 
 import AdminContentManagementView from './AdminContentManagementView.vue'
+import contentViewSource from './AdminContentManagementView.vue?raw'
 
 vi.mock('@/api/client', () => {
   class MockApiError extends Error {
@@ -946,5 +947,94 @@ describe('AdminContentManagementView', () => {
       '暂无政策内容'
     )
     empty.wrapper.unmount()
+  })
+})
+
+// A tiny CSS reader so the responsive/typography constraints below are checked
+// against the view's real `<style>` source rather than a hand-copied string.
+function parseDeclarations(body: string): Record<string, string> {
+  const declarations: Record<string, string> = {}
+  for (const chunk of body.split(';')) {
+    const colon = chunk.indexOf(':')
+    if (colon === -1) continue
+    const property = chunk.slice(0, colon).trim()
+    const value = chunk.slice(colon + 1).trim()
+    if (property && value) declarations[property] = value
+  }
+  return declarations
+}
+
+function parseStyleRules(source: string): { selector: string; body: string }[] {
+  const blocks = [
+    ...source.matchAll(/<style(?:\s[^>]*)?>([\s\S]*?)<\/style>/g)
+  ]
+    .map(match => match[1] ?? '')
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+  const rules: { selector: string; body: string }[] = []
+  let index = 0
+  while (index < blocks.length) {
+    const open = blocks.indexOf('{', index)
+    if (open === -1) break
+    const prelude = blocks.slice(index, open).trim()
+    let depth = 1
+    let cursor = open + 1
+    while (cursor < blocks.length && depth > 0) {
+      if (blocks[cursor] === '{') depth += 1
+      else if (blocks[cursor] === '}') depth -= 1
+      cursor += 1
+    }
+    const body = blocks.slice(open + 1, cursor - 1)
+    index = cursor
+    if (prelude.startsWith('@')) continue
+    for (const selector of prelude
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean)) {
+      rules.push({ selector, body })
+    }
+  }
+  return rules.filter(rule => !rule.selector.startsWith('@'))
+}
+
+function cssRule(source: string, selector: string): string {
+  const bodies = parseStyleRules(source)
+    .filter(rule => rule.selector === selector)
+    .map(rule =>
+      Object.entries(parseDeclarations(rule.body))
+        .map(([property, value]) => `${property}: ${value}`)
+        .join('; ')
+    )
+  expect(bodies, `missing CSS rule for ${selector}`).not.toHaveLength(0)
+  return bodies.join('; ')
+}
+
+describe('AdminContentManagementView responsive constraints', () => {
+  it('lets the shell own outer clipping while the content region self-contains', () => {
+    expect(cssRule(contentViewSource, '.admin-content')).toContain(
+      'min-width: 0'
+    )
+    // The wide content table owns its own horizontal scroll so a 760px-min row
+    // never widens the page shell at 320px.
+    const tableWrap = cssRule(contentViewSource, '.content-table-wrap')
+    expect(tableWrap).toContain('min-width: 0')
+    expect(tableWrap).toContain('overflow-x: auto')
+  })
+
+  it('collapses fixed-format grids with minmax(0, 1fr) tracks', () => {
+    expect(cssRule(contentViewSource, '.content-header__summary')).toContain(
+      'repeat(2, minmax(0, 1fr))'
+    )
+  })
+
+  it('wraps long Chinese prose without mid-word breaks', () => {
+    for (const selector of ['.content-header__identity p']) {
+      const rule = cssRule(contentViewSource, selector)
+      expect(rule, `${selector} line-break`).toContain('line-break: strict')
+      expect(rule, `${selector} overflow-wrap`).toContain(
+        'overflow-wrap: anywhere'
+      )
+      expect(rule, `${selector} word-break`).toContain('word-break: keep-all')
+    }
   })
 })
