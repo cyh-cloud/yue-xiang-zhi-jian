@@ -150,7 +150,8 @@
 - Branch and worktree: `v2/lixKRT/011-admin-console` in
   `.worktrees/011-admin-console` (the directory sits inside the main repo, not
   as a sibling). No merge, push, or worktree cleanup has been performed; the
-  final whole-branch review is intentionally not run yet.
+  final whole-branch review was run in session 7 over `1a62cf9..12e59b4`:
+  APPROVE (0 Critical / 0 Important / 4 Minor). Task 32 closed at `12e59b4`.
 - Tasks 1-28 closed in earlier sessions. Session 6 (2026-09-22) closed Task
   29-31 in commit range `356e187..10791eb`:
   - Task 29 (ordinary-admin dashboard exclusions and metric semantics):
@@ -182,10 +183,18 @@
   full `unittest discover` `Ran 1277 tests in 2825.341s ... OK`; frontend
   `113 files / 806 tests` passed; `tsc -b --noEmit` exit 0; `npm run build`
   success.
-- Task 32 (full regression plus browser acceptance at 320/375/1280) is the
-  remaining implementation task; it was blocked in session 6 by the agent
-  thread limit and is recorded as the first item of the handoff. Browser
-  evidence (screenshots and route/width matrix) is not yet produced.
+- Task 32 closed in session 7 at `12e59b4` (full regression + browser acceptance):
+  - 9-area acceptance assertions added (backend `admin_section_names()` derived
+    from the live URL map; frontend role-matrix/route coverage). No production
+    code changed.
+  - Full four-piece at `12e59b4`: backend `Ran 1279 tests in 2881.807s ... OK`
+    (1277 + 2); frontend `113 files / 809 tests` (806 + 3); `tsc -b --noEmit`
+    exit 0; `npm run build` success.
+  - Real browser (agent-browser vs dev :5173 + backend :5000): super-admin 10
+    routes x 320/375/1280 = 30/30 no overflow; ordinary-admin 7 routes x 3 =
+    21/21; the 3 super-admin-only routes redirect ordinary admins at the guard;
+    console errors empty for both roles. 22 screenshots, image-agent OVERALL PASS
+    (2 cosmetic MINOR). Evidence: `.superpowers/.../browser-report.md` (local only).
 - Deferred minor/Info items registered at Task 33 convergence: 27 total
   (26 open hardening items plus 1 verified-compliant), spread across Task 19
   (3), Task 20 (1), Task 25 (2), Task 26 (2), Task 27 (4), Task 28 (4),
@@ -195,6 +204,10 @@
   `set_video_review_provider` is a fan-out assembler, the
   `handcraft_teaching_video` dashboard count is permanently 0 (Task 8 split),
   and cross-console 401/403 rejection semantics are intentionally not unified.
+- Session 7 additions (all non-blocking, recorded in the plan handoff): one
+  Task-32 cosmetic minor (presets/rewards "新建奖品" heading 3+1 wrap at 320px)
+  plus the final-review minors O1-O4 (comment attribution, conditional
+  content_review slot, AdminPortalView not in the shared list, db.py additive).
 
 ## Integration Branch
 

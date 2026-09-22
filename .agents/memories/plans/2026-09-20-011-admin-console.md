@@ -2675,7 +2675,7 @@ git commit -m "集成 011 后台 provider 与现有模块"
 - Consumes: all implementation tasks.
 - Produces: backend/frontend full regression evidence and browser geometry evidence for desktop/mobile.
 
-- [ ] **Step 1: Write failing final acceptance assertions**
+- [x] **Step 1: Write failing final acceptance assertions**
 
 ```python
 def test_all_nine_admin_areas_are_covered(self):
@@ -2689,7 +2689,7 @@ def test_all_nine_admin_areas_are_covered(self):
     )
 ```
 
-- [ ] **Step 2: Run full backend and frontend suites**
+- [x] **Step 2: Run full backend and frontend suites**
 
 Run: `uv run --directory backend python -m unittest discover -s tests -v`
 
@@ -2701,17 +2701,17 @@ Run: `cd frontend; npm run build`
 
 Expected: all suites and build PASS.
 
-- [ ] **Step 3: Run browser geometry and interaction checks**
+- [x] **Step 3: Run browser geometry and interaction checks**
 
 Use the project browser runbook to start the app and verify `/admin`, `/admin/review`, `/admin/moderation`, `/admin/presets`, `/admin/rewards`, `/admin/redemptions`, `/admin/accounts`, `/admin/points-policy`, `/admin/content`, `/admin/announcements` at `320`, `375`, and `1280` pixels.
 
 Expected: every route has `clientWidth == scrollWidth`; critical actions remain reachable; role-hidden routes are absent for ordinary admin; no console errors.
 
-- [ ] **Step 4: Record verification evidence**
+- [x] **Step 4: Record verification evidence**
 
 Write command outputs, screenshot paths, route/width matrix, and any residual visual risk to `.superpowers/sdd/2026-09-20-011-admin-console/browser-report.md`. `.superpowers/` is local-only and MUST NOT be staged or committed.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add backend/tests/test_admin_integration.py frontend/src/views/AdminConsoleAcceptance.test.ts
@@ -2828,6 +2828,9 @@ Do not merge, push, clean worktrees, or enter SDD execution without explicit aut
   - Task 31: `10791eb`（任务级审查 PASS，生产代码零改动）
   - Task 33: `e83c778`（规格与跨模块契约收敛）
   - 收尾修复: `cd3a93c`（移除 Task 20 遗留的未使用类型导入，修复 `npm run build`）
+- Session 7 commit range: `ac2dea9..12e59b4`
+  - Task 32: `12e59b4`（9 管理区验收断言 + 全量四件套回归 + 真实浏览器 10x3 回归；
+    最终全分支审查 APPROVE，0 Critical / 0 Important / 4 Minor）
 - Verification:
   - backend full `unittest discover` at `10791eb`: `Ran 1277 tests ... OK`；
     closing re-run at `cd3a93c`: `Ran 1277 tests in 2825.341s ... OK`。
@@ -2835,16 +2838,27 @@ Do not merge, push, clean worktrees, or enter SDD execution without explicit aut
   - frontend `npx tsc -b --noEmit`: exit 0。
   - frontend `npm run build`: success at `cd3a93c`（`cd3a93c` 之前失败于
     `vue-tsc` TS6196 未使用导入，属 `tsc -b` 与 build 校验范围差异）。
-  - browser matrix at 320/375/1280: NOT produced（Task 32 被派单阻塞，
-    见下）。jsdom 几何断言已由 Task 30 全覆盖 10 个 admin 视图。
-- Remaining work（唯一未完成任务）:
-  - Task 32: Step 1 两个测试增量（`test_all_nine_admin_areas_are_covered` 与前端
-    最终验收断言）、Step 3 真实浏览器 10 路由 × 3 宽度几何/交互/console 检查、
-    Step 4 `browser-report.md` 与 `screenshots/`（本地）、Step 5 提交。
-    阻塞原因：平台 agent thread limit reached 持续约 60 分钟不释放，且本环境
-    无 close_agent 调用手段。Step 2 的全量回归实质上已由收尾回归完成（数字同上），
-    续跑时只需补 Step 1/3/4/5。
-  - 最终全分支审查：未跑（按硬约束停在合并之前）。
+  - browser matrix at 320/375/1280: PRODUCED in Task 32. Super-admin 10 routes x 3
+    widths = 30/30 no horizontal overflow, console nav rendered; ordinary-admin 7
+    routes x 3 = 21/21; the 3 super-admin-only routes redirect ordinary admins at
+    the guard; console errors empty for both roles; 22 screenshots reviewed by the
+    image agent (OVERALL PASS, 2 cosmetic MINOR). Evidence:
+    `.superpowers/sdd/2026-09-20-011-admin-console/browser-report.md` (local only).
+- Remaining work (Task-32 verification numbers):
+  - backend full at `12e59b4`: `Ran 1279 tests in 2881.807s ... OK` (1277 + 2 new).
+  - frontend `vitest run`: `113 files / 809 tests` passed (806 + 3 new);
+    `tsc -b --noEmit` exit 0; `npm run build` success.
+- Status: Task 1-32、33、34 全部完成。
+- 最终全分支审查（`1a62cf9..12e59b4`）: APPROVE — 0 Critical / 0 Important / 4 Minor:
+  - `routes.py:846` GET `/points-policy` 超管专属；注释归因写"权限矩阵"实为 FR-005（行为正确）。
+  - `providers.py:199` `content_review_provider` 为唯一条件装配（仅当槽空或 Unavailable 时替换；默认装配下 011 provider 生效，安全）。
+  - `AdminPortalView.vue` 全量重写但未列入计划前端共享清单（属 /admin 父布局必需，PortalShell 未动，无跨模块回归）。
+  - `db.py` +324 行纯新增（0 删除），落在 Task 1/24 schema 边界内。
+- Remaining work: 将 `v2/lixKRT/011-admin-console` 合并进 `v2/lixKRT/dev`
+  （需用户明确授权；未授权则停在审查后，不 merge、不 push、不清 worktree）。
+  合并须整包取 011 的 `backend/app/admin_console/`（19 文件；dev 当前为 012 的 13 文件快照），
+  回收计划见 `DECISIONS.md`；`.agents/memories/{NOW,DECISIONS}.md` 需内容合并，
+  `backend/app/__init__.py` 与前端共享文件需保留双方增量。
 - Deferred（Task 33 收敛登记，共 27 项 minor/Info，26 开放 + 1 核实免改）:
   Task 19 (3)、Task 20 (1，h1 移动端核实免改；另 2 项已在 Task 30 修复)、
   Task 25 (2 Info；3 项 minor 已在 Task 30 修复)、Task 26 (2)、Task 27 (4)、
@@ -2854,6 +2868,8 @@ Do not merge, push, clean worktrees, or enter SDD execution without explicit aut
   handcraft `set_video_review_provider` 为扇出装配器；
   `handcraft_teaching_video` 看板计数恒 0（Task 8 割裂）；
   跨控制台 401/403 语义分裂有意不统一。
+- Task 32 新增 deferred minor（图片 agent MINOR，cosmetic）：预置/奖品视图 "新建奖品"
+  标题在 320px 下 3+1 换行；桌面端及其余视图无缺陷。
 - Deviations recorded: Task 33 由主代理以记账身份完成（派单阻塞；纯文档工件）；
   收尾回归发现的 build 阻塞修复 `cd3a93c` 由主代理执行（一行删除未使用导入）。
-- Stop before merge: 未 merge、未 push、未清理 worktree、未跑最终全分支审查。
+- Stop before merge: 最终全分支审查已跑并 APPROVE；未 merge、未 push、未清理 worktree（等待合并授权）。
