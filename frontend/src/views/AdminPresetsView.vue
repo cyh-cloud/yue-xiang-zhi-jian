@@ -2427,7 +2427,10 @@ onMounted(() => {
 }
 
 .preset-state--empty {
-  flex-direction: column;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
 }
 
 /* The table owns its own horizontal scroll so a wide row never widens the
