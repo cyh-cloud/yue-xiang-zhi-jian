@@ -1,5 +1,32 @@
 # Current Work
 
+## 011 Admin Console 合并进 dev（2026-09-22，当前状态）
+
+- `v2/lixKRT/011-admin-console` 合入 `v2/lixKRT/dev`：merge commit `7e09bb4`
+  （父 `428641f` × `1c9f914`，merge-base `1a62cf9`，58 个提交）。未 push；
+  011 worktree `.worktrees/011-admin-console` 与分支均保留。
+- 合并前清理：删除 3 个 0 字节未跟踪占位（`backend/tests/test_admin_rewards_fulfillment.py`、
+  `frontend/src/views/AdminAnnouncementsView.test.ts`、`.agents/memories/plans/2026-09-20-011-admin-console.md`）；
+  提交 `428641f` chore(memory)（模型阶梯更新 + 012 SDD checkpoint 归档）。
+- 冲突处置：`backend/app/admin_console/` 整包取 011（19 文件，012 vendored 快照回收，
+  DECISIONS.md 已标 reclaimed）；`backend/app/db.py` 保留双方建表（012 会话表 + 011
+  管理端表，含 `admin_assistant_feature_knowledge`）；`backend/app/__init__.py` 双方
+  provider 注册齐全，`install_default_admin_services(app)` 排在
+  `install_default_ai_companion_services(app)` 之后（011 不变量），fresh app 的共享
+  knowledge 槽由真实 `DatabaseAssistantFeatureKnowledgeProvider` 持有；
+  `.agents/memories/DECISIONS.md` 内容合并；`frontend/src/api/types.ts` 双方类型块合并；
+  `.specify/feature.json` 取最新完成 feature（012）。
+- 独立审查（step-5-preview，high）：结构项全部通过；5 个"快照时代"分支相对断言按
+  DECISIONS.md 回收计划翻转为合并后事实（提交 `1da1404`）。
+- 合并后全量回归：后端 `unittest discover` `Ran 1357 tests ... OK`（3419.881s）；
+  前端 `npm test` 123 文件 / 921 测试全过；`npx tsc -b --noEmit` exit 0；`npm run build`
+  成功；真实 `create_app` 装配冒烟（`test_admin_integration`）19/19 OK。
+- 残余风险：011 最终全分支审查 4 个 Minor 登记项未修（routes.py:846 注释归因、
+  providers.py:199 条件装配、AdminPortalView.vue 未列入共享清单、db.py +324 行纯新增）；
+  27 项 deferred minor 分布见本文件 011 段（Task 19×3、20×1、25×2、26×2、27×4、28×4、
+  29×4、30×3、31×4）。012 的 deferred 项"011 real-provider assembly order"已随本次合并闭环。
+- 下一步：push 需单独授权；后续 feature 从 `v2/lixKRT/dev` 顶端的真实 011 代码继续。
+
 ## 012 AI Companion (SDD CHECKPOINT - RESUME from Task 14)
 
 - 2026-09-21 phase wrap after Task 13. Branch v2/lixKRT/012-ai-companion, HEAD=aa3118e, worktree clean, local only (NOT pushed/merged), 011 independent. Durable done-list = git log (20 commits, Task 1-13 + prereq + fixes).
