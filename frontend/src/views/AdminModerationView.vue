@@ -26,7 +26,6 @@ import type {
   AdminModerationReportQuery,
   AdminModerationVisibilityFilter,
   AdminResolvedCommentReport,
-  AdminUpdatedFeedbackRecord
 } from '@/stores/adminConsole'
 import { useAdminConsoleStore } from '@/stores/adminConsole'
 import { widenModerationDay } from '@/stores/adminConsole'
