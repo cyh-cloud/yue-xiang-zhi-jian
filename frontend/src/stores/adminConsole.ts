@@ -136,6 +136,25 @@ export interface AdminModerationFeedbackQuery {
   created_to: string
 }
 
+// 后端只接受带时区的 ISO 8601 时间戳，`type="date"` 的裸值需加宽为平台当日边界。
+// 若某个值已经带上时间分量（即此前已加宽过），则原样透传，保证加宽幂等——
+// 否则经 store 默认参数 query 回灌的 ISO 串会被再次拼成
+// `...T00:00:00+08:00T00:00:00+08:00`。
+export function widenModerationDay(filters: {
+  created_from: string
+  created_to: string
+}): { created_from: string; created_to: string } {
+  const widen = (value: string, endOfDay: boolean): string => {
+    if (!value) return ''
+    if (value.includes('T')) return value
+    return endOfDay ? `${value}T23:59:59+08:00` : `${value}T00:00:00+08:00`
+  }
+  return {
+    created_from: widen(filters.created_from, false),
+    created_to: widen(filters.created_to, true)
+  }
+}
+
 export interface AdminModerationCommentsResponse {
   success: true
   items: AdminModerationComment[]

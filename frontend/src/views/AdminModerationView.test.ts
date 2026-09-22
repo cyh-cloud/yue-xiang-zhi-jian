@@ -413,6 +413,45 @@ describe('AdminModerationView', () => {
     expect(lastPath()).toContain('offset=0')
   })
 
+  it('never reaches an empty page when the total is a whole multiple of the page size', async () => {
+    comments = Array.from({ length: 40 }, (_, index) =>
+      commentFixture({
+        comment_id: `comment-${index + 1}`,
+        body: `评论正文 ${index + 1}`
+      })
+    )
+    const { wrapper } = await mountView()
+
+    expect(wrapper.findAll('[data-test="comment-row"]')).toHaveLength(20)
+    expect(wrapper.get('[data-test="moderation-page"]').text()).toContain('第 1 页')
+
+    await wrapper.get('[data-test="moderation-next"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="moderation-page"]').text()).toContain('第 2 页')
+    expect(wrapper.findAll('[data-test="comment-row"]')).toHaveLength(20)
+    // 总数 40 恰为页大小 20 的整数倍：第 2 页仍是整页，“下一页”仍可点。
+    expect(
+      wrapper.get('[data-test="moderation-next"]').attributes('disabled')
+    ).toBeUndefined()
+
+    await wrapper.get('[data-test="moderation-next"]').trigger('click')
+    await flushPromises()
+    await flushPromises()
+
+    // 越过末行的一页命中空页后回退到第 2 页并锁止前进：空页永不可达。
+    expect(wrapper.findAll('[data-test="comment-row"]')).toHaveLength(20)
+    expect(wrapper.get('[data-test="moderation-page"]').text()).toContain('第 2 页')
+    expect(
+      wrapper.get('[data-test="moderation-next"]').attributes('disabled')
+    ).toBeDefined()
+    expect(
+      wrapper.get('[data-test="moderation-prev"]').attributes('disabled')
+    ).toBeUndefined()
+    expect(lastPath()).toContain('offset=20')
+    wrapper.unmount()
+  })
+
   it('applies the comment filters as timezone-aware stamps', async () => {
     const { wrapper } = await mountView()
     apiFetchMock.mockClear()

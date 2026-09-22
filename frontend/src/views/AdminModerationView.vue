@@ -12,7 +12,7 @@ import {
   Trash2,
   X
 } from 'lucide-vue-next'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 
 import type {
   AdminCommentReport,
@@ -29,6 +29,7 @@ import type {
   AdminUpdatedFeedbackRecord
 } from '@/stores/adminConsole'
 import { useAdminConsoleStore } from '@/stores/adminConsole'
+import { widenModerationDay } from '@/stores/adminConsole'
 
 type ModerationTab = 'comments' | 'reports' | 'feedback'
 
@@ -150,6 +151,11 @@ const pageSize = ref(20)
 const commentsOffset = ref(0)
 const reportsOffset = ref(0)
 const feedbackOffset = ref(0)
+// 总数恰为页大小整数倍时，最后一整页的“下一页”会越过末行进入空页。命中空页即锁止
+// 前进并回退一页，使该空页永不对用户可见。
+const commentsHitEnd = ref(false)
+const reportsHitEnd = ref(false)
+const feedbackHitEnd = ref(false)
 const actionMessage = ref('')
 const deleteCandidate = ref<AdminModerationComment | null>(null)
 const reportCandidate = ref<{
@@ -203,9 +209,19 @@ const activePage = computed(() => Math.floor(activeOffset.value / pageSize.value
 
 const canGoPrevious = computed(() => activeOffset.value > 0)
 
+const activeHitEnd = computed(() => {
+  if (activeTab.value === 'comments') return commentsHitEnd.value
+  if (activeTab.value === 'reports') return reportsHitEnd.value
+  return feedbackHitEnd.value
+})
+
 // A short page is the end of the queue: `count` is the number of rows this
 // page carries, so a full page is the only signal that more rows may follow.
-const canGoNext = computed(() => activeCount.value >= pageSize.value)
+// 当总数恰为页大小整数倍时末页是整页，越过末行的一页返回 0 行，届时 `activeHitEnd`
+// 会锁止前进，数据上的空页由此不可达。
+const canGoNext = computed(
+  () => activeCount.value >= pageSize.value && !activeHitEnd.value
+)
 
 const trimmedReportResult = computed(() => reportResult.value.trim())
 const canSubmitReport = computed(
@@ -258,43 +274,62 @@ function formatTime(value: string | null): string {
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
 }
 
-// The backend only accepts timezone-aware ISO 8601 stamps, so a `type="date"`
-// value is widened into the platform day boundaries instead of being sent raw.
-function dayBoundaries(filters: {
-  created_from: string
-  created_to: string
-}): { created_from: string; created_to: string } {
-  return {
-    created_from: filters.created_from
-      ? `${filters.created_from}T00:00:00+08:00`
-      : '',
-    created_to: filters.created_to
-      ? `${filters.created_to}T23:59:59+08:00`
-      : ''
+// 加宽查询仅做一次：`widenModerationDay` 幂等，故同一批过滤条件无论被 settlePage 读取
+// 多少次都不会二次拼时区。若一页返回 0 行且已离开首页，说明上一整页之后没有更多数据
+// （总数恰为页大小整数倍），于是锁止前进并回退一页。
+async function settlePage<
+  Q extends { created_from: string; created_to: string }
+>(
+  filters: Q,
+  offset: Ref<number>,
+  endReached: Ref<boolean>,
+  load: (query: Q, offset: number) => Promise<boolean>,
+  count: () => number
+): Promise<void> {
+  const query = { ...filters, ...widenModerationDay(filters) } as Q
+  const ok = await load(query, offset.value)
+  if (!ok) return
+  if (offset.value > 0 && count() === 0) {
+    endReached.value = true
+    offset.value = Math.max(0, offset.value - pageSize.value)
+    await load(query, offset.value)
+    return
+  }
+  if (offset.value === 0 || count() < pageSize.value) {
+    endReached.value = false
   }
 }
 
 function reloadComments(): void {
-  void store.loadModerationComments(
-    { ...commentFilters.value, ...dayBoundaries(commentFilters.value) },
-    commentsOffset.value,
-    pageSize.value
+  void settlePage<AdminModerationCommentQuery>(
+    commentFilters.value,
+    commentsOffset,
+    commentsHitEnd,
+    (query, offset) =>
+      store.loadModerationComments(query, offset, pageSize.value),
+    () => store.moderationCommentCount
   )
 }
 
 function reloadReports(): void {
-  void store.loadModerationReports(
-    { ...reportFilters.value, ...dayBoundaries(reportFilters.value) },
-    reportsOffset.value,
-    pageSize.value
+  void settlePage<AdminModerationReportQuery>(
+    reportFilters.value,
+    reportsOffset,
+    reportsHitEnd,
+    (query, offset) =>
+      store.loadModerationReports(query, offset, pageSize.value),
+    () => store.moderationReportCount
   )
 }
 
 function reloadFeedback(): void {
-  void store.loadModerationFeedback(
-    { ...feedbackFilters.value, ...dayBoundaries(feedbackFilters.value) },
-    feedbackOffset.value,
-    pageSize.value
+  void settlePage<AdminModerationFeedbackQuery>(
+    feedbackFilters.value,
+    feedbackOffset,
+    feedbackHitEnd,
+    (query, offset) =>
+      store.loadModerationFeedback(query, offset, pageSize.value),
+    () => store.moderationFeedbackCount
   )
 }
 
@@ -1506,7 +1541,10 @@ onBeforeUnmount(() => {
 }
 
 .mod-state--empty {
-  flex-direction: column;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
 }
 
 .mod-table-wrap {
@@ -1948,6 +1986,16 @@ onBeforeUnmount(() => {
 
   .mod-filter-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mod-filters__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .mod-filters__actions .mod-field {
+    grid-column: 1 / -1;
   }
 
   .mod-table td {
