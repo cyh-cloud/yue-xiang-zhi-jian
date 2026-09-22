@@ -41,19 +41,35 @@ const apiFetchMock = vi.mocked(apiFetch)
 
 // FR-102 forbids these keys anywhere in the ordinary-admin dashboard, at any
 // nesting depth, so the scan below walks the whole DTO instead of the surface.
+// The five distribution/count keys mirror the backend
+// FORBIDDEN_ADMIN_DASHBOARD_KEYS set: the 011 spec excludes them from the
+// ordinary-admin content dashboard even though only the platform snapshot
+// ever carries some of them today.
 const FORBIDDEN_DASHBOARD_KEYS: readonly string[] = [
   'total_users',
   'role_distribution',
+  'region_distribution',
+  'direction_distribution',
   'student_total',
   'student_count',
   'user_details',
+  'course_count',
   'average_progress',
   'completion_rate',
+  'progress',
+  'certificate_count',
   'quiz_attempt_count',
   'quiz_average_score',
   'training_progress',
   'learning_behavior_count'
 ]
+
+// `AdminMetricGroup` renders the raw key into `data-metric-key`, so a plain
+// substring scan would fire on the allowed `published_course_count` tile when
+// the forbidden key is `course_count`; the token boundary keeps the scan exact.
+function htmlLeaksKey(html: string, key: string): boolean {
+  return new RegExp(`(?<![A-Za-z0-9_])${key}(?![A-Za-z0-9_])`).test(html)
+}
 
 function collectKeys(value: unknown, into: Set<string> = new Set()): Set<string> {
   if (Array.isArray(value)) {
@@ -199,7 +215,10 @@ describe('AdminDashboardView', () => {
     expect(wrapper.text()).not.toContain('学员数')
 
     for (const key of FORBIDDEN_DASHBOARD_KEYS) {
-      expect(wrapper.html(), `rendered markup leaks ${key}`).not.toContain(key)
+      expect(
+        htmlLeaksKey(wrapper.html(), key),
+        `rendered markup leaks ${key}`
+      ).toBe(false)
     }
   })
 
@@ -223,7 +242,10 @@ describe('AdminDashboardView', () => {
     ])
 
     for (const key of FORBIDDEN_DASHBOARD_KEYS) {
-      expect(wrapper.html(), `rendered markup leaks ${key}`).not.toContain(key)
+      expect(
+        htmlLeaksKey(wrapper.html(), key),
+        `rendered markup leaks ${key}`
+      ).toBe(false)
       expect(
         wrapper.find(`[data-metric-key="${key}"]`).exists(),
         `rendered tile leaks ${key}`
