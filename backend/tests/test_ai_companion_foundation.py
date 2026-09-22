@@ -14,6 +14,7 @@ from app.ai_companion.knowledge_provider import (
 )
 from app.admin_console.providers import (
     AssistantFeatureKnowledgeProvider,
+    DatabaseAssistantFeatureKnowledgeProvider,
     UnavailableAssistantFeatureKnowledgeProvider,
 )
 from app.admin_console.errors import ProviderUnavailableError
@@ -45,13 +46,17 @@ class AiCompanionFoundationTests(unittest.TestCase):
             ("platform_usage", "learning_question", "out_of_scope"),
         )
 
-    def test_provider_placeholder_and_single_slot_replacement(self):
+    def test_real_provider_default_and_single_slot_replacement(self):
+        # 011 合并回收后 fresh app 默认安装真实的
+        # DatabaseAssistantFeatureKnowledgeProvider；单槽替换语义不变。
         with self.app.app_context():
-            placeholder = get_assistant_feature_knowledge_provider()
+            provider = get_assistant_feature_knowledge_provider()
             self.assertIsInstance(
-                placeholder,
-                UnavailableAssistantFeatureKnowledgeProvider,
+                provider,
+                DatabaseAssistantFeatureKnowledgeProvider,
             )
+            # 占位 provider 自身仍以 ProviderUnavailableError 失败关闭。
+            placeholder = UnavailableAssistantFeatureKnowledgeProvider()
             with self.assertRaises(ProviderUnavailableError):
                 placeholder.list_entries()
 

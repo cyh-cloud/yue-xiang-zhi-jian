@@ -3,7 +3,7 @@
 This module is the final acceptance gate for feature 012. It deliberately
 re-asserts the seven whole-feature behaviours at the API level instead of
 trusting the per-task suites, and it proves the 011 provider-ownership facts
-as facts (identity, single definition, the missing
+as facts (identity, single definition, the created
 `admin_assistant_feature_knowledge` table and the entry field shape). No test
 here creates the 011 table, registers a provider on behalf of 011, or stubs
 around a gap: every assertion reads live repository state.
@@ -12,7 +12,6 @@ around a gap: every assertion reads live repository state.
 import ast
 import io
 import re
-import sqlite3
 import tempfile
 import tokenize
 import unittest
@@ -752,7 +751,7 @@ class ProviderReconciliationTests(unittest.TestCase):
                 path, _lineno = found[0]
                 self.assertEqual(path, PROVIDERS_SOURCE_PATH)
 
-    def test_the_011_knowledge_table_is_not_created_on_this_branch(self):
+    def test_the_011_knowledge_table_is_created_in_the_shared_schema(self):
         statements = create_table_statements(APP_SOURCE_ROOT)
         # Teeth：扫描确实看得到 CREATE TABLE 文本，否则下面的计数是空的。
         self.assertTrue(statements)
@@ -767,20 +766,24 @@ class ProviderReconciliationTests(unittest.TestCase):
             for statement in statements
             if KNOWLEDGE_TABLE in statement.lower()
         ]
-        self.assertEqual(matches, [])
-
-    def test_the_real_db_provider_raises_no_such_table(self):
-        # 记录事实而不是绕过事实：真实 provider 在本分支上必然抛
-        # "no such table"，因为 011 的表从未被创建。
-        with self.app.app_context():
-            with self.assertRaises(sqlite3.OperationalError) as caught:
-                DatabaseAssistantFeatureKnowledgeProvider().list_entries()
+        # 011 合并回收后，该表由 backend/app/db.py 创建，全仓应恰好一处。
+        self.assertEqual(len(matches), 1)
         self.assertIn(
-            f"no such table: {KNOWLEDGE_TABLE}",
-            str(caught.exception),
+            f"CREATE TABLE IF NOT EXISTS {KNOWLEDGE_TABLE}",
+            matches[0],
         )
 
-    def test_the_real_db_provider_reads_the_missing_table(self):
+    def test_the_real_db_provider_reads_the_created_table(self):
+        # 011 合并回收后 admin_assistant_feature_knowledge 表由 db.py 创建，
+        # 真实 provider 正常读取；表若再次缺失，list_entries 会抛
+        # OperationalError，本测试即该事实的守卫。
+        with self.app.app_context():
+            entries = DatabaseAssistantFeatureKnowledgeProvider().list_entries()
+        self.assertIsInstance(entries, list)
+        for entry in entries:
+            self.assertTrue(set(KNOWLEDGE_FIELDS) <= set(entry))
+
+    def test_the_real_db_provider_reads_the_shared_table(self):
         source = PRESETS_SOURCE_PATH.read_text(encoding="utf-8")
         module = ast.parse(source, filename=str(PRESETS_SOURCE_PATH))
         provider_class = next(
@@ -834,39 +837,38 @@ class ProviderReconciliationTests(unittest.TestCase):
         for field in KNOWLEDGE_FIELDS:
             self.assertIn(field, serialized)
 
-    def test_fresh_app_defaults_to_the_011_placeholder_provider(self):
-        # 012 默认装的是 011 的占位 provider；真实 DatabaseAssistantFeature
-        # KnowledgeProvider 需要 011 侧建表后再注册，本分支不代劳。
+    def test_fresh_app_defaults_to_the_real_db_provider(self):
+        # 011 合并回收后，admin 安装排在 ai_companion 安装之后并无条件替换
+        # 共享槽：fresh app 默认持有真实的
+        # DatabaseAssistantFeatureKnowledgeProvider。
         with self.app.app_context():
             provider = admin_providers.get_assistant_feature_knowledge_provider()
         self.assertIsInstance(
             provider,
-            admin_providers.UnavailableAssistantFeatureKnowledgeProvider,
+            admin_providers.DatabaseAssistantFeatureKnowledgeProvider,
         )
 
-    def test_create_app_registers_no_admin_console_routes(self):
-        # 011 快照只服务于 provider 契约：create_app 不得注册 admin_console
-        # 蓝图，也不得挂出其路由前缀下的任何 rule，否则 012 就替 011 开了
-        # 管理端入口。这是"不得注册管理路由"约束的行为守卫。
+    def test_create_app_registers_admin_console_routes(self):
+        # 011 合并回收后 create_app 注册 admin_console 蓝图（前缀
+        # /api/admin）。"012 不得代注册管理路由"的分支约束随快照回收解除，
+        # 管理端入口由 011 自身的路由与角色守卫守护。
         self.assertEqual(admin_console_bp.url_prefix, "/api/admin")
-        self.assertNotIn("admin_console", self.app.blueprints)
-        self.assertEqual(
+        self.assertIn("admin_console", self.app.blueprints)
+        self.assertTrue(
             [
                 rule.rule
                 for rule in self.app.url_map.iter_rules()
                 if rule.rule == admin_console_bp.url_prefix
                 or rule.rule.startswith(f"{admin_console_bp.url_prefix}/")
             ],
-            [],
         )
         # 端点名前缀兜底：即使蓝图换个名字注册，端点仍带 admin_console. 前缀。
-        self.assertEqual(
+        self.assertTrue(
             [
                 rule.endpoint
                 for rule in self.app.url_map.iter_rules()
                 if rule.endpoint.startswith("admin_console.")
             ],
-            [],
         )
 
 
