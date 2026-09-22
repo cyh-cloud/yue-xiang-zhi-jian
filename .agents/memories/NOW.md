@@ -245,10 +245,19 @@ whole-branch review.
   frontend whole-feature `12/12`; frontend full `110` files / `736` tests
   (includes the Task 13 reopen-reload regression test);
   `npx vue-tsc --noEmit` silent; `npm run build` succeeded.
-- Browser acceptance is BLOCKED: port 5000 is held by PID 34676, which cannot be
-  identified (`tasklist` reports no such task), and the no-kill rule forbids
-  terminating it. No screenshots, no browser geometry, and image delegation is
-  not applicable.
+- 2026-09-22: Browser acceptance (Task 15 Step 4) COMPLETED. Ports 5000/5173
+  verified free before start; real app (uv run --directory backend python run.py
+  + npm run dev) run in the worktree with a scratch DB outside git;
+  worktree-scoped agent-browser session; student login. Geometry at
+  320/375/1280: no horizontal overflow (scrollWidth == viewport), launcher
+  inset 16px (mobile) / 24px (desktop), no overlap with header/primary
+  submit/bottom actions, panel opens/scrolls/composer visible/Escape closes
+  with focus return. Screenshots under
+  .superpowers/sdd/2026-09-20-012-ai-companion/task-15-screenshots/
+  (gitignored). Image inspection delegated to the 图片理解 subagent
+  (step-3.7-flash, high). The pass surfaced one 320px composer-overflow defect
+  (submit button pushed past the viewport edge), fixed the same day; see the
+  2026-09-22 final-review entry below.
 - Provider reconciliation: 012 consumes the 011-owned
   `assistant_feature_knowledge_provider` contract by re-export only, asserted by
   object identity for the setter, the getter and both provider classes. Exactly
@@ -264,5 +273,21 @@ whole-branch review.
   `app/ai_companion/__init__.py` not re-exporting `AI_UNAVAILABLE_MESSAGE` and
   `ASR_FAILURE_MESSAGE`; the 7-field knowledge whitelist test needing hardening;
   180-day retention computed by `updated_at`; 011 real-provider assembly order.
-- The 012 worktree and branch are retained. No push, no merge and no worktree
-  cleanup has been performed.
+- 2026-09-22: Final whole-branch review over 1a62cf9..2d7c376 (36 commits,
+  independent read-only reviewer, step-5-preview high): no Critical; Important
+  I-1 (vendored 011 admin_console snapshot broader than the provider dependency
+  and unregistered as a decision) and Minor M-1 (.specify/feature.json pointer)
+  / M-2 (retention exact-threshold cases missing; registered, not fixed). Fix
+  wave by an independent implementer: 2081b8a
+  fix(ai-companion): 修复 320px 视口下对话面板 composer 溢出面板与视口
+  and 467d488
+  docs(ai-companion): 登记 011 admin_console 快照策略并补无管理路由守卫.
+  Scoped re-review: both ADDRESSED, no new breakage. Post-fix verification:
+  backend full 1019/1019, frontend full 110 files / 737 tests, vue-tsc silent,
+  build success. DECISIONS.md now carries "AI Companion Vendored 011
+  admin_console Snapshot" with the reclaim plan at 011 merge. v2/lixKRT/dev
+  fast-forwarded to the 012 tip afterwards; the merged result was re-verified
+  with the full suites.
+- The 012 worktree and branch are retained. No push and no worktree cleanup
+  has been performed; the only merge was the authorized fast-forward of
+  v2/lixKRT/dev onto the 012 branch tip.
