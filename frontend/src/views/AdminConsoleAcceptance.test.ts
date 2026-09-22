@@ -964,28 +964,89 @@ async function mountNav(role: 'admin' | 'super_admin') {
   return { test, wrapper }
 }
 
+// Single source of truth for the role navigation matrix. The two tests below
+// and the area coverage block read these, so an entry cannot be added or
+// dropped in one place only.
+const ADMIN_VISIBLE_NAV_TEST_IDS = [
+  'dashboard',
+  'review',
+  'moderation',
+  'presets',
+  'rewards',
+  'redemptions',
+  'content'
+]
+
+// 账号管理、积分规则、系统公告为超管专属，普通管理员一律看不到。
+const ADMIN_HIDDEN_NAV_TEST_IDS = ['accounts', 'points-policy', 'announcements']
+
+const SUPER_ADMIN_VISIBLE_NAV_TEST_IDS = [
+  'dashboard',
+  'review',
+  'moderation',
+  'presets',
+  'rewards',
+  'redemptions',
+  'accounts',
+  'points-policy',
+  'content',
+  'announcements'
+]
+
+const CONSOLE_ROLES = ['admin', 'super_admin'] as const
+
+type ConsoleRole = (typeof CONSOLE_ROLES)[number]
+
+const NAV_TEST_IDS_BY_ROLE: Record<ConsoleRole, string[]> = {
+  // The matrix arrays above carry the nav suffixes, so they are widened to the
+  // full `data-test` ids the area map and the DOM use.
+  admin: ADMIN_VISIBLE_NAV_TEST_IDS.map(suffix => `admin-nav-${suffix}`),
+  super_admin: SUPER_ADMIN_VISIBLE_NAV_TEST_IDS.map(
+    suffix => `admin-nav-${suffix}`
+  )
+}
+
+// The nine console areas of the 011 spec, each mapped to the nav entry that
+// carries it. `announcements` is a tenth super-admin route, not an area, so it
+// stays out of this map on purpose.
+const AREA_NAV_TEST_IDS: Record<string, string> = {
+  dashboard: 'admin-nav-dashboard',
+  review: 'admin-nav-review',
+  moderation: 'admin-nav-moderation',
+  presets: 'admin-nav-presets',
+  rewards: 'admin-nav-rewards',
+  redemptions: 'admin-nav-redemptions',
+  accounts: 'admin-nav-accounts',
+  points_policy: 'admin-nav-points-policy',
+  content_management: 'admin-nav-content'
+}
+
+// Console area -> the route paths that may serve it. The dashboard answers on
+// both the console root and the explicit dashboard path.
+const AREA_ROUTE_PATHS: Record<string, string[]> = {
+  dashboard: ['/admin', '/admin/dashboard'],
+  review: ['/admin/review'],
+  moderation: ['/admin/moderation'],
+  presets: ['/admin/presets'],
+  rewards: ['/admin/rewards'],
+  redemptions: ['/admin/redemptions'],
+  accounts: ['/admin/accounts'],
+  points_policy: ['/admin/points-policy'],
+  content_management: ['/admin/content']
+}
+
 describe('admin console role navigation', () => {
   it('shows ordinary admins the read-only set that includes data management', async () => {
     const { wrapper } = await mountNav('admin')
 
-    const visible = [
-      'dashboard',
-      'review',
-      'moderation',
-      'presets',
-      'rewards',
-      'redemptions',
-      'content'
-    ]
-    for (const testId of visible) {
+    for (const testId of ADMIN_VISIBLE_NAV_TEST_IDS) {
       expect(
         wrapper.find(`[data-test="admin-nav-${testId}"]`).exists(),
         `admin visible: ${testId}`
       ).toBe(true)
     }
 
-    // 账号管理、积分规则、系统公告为超管专属，普通管理员一律看不到。
-    for (const testId of ['accounts', 'points-policy', 'announcements']) {
+    for (const testId of ADMIN_HIDDEN_NAV_TEST_IDS) {
       expect(
         wrapper.find(`[data-test="admin-nav-${testId}"]`).exists(),
         `admin hidden: ${testId}`
@@ -995,19 +1056,7 @@ describe('admin console role navigation', () => {
 
   it('shows super admins every console entry', async () => {
     const { wrapper } = await mountNav('super_admin')
-    const expected = [
-      'dashboard',
-      'review',
-      'moderation',
-      'presets',
-      'rewards',
-      'redemptions',
-      'accounts',
-      'points-policy',
-      'content',
-      'announcements'
-    ]
-    for (const testId of expected) {
+    for (const testId of SUPER_ADMIN_VISIBLE_NAV_TEST_IDS) {
       expect(
         wrapper.find(`[data-test="admin-nav-${testId}"]`).exists()
       ).toBe(true)
@@ -1037,6 +1086,74 @@ describe('admin console navigation and route guards agree', () => {
       '/admin/announcements',
       '/admin/points-policy'
     ])
+  })
+})
+
+describe('admin console area coverage', () => {
+  it('all nine console areas are covered by the role navigation matrix', async () => {
+    const areas = Object.entries(AREA_NAV_TEST_IDS)
+    expect(areas).toHaveLength(9)
+    expect(areas.map(([area]) => area).sort()).toEqual([
+      'accounts',
+      'content_management',
+      'dashboard',
+      'moderation',
+      'points_policy',
+      'presets',
+      'redemptions',
+      'review',
+      'rewards'
+    ])
+    expect(Object.values(AREA_NAV_TEST_IDS)).not.toContain(
+      'admin-nav-announcements'
+    )
+
+    const wrappers = {
+      admin: (await mountNav('admin')).wrapper,
+      super_admin: (await mountNav('super_admin')).wrapper
+    }
+
+    for (const [area, testId] of areas) {
+      // Expected role set comes from the matrix arrays above, never restated.
+      const visibleTo = CONSOLE_ROLES.filter(role =>
+        NAV_TEST_IDS_BY_ROLE[role].includes(testId)
+      )
+      expect(
+        visibleTo.length,
+        `${area} (${testId}) is not reachable by any role`
+      ).toBeGreaterThan(0)
+
+      for (const role of CONSOLE_ROLES) {
+        expect(
+          wrappers[role].find(`[data-test="${testId}"]`).exists(),
+          `${area} (${testId}) for ${role}`
+        ).toBe(visibleTo.includes(role))
+      }
+    }
+  })
+
+  it('every console area keeps a route in the navigation matrix', () => {
+    const matrix = testRouter()
+      .getRoutes()
+      .map(record => record.path)
+
+    for (const [area, paths] of Object.entries(AREA_ROUTE_PATHS)) {
+      expect(
+        paths.some(path => matrix.includes(path)),
+        `${area} route missing from the navigation matrix`
+      ).toBe(true)
+    }
+  })
+
+  it('every console area keeps a route in the real router table', () => {
+    const registered = router.getRoutes().map(record => record.path)
+
+    for (const [area, paths] of Object.entries(AREA_ROUTE_PATHS)) {
+      expect(
+        paths.some(path => registered.includes(path)),
+        `${area} route missing from the router table`
+      ).toBe(true)
+    }
   })
 })
 

@@ -159,6 +159,59 @@ class AdminIntegrationTestCase(TestCase):
                 for row in get_db().execute(sql, parameters).fetchall()
             ]
 
+    # Blueprint name declared in `app/admin_console/routes.py`; every 011
+    # endpoint is registered as `admin_console.<handler>`.
+    ADMIN_BLUEPRINT = "admin_console"
+    ADMIN_URL_PREFIX = "/api/admin"
+    # First path segment after the blueprint prefix -> console area. Kept as
+    # data so a new admin route has to be classified on purpose.
+    ADMIN_SECTION_BY_SEGMENT = {
+        "dashboard": "dashboard",
+        "content-dashboard": "dashboard",
+        "accounts": "accounts",
+        "review": "review",
+        "comments": "moderation",
+        "reports": "moderation",
+        "feedback": "moderation",
+        "presets": "presets",
+        "content": "content_management",
+        "rewards": "rewards",
+        "redemptions": "redemptions",
+        "fulfillments": "redemptions",
+        "points-policy": "points_policy",
+    }
+    # Super-admin broadcast surface: a real route, but not one of the nine
+    # console areas the 011 spec counts, so it is dropped deliberately.
+    ADMIN_EXCLUDED_SEGMENTS = frozenset({"announcements"})
+
+    def admin_section_names(self) -> set[str]:
+        """Console areas the admin console blueprint really registers.
+
+        Read from the live URL map of the app built in `setUp`, never from a
+        literal list, so adding or losing a route in
+        `backend/app/admin_console/routes.py` changes the answer here. A rule
+        whose first segment has no area mapping is an error rather than a
+        silent drop.
+        """
+        sections: set[str] = set()
+        for rule in self.app.url_map.iter_rules():
+            if not rule.endpoint.startswith(f"{self.ADMIN_BLUEPRINT}."):
+                continue
+            if "GET" not in rule.methods:
+                continue
+            if not rule.rule.startswith(self.ADMIN_URL_PREFIX):
+                continue
+            segment = rule.rule[len(self.ADMIN_URL_PREFIX) :].strip("/").split("/")[0]
+            if segment in self.ADMIN_EXCLUDED_SEGMENTS:
+                continue
+            if segment not in self.ADMIN_SECTION_BY_SEGMENT:
+                raise AssertionError(
+                    "admin console route segment is not mapped to an area: "
+                    f"{segment!r} (rule {rule.rule}, endpoint {rule.endpoint})"
+                )
+            sections.add(self.ADMIN_SECTION_BY_SEGMENT[segment])
+        return sections
+
 
 class AdminProviderAssemblyTests(AdminIntegrationTestCase):
     """Real `create_app()` wiring, read through the consumers' own getters."""
@@ -810,3 +863,46 @@ class SessionAndRoleGuardTests(AdminIntegrationTestCase):
             with self.subTest(role=role):
                 response = self.clients[role].get("/api/messages/notifications")
                 self.assertEqual(response.status_code, 200)
+
+
+class AdminConsoleAreaCoverageTests(AdminIntegrationTestCase):
+    """Every one of the nine console areas is backed by a registered route."""
+
+    def test_all_nine_admin_areas_are_covered(self):
+        self.assertEqual(
+            {
+                "dashboard",
+                "accounts",
+                "review",
+                "moderation",
+                "presets",
+                "rewards",
+                "redemptions",
+                "points_policy",
+                "content_management",
+            },
+            self.admin_section_names(),
+        )
+
+    def test_admin_console_routes_are_all_classified(self):
+        # Guards the helper itself: it must read a non-empty blueprint and
+        # every segment it saw must have been mapped, otherwise the coverage
+        # assertion above could pass on an empty set.
+        sections = self.admin_section_names()
+        self.assertTrue(sections)
+        blueprint_rules = [
+            rule
+            for rule in self.app.url_map.iter_rules()
+            if rule.endpoint.startswith(f"{self.ADMIN_BLUEPRINT}.")
+            and "GET" in rule.methods
+        ]
+        self.assertTrue(blueprint_rules)
+        for rule in blueprint_rules:
+            segment = (
+                rule.rule[len(self.ADMIN_URL_PREFIX) :].strip("/").split("/")[0]
+            )
+            self.assertIn(
+                segment,
+                set(self.ADMIN_SECTION_BY_SEGMENT) | set(self.ADMIN_EXCLUDED_SEGMENTS),
+                (rule.rule, rule.endpoint),
+            )
