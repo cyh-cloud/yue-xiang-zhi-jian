@@ -52,3 +52,32 @@
   `government_employment_statistics_provider`.
 - 010 consumes that slot without direct job/application table access or a
   second registry.
+
+## 011 Admin Console Provider Decisions
+
+- 011 owns eight provider slots and installs them last in `create_app`, after
+  every consumer default and before `register_messaging_source_provider`.
+- Slot replacement is unconditional for `agri_preset_provider`,
+  `handcraft_craft_preset_provider`, `local_resource_case_provider`, and
+  `handcraft_reward_catalog_provider`: 03/05/06 install their own defaults
+  earlier, so a "not in app.extensions" guard would silently keep the
+  consumer placeholder and 011 would never take effect.
+- `content_review_provider` is replaced only when the installed slot is absent
+  or is the `UnavailableContentReviewProvider` placeholder; a non-placeholder
+  provider installed by a test or a later feature is left alone.
+- `knowledge` and `feedback_intake` slots are replaced unconditionally; the
+  "pre-installed sentinel is replaced" behavior is pinned by tests so a future
+  guard regression fails loudly.
+- One `DatabasePointsPolicyProvider` instance fans out to both
+  `handcraft_points_policy_provider` (05 read slot) and
+  `admin_points_policy_provider` (011 management read slot).
+- `configure_admin_providers()` only delegates to the unique per-slot setters;
+  a `None` parameter leaves the installed default in place, so a later feature
+  can override one slot after `create_app`.
+- Ordinary-admin content dashboard metrics are an exact ten-key contract and
+  the forbidden-key exclusion is recursive over the full JSON response; the
+  implemented forbidden set is the union of spec FR-102 and the 010 historical
+  exclusion list (16 keys).
+- Cross-console rejection semantics stay as implemented (401 for
+  `abort_session_required` on 03/05/08/09, 403 for 06/011); unifying them
+  would touch three consumer write sets and is deferred.
