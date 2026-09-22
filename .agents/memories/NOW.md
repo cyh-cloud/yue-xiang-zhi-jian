@@ -1,5 +1,21 @@
 # Current Work
 
+## 012 AI Companion (SDD CHECKPOINT - RESUME from Task 14)
+
+- 2026-09-21 phase wrap after Task 13. Branch v2/lixKRT/012-ai-companion, HEAD=aa3118e, worktree clean, local only (NOT pushed/merged), 011 independent. Durable done-list = git log (20 commits, Task 1-13 + prereq + fixes).
+- DONE Task 1-13. Backend 998 tests, frontend 687 tests, tsc + vue-tsc green. Full ledger: .superpowers/sdd/2026-09-20-012-ai-companion/progress.md (VOLATILE, wiped by worktree-hygiene reset; rely on git log + this entry).
+- RESUME Task 14 (frontend role/intent/privacy/failure tests + mount AiCompanionLauncher in App.vue, no route-meta condition) -> Task 15 (responsive/a11y/browser 320/375/1280) -> Task 16 (whole-feature acceptance + provider reconciliation + memory handoff).
+- Rules: model=step-5-preview EXPLICIT on every spawn (effort high); commit type(scope): desc; reviewer emits findings+fix plan -> implementer executes -> scoped re-review; import msg strings from app.ai_companion.constants; 012 errors class-attr code; keep two error classes distinct; frontend colors only tokens.css, CRLF, 320/375/1280 no orphan CJK; canUseAiCompanion role-only (never route); resolveCompanionJumpTarget only meta.roles user (jump validation only); ASR reuse 003 transcribe(call_point=speech_to_text) no dialect.
+- Deferred to Task 16: Medium-2 proxy-prefilter over-match; Task1 __init__ constants; Task3 whitelist test; Task5 180-day-by-updated_at; 011 real-provider integration ordering.
+
+## 012 AI Companion (SDD checkpoint - RESUME from Task 3)
+
+- 2026-09-21: SDD checkpoint after Task 2. Branch `v2/lixKRT/012-ai-companion` (local only, NOT pushed/merged). HEAD=`1be8d88`, worktree clean.
+- Done: prereq 011 provider snapshot `e5d70f2`; Task 1 `0d4ca69` (review PASS); Task 2 `36df223` + fix `1be8d88` (Medium-1 resolved). Tasks 3-16 PENDING.
+- RESUME at Task 3 (Knowledge validation / ranking / platform answers) per plan `.agents/memories/plans/2026-09-20-012-ai-companion.md`. Detailed ledger `.superpowers/sdd/2026-09-20-012-ai-companion/progress.md` is VOLATILE (wiped twice mid-run); this NOW.md entry + `git log` are the durable record.
+- Rules for continuation: implementer/reviewer = `step-5-preview` (ALWAYS pass model explicitly, effort high); commit format `type(scope): 中文描述`; import message strings from `app.ai_companion.constants`; 012 errors use class-attr `code` (not 011's `code=`/`details=` ctor style); 011 consumer maps `ProviderUnavailableError` -> "暂无法回答，请稍后再试" (distinct from AI failure "AI 服务暂时不可用"); end-to-end platform-answer tests (3/6/7/16) need the `admin_assistant_feature_knowledge` table + real provider installed WITHOUT admin routes (decide in Task 7).
+- ESCALATION (Medium-2, needs plan/spec owner): business-proxy prefilter rule (broad "帮忙" + any action phrase) cannot distinguish "帮我做X" (proxy) from "帮我理解怎么做X" (help); e.g. "帮忙解释怎么投简历" -> false `out_of_scope`. Decide: question-frame guardrail (怎么/如何/怎样/哪里) OR narrow "帮忙". Affects Tasks 4/6/8/16 + SC-003/004.
+
 ## 006 Local Resources
 
 - 2026-09-20: Final whole-branch review passed on the 基元律动 channel after
