@@ -846,9 +846,9 @@ def list_announcements_route():
 def get_points_policy_route():
     from app.admin_console.points_policy import get_points_policy
 
-    # Super admin only: the permission matrix keeps the whole points-policy
-    # surface, read included, out of the ordinary admin's console, so the
-    # guard runs before any policy row is read.
+    # Super admin only per FR-005: an ordinary admin must not reach the
+    # points-policy configuration surface, read included, so the guard runs
+    # before any policy row is read.
     require_admin_session(roles={"super_admin"})
     return jsonify(success=True, policy=get_points_policy())
 

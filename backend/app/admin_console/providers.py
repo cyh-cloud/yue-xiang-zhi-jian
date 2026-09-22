@@ -197,6 +197,14 @@ def configure_admin_providers(
 
 
 def install_default_admin_services(app: Flask) -> None:
+    # The one conditional slot, by design: a test or a later feature may
+    # install its own non-placeholder review provider before this function
+    # runs, and that provider stays authoritative for the review path. 011
+    # only fills the slot when it is absent or still holds the
+    # UnavailableContentReviewProvider placeholder; replacing it
+    # unconditionally would silently discard that provider's behavior. The
+    # seven slots below must be replaced unconditionally instead, as their
+    # comments record.
     content_review = app.extensions.get("content_review_provider")
     if content_review is None or isinstance(
         content_review,

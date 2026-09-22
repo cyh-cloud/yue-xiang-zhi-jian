@@ -177,6 +177,10 @@
 - `frontend/src/router/index.ts`：只把现有 `/admin` 单页改为父布局加子路由。
 - `frontend/src/api/types.ts`：只追加后台 DTO，不重排既有类型。
 - `frontend/src/data/portal-guides.ts`：只更新 admin entries 的 href。
+- `frontend/src/views/AdminPortalView.vue`：全量重写为 `/admin` 父布局容器（渲染
+  `AdminConsoleNav` 与 `<RouterView />`，`/admin` 重定向到 `/admin/dashboard`，子路由使用
+  `adminMeta`/`superAdminMeta`）；不再使用 `PortalShell`，但 `PortalShell` 本身不动；
+  无跨模块回归（2026-09-22 补登：最终审查 O3，当时遗漏于本清单）。
 
 ## Dependency Direction Check
 
@@ -2854,6 +2858,17 @@ Do not merge, push, clean worktrees, or enter SDD execution without explicit aut
   - `providers.py:199` `content_review_provider` 为唯一条件装配（仅当槽空或 Unavailable 时替换；默认装配下 011 provider 生效，安全）。
   - `AdminPortalView.vue` 全量重写但未列入计划前端共享清单（属 /admin 父布局必需，PortalShell 未动，无跨模块回归）。
   - `db.py` +324 行纯新增（0 删除），落在 Task 1/24 schema 边界内。
+- 4 Minor 处置（2026-09-22，`v2/lixKRT/dev` 修复提交，行为均不变）:
+  - O1 `routes.py` GET `/points-policy` 注释归因已由"权限矩阵"改为 FR-005
+    （普通管理员 MUST NOT 访问积分规则配置；spec 中公告面的权限矩阵归因不受影响）。
+  - O2 `providers.py` `install_default_admin_services` 的条件装配已补注释登记:
+    该槽是唯一条件项，测试或后续 feature 自装的非占位 review provider 保持权威，
+    与 DECISIONS.md 已登记的决策一致；其余七槽仍无条件替换。
+  - O3 `AdminPortalView.vue` 已补登"共享文件改动"清单（`/admin` 父布局容器，
+    `PortalShell` 未动）。
+  - O4 `db.py` +324 行纯新增已核实全部落在 T001/T024 声明的 schema 边界内
+    （见"共享文件改动" db.py 条：T001 建表、T006/T010/T012/T016/T019/T021/T022
+    只增索引/约束/seed、T022/T024 增加迁移列），0 删除、幂等迁移。
 - Remaining work: 将 `v2/lixKRT/011-admin-console` 合并进 `v2/lixKRT/dev`
   （需用户明确授权；未授权则停在审查后，不 merge、不 push、不清 worktree）。
   合并须整包取 011 的 `backend/app/admin_console/`（19 文件；dev 当前为 012 的 13 文件快照），
