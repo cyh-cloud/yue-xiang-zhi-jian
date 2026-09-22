@@ -25,7 +25,6 @@ import type {
   AdminManagedContentType
 } from '@/stores/adminConsole'
 import { useAdminConsoleStore } from '@/stores/adminConsole'
-import { useAuthStore } from '@/stores/auth'
 
 // How a delete removes the row. The backend fixes the semantics per content
 // type and the console has to say out loud which one the operator is about to
@@ -209,9 +208,10 @@ const PRESET_FAMILY_LABELS: Record<AdminPresetCategory, string> = {
 }
 
 const store = useAdminConsoleStore()
-const auth = useAuthStore()
 
-const canManage = computed(() => auth.user?.role === 'super_admin')
+// 复用 store 的 canManagePlatform，作为“是否超管”的单一来源，避免与壳层角色派生
+// 分裂（行为不变：仍为 role === 'super_admin'）。
+const canManage = computed(() => store.canManagePlatform)
 const activeType = computed<AdminManagedContentType>(
   () => store.managedContentType
 )
