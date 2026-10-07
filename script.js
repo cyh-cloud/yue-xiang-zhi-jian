@@ -9,18 +9,20 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
-    showNotification('提示：点击了解项目功能', 'info');
+    // 首屏不再无条件弹「点击了解项目功能」这种语义不明、无指向的 toast；
+    // 首次访问的引导由 checkOnboarding() 的引导层负责。
     checkOnboarding();
     const setupFns = [
-        setupNavigation, setupFeatureTabs, setupLoginModal,
+        setupNavigation, setupLoginModal,
         setupProductSelection, setupCraftSelection, setupDialectSelection,
         setupVoiceInput, setupAgricultureQA, setupCalendar,
-        setupSimulationModules, setupEventListeners, setupUserDropdown,
+        setupPestDiagnosisEntry, setupEventListeners, setupUserDropdown,
         setupCaseButtons, setupEmploymentTab, setupPolicySection,
         setupTeacherPanel, setup3DControls, setupQuickMessage,
         restoreSession, checkConnection, setupScrollReveal,
         setupNavbarScroll, setupHeroParticles, setupStatCounter,
-        setupSmoothScroll, setupThemeToggle, setupHamburger, setupPointsExchange
+        setupSmoothScroll, setupThemeToggle, setupLargeTextToggle, setupHamburger,
+        updateCraftSteps, setupPestGuide
     ];
     setupFns.forEach(fn => {
         try { fn(); } catch(e) { console.error(`${fn.name} 初始化失败:`, e); }
@@ -58,6 +60,34 @@ function updateThemeIcon(theme) {
     }
 }
 
+// ==================== 大字模式（无障碍） ====================
+// 顶部「大字模式」按钮此前是死控件：styles.css 里 html[data-large-text] 的规则齐全，
+// 但没有任何 JS 去切换这个属性。这里把它接上，并持久化到 localStorage。
+
+function setupLargeTextToggle() {
+    const btn = document.getElementById('large-text-toggle');
+    if (!btn) return;
+    let saved = false;
+    try { saved = localStorage.getItem(STORAGE_KEYS.LARGE_TEXT) === '1'; } catch (e) { /* 隐私模式忽略 */ }
+    applyLargeText(saved);
+    btn.addEventListener('click', () => {
+        const next = document.documentElement.dataset.largeText !== '1';
+        applyLargeText(next);
+        try { localStorage.setItem(STORAGE_KEYS.LARGE_TEXT, next ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+    });
+}
+
+function applyLargeText(on) {
+    const root = document.documentElement;
+    if (on) {
+        root.dataset.largeText = '1';
+    } else {
+        delete root.dataset.largeText;
+    }
+    const btn = document.getElementById('large-text-toggle');
+    if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
 // ==================== 汉堡菜单 ====================
 
 function setupHamburger() {
@@ -90,18 +120,40 @@ function setupHamburger() {
 
 // ==================== 会话恢复 ====================
 
+/* 统一 user 对象口径：id 缺失时回落到 user_id。
+   历史原因：老版 /api/auth/verify 直接回了 database.get_session() 的结果
+   （{user_id, name, role}，没有 id），restoreSession() 把它整体覆盖到
+   AppState.user 上，于是 AppState.user.id === undefined，
+   所有 `/api/xxx/${AppState.user.id}` 都会被拼成 `/api/xxx/undefined`
+   （就业对接的 _self_only 会因此返回 403）。
+   后端已修，这里再兜一层：服务端没重启时（新前端 + 旧后端）也不会退化。 */
+function normalizeUser(u) {
+    if (!u || typeof u !== 'object') return u;
+    const id = u.id || u.user_id || '';
+    if (u.id === id) return u;
+    return Object.assign({}, u, { id });
+}
+
 function restoreSession() {
     const saved = localStorage.getItem(STORAGE_KEYS.SESSION);
     if (!saved) return;
     try {
-        const { sessionId, user } = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        const sessionId = parsed.sessionId;
         AppState.sessionId = sessionId;
-        AppState.user = user;
+        AppState.user = normalizeUser(parsed.user);
         apiCall('/api/auth/verify', 'POST', { session_id: sessionId })
             .then(data => {
                 if (data.success) {
-                    AppState.user = data.user;
+                    AppState.user = normalizeUser(Object.assign({}, AppState.user, data.user));
                     updateUserUI();
+                    if (typeof onLoginSuccess === 'function') onLoginSuccess();
+                    // P1-5：刷新页面恢复会话后也要拉一次积分（此前只在登录时拉，
+                    // 刷新后积分余额恒为占位符，学员查不到自己有多少积分）。
+                    loadUserData();
+                    // 农事提醒补发（幂等，静默执行，不阻塞渲染）
+                    checkFarmingReminders();
+                    syncFarmingSubscriptionButton();
                 } else {
                     localStorage.removeItem(STORAGE_KEYS.SESSION);
                 }
@@ -155,26 +207,24 @@ function setupNavigation() {
     });
 }
 
-function setupFeatureTabs() {
-    document.querySelectorAll('.feature-tab').forEach(tab => {
-        tab.addEventListener('click', function() {
-            switchTab(this.getAttribute('data-tab'));
-        });
-    });
-}
-
 function switchTab(tabName) {
+    // ===== 权限守卫 =====
+    if (AppState.user && !isTabAllowed(tabName, AppState.user.role)) {
+        showNotification("无权访问该页面", "error");
+        tabName = ROLE_DEFAULT[AppState.user.role] || "agriculture";
+    }
+    // ===== 离场清理 =====
+    // 切走「电商运营」时必须停掉直播间（朗读计时 + 语音识别 + 各刷新定时器），
+    // 否则定时器在后台空转、麦克风被占用到刷新页面。
+    if (AppState.currentTab === 'ecommerce' && tabName !== 'ecommerce'
+        && typeof stopLiveSimulation === 'function') {
+        stopLiveSimulation();
+    }
     // 更新导航栏active + ARIA
     document.querySelectorAll('.nav-item').forEach(item => {
         const isActive = item.getAttribute('data-tab') === tabName;
         item.classList.toggle('active', isActive);
         item.setAttribute('aria-selected', isActive);
-    });
-    // 更新feature tabs active + ARIA
-    document.querySelectorAll('.feature-tab').forEach(tab => {
-        const isActive = tab.getAttribute('data-tab') === tabName;
-        tab.classList.toggle('active', isActive);
-        tab.setAttribute('aria-selected', isActive);
     });
     // 淡出当前tab
     const allTabs = document.querySelectorAll('.tab-content');
@@ -195,16 +245,15 @@ function switchTab(tabName) {
                 target.style.transform = 'translateY(0)';
             });
             AppState.currentTab = tabName;
-            const featuresSection = document.getElementById('features');
-            if (featuresSection) {
-                featuresSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
+            // 滚动到主内容区，让用户看到切换后的板块
+            document.getElementById('main-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         // 更新面包屑
         const tabNames = {
             agriculture: '农业技能', ecommerce: '电商运营', crafts: '手工传承',
-            simulation: '虚拟实训', resources: '本土资源', employment: '就业对接',
-            teacher: '教师管理'
+            resources: '本土资源', employment: '就业对接',
+            teacher: '教师管理', admin: '系统管理', government: '政府工作台',
+            enterprise: '企业中心', discussions: '讨论社区'
         };
         const breadcrumb = document.getElementById('breadcrumb-current');
         const breadcrumbBar = document.getElementById('breadcrumb-bar');
@@ -216,6 +265,18 @@ function switchTab(tabName) {
         if (tabName === 'teacher') loadTeacherDashboard();
         // 切到就业tab时刷新数据
         if (tabName === 'employment') loadEmploymentData();
+        // 新面板数据加载
+        if (tabName === 'admin') loadAdminUsers();
+        if (tabName === 'government') loadGovDashboard();
+        if (tabName === 'enterprise') loadEnterpriseJobs();
+        if (tabName === 'discussions') loadDiscussions();
+        // P4（2026-10-06）：切到手工传承时轻量重拉 3D 模型，让教师新发布的模型及时可见。
+        if (tabName === 'crafts') loadCraftModels();
+        // 切到本土资源时加载本地成功案例与政策（首次加载后缓存，除非显式 force）
+        if (tabName === 'resources') {
+            loadSuccessCases();
+            loadPolicies();
+        }
     }, 200);
 }
 
@@ -254,9 +315,13 @@ function setupLoginModal() {
 
     loginBtn?.addEventListener('click', () => {
         loginModal.classList.remove('is-hidden');
+        resetAuthTabs();
         trapFocus(loginModal);
     });
-    closeBtn?.addEventListener('click', () => loginModal.classList.add('is-hidden'));
+    closeBtn?.addEventListener('click', () => {
+        loginModal.classList.add('is-hidden');
+        resetAuthTabs();
+    });
     submitBtn?.addEventListener('click', handleLogin);
     demoBtn?.addEventListener('click', handleDemoLogin);
     logoutBtn?.addEventListener('click', handleLogout);
@@ -266,7 +331,6 @@ function setupLoginModal() {
         el.addEventListener('click', function() {
             document.getElementById('login-username').value = this.dataset.username;
             document.getElementById('login-password').value = this.dataset.password;
-            document.getElementById('user-role-select').value = this.dataset.role;
         });
     });
 
@@ -289,15 +353,22 @@ async function handleLogin() {
         hideLoading();
         if (data.success) {
             AppState.sessionId = data.session_id;
-            AppState.user = data.user;
+            AppState.user = normalizeUser(data.user);
             localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
                 sessionId: data.session_id,
                 user: data.user
             }));
             document.getElementById('login-modal').classList.add('is-hidden');
+            // 角色分流：跳转到独立门户
+            var _role = data.user.role;
+            if (_role === 'super_admin') { location.href = 'admin.html'; return; }
+            if (_role === 'government') { location.href = 'government.html'; return; }
+            if (_role === 'enterprise') { location.href = 'enterprise.html'; return; }
+            if (_role === 'teacher') { location.href = 'teacher.html'; return; }
             updateUserUI();
             showNotification(`欢迎回来，${data.user.name}！`, 'success');
             loadUserData();
+            if (typeof onLoginSuccess === 'function') onLoginSuccess();
         } else {
             showNotification(data.message || '登录失败', 'error');
         }
@@ -310,22 +381,19 @@ async function handleLogin() {
 function handleDemoLogin() {
     document.getElementById('login-username').value = 'student_demo';
     document.getElementById('login-password').value = '123456';
-    document.getElementById('user-role-select').value = 'student';
     handleLogin();
 }
 
 async function handleLogout() {
-    if (AppState.sessionId) {
-        try { await apiCall('/api/auth/logout', 'POST', { session_id: AppState.sessionId }); } catch(e) {}
-    }
+    apiCall("/api/auth/logout", "POST", { session_id: AppState.sessionId });
     AppState.sessionId = null;
     AppState.user = null;
-    localStorage.removeItem('yuexiang_session');
-    document.getElementById('login-section').classList.remove('is-hidden');
-    document.getElementById('user-info').classList.add('is-hidden');
-    document.getElementById('teacher-quick-menu').classList.add('is-hidden');
-    document.querySelectorAll('.teacher-only').forEach(el => el.classList.add('is-hidden'));
-    showNotification('已退出登录', 'info');
+    // 求职相关的用户态缓存必须一并清空，否则换个账号登录会看到上一个人的意向/简历状态
+    MY_INTENT_KEYS = null;
+    RESUME_CACHE = { profile: null, resume: null };
+    localStorage.removeItem(STORAGE_KEYS.SESSION);
+    resetToPublicView();
+    showNotification("已退出登录", "info");
 }
 
 function updateUserUI() {
@@ -339,11 +407,19 @@ function updateUserUI() {
 
     if (AppState.user.role === 'teacher') {
         document.querySelectorAll('.teacher-only').forEach(el => el.classList.remove('is-hidden'));
-        document.getElementById('teacher-quick-menu').classList.remove('is-hidden');
     } else {
         document.querySelectorAll('.teacher-only').forEach(el => el.classList.add('is-hidden'));
-        document.getElementById('teacher-quick-menu').classList.add('is-hidden');
     }
+    // 消息中心（铃铛）：所有**已登录**角色都可见（2026-10-07 修正）。
+    // 容器 id 叫 teacher-quick-menu，但里面装的只有消息中心（公告推送 / 作业批改 /
+    // 企业投递状态 / 互动私信），对学员同样相关 —— 此前只对教师显示，
+    // 学员登录后根本看不到消息中心，红点修好了也没人能看见。
+    // 未登录时的隐藏由初始 HTML 的 is-hidden 与 resetToPublicView() 负责。
+    document.getElementById('teacher-quick-menu').classList.remove('is-hidden');
+    // 「写消息」只对教师开放：收件人只有教师名册，学员/企业没有可主动发起的联系人。
+    // 放在这里统一控制，避免出现一个点了只能说「暂不支持」的死按钮。
+    const composeBtn = document.getElementById('msg-compose-btn');
+    if (composeBtn) composeBtn.classList.toggle('is-hidden', AppState.user.role !== 'teacher');
 }
 
 async function loadUserData() {
@@ -353,8 +429,6 @@ async function loadUserData() {
         if (ptsData.success) {
             const el = document.getElementById('points-balance');
             if (el) el.textContent = ptsData.points.toLocaleString();
-            const el2 = document.getElementById('emp-points-balance');
-            if (el2) el2.textContent = ptsData.points.toLocaleString();
         }
     } catch(e) {
         showNotification('加载积分数据失败', 'error');
@@ -395,13 +469,23 @@ function setupUserDropdown() {
 
 // ==================== 个人设置（仿微信） ====================
 
+// 消息通知偏好：控制是否在消息中心接收「教师 / 企业 / 超级管理员」发布的系统公告。
+// 关闭后消息中心不再拉取通知源、红点也不显示；用户可随时在设置中重新开启。
+function isNotifEnabled() {
+    try { return localStorage.getItem(STORAGE_KEYS.NOTIF) !== '0'; } catch (e) { return true; }
+}
+
+function setNotifEnabled(on) {
+    try { localStorage.setItem(STORAGE_KEYS.NOTIF, on ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+}
+
 async function showSettingsModal() {
     const user = AppState.user || {};
     let profileData = null;
     try {
         const data = await apiCall('/api/user/profile');
         if (data.success) profileData = data.user;
-    } catch(e) {}
+    } catch(e) { console.warn('[个人设置] 资料加载失败，改用本地会话数据', e); }
 
     const name = profileData?.name || user.name || '';
     const email = profileData?.email || user.email || '';
@@ -428,20 +512,8 @@ async function showSettingsModal() {
             <!-- 功能列表组1 -->
             <div class="wx-cell-group">
                 <div class="wx-cell" id="wx-cell-my-posts">
-                    <div class="wx-cell-icon"><i class="fas fa-book-open"></i></div>
-                    <span class="wx-cell-label">我的动态</span>
-                    <span class="wx-cell-value"></span>
-                    <i class="fas fa-chevron-right wx-cell-arrow"></i>
-                </div>
-                <div class="wx-cell" id="wx-cell-my-assignments">
-                    <div class="wx-cell-icon orange"><i class="fas fa-file-lines"></i></div>
-                    <span class="wx-cell-label">我的作业</span>
-                    <span class="wx-cell-value"></span>
-                    <i class="fas fa-chevron-right wx-cell-arrow"></i>
-                </div>
-                <div class="wx-cell" id="wx-cell-my-attendance">
-                    <div class="wx-cell-icon green"><i class="fas fa-clipboard-check"></i></div>
-                    <span class="wx-cell-label">我的考勤</span>
+                    <div class="wx-cell-icon"><i class="fas fa-bullhorn"></i></div>
+                    <span class="wx-cell-label">通知公告</span>
                     <span class="wx-cell-value"></span>
                     <i class="fas fa-chevron-right wx-cell-arrow"></i>
                 </div>
@@ -454,7 +526,7 @@ async function showSettingsModal() {
                     <span class="wx-cell-label">新消息通知</span>
                     <span class="wx-cell-value"></span>
                     <label class="wx-switch">
-                        <input type="checkbox" id="wx-notif-toggle" checked>
+                        <input type="checkbox" id="wx-notif-toggle" ${isNotifEnabled() ? 'checked' : ''}>
                         <span class="wx-switch-slider"></span>
                     </label>
                 </div>
@@ -471,6 +543,12 @@ async function showSettingsModal() {
 
             <!-- 功能列表组3 -->
             <div class="wx-cell-group">
+                <div class="wx-cell" id="wx-cell-replay-guide">
+                    <div class="wx-cell-icon green"><i class="fas fa-graduation-cap"></i></div>
+                    <span class="wx-cell-label">重新查看新手引导</span>
+                    <span class="wx-cell-value"></span>
+                    <i class="fas fa-chevron-right wx-cell-arrow"></i>
+                </div>
                 <div class="wx-cell" id="wx-cell-about">
                     <div class="wx-cell-icon gray"><i class="fas fa-circle-info"></i></div>
                     <span class="wx-cell-label">关于粤乡智匠</span>
@@ -486,19 +564,9 @@ async function showSettingsModal() {
         showSettingsSubPage('edit-profile', { name, email, username, roleLabel, createdAt });
     });
 
-    // 我的动态
+    // 通知公告（原「我的动态」，实为全局公告，见 showSettingsSubPage 注释）
     document.getElementById('wx-cell-my-posts')?.addEventListener('click', () => {
         showSettingsSubPage('my-posts', {});
-    });
-
-    // 我的作业
-    document.getElementById('wx-cell-my-assignments')?.addEventListener('click', () => {
-        showSettingsSubPage('my-assignments', {});
-    });
-
-    // 我的考勤
-    document.getElementById('wx-cell-my-attendance')?.addEventListener('click', () => {
-        showSettingsSubPage('my-attendance', {});
     });
 
     // 深色模式开关
@@ -507,6 +575,22 @@ async function showSettingsModal() {
         document.documentElement.dataset.theme = theme;
         localStorage.setItem(STORAGE_KEYS.THEME, theme);
         updateThemeIcon();
+    });
+
+    // 新消息通知开关：是否接收教师 / 企业 / 超级管理员发布的系统公告
+    document.getElementById('wx-notif-toggle')?.addEventListener('change', (e) => {
+        setNotifEnabled(e.target.checked);
+        showNotification(
+            e.target.checked ? '已开启消息通知' : '已关闭消息通知，将不再接收系统公告',
+            e.target.checked ? 'success' : 'info'
+        );
+        if (typeof updateBadgeCount === 'function') updateBadgeCount();
+    });
+
+    // 重新查看新手引导
+    document.getElementById('wx-cell-replay-guide')?.addEventListener('click', () => {
+        document.querySelector('.modal-overlay.detail-modal')?.remove();
+        if (typeof showOnboarding === 'function') showOnboarding();
     });
 
     // 关于页面
@@ -528,11 +612,6 @@ function showSettingsSubPage(page, data) {
                     <button class="wx-save-btn" id="wx-save-profile">保存</button>
                 </div>
                 <div class="wx-cell-group">
-                    <div class="wx-cell">
-                        <span class="wx-cell-label">头像</span>
-                        <div class="wx-cell-avatar-preview"><i class="fas fa-user"></i></div>
-                        <i class="fas fa-chevron-right wx-cell-arrow"></i>
-                    </div>
                     <div class="wx-cell">
                         <span class="wx-cell-label">姓名</span>
                         <input type="text" class="wx-cell-input" id="wx-edit-name" value="${data.name}" placeholder="请输入姓名">
@@ -650,7 +729,7 @@ function showSettingsSubPage(page, data) {
                     </div>
                     <div class="wx-cell">
                         <span class="wx-cell-label">教学管理</span>
-                        <span class="wx-cell-value">通知 · 作业 · 签到 · 分析</span>
+                        <span class="wx-cell-value">通知 · 作业 · 批改 · 分析</span>
                     </div>
                     <div class="wx-cell">
                         <span class="wx-cell-label">技术支持</span>
@@ -661,12 +740,13 @@ function showSettingsSubPage(page, data) {
         `;
 
     } else if (page === 'my-posts') {
-        // 我的动态 — 加载通知公告列表
+        // P1-6：这里展示的是平台/教师的**全局通知公告**（后端按 limit 取，不按用户过滤），
+        // 原叫「我的动态」属名实不符，改为如实命名。
         modalBody.innerHTML = `
             <div class="wx-sub-page">
                 <div class="wx-sub-header">
                     <button class="wx-back-btn" onclick="showSettingsModal()"><i class="fas fa-chevron-left"></i> 返回</button>
-                    <span class="wx-sub-title">我的动态</span>
+                    <span class="wx-sub-title">通知公告</span>
                     <span></span>
                 </div>
                 <div id="wx-posts-list" class="wx-list-container">
@@ -676,37 +756,6 @@ function showSettingsSubPage(page, data) {
         `;
         loadMyPosts();
 
-    } else if (page === 'my-assignments') {
-        // 我的作业
-        modalBody.innerHTML = `
-            <div class="wx-sub-page">
-                <div class="wx-sub-header">
-                    <button class="wx-back-btn" onclick="showSettingsModal()"><i class="fas fa-chevron-left"></i> 返回</button>
-                    <span class="wx-sub-title">我的作业</span>
-                    <span></span>
-                </div>
-                <div id="wx-assignments-list" class="wx-list-container">
-                    <div class="wx-loading"><div class="spinner"></div> 加载中...</div>
-                </div>
-            </div>
-        `;
-        loadMyAssignments();
-
-    } else if (page === 'my-attendance') {
-        // 我的考勤
-        modalBody.innerHTML = `
-            <div class="wx-sub-page">
-                <div class="wx-sub-header">
-                    <button class="wx-back-btn" onclick="showSettingsModal()"><i class="fas fa-chevron-left"></i> 返回</button>
-                    <span class="wx-sub-title">我的考勤</span>
-                    <span></span>
-                </div>
-                <div id="wx-attendance-list" class="wx-list-container">
-                    <div class="wx-loading"><div class="spinner"></div> 加载中...</div>
-                </div>
-            </div>
-        `;
-        loadMyAttendance();
     }
 }
 
@@ -716,129 +765,91 @@ async function loadMyPosts() {
     try {
         const data = await apiCall('/api/student/announcements');
         if (!data.success || !data.announcements.length) {
-            container.innerHTML = '<div class="wx-empty"><i class="fas fa-bullhorn"></i><p>暂无动态</p></div>';
+            container.innerHTML = '<div class="wx-empty"><i class="fas fa-bullhorn"></i><p>暂无公告</p></div>';
             return;
         }
         container.innerHTML = `<div class="wx-cell-group">${data.announcements.map(a => {
             const catColors = { '通知': 'blue', '公告': 'gray', '紧急': 'orange' };
             const catCls = catColors[a.category] || 'blue';
+            // 公告由教师/管理员撰写，字段一律转义后再拼进 HTML，避免注入
             return `
                 <div class="wx-cell vertical">
                     <div class="wx-cell-top">
-                        <span class="wx-tag ${catCls}">${a.category}</span>
+                        <span class="wx-tag ${catCls}">${escapeHtml(a.category || '')}</span>
                         ${a.pinned ? '<span class="wx-tag pin">置顶</span>' : ''}
-                        <span class="wx-cell-time">${a.created_at || ''}</span>
+                        <span class="wx-cell-time">${escapeHtml(a.created_at || '')}</span>
                     </div>
-                    <span class="wx-cell-title">${a.title}</span>
-                    <span class="wx-cell-desc">${a.content}</span>
+                    <span class="wx-cell-title">${escapeHtml(a.title || '')}</span>
+                    <span class="wx-cell-desc">${escapeHtml(a.content || '')}</span>
                 </div>
             `;
         }).join('')}</div>`;
     } catch(e) {
-        container.innerHTML = '<div class="wx-empty">加载失败</div>';
-    }
-}
-
-async function loadMyAssignments() {
-    const container = document.getElementById('wx-assignments-list');
-    if (!container) return;
-    const userId = AppState.currentUser?.id || AppState.sessionId || '';
-    try {
-        const data = await apiCall(`/api/student/submissions?user_id=${userId}`);
-        if (!data.success || !data.submissions.length) {
-            container.innerHTML = '<div class="wx-empty"><i class="fas fa-file-lines"></i><p>暂无作业记录</p></div>';
-            return;
-        }
-        container.innerHTML = `<div class="wx-cell-group">${data.submissions.map(s => {
-            const statusMap = { 'pending': '待批改', 'graded': '已批改' };
-            const statusCls = s.status === 'graded' ? 'green' : 'orange';
-            const scoreText = s.score != null ? `${s.score}分` : '';
-            return `
-                <div class="wx-cell vertical">
-                    <div class="wx-cell-top">
-                        <span class="wx-cell-title">${s.assignment_title || '作业'}</span>
-                        <span class="wx-tag ${statusCls}">${statusMap[s.status] || s.status}</span>
-                    </div>
-                    <div class="wx-cell-meta">
-                        ${scoreText ? `<span>得分：<strong>${scoreText}</strong></span>` : ''}
-                        ${s.feedback ? `<span>评语：${s.feedback}</span>` : ''}
-                        <span>${s.submitted_at || ''}</span>
-                    </div>
-                </div>
-            `;
-        }).join('')}</div>`;
-    } catch(e) {
-        container.innerHTML = '<div class="wx-empty">加载失败</div>';
-    }
-}
-
-async function loadMyAttendance() {
-    const container = document.getElementById('wx-attendance-list');
-    if (!container) return;
-    const userId = AppState.currentUser?.id || AppState.sessionId || '';
-    try {
-        const data = await apiCall(`/api/student/attendance?user_id=${userId}`);
-        if (!data.success || !data.records.length) {
-            container.innerHTML = '<div class="wx-empty"><i class="fas fa-clipboard-check"></i><p>暂无考勤记录</p></div>';
-            return;
-        }
-        // 统计
-        const total = data.records.length;
-        const present = data.records.filter(r => r.check_status === 'present').length;
-        const late = data.records.filter(r => r.check_status === 'late').length;
-        const absent = data.records.filter(r => !r.check_status).length;
-        const rate = total ? (present / total * 100).toFixed(0) : 0;
-
-        container.innerHTML = `
-            <div class="wx-attendance-stats">
-                <div class="wx-att-stat"><span class="wx-att-num">${total}</span><span class="wx-att-label">总签到</span></div>
-                <div class="wx-att-stat"><span class="wx-att-num green">${present}</span><span class="wx-att-label">已签到</span></div>
-                <div class="wx-att-stat"><span class="wx-att-num orange">${late}</span><span class="wx-att-label">迟到</span></div>
-                <div class="wx-att-stat"><span class="wx-att-num red">${absent}</span><span class="wx-att-label">缺勤</span></div>
-                <div class="wx-att-stat"><span class="wx-att-num blue">${rate}%</span><span class="wx-att-label">出勤率</span></div>
-            </div>
-            <div class="wx-cell-group">${data.records.map(r => {
-                const statusMap = { 'present': '已签到', 'late': '迟到' };
-                const statusCls = r.check_status === 'present' ? 'green' : r.check_status === 'late' ? 'orange' : 'red';
-                const statusText = statusMap[r.check_status] || '缺勤';
-                return `
-                    <div class="wx-cell">
-                        <span class="wx-cell-label">${r.title || '签到'}</span>
-                        <span class="wx-cell-time">${r.session_time || ''}</span>
-                        <span class="wx-tag ${statusCls}">${statusText}</span>
-                    </div>
-                `;
-            }).join('')}</div>`;
-    } catch(e) {
-        container.innerHTML = '<div class="wx-empty">加载失败</div>';
+        container.innerHTML = '<div class="wx-empty">公告加载失败，请稍后重试</div>';
     }
 }
 
 // ==================== 农产品选择 ====================
 
 function setupProductSelection() {
-    setupSelectionHandler('.product-card', 'active', 'currentProduct', () => updateFarmingCalendar());
+    // 恢复上次选择的作物（localStorage）；HTML 中不再硬编码 active，统一由这里同步
+    const cards = document.querySelectorAll('.product-card');
+    const saved = (() => {
+        try { return localStorage.getItem('yuexiang_farming_product'); } catch (e) { return null; }
+    })();
+    const target = (saved && document.querySelector(`.product-card[data-product="${saved}"]`))
+        || document.querySelector('.product-card');
+    if (target && cards.length) {
+        cards.forEach(c => c.classList.remove('active'));
+        target.classList.add('active');
+        AppState.currentProduct = target.dataset.product;
+    }
+
+    setupSelectionHandler('.product-card', 'active', 'currentProduct', (card) => {
+        const pid = card.dataset.product;
+        if (pid) {
+            AppState.currentProduct = pid;
+            try { localStorage.setItem('yuexiang_farming_product', pid); } catch (e) { /* 忽略隐私模式异常 */ }
+        }
+        updateFarmingCalendar();
+        syncFarmingSubscriptionButton();
+        // A1：顶部作物变了，诊断面板的作物必须跟着换 —— 否则学生照着水稻症状提交，
+        // 拿到一份写在柑橘名下的结论，界面上还不会提示。这里显式复位「用户手选过」的门禁
+        // 再同步一次；面板内手选仍然不会被「收起再展开」静默改掉（见 syncPestCropFromProduct）。
+        resetPestCropToCurrent();
+        // A4：速查的作物筛选同理跟随 —— 同一个页面里「当前作物」只应有一套含义。
+        resetPestGuideCropToCurrent();
+    });
 }
 
 // ==================== 手工艺选择 ====================
 
 function setupCraftSelection() {
-    setupSelectionHandler('.craft-card', 'active', 'currentCraft', () => updateCraftSteps());
+    setupSelectionHandler('.craft-card', 'active', 'currentCraft', () => {
+        updateCraftSteps();
+        loadCraftModels();
+    });
 }
 
 async function updateCraftSteps() {
     const container = document.getElementById('craft-steps');
-    const materialsGrid = document.querySelector('.materials-grid');
     if (!container) return;
     showSkeleton(container, 'text', 4);
+    // P1-9：材料采购指南必须随手工艺同步刷新。先置加载态，
+    // 否则切到手工艺的请求还没回来时，页面会残留上一个手工艺（广绣）的采购卡。
+    const materialsSection = document.getElementById('materials-section');
+    if (materialsSection) showSkeleton(materialsSection, 'card', 3);
 
     try {
         const data = await apiCall(`/api/crafts/${AppState.currentCraft}`);
         if (data.success && data.data) {
+            // 渲染文化背景卡（② 2026-10-06：展示 history/origin/name，让非遗不只技法）
+            renderCraftIntro(data.data);
+
             // 渲染步骤
             if (data.data.steps && data.data.steps.length > 0) {
                 container.innerHTML = data.data.steps.map((s, i) => `
-                    <div class="step${i === 0 ? ' active' : ''}">
+                    <div class="step${i === 0 ? ' active' : ''}" data-step-index="${i}">
                         <span class="step-number">${i + 1}</span>
                         <div class="step-content">
                             <h5>${s.title}</h5>
@@ -847,26 +858,220 @@ async function updateCraftSteps() {
                         </div>
                     </div>
                 `).join('');
+                // 步骤点击 → 3D 视角联动（2026-10-06）
+                container.querySelectorAll('.step').forEach(stepEl => {
+                    stepEl.addEventListener('click', () => {
+                        const idx = parseInt(stepEl.dataset.stepIndex, 10);
+                        container.querySelectorAll('.step').forEach(e => e.classList.remove('active'));
+                        stepEl.classList.add('active');
+                        focusCraftStep(idx, data.data.steps.length);
+                        // ③ 学习进度：点击步骤即标记为已完成（含之前的所有步骤）
+                        markCraftStepsComplete(idx);
+                    });
+                });
+                // ③ 恢复学习进度高亮（切手工艺后重渲染步骤时回填）
+                applyCraftProgress(data.data.steps.length);
             } else {
                 showEmptyState(container, 'fa-paint-brush', '暂无步骤', '该手工艺的步骤正在准备中');
             }
 
-            // 渲染材料采购指南
-            if (materialsGrid && data.data.materials && data.data.materials.length > 0) {
-                materialsGrid.innerHTML = data.data.materials.map(m => `
-                    <div class="material-card">
-                        <div class="material-icon"><i class="fas fa-tools"></i></div>
-                        <h4>${m.name}</h4>
-                        <p>${m.note || ''}</p>
-                        <span class="price-tag">${m.price}</span>
-                        ${m.where ? `<div class="material-where"><i class="fas fa-map-marker-alt"></i> ${m.where}</div>` : ''}
-                    </div>
-                `).join('');
+            // 渲染材料采购指南（详细采购手册）
+            const guide = data.data.purchase_guide;
+            if (guide && guide.categories) {
+                renderPurchaseGuide(guide);
+            } else if (materialsSection) {
+                // 该手工艺没有采购清单：如实出空态，绝不沿用上一个手工艺的数据
+                showEmptyState(materialsSection, 'fa-shopping-basket', '暂无材料采购指南', '该手工艺的采购清单正在整理中');
             }
         }
     } catch(e) {
         showErrorState(container, '加载手工艺步骤失败', () => updateCraftSteps());
+        // 材料指南同样回到错误态并提供重试，不留旧数据
+        if (materialsSection) {
+            showErrorState(materialsSection, '材料采购指南加载失败', () => updateCraftSteps());
+        }
     }
+}
+
+// ② 文化背景卡：展示手工艺的产地与历史渊源
+function renderCraftIntro(craft) {
+    const el = document.getElementById('craft-intro');
+    if (!el) return;
+    const name = craft.name || '';
+    const origin = craft.origin || '';
+    const history = craft.history || '';
+    if (!history && !origin) {
+        el.innerHTML = '';
+        el.style.display = 'none';
+        return;
+    }
+    el.style.display = '';
+    el.innerHTML = `
+        <div class="craft-intro-card">
+            <div class="craft-intro-icon"><i class="fas fa-landmark"></i></div>
+            <div class="craft-intro-body">
+                <div class="craft-intro-head">
+                    <h3>${escapeHtml(name)}</h3>
+                    ${origin ? `<span class="craft-intro-origin"><i class="fas fa-map-marker-alt"></i> ${escapeHtml(origin)}</span>` : ''}
+                </div>
+                ${history ? `<p>${escapeHtml(history)}</p>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// ③ 学习进度：每个手工艺独立记录「已完成的步骤数」（持久化到 localStorage）。
+// 点击某一步即认为「学到了这一步」，之前的步骤也都算完成。
+function getCraftProgressKey(craft) {
+    return 'yuexiang_craft_progress_' + (craft || 'embroidery');
+}
+
+function markCraftStepsComplete(stepIndex) {
+    const craft = AppState.currentCraft || 'embroidery';
+    const key = getCraftProgressKey(craft);
+    let done = 0;
+    try { done = parseInt(localStorage.getItem(key), 10) || 0; } catch (e) {}
+    // 完成数 = max(已记录, 当前步+1)
+    const next = Math.max(done, stepIndex + 1);
+    try { localStorage.setItem(key, String(next)); } catch (e) {}
+    applyCraftProgress();
+}
+
+// 回填：切手工艺后重渲染步骤时，把已完成步骤标记出来 + 更新进度条
+function applyCraftProgress(totalSteps) {
+    const craft = AppState.currentCraft || 'embroidery';
+    const key = getCraftProgressKey(craft);
+    let done = 0;
+    try { done = parseInt(localStorage.getItem(key), 10) || 0; } catch (e) {}
+    // 上限取「传入的步骤总数」或「当前 DOM 里的步骤数」（无参调用时用后者兜底）
+    const total = totalSteps || document.querySelectorAll('#craft-steps .step').length || 0;
+    done = Math.max(0, Math.min(done, total));
+
+    // 给已完成步骤加 .is-done 标记
+    const steps = document.querySelectorAll('#craft-steps .step');
+    steps.forEach((el, i) => {
+        el.classList.toggle('is-done', i < done);
+    });
+
+    // 更新进度条
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    const fill = document.getElementById('craft-progress-fill');
+    const text = document.getElementById('craft-progress-text');
+    if (fill) fill.style.width = pct + '%';
+    if (text) text.textContent = `已完成 ${done}/${total} 步`;
+}
+
+const CATEGORY_META = {
+    essential: { icon: 'fa-circle-check', cls: 'essential', badge: '必买' },
+    consumable: { icon: 'fa-boxes-stacked', cls: 'consumable', badge: '常备' },
+    advanced: { icon: 'fa-sliders', cls: 'advanced', badge: '选配' }
+};
+
+// 从价格字符串（如"35-80元"、"20-40元/10斤"）解析数值区间，汇总分组小计
+function calcCategorySubtotal(items) {
+    let minSum = 0, maxSum = 0, hasPrice = false;
+    items.forEach(m => {
+        if (!m.price) return;
+        const head = String(m.price).split('元')[0];
+        const nums = (head.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+        if (nums.length === 0) return;
+        hasPrice = true;
+        minSum += Math.min(...nums);
+        maxSum += Math.max(...nums);
+    });
+    return hasPrice ? `小计约 ${minSum}-${maxSum} 元` : '';
+}
+
+function renderPurchaseGuide(guide) {
+    const section = document.getElementById('materials-section');
+    if (!section) return;
+
+    const catHtml = guide.categories.map((cat, idx) => {
+        const meta = CATEGORY_META[cat.key] || CATEGORY_META.essential;
+        const open = idx === 0; // 必买组默认展开，其余收起
+        const subtotal = calcCategorySubtotal(cat.items);
+        const items = cat.items.map(m => `
+            <div class="guide-item ${meta.cls}">
+                <div class="guide-item-head">
+                    <span class="guide-badge ${meta.cls}">${meta.badge}</span>
+                    <h5>${m.name}</h5>
+                    <span class="price-tag">${m.price}</span>
+                </div>
+                ${m.spec ? `<div class="guide-spec"><i class="fas fa-ruler-combined"></i> <b>怎么选：</b>${m.spec}</div>` : ''}
+                ${m.where ? `<div class="guide-where"><i class="fas fa-map-marker-alt"></i> <b>去哪买：</b>${m.where}</div>` : ''}
+                ${m.tip ? `<div class="guide-tip"><i class="fas fa-lightbulb"></i> <b>避坑提示：</b>${m.tip}</div>` : ''}
+            </div>
+        `).join('');
+        return `
+            <div class="guide-category ${meta.cls}${open ? ' open' : ''}">
+                <button type="button" class="guide-cat-head" aria-expanded="${open}">
+                    <i class="fas ${meta.icon}"></i>
+                    <span>${cat.label}</span>
+                    <small>${cat.desc || ''}</small>
+                    <span class="guide-cat-meta">
+                        ${subtotal ? `<b class="guide-subtotal">${subtotal}</b>` : ''}
+                        <em class="guide-count">${cat.items.length} 项</em>
+                        <i class="fas fa-chevron-down guide-chevron"></i>
+                    </span>
+                </button>
+                <div class="guide-body">
+                    <div class="guide-items">${items}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    section.innerHTML = `
+        <h3 class="card-section-title"><i class="fas fa-shopping-basket"></i> 材料采购指南</h3>
+        ${guide.budget ? `
+        <div class="guide-budget">
+            <div class="budget-item starter">
+                <i class="fas fa-piggy-bank"></i>
+                <div><small>入门全套预算</small><b>${guide.budget.starter}</b></div>
+            </div>
+            <div class="budget-item advanced">
+                <i class="fas fa-chart-line"></i>
+                <div><small>进阶全套预算</small><b>${guide.budget.advanced}</b></div>
+            </div>
+        </div>` : ''}
+        ${guide.buying_tips ? `
+        <div class="guide-buying-tips">
+            <i class="fas fa-compass"></i>
+            <div><b>学员采购建议：</b>${guide.buying_tips}</div>
+        </div>` : ''}
+        <div class="guide-toolbar">
+            <button type="button" class="btn btn-text btn-sm" id="guide-toggle-all">全部展开 <i class="fas fa-angles-down"></i></button>
+        </div>
+        ${catHtml}
+    `;
+
+    // 折叠交互：点击分组标题栏切换展开/收起
+    const catEls = section.querySelectorAll('.guide-category');
+    catEls.forEach(catEl => {
+        catEl.querySelector('.guide-cat-head').addEventListener('click', () => {
+            const open = catEl.classList.toggle('open');
+            catEl.querySelector('.guide-cat-head').setAttribute('aria-expanded', open);
+            syncToggleAllText();
+        });
+    });
+
+    // 全部展开 / 全部收起
+    const toggleAllBtn = document.getElementById('guide-toggle-all');
+    function syncToggleAllText() {
+        if (!toggleAllBtn) return;
+        const allOpen = [...catEls].every(c => c.classList.contains('open'));
+        toggleAllBtn.innerHTML = allOpen
+            ? '全部收起 <i class="fas fa-angles-up"></i>'
+            : '全部展开 <i class="fas fa-angles-down"></i>';
+    }
+    toggleAllBtn?.addEventListener('click', () => {
+        const allOpen = [...catEls].every(c => c.classList.contains('open'));
+        catEls.forEach(c => {
+            c.classList.toggle('open', !allOpen);
+            c.querySelector('.guide-cat-head').setAttribute('aria-expanded', !allOpen);
+        });
+        syncToggleAllText();
+    });
 }
 
 // ==================== 方言选择 ====================
@@ -875,7 +1080,32 @@ const VoiceState = {
     history: [],
     maxHistory: 10,
     isRecording: false,
-    recognition: null
+    recognition: null,
+    // TTS 朗读状态机：idle（未读）/ speaking（朗读中）/ paused（已暂停）
+    ttsState: 'idle',
+    ttsBtn: null,       // 当前朗读按钮引用
+    ttsUtter: null,     // 当前 utterance 引用（用于忽略过期回调）
+    ttsTimer: null,     // Chrome 长文本 keep-alive 定时器
+    inputHintTimer: null // 语音输入框错误提示的自动恢复定时器
+};
+
+// 语音输入框默认占位文案（错误提示用完必须恢复，别让一次错误常驻）
+const VOICE_INPUT_DEFAULT_PLACEHOLDER = '输入你的问题...';
+
+// 方言 → 语音识别语言映射（SpeechRecognition.lang）
+// 粤语用 zh-HK（广东话）；客家话/潮汕话主流浏览器无对应语言包，
+// 用 zh-CN 兜底（识别普通话转写，仍可送后端用方言回答）。
+const DIALECT_SPEECH_LANG = {
+    cantonese: 'zh-HK',
+    hakka: 'zh-CN',
+    teochew: 'zh-CN'
+};
+
+// 方言 → 语音合成（TTS）语言映射，speechSynthesis.lang
+const DIALECT_TTS_LANG = {
+    cantonese: 'zh-HK',
+    hakka: 'zh-CN',
+    teochew: 'zh-CN'
 };
 
 function setupDialectSelection() {
@@ -888,6 +1118,37 @@ function setupDialectSelection() {
             loadDialectInfo(AppState.currentDialect);
         });
     });
+    // P1-8：卡片上的「覆盖区域 / 使用者数」此前是 HTML 硬编码，且与后端 DIALECTS_DATA
+    // （areas/speakers）不一致 → 改为以后端为准回填，避免两处文案各说各话。
+    loadDialectCards();
+}
+
+async function loadDialectCards() {
+    const cards = document.querySelectorAll('.dialect-card');
+    if (!cards.length) return;
+    try {
+        const data = await apiCall('/api/resources/dialects');
+        if (!data.success || !Array.isArray(data.dialects)) return;
+        const byId = {};
+        data.dialects.forEach(d => { if (d && d.id) byId[d.id] = d; });
+        cards.forEach(card => {
+            const d = byId[card.dataset.dialect];
+            if (!d) return;   // 后端没有这个方言：保持预置值，不臆造
+            const strong = card.querySelector('.dialect-card-header strong');
+            if (strong && d.name) strong.textContent = d.name;
+            const regionEl = card.querySelector('.dialect-card-header div > span');
+            if (regionEl && d.region) regionEl.textContent = d.region;
+            const metaSpans = card.querySelectorAll('.dialect-card-meta > span');
+            if (metaSpans[0] && d.areas) {
+                metaSpans[0].innerHTML = '<i class="fas fa-map-marker-alt"></i> ' + escapeHtml(d.areas);
+            }
+            if (metaSpans[1] && d.speakers) {
+                metaSpans[1].innerHTML = '<i class="fas fa-users"></i> ' + escapeHtml(d.speakers);
+            }
+        });
+    } catch (e) {
+        // 取不到时保留 HTML 预置值（与后端同源），不静默清空成空白卡片
+    }
 }
 
 // ==================== 语音输入 ====================
@@ -910,12 +1171,13 @@ function setupVoiceInput() {
         if (SpeechRecognition) {
             startSpeechRecognition();
         } else {
-            VoiceState.isRecording = true;
-            voiceBtn.classList.add('recording');
-            setTimeout(() => {
-                stopRecording();
-                sendVoiceMessage('请问荔枝什么时候施肥最好？');
-            }, 2000);
+            // ⚠️ 此处原有一段「假演示」：不支持语音识别时，点麦克风会在 2 秒后
+            //    自动发送固定问题「请问荔枝什么时候施肥最好？」，并在聊天区
+            //    显示成学员自己的提问。学员从未说过这句话 —— 属于伪造用户输入，
+            //    与项目「不冒充、失败必须可见」的红线直接冲突，已移除。
+            //    改为如实告知不支持，并指向可用的文字输入。
+            setVoiceInputHint('当前浏览器不支持语音识别，请用下方文字输入');
+            showNotification('当前浏览器不支持语音识别，请改用文字输入提问', 'warning');
         }
     });
 
@@ -942,6 +1204,7 @@ function setupVoiceInput() {
 
     // 清空对话
     clearBtn?.addEventListener('click', () => {
+        stopSpeak();
         VoiceState.history = [];
         const messages = document.getElementById('voice-chat-messages');
         if (messages) {
@@ -953,14 +1216,34 @@ function setupVoiceInput() {
     loadDialectInfo(AppState.currentDialect || 'cantonese');
 }
 
+// 语音输入框提示：临时显示错误文案，并在「重新录音 / 识别成功 / 超时」后恢复默认。
+// 修 bug：此前把错误写进 placeholder 后从不恢复，一次「未检测到麦克风」会永久占位。
+function setVoiceInputHint(msg) {
+    const el = document.getElementById('voice-text-input');
+    if (el) el.placeholder = msg;
+    if (VoiceState.inputHintTimer) clearTimeout(VoiceState.inputHintTimer);
+    VoiceState.inputHintTimer = setTimeout(clearVoiceInputHint, 6000);
+}
+function clearVoiceInputHint() {
+    const el = document.getElementById('voice-text-input');
+    if (el) el.placeholder = VOICE_INPUT_DEFAULT_PLACEHOLDER;
+    if (VoiceState.inputHintTimer) {
+        clearTimeout(VoiceState.inputHintTimer);
+        VoiceState.inputHintTimer = null;
+    }
+}
+
 function startSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.lang = 'zh-CN';
+    recognition.lang = DIALECT_SPEECH_LANG[AppState.currentDialect] || 'zh-CN';
     recognition.interimResults = true;
     recognition.continuous = false;
     VoiceState.recognition = recognition;
     VoiceState.isRecording = true;
+
+    // 重新开始录音 → 清掉上一次残留的错误提示
+    clearVoiceInputHint();
 
     const voiceBtn = document.getElementById('voice-record-btn');
     voiceBtn?.classList.add('recording');
@@ -969,13 +1252,32 @@ function startSpeechRecognition() {
         const transcript = event.results[0][0].transcript;
         const textInput = document.getElementById('voice-text-input');
         if (textInput) textInput.value = transcript;
+        // 有识别结果 = 麦克风正常，清掉错误提示
+        clearVoiceInputHint();
         if (event.results[0].isFinal) {
             sendVoiceMessage(transcript);
             if (textInput) textInput.value = '';
         }
     };
 
-    recognition.onerror = function() {
+    recognition.onerror = function(event) {
+        // 按错误类型给明确提示，不再静默失败
+        const map = {
+            'not-allowed': '麦克风权限被拒绝，请在浏览器地址栏允许麦克风后重试',
+            'service-not-allowed': '麦克风权限被拒绝，请在浏览器地址栏允许麦克风后重试',
+            'audio-capture': '未检测到麦克风设备，请确认麦克风已连接',
+            'no-speech': '没有听到声音，请靠近麦克风再试一次',
+            'network': '语音识别网络异常，请检查网络后重试',
+            'aborted': '已停止录音'
+        };
+        const msg = map[event.error] || ('语音识别失败：' + event.error);
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+            setVoiceInputHint(msg);
+        }
+        // 用通知条提示（复用项目通知组件）
+        if (event.error !== 'aborted') {
+            showNotification(msg, event.error === 'not-allowed' || event.error === 'service-not-allowed' ? 'warning' : 'error');
+        }
         stopRecording();
     };
 
@@ -995,15 +1297,52 @@ function stopRecording() {
     }
 }
 
+// 属性值转义：escapeHtml 走 textContent→innerHTML，不转引号，拼进属性前必须补一道
+function attrEsc(s) {
+    return escapeHtml(String(s == null ? '' : s)).replace(/"/g, '&quot;');
+}
+
 async function loadDialectInfo(dialectId) {
     try {
         const data = await apiCall(`/api/resources/dialect-info?dialect=${dialectId}`);
-        if (data.success && data.info) {
-            renderDialectInfo(data.info);
+        // ⚠️ 必须校验返回的 id 与请求的一致：后端对未知方言是
+        //    `DIALECTS_DATA.get(id, DIALECTS_DATA['cantonese'])` —— **静默回退成粤语**。
+        //    不校验的话，学员点「潮汕话」，卡片高亮潮汕话、下面显示的却是粤语内容。
+        if (!data.success || !data.info || data.info.id !== dialectId) {
+            throw new Error('方言资料返回异常');
         }
+        renderDialectInfo(data.info);
     } catch(e) {
-        // 静默失败
+        // 不能静默失败（原实现 catch 里只有一句注释）：
+        // 否则卡片已经高亮成新方言，内容还停在上一个方言，界面自相矛盾 ——
+        // 学员会以为「潮汕话和粤语一模一样」，或者以为点错了没反应。
+        renderDialectError(dialectId);
     }
+}
+
+// 方言资料取不到时：清掉上一个方言的内容并如实说明，不留旧方言残影
+function renderDialectError(dialectId) {
+    const card = document.querySelector(`.dialect-card[data-dialect="${dialectId}"] strong`);
+    const name = card ? card.textContent : '该方言';
+    const greetingMain = document.getElementById('greeting-main');
+    const greetingMeaning = document.getElementById('greeting-meaning');
+    if (greetingMain) greetingMain.textContent = '资料加载失败';
+    if (greetingMeaning) greetingMeaning.textContent = `（${name}的问候语与常用短语暂时取不到，请重新点击该方言重试）`;
+    // 特征标签 / 短语 / 快捷问题都清空 —— 宁可空着，也不能拿上一个方言的内容冒充
+    const featuresEl = document.getElementById('dialect-features');
+    if (featuresEl) featuresEl.innerHTML = '';
+    const phrasesGrid = document.getElementById('phrases-grid');
+    if (phrasesGrid) phrasesGrid.innerHTML = '';
+    const quickEl = document.getElementById('voice-quick-questions');
+    if (quickEl) quickEl.innerHTML = '';
+    // 短语区整块收起：否则会留下一个「常用短语」标题配一片空白，看起来像加载到一半
+    togglePhrasesPanel(false);
+}
+
+// 常用短语区：没有短语时整块收起（失败态、或该方言确实没有短语）
+function togglePhrasesPanel(show) {
+    const panel = document.querySelector('.phrases-panel');
+    if (panel) panel.style.display = show ? '' : 'none';
 }
 
 function renderDialectInfo(info) {
@@ -1013,22 +1352,24 @@ function renderDialectInfo(info) {
     if (greetingMain) greetingMain.textContent = info.greeting || '';
     if (greetingMeaning) greetingMeaning.textContent = `（${info.greeting_meaning || ''}）`;
 
-    // 特征标签
+    // 特征标签（无条件重写：字段缺失时清空，避免残留上一个方言的标签）
     const featuresEl = document.getElementById('dialect-features');
-    if (featuresEl && info.features) {
-        featuresEl.innerHTML = info.features.map(f => `<span class="feature-tag">${f}</span>`).join('');
+    if (featuresEl) {
+        featuresEl.innerHTML = (info.features || [])
+            .map(f => `<span class="feature-tag">${escapeHtml(f)}</span>`).join('');
     }
 
-    // 常用短语
+    // 常用短语（同样无条件重写）
     const phrasesGrid = document.getElementById('phrases-grid');
-    if (phrasesGrid && info.phrases) {
-        phrasesGrid.innerHTML = info.phrases.map(p =>
-            `<div class="phrase-item" data-text="${p.dialect}" title="点击发送：${p.dialect}">
-                <span class="phrase-dialect">${p.dialect}</span>
-                <span class="phrase-mandarin">${p.mandarin}</span>
-                <span class="phrase-pinyin">${p.pinyin || ''}</span>
+    if (phrasesGrid) {
+        phrasesGrid.innerHTML = (info.phrases || []).map(p =>
+            `<div class="phrase-item" data-text="${attrEsc(p.dialect)}" title="点击发送：${attrEsc(p.dialect)}">
+                <span class="phrase-dialect">${escapeHtml(p.dialect)}</span>
+                <span class="phrase-mandarin">${escapeHtml(p.mandarin)}</span>
+                <span class="phrase-pinyin">${escapeHtml(p.pinyin || '')}</span>
             </div>`
         ).join('');
+        togglePhrasesPanel((info.phrases || []).length > 0);
         // 点击短语发送
         phrasesGrid.querySelectorAll('.phrase-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -1037,11 +1378,11 @@ function renderDialectInfo(info) {
         });
     }
 
-    // 快捷问题
+    // 快捷问题（同样无条件重写）
     const quickEl = document.getElementById('voice-quick-questions');
-    if (quickEl && info.quick_questions) {
-        quickEl.innerHTML = info.quick_questions.map(q =>
-            `<button class="voice-quick-btn">${q}</button>`
+    if (quickEl) {
+        quickEl.innerHTML = (info.quick_questions || []).map(q =>
+            `<button class="voice-quick-btn">${escapeHtml(q)}</button>`
         ).join('');
         quickEl.querySelectorAll('.voice-quick-btn').forEach(btn => {
             btn.addEventListener('click', () => sendVoiceMessage(btn.textContent));
@@ -1052,6 +1393,9 @@ function renderDialectInfo(info) {
 async function sendVoiceMessage(text) {
     const messagesEl = document.getElementById('voice-chat-messages');
     if (!messagesEl) return;
+
+    // 发新消息前先停掉正在朗读/暂停的内容，避免新旧语音叠着念
+    stopSpeak();
 
     // 移除欢迎消息
     const welcome = messagesEl.querySelector('.voice-welcome');
@@ -1088,7 +1432,26 @@ async function sendVoiceMessage(text) {
             if (r.dialect_name) {
                 html += `<div class="msg-dialect-tag">${r.dialect_name}助手</div>`;
             }
-            html += `<div>${formatAnswer(r.answer || '暂无回答')}</div>`;
+            html += `<div class="voice-msg-body">${formatAnswer(r.answer || '暂无回答')}</div>`;
+            // 朗读 + 诚实标注（P2/P3）
+            const hasTTS = 'speechSynthesis' in window;
+            html += `<div class="voice-msg-actions">`;
+            if (hasTTS) {
+                html += `<button class="voice-speak-btn" data-answer="${encodeURIComponent(r.answer || '')}" title="朗读回答"><i class="fas fa-volume-up"></i> 朗读</button>`;
+                html += `<button class="voice-stop-btn" style="display:none" title="停止朗读"><i class="fas fa-stop"></i> 停止</button>`;
+            }
+            // 诚实标注：AI 方言回答不一定地道，降级话术库同样标注来源
+            const note = r.source === 'fallback'
+                ? '（本地方言语料库回答，仅供学习参考）'
+                : '（AI 方言回答，仅供学习参考，个别用词可能与当地口语有差异）';
+            html += `<span class="voice-msg-note">${note}</span>`;
+            html += `</div>`;
+            // 用药提示：回答里出现用量 / 稀释倍数 / 安全间隔期时，由服务端单独下发。
+            // 与农技问答、病虫害诊断同一条红线 —— 给了用量就必须给用户提示，
+            // 不能因为「这是方言版」就少一句免责声明。
+            if (r.chem_notice) {
+                html += `<div class="voice-msg-chem"><i class="fas fa-exclamation-triangle"></i>${escapeHtml(r.chem_notice)}</div>`;
+            }
             if (r.suggestions && r.suggestions.length) {
                 html += `<div class="msg-suggestions">${r.suggestions.map(s =>
                     `<span class="suggestion-btn">${s}</span>`
@@ -1096,6 +1459,15 @@ async function sendVoiceMessage(text) {
             }
             botMsg.innerHTML = html;
             messagesEl.appendChild(botMsg);
+
+            // 朗读按钮（三态：朗读 → 暂停 → 继续）
+            botMsg.querySelectorAll('.voice-speak-btn').forEach(btn => {
+                btn.addEventListener('click', () => speakAnswer(decodeURIComponent(btn.dataset.answer), btn));
+            });
+            // 停止按钮
+            botMsg.querySelectorAll('.voice-stop-btn').forEach(btn => {
+                btn.addEventListener('click', () => stopSpeak());
+            });
 
             // 追问按钮点击
             botMsg.querySelectorAll('.suggestion-btn').forEach(btn => {
@@ -1107,41 +1479,172 @@ async function sendVoiceMessage(text) {
             if (VoiceState.history.length > VoiceState.maxHistory) {
                 VoiceState.history = VoiceState.history.slice(-VoiceState.maxHistory);
             }
+        } else {
+            // success 但没有 result —— 也必须让学员看见失败。
+            // loading 气泡此时已被移除，若什么都不做，界面会停在学员提问后一动不动，
+            // 看起来像「问完就没反应了」（违反「失败必须可见」）。
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'voice-msg bot';
+            emptyMsg.textContent = '抱歉，这次没有拿到回答，请再问一次';
+            messagesEl.appendChild(emptyMsg);
         }
     } catch(e) {
         loadingMsg.remove();
         const errMsg = document.createElement('div');
         errMsg.className = 'voice-msg bot';
-        errMsg.textContent = '抱歉，暂时无法回答，请稍后再试';
+        // 按服务端下发的 code 给出针对性提示（apiCall 失败时带 err.status / err.code）
+        if (e && e.status === 429) {
+            errMsg.textContent = '提问过于频繁，请稍后再试';
+        } else if (e && e.code === 'ai_not_configured') {
+            errMsg.textContent = '该功能尚未启用，请联系管理员';
+        } else {
+            errMsg.textContent = '抱歉，暂时无法回答，请稍后再试';
+        }
         messagesEl.appendChild(errMsg);
     }
 
     messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// ==================== 语音合成（TTS 朗读） ====================
+// 三态：朗读 → 暂停 → 继续；另有独立的「停止」。
+// ⚠️ 暂停必须用 speechSynthesis.pause()（保留播放位置），不能用 cancel()
+//    —— cancel() 会丢弃进度，之后再 speak() 就是从头读（用户报过这个 bug）。
+
+function speakAnswer(text, btn) {
+    if (!('speechSynthesis' in window)) {
+        showNotification('当前浏览器不支持语音朗读', 'warning');
+        return;
+    }
+    // 同一按钮：朗读中 → 暂停；暂停中 → 继续
+    if (VoiceState.ttsBtn === btn) {
+        if (VoiceState.ttsState === 'speaking') { pauseSpeak(); return; }
+        if (VoiceState.ttsState === 'paused') { resumeSpeak(); return; }
+    }
+    // 点了别的回答的朗读按钮 → 先把当前这条彻底停掉再开始
+    stopSpeak();
+
+    // 去掉 markdown 符号，纯文字朗读
+    const plain = text
+        .replace(/[*_`#>\[\]()]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!plain) return;
+
+    const u = new SpeechSynthesisUtterance(plain);
+    u.lang = DIALECT_TTS_LANG[AppState.currentDialect] || 'zh-CN';
+    u.rate = 0.95;
+
+    VoiceState.ttsUtter = u;
+    VoiceState.ttsBtn = btn;
+    setTtsState('speaking', btn);
+
+    // 只在「仍是当前这条 utterance」时才收尾，避免旧回调把新朗读的状态冲掉
+    u.onend = function() { if (VoiceState.ttsUtter === u) stopSpeak(); };
+    u.onerror = function() { if (VoiceState.ttsUtter === u) stopSpeak(); };
+
+    window.speechSynthesis.speak(u);
+    startTtsKeepAlive();
+}
+
+function pauseSpeak() {
+    if (VoiceState.ttsState !== 'speaking') return;
+    try { window.speechSynthesis.pause(); } catch (e) {}
+    setTtsState('paused', VoiceState.ttsBtn);
+}
+
+function resumeSpeak() {
+    if (VoiceState.ttsState !== 'paused') return;
+    try { window.speechSynthesis.resume(); } catch (e) {}
+    setTtsState('speaking', VoiceState.ttsBtn);
+}
+
+function stopSpeak() {
+    stopTtsKeepAlive();
+    if ('speechSynthesis' in window) {
+        try { window.speechSynthesis.cancel(); } catch (e) {}
+    }
+    const btn = VoiceState.ttsBtn;
+    VoiceState.ttsUtter = null;
+    VoiceState.ttsState = 'idle';
+    VoiceState.ttsBtn = null;
+    if (btn) updateTtsBtn(btn, 'idle');
+}
+
+function setTtsState(state, btn) {
+    VoiceState.ttsState = state;
+    if (btn) updateTtsBtn(btn, state);
+}
+
+function updateTtsBtn(btn, state) {
+    if (!btn) return;
+    btn.classList.toggle('speaking', state === 'speaking');
+    btn.classList.toggle('paused', state === 'paused');
+    if (state === 'speaking') {
+        btn.innerHTML = '<i class="fas fa-pause"></i> 暂停';
+    } else if (state === 'paused') {
+        btn.innerHTML = '<i class="fas fa-play"></i> 继续';
+    } else {
+        btn.innerHTML = '<i class="fas fa-volume-up"></i> 朗读';
+    }
+    // 停止按钮：仅在朗读中/暂停中显示
+    const stopBtn = btn.parentElement ? btn.parentElement.querySelector('.voice-stop-btn') : null;
+    if (stopBtn) stopBtn.style.display = (state === 'idle') ? 'none' : '';
+}
+
+// Chrome 对较长文本（约 15 秒以上）会「自动静默暂停」，需周期性 resume 维持朗读。
+function startTtsKeepAlive() {
+    stopTtsKeepAlive();
+    VoiceState.ttsTimer = setInterval(function() {
+        if (VoiceState.ttsState === 'speaking') {
+            try { window.speechSynthesis.resume(); } catch (e) {}
+        }
+    }, 10000);
+}
+function stopTtsKeepAlive() {
+    if (VoiceState.ttsTimer) { clearInterval(VoiceState.ttsTimer); VoiceState.ttsTimer = null; }
+}
+
 // ==================== 农业问答（对话式） ====================
 
 const QAState = {
+    // [{ question, answer, roundId, interrupted }]
+    // 内存中保留的轮数多于实际送模型的轮数：多出来的部分只服务于
+    // 「重新生成」按轮次定位（见 appendActions），不影响上下文长度。
     history: [],
     maxHistory: 10,
-    lastAnswer: '',
-    isTyping: false
+    isTyping: false,
+    product: '',          // 当前对话所属作物，用于检测「切了作物但对话没换」
+    abort: null,          // 在途请求的 AbortController，供「清空对话」中断
+    generation: 0,        // 代次号：清空/切换作物时递增，使在途响应失效
+    activeRound: null     // 当前在途轮次号：用于「忙碌态」的精确释放（代次号无法区分同代内的多轮）
 };
+
+const QA_QUESTION_MAXLEN = 500;        // 与后端 AGRI_QUESTION_MAX_LEN 一致
+const QA_HISTORY_CONTEXT_TURNS = 5;    // 随请求送出的历史轮数，与后端 AGRI_HISTORY_MAX_TURNS 一致
+const QA_REQUEST_TIMEOUT_MS = 60000;   // 非流式请求客户端超时（后端上游超时 30s）
+const QA_STREAM_TIMEOUT_MS = 90000;    // 流式请求客户端超时
+
+// 每轮问答一个标识，用于精确移除「某一轮」的气泡/按钮/建议，不依赖 DOM 顺序
+let qaRoundSeq = 0;
+function newQaRoundId() {
+    qaRoundSeq += 1;
+    return 'qa-r' + qaRoundSeq;
+}
 
 function setupAgricultureQA() {
     const askBtn = document.getElementById('ask-agriculture-btn');
     const questionInput = document.getElementById('agriculture-question');
     const clearBtn = document.getElementById('qa-clear-btn');
 
-    askBtn?.addEventListener('click', () => {
-        const question = questionInput.value.trim();
-        if (!question || QAState.isTyping) return;
-        questionInput.value = '';
-        autoResizeTextarea(questionInput);
-        askAgricultureQuestion(question);
-    });
+    // 前端长度上限与后端保持一致（后端仍会独立校验，前端只是提前拦截）
+    if (questionInput) questionInput.setAttribute('maxlength', String(QA_QUESTION_MAXLEN));
+
+    askBtn?.addEventListener('click', () => submitAgricultureQuestion());
 
     questionInput?.addEventListener('keydown', e => {
+        // 中文输入法候选未上屏时，Enter 属于「选字」，不能当成发送
+        if (e.isComposing || e.keyCode === 229) return;
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             askBtn?.click();
@@ -1152,41 +1655,86 @@ function setupAgricultureQA() {
     questionInput?.addEventListener('input', () => autoResizeTextarea(questionInput));
 
     clearBtn?.addEventListener('click', () => {
-        QAState.history = [];
-        QAState.lastAnswer = '';
-        const flow = document.getElementById('qa-chat-flow');
-        if (flow) {
-            flow.innerHTML = `
-                <div class="qa-welcome">
-                    <i class="fas fa-robot"></i>
-                    <p>你好！我是AI农技专家，专注于<strong id="qa-product-label">${getProductName(AppState.currentProduct)}</strong>种植指导。有什么问题尽管问我！</p>
-                </div>
-            `;
-        }
+        resetQaConversation();
+        showNotification('对话已清空', 'info');
     });
 
     // 示例问题（动态 + 静态混合）
     bindSuggestionClicks();
 
-    // 农产品切换时刷新建议
-    const origSwitch = AppState.currentProduct;
-    const observer = new MutationObserver(() => {
-        if (AppState.currentProduct !== origSwitch) {
-            QAState.history = [];
-            refreshSuggestions(AppState.currentProduct);
-            updateProductLabel();
-            clearChatFlow();
-        }
-    });
-    // 监听产品选择变化
+    // 切换作物时同步：对话本身属于上一个作物的语境，必须一并重置，
+    // 否则旧作物的问答会被当作新作物的上下文一起发给模型，导致答非所问。
     document.querySelectorAll('.product-card').forEach(card => {
-        card.addEventListener('click', () => {
-            setTimeout(() => {
-                refreshSuggestions(AppState.currentProduct);
-                updateProductLabel();
-            }, 50);
-        });
+        card.addEventListener('click', () => syncQaProduct());
     });
+
+    // 首屏：与已保存/已选作物保持一致（此前这些函数在初始化时从未被调用，
+    // 导致欢迎语与示例问题固定停留在「荔枝」）
+    QAState.product = AppState.currentProduct;
+    updateProductLabel();
+    refreshSuggestions(AppState.currentProduct);
+}
+
+// 统一提问入口：负责取值、长度校验、清空输入框，再交给 askAgricultureQuestion
+function submitAgricultureQuestion(rawQuestion) {
+    const input = document.getElementById('agriculture-question');
+    const question = String(rawQuestion == null ? (input ? input.value : '') : rawQuestion).trim();
+    if (!question) return;
+    // 上一轮还在生成时不再静默丢弃：明确告知，避免「点了没反应」
+    if (QAState.isTyping) {
+        showNotification('正在回答上一个问题，请稍候再问', 'info');
+        return;
+    }
+    if (question.length > QA_QUESTION_MAXLEN) {
+        showNotification(`问题过长，请控制在 ${QA_QUESTION_MAXLEN} 字以内`, 'warning');
+        return;
+    }
+    if (input) {
+        input.value = '';
+        autoResizeTextarea(input);
+    }
+    askAgricultureQuestion(question);
+}
+
+// 作物变化时重置对话。返回是否真的发生了切换。
+function syncQaProduct() {
+    const product = AppState.currentProduct;
+    if (product === QAState.product) return false;
+    QAState.product = product;
+    resetQaConversation();
+    refreshSuggestions(product);
+    showNotification(`已切换到「${getProductName(product)}」，对话已重置`, 'info');
+    return true;
+}
+
+// 重置对话：中断在途请求、清空历史与界面。既用于「清空对话」，也用于切换作物。
+function resetQaConversation() {
+    QAState.generation += 1;
+    if (QAState.abort) {
+        try { QAState.abort.abort(); } catch (e) { /* 忽略重复中断 */ }
+        QAState.abort = null;
+    }
+    QAState.history = [];
+    QAState.isTyping = false;
+    QAState.activeRound = null;
+    setQaBusy(false);
+    clearChatFlow();
+}
+
+function setQaBusy(busy) {
+    const askBtn = document.getElementById('ask-agriculture-btn');
+    if (askBtn) {
+        askBtn.disabled = !!busy;
+        askBtn.setAttribute('aria-busy', busy ? 'true' : 'false');
+    }
+    // 提问进行中：示例问题与追问建议一并置灰。
+    // 此前它们仍显示为可点击，点击后被 submitAgricultureQuestion 静默忽略，
+    // 用户会以为「点了没反应」。
+    document.querySelectorAll('.example-btn, .qa-action-btn.suggest-btn').forEach(btn => {
+        btn.disabled = !!busy;
+    });
+    const input = document.getElementById('agriculture-question');
+    if (input) input.setAttribute('aria-busy', busy ? 'true' : 'false');
 }
 
 function autoResizeTextarea(el) {
@@ -1194,9 +1742,15 @@ function autoResizeTextarea(el) {
     el.style.height = Math.min(el.scrollHeight, 100) + 'px';
 }
 
+// 作物 id → 中文名（8 个，与顶部「选择农产品」/ 后端 EC_PRODUCTS 白名单一致）。
+// 2026-10-05 从 getProductName 内联 map 抽出：直播间商品下拉(#live-product)也用它渲染。
+const PRODUCT_NAMES = {
+    lychee: '荔枝', longan: '龙眼', citrus: '柑橘', banana: '香蕉',
+    aquatic: '水产养殖', rice: '水稻', tea: '茶叶', vegetable: '蔬菜',
+};
+
 function getProductName(productId) {
-    const names = { lychee: '荔枝', longan: '龙眼', aquatic: '水产养殖', rice: '水稻', tea: '茶叶', vegetable: '蔬菜' };
-    return names[productId] || '广东特色农产品';
+    return PRODUCT_NAMES[productId] || '广东特色农产品';
 }
 
 function updateProductLabel() {
@@ -1204,16 +1758,16 @@ function updateProductLabel() {
     if (label) label.textContent = getProductName(AppState.currentProduct);
 }
 
+// 恢复欢迎语。保留 id="qa-product-label"，否则清空后标签就再也找不到了。
 function clearChatFlow() {
     const flow = document.getElementById('qa-chat-flow');
-    if (flow) {
-        flow.innerHTML = `
-            <div class="qa-welcome">
-                <i class="fas fa-robot"></i>
-                <p>你好！我是AI农技专家，专注于<strong>${getProductName(AppState.currentProduct)}</strong>种植指导。有什么问题尽管问我！</p>
-            </div>
-        `;
-    }
+    if (!flow) return;
+    flow.innerHTML = `
+        <div class="qa-welcome">
+            <i class="fas fa-robot"></i>
+            <p>你好！我是AI农技专家，专注于<strong id="qa-product-label">${escapeHtml(getProductName(AppState.currentProduct))}</strong>种植指导。有什么问题尽管问我！</p>
+        </div>
+    `;
 }
 
 function bindSuggestionClicks() {
@@ -1222,32 +1776,73 @@ function bindSuggestionClicks() {
     container.addEventListener('click', e => {
         const btn = e.target.closest('.example-btn');
         if (!btn) return;
-        const q = btn.dataset.question || btn.textContent;
-        const input = document.getElementById('agriculture-question');
-        if (input) input.value = '';
-        askAgricultureQuestion(q);
+        // 保持「点击即发送」的语义（目标用户是农户，减少一次点击），
+        // 但统一走 submitAgricultureQuestion，以便共用长度与空值校验。
+        submitAgricultureQuestion(btn.dataset.question || btn.textContent || '');
+    });
+}
+
+// 建议栏兜底模板：接口不可达时使用，保证按钮与当前作物标签一致（{p} 为作物名）
+const QA_GENERIC_QUESTIONS = [
+    '{p}当前季节该做哪些管理？',
+    '{p}常见病虫害如何防治？',
+    '{p}怎么提高产量和品质？'
+];
+
+function renderGenericSuggestions(container, product) {
+    const name = getProductName(product);
+    container.dataset.product = product;
+    container.innerHTML = '';
+    QA_GENERIC_QUESTIONS.forEach(tpl => {
+        const text = tpl.replace('{p}', name);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'example-btn';
+        btn.dataset.question = text;
+        btn.textContent = text;
+        btn.title = text;
+        container.appendChild(btn);
     });
 }
 
 async function refreshSuggestions(product) {
+    const container = document.getElementById('qa-suggestions');
+    if (!container) return;
+
+    let list = [];
     try {
-        const data = await apiCall(`/api/agriculture/suggestions?product=${product}`);
-        if (data.success && data.suggestions) {
-            const container = document.getElementById('qa-suggestions');
-            if (container) {
-                container.innerHTML = data.suggestions.map(q =>
-                    `<button class="example-btn" data-question="${q}">${q}</button>`
-                ).join('');
-            }
-        }
+        const data = await apiCall(`/api/agriculture/suggestions?product=${encodeURIComponent(product)}`);
+        list = (data && data.success && Array.isArray(data.suggestions)) ? data.suggestions : [];
     } catch (e) {
-        // 静默失败，保留原有建议
+        list = [];
     }
+
+    // 拿不到建议时不能无条件保留旧按钮：若旧按钮属于「上一个作物」，
+    // 就会出现「标签写着水稻、示例问题还在问荔枝」的自相矛盾。
+    // 只在按钮确实属于当前作物时才保留。
+    if (list.length === 0) {
+        if (container.dataset.product !== product) renderGenericSuggestions(container, product);
+        return;
+    }
+
+    // 用 DOM API 构建，data-question 走属性赋值，不存在 HTML/属性注入
+    container.dataset.product = product;
+    container.innerHTML = '';
+    list.forEach(item => {
+        const text = String(item);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'example-btn';
+        btn.dataset.question = text;
+        btn.textContent = text;
+        btn.title = text;
+        container.appendChild(btn);
+    });
 }
 
-function appendMessage(role, content) {
+function appendMessage(role, content, roundId) {
     const flow = document.getElementById('qa-chat-flow');
-    if (!flow) return;
+    if (!flow) return null;
 
     // 移除欢迎信息
     const welcome = flow.querySelector('.qa-welcome');
@@ -1255,6 +1850,10 @@ function appendMessage(role, content) {
 
     const div = document.createElement('div');
     div.className = `qa-message ${role}`;
+    if (roundId) {
+        div.dataset.qaRound = roundId;
+        div.dataset.qaRole = role;
+    }
 
     if (role === 'user') {
         div.innerHTML = `
@@ -1271,6 +1870,28 @@ function appendMessage(role, content) {
     flow.appendChild(div);
     flow.scrollTop = flow.scrollHeight;
     return div;
+}
+
+function qaContentEl(msgEl) {
+    return msgEl ? msgEl.querySelector('.msg-content') : null;
+}
+
+// 只移除某一轮的「输出」（机器人气泡 + 操作按钮 + 追问建议），保留用户提问气泡。
+// 用于流式失败后回退到非流式，此时用户气泡必须留着，否则会被重复创建一次。
+function removeQaBotOutput(roundId) {
+    const flow = document.getElementById('qa-chat-flow');
+    if (!flow || !roundId) return;
+    flow.querySelectorAll(`[data-qa-round="${roundId}"]`).forEach(el => {
+        if (el.dataset.qaRole !== 'user') el.remove();
+    });
+}
+
+// 移除整轮（含用户提问气泡）。用于「重新生成」：随后重新提问会重建提问气泡，
+// 避免旧气泡残留导致同一个问题在界面上出现两次。
+function removeQaRound(roundId) {
+    const flow = document.getElementById('qa-chat-flow');
+    if (!flow || !roundId) return;
+    flow.querySelectorAll(`[data-qa-round="${roundId}"]`).forEach(el => el.remove());
 }
 
 function appendTypingIndicator() {
@@ -1295,36 +1916,52 @@ function removeTypingIndicator() {
     document.getElementById('qa-typing-indicator')?.remove();
 }
 
-function appendSuggestions(suggestions) {
+function appendSuggestions(suggestions, roundId) {
     const flow = document.getElementById('qa-chat-flow');
-    if (!flow || !suggestions || suggestions.length === 0) return;
+    if (!flow || !Array.isArray(suggestions) || suggestions.length === 0) return null;
 
     const div = document.createElement('div');
     div.className = 'qa-msg-suggestions';
-    div.innerHTML = `
-        <div class="qa-msg-actions" style="margin-top:4px;">
-            ${suggestions.map(q =>
-                `<button class="qa-action-btn suggest-btn" data-question="${escapeHtml(q)}"><i class="fas fa-reply"></i> ${escapeHtml(q)}</button>`
-            ).join('')}
-        </div>
-    `;
-    flow.appendChild(div);
+    if (roundId) {
+        div.dataset.qaRound = roundId;
+        div.dataset.qaRole = 'suggestions';
+    }
 
-    div.querySelectorAll('.suggest-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            askAgricultureQuestion(btn.dataset.question);
-        });
+    const bar = document.createElement('div');
+    bar.className = 'qa-msg-actions';
+    bar.style.marginTop = '4px';
+
+    suggestions.forEach(item => {
+        const text = String(item);
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'qa-action-btn suggest-btn';
+        // 用 dataset 赋值而非拼字符串：进不了 HTML 解析，属性也无法被引号破坏
+        btn.dataset.question = text;
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-reply';
+        btn.appendChild(icon);
+        btn.appendChild(document.createTextNode(' ' + text));
+        btn.addEventListener('click', () => submitAgricultureQuestion(text));
+        bar.appendChild(btn);
     });
 
+    div.appendChild(bar);
+    flow.appendChild(div);
     flow.scrollTop = flow.scrollHeight;
+    return div;
 }
 
-function appendActions(answer) {
+function appendActions(answer, roundId) {
     const flow = document.getElementById('qa-chat-flow');
-    if (!flow) return;
+    if (!flow) return null;
 
     const div = document.createElement('div');
     div.className = 'qa-msg-actions';
+    if (roundId) {
+        div.dataset.qaRound = roundId;
+        div.dataset.qaRole = 'actions';
+    }
     div.innerHTML = `
         <button class="qa-action-btn copy-btn"><i class="fas fa-copy"></i> 复制</button>
         <button class="qa-action-btn retry-btn"><i class="fas fa-redo"></i> 重新生成</button>
@@ -1332,544 +1969,1411 @@ function appendActions(answer) {
     flow.appendChild(div);
 
     div.querySelector('.copy-btn')?.addEventListener('click', function() {
+        const btn = this;
+        if (!navigator.clipboard) {
+            showNotification('当前浏览器不支持自动复制，请手动选择文本', 'warning');
+            return;
+        }
         navigator.clipboard.writeText(answer).then(() => {
-            this.classList.add('copied');
-            this.innerHTML = '<i class="fas fa-check"></i> 已复制';
+            btn.classList.add('copied');
+            btn.innerHTML = '<i class="fas fa-check"></i> 已复制';
             setTimeout(() => {
-                this.classList.remove('copied');
-                this.innerHTML = '<i class="fas fa-copy"></i> 复制';
+                btn.classList.remove('copied');
+                btn.innerHTML = '<i class="fas fa-copy"></i> 复制';
             }, 2000);
-        });
+        }).catch(() => showNotification('复制失败，请手动选择文本', 'warning'));
     });
 
+    // 「重新生成」：按轮次标识精确定位，不再假设「最后一个气泡就是刚生成的那条」。
+    // 该轮若已滑出历史窗口，则从界面上取回原问题——此前会直接 return，
+    // 表现为「点了重新生成毫无反应」。
     div.querySelector('.retry-btn')?.addEventListener('click', () => {
-        if (QAState.history.length > 0) {
-            const last = QAState.history[QAState.history.length - 1];
-            QAState.history.pop();
-            // 移除最后一条bot消息和actions
-            const messages = flow.querySelectorAll('.qa-message');
-            const lastMsg = messages[messages.length - 1];
-            if (lastMsg?.classList.contains('bot')) lastMsg.remove();
-            div.remove();
-            // 移除追问建议
-            const suggestions = flow.querySelector('.qa-msg-suggestions');
-            if (suggestions) suggestions.remove();
-            askAgricultureQuestion(last.question);
+        if (QAState.isTyping) {
+            showNotification('正在回答上一个问题，请稍候', 'info');
+            return;
         }
+        const idx = QAState.history.findIndex(h => h.roundId === roundId);
+        let question = idx >= 0 ? QAState.history[idx].question : '';
+        if (idx >= 0) QAState.history.splice(idx, 1);
+        if (!question) {
+            const bubble = document.querySelector(
+                `[data-qa-round="${roundId}"][data-qa-role="user"] .msg-bubble`);
+            question = bubble ? String(bubble.textContent || '').trim() : '';
+        }
+        if (!question) {
+            showNotification('无法取回原问题，请重新输入', 'warning');
+            return;
+        }
+        removeQaRound(roundId);
+        askAgricultureQuestion(question);
     });
 
     flow.scrollTop = flow.scrollHeight;
+    return div;
 }
 
 async function askAgricultureQuestion(question) {
     if (QAState.isTyping) return;
-    QAState.isTyping = true;
-
-    appendMessage('user', question);
-
-    // 优先使用 SSE 流式，失败回退到普通请求
-    const streamOk = await askAgricultureStreaming(question);
-    if (streamOk) {
-        QAState.isTyping = false;
+    const q = String(question || '').trim();
+    if (!q) return;
+    if (q.length > QA_QUESTION_MAXLEN) {
+        showNotification(`问题过长，请控制在 ${QA_QUESTION_MAXLEN} 字以内`, 'warning');
         return;
     }
 
-    // 流式失败，回退到传统请求
-    const typingEl = appendTypingIndicator();
+    // 作物若已变化，先重置对话，避免用上一个作物的上下文回答新作物的问题
+    syncQaProduct();
+
+    const generation = QAState.generation;
+    QAState.isTyping = true;
+    setQaBusy(true);
+
+    const roundId = newQaRoundId();
+    QAState.activeRound = roundId;
+    appendMessage('user', q, roundId);
 
     try {
-        const data = await apiCall('/api/agriculture/ask', 'POST', {
-            question,
-            product: AppState.currentProduct,
-            history: QAState.history.slice(-5)
-        });
-
-        removeTypingIndicator();
-
-        if (data.success) {
-            const answer = data.answer;
-            QAState.lastAnswer = answer;
-
-            // 添加到历史
-            QAState.history.push({ question, answer });
-            if (QAState.history.length > QAState.maxHistory) QAState.history.shift();
-
-            // 渲染回答（打字机效果）
-            const msg = appendMessage('bot', '');
-            const contentEl = msg.querySelector('.msg-content');
-            await typewriterEffect(contentEl, answer);
-            contentEl.innerHTML = formatAnswer(answer);
-
-            // 操作按钮
-            appendActions(answer);
-
-            // 追问建议
-            if (data.suggestions && data.suggestions.length > 0) {
-                appendSuggestions(data.suggestions);
-            }
-
-            // 更新底部建议
-            refreshSuggestions(AppState.currentProduct);
+        const outcome = await askAgricultureStreaming(q, roundId, generation);
+        // 仅当「流式通道本身不可用」时才回退到一次性请求，避免同一失败重试两次
+        if (outcome === 'fallback') {
+            await askAgricultureOnce(q, roundId, generation);
         }
-    } catch (e) {
-        removeTypingIndicator();
-        const msg = appendMessage('bot', '');
-        const contentEl = msg.querySelector('.msg-content');
-        showErrorState(contentEl, 'AI服务暂时不可用，请稍后重试', () => {
-            QAState.history.pop();
-            askAgricultureQuestion(question);
-        });
     } finally {
-        QAState.isTyping = false;
+        // 按轮次号释放：流式可能已在 done 事件处提前收尾并释放过，
+        // 这里只兜底；若期间用户已开始新一轮，则不覆盖新一轮的忙碌态。
+        if (QAState.activeRound === roundId) {
+            QAState.activeRound = null;
+            QAState.isTyping = false;
+            setQaBusy(false);
+        }
+    }
+}
+
+// 非流式一次性请求（流式不可用时的回退路径）
+async function askAgricultureOnce(question, roundId, generation) {
+    // 已作废的轮次不再插入「思考中…」：此前该指示器在代次校验之前插入，
+    // 一旦这轮被清空/切作物作废，它会残留在新一轮的对话里。
+    if (generation !== QAState.generation) return;
+
+    appendTypingIndicator();
+
+    const result = await qaPostJson('/api/agriculture/ask', {
+        question,
+        product: AppState.currentProduct,
+        history: qaHistoryPayload()
+    }, QA_REQUEST_TIMEOUT_MS);
+
+    removeTypingIndicator();
+    if (generation !== QAState.generation) return;
+
+    const data = result.data;
+    if (!result.ok || !data || !data.success || !data.answer) {
+        const message = (data && data.message)
+            || (result.timedOut ? '请求超时，请重试'
+                : result.aborted ? '请求已取消'
+                    : qaStatusMessage(result.status));
+        renderQaError(roundId, message, question);
+        return;
+    }
+
+    const answer = String(data.answer);
+    const msg = appendMessage('bot', '', roundId);
+    const contentEl = qaContentEl(msg);
+    // 回退路径直接渲染（渐进打字效果由正常情况下的流式路径提供）
+    if (contentEl) contentEl.innerHTML = formatAnswer(answer);
+
+    finishQaRound(roundId, question, answer, data.suggestions);
+}
+
+// 一轮问答的统一收尾：写历史 → 挂操作按钮 → 再挂本轮追问建议 → 刷新底部建议。
+// 固定「按钮在前、建议在后」，流式与一次性两条路径共用同一顺序，
+// 此前流式把建议插在循环里、按钮在循环后，两条路径的 DOM 顺序不一致。
+function finishQaRound(roundId, question, answer, suggestions, opts) {
+    const options = opts || {};
+    QAState.history.push({
+        question,
+        answer,
+        roundId,
+        // 中断的半截回答不能当作完整答复回送给模型（见 qaHistoryPayload）
+        interrupted: !!options.interrupted
+    });
+    while (QAState.history.length > QAState.maxHistory) QAState.history.shift();
+    appendActions(answer, roundId);
+    if (Array.isArray(suggestions) && suggestions.length > 0) {
+        appendSuggestions(suggestions, roundId);
+    }
+    refreshSuggestions(AppState.currentProduct);
+}
+
+// 送给模型的历史上下文：中断轮次只保留提问、把回答置空。
+// 后端 _build_agri_messages 会跳过 answer 为空的历史项，
+// 从而避免「半截回答」被模型当成完整答复继续接龙。
+function qaHistoryPayload() {
+    return QAState.history.slice(-QA_HISTORY_CONTEXT_TURNS).map(h => ({
+        question: h.question,
+        answer: h.interrupted ? '' : h.answer
+    }));
+}
+
+function qaStatusMessage(status) {
+    if (status === 429) return '提问过于频繁，请稍后再试';
+    if (status === 400) return '请求有误，请检查输入后重试';
+    return 'AI 服务暂时不可用，请稍后重试';
+}
+
+// 在气泡位置渲染「可重试的错误态」，而不是把失败伪装成一条正常回答
+function renderQaError(roundId, message, question) {
+    removeQaBotOutput(roundId);
+    const msg = appendMessage('bot', '', roundId);
+    if (!msg) return;
+    msg.classList.add('qa-message-error');
+    const contentEl = qaContentEl(msg);
+    if (!contentEl) return;
+    showErrorState(contentEl, message, () => {
+        removeQaRound(roundId);
+        askAgricultureQuestion(question);
+    });
+}
+
+// 带超时与会话头的 JSON POST。错误响应也把 body 解析出来，以便展示服务端给的 message。
+// 全部异常都在内部收敛为返回值，调用方不需要 try/catch。
+async function qaPostJson(path, body, timeoutMs) {
+    const controller = ('AbortController' in window) ? new AbortController() : null;
+    QAState.abort = controller;
+    let timedOut = false;
+    const timer = controller ? setTimeout(() => {
+        timedOut = true;
+        try { controller.abort(); } catch (e) { /* 忽略重复中断 */ }
+    }, timeoutMs) : null;
+
+    try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (AppState.sessionId) headers['X-Session-Id'] = AppState.sessionId;
+        const resp = await fetch(`${API_BASE_URL}${path}`, {
+            method: 'POST',
+            headers,
+            signal: controller ? controller.signal : undefined,
+            body: JSON.stringify(body)
+        });
+        let data = null;
+        try { data = await resp.json(); } catch (e) { data = null; }
+        return { ok: resp.ok, status: resp.status, data, aborted: false, timedOut: false };
+    } catch (e) {
+        return { ok: false, status: 0, data: null, aborted: true, timedOut };
+    } finally {
+        if (timer) clearTimeout(timer);
+        if (QAState.abort === controller) QAState.abort = null;
     }
 }
 
 // ==================== SSE 流式 AI 问答 ====================
 
-async function askAgricultureStreaming(question) {
+// 返回值：'done' 已渲染完成 ｜ 'fallback' 未渲染任何内容、调用方改用非流式 ｜ 'error' 已渲染错误态
+async function askAgricultureStreaming(question, roundId, generation) {
+    const controller = ('AbortController' in window) ? new AbortController() : null;
+    QAState.abort = controller;
+
+    // 看门狗：连接卡住时（read() 永不返回）也能真正超时，而不是干等
+    let timedOut = false;
+    let watchdog = null;
+    const armWatchdog = () => {
+        if (watchdog) clearTimeout(watchdog);
+        watchdog = setTimeout(() => {
+            timedOut = true;
+            try { controller.abort(); } catch (e) { /* 忽略 */ }
+        }, QA_STREAM_TIMEOUT_MS);
+    };
+    const clearWatchdog = () => {
+        if (watchdog) clearTimeout(watchdog);
+        watchdog = null;
+        if (QAState.abort === controller) QAState.abort = null;
+    };
+
+    let response;
     try {
-        const response = await fetch(`${API_BASE_URL}/api/agriculture/ask/stream`, {
+        armWatchdog();
+        response = await fetch(`${API_BASE_URL}/api/agriculture/ask/stream`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 ...(AppState.sessionId ? { 'X-Session-Id': AppState.sessionId } : {})
             },
+            signal: controller ? controller.signal : undefined,
             body: JSON.stringify({
                 question,
                 product: AppState.currentProduct,
-                history: QAState.history.slice(-5)
+                history: qaHistoryPayload()
             })
         });
+    } catch (e) {
+        clearWatchdog();
+        if (generation !== QAState.generation) return 'error';
+        console.warn('SSE 连接未能建立，改用一次性请求:', e && e.message);
+        return 'fallback';
+    }
 
-        if (!response.ok) return false;
+    if (!response.ok) {
+        clearWatchdog();
+        if (generation !== QAState.generation) return 'error';
+        // 服务端对「未启用 / 限流 / 参数错」都会给出明确 message，直接呈现即可；
+        // 不在这里再走一次非流式（同一原因必然再次失败，白白多一次往返）。
+        let data = null;
+        try { data = await response.json(); } catch (e) { data = null; }
+        if (data && data.message) {
+            renderQaError(roundId, data.message, question);
+            return 'error';
+        }
+        // 只有「流式端点本身不存在」才值得回退到一次性请求
+        if (response.status === 404 || response.status === 405) return 'fallback';
+        renderQaError(roundId, qaStatusMessage(response.status), question);
+        return 'error';
+    }
+    if (!response.body) {
+        clearWatchdog();
+        return 'fallback';
+    }
+    // 响应到达前若已被「清空对话 / 切换作物」作废，就不要往界面上插新气泡
+    if (generation !== QAState.generation) {
+        clearWatchdog();
+        return 'error';
+    }
 
-        const msg = appendMessage('bot', '');
-        const contentEl = msg.querySelector('.msg-content');
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        let fullAnswer = '';
-        const flow = document.getElementById('qa-chat-flow');
+    const msg = appendMessage('bot', '', roundId);
+    const contentEl = qaContentEl(msg);
+    const flow = document.getElementById('qa-chat-flow');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
 
+    let buffer = '';
+    let fullAnswer = '';
+    let streamError = '';
+    let sawEvent = false;         // 是否解析出过任何 SSE 事件：区分「通道不通」与「上游失败」
+    let pendingSuggestions = [];  // done 之前到达的追问建议，随收尾一起挂出
+    let finalized = false;
+
+    // 释放「提问中」状态。按轮次判定，避免上一轮的收尾把新一轮的忙碌态清掉。
+    const releaseBusy = () => {
+        if (QAState.activeRound !== roundId) return;
+        QAState.activeRound = null;
+        QAState.isTyping = false;
+        setQaBusy(false);
+    };
+
+    // 统一收尾：渲染正文 → 写历史 → 挂操作按钮 → 再挂本轮追问建议。
+    const finalize = (answer, opts) => {
+        if (finalized || generation !== QAState.generation) return false;
+        finalized = true;
+        if (contentEl) contentEl.innerHTML = formatAnswer(answer)
+            + (opts && opts.interrupted ? qaInterruptNoteHtml() : '');
+        finishQaRound(roundId, question, answer, pendingSuggestions, opts);
+        pendingSuggestions = [];
+        releaseBusy();
+        return true;
+    };
+
+    try {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-
+            armWatchdog();
             buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
 
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.slice(6));
-                        fullAnswer += data.content;
-                        contentEl.innerHTML = formatAnswer(fullAnswer);
-                        if (flow) flow.scrollTop = flow.scrollHeight;
-                    } catch (e) { /* 跳过解析失败的行 */ }
-                } else if (line.startsWith('event: error')) {
-                    return false;
+            // 按空行切分完整 SSE 块：一个块里的 event 与 data 必须一起解析，
+            // 否则 error 事件与其 message 会被拆散
+            let sep;
+            while ((sep = buffer.indexOf('\n\n')) !== -1) {
+                const block = buffer.slice(0, sep);
+                buffer = buffer.slice(sep + 2);
+                if (!block.trim()) continue;
+                sawEvent = true;
+
+                const parsed = parseSseBlock(block);
+                if (parsed.event === 'error') {
+                    // 错误类型以服务端下发的 code 为准，不再靠中文文案正则猜测
+                    const errPayload = ssePayload(parsed.data);
+                    streamError = (errPayload && errPayload.message)
+                        || 'AI 服务暂时不可用，请稍后重试';
+                    break;
                 }
+                if (parsed.event === 'done') {
+                    // 正文已完整：立即收尾并放开输入框，不必等追问建议生成完。
+                    // 此后仍继续读取，以便接住随后的 suggestions 事件。
+                    finalize(fullAnswer);
+                    continue;
+                }
+                if (parsed.event === 'suggestions') {
+                    try {
+                        const payload = JSON.parse(parsed.data);
+                        const list = payload && payload.suggestions;
+                        if (Array.isArray(list) && list.length && generation === QAState.generation) {
+                            // 已收尾则直接挂出（按钮仍在前）；未收尾则并入收尾时一起挂
+                            if (finalized) appendSuggestions(list, roundId);
+                            else pendingSuggestions = pendingSuggestions.concat(list);
+                        }
+                    } catch (e) { /* 忽略结构异常的建议 */ }
+                    continue;
+                }
+                try {
+                    const payload = JSON.parse(parsed.data);
+                    if (payload && typeof payload.content === 'string' && payload.content) {
+                        fullAnswer += payload.content;
+                        if (contentEl) contentEl.innerHTML = formatAnswer(fullAnswer);
+                        if (flow) flow.scrollTop = flow.scrollHeight;
+                    }
+                } catch (e) { /* 跳过无法解析的数据块 */ }
             }
+            if (streamError) break;
         }
-
-        // 流式完成
-        QAState.lastAnswer = fullAnswer;
-        QAState.history.push({ question, answer: fullAnswer });
-        if (QAState.history.length > QAState.maxHistory) QAState.history.shift();
-        contentEl.innerHTML = formatAnswer(fullAnswer);
-
-        // 操作按钮
-        appendActions(fullAnswer);
-
-        // 更新底部建议
-        refreshSuggestions(AppState.currentProduct);
-
-        return true;
     } catch (e) {
-        console.warn('SSE流式失败，回退到普通请求:', e.message);
-        return false;
+        streamError = timedOut
+            ? 'AI 响应超时，请重试'
+            : (e && e.name === 'AbortError' ? '请求已取消' : 'AI 服务连接中断，请重试');
+    } finally {
+        clearWatchdog();
+        try { reader.cancel(); } catch (e) { /* 忽略 */ }
+    }
+
+    // 已被「清空对话 / 切换作物」作废：丢弃结果，绝不写入界面
+    if (generation !== QAState.generation) return 'error';
+
+    // 正文已在 done 事件处收尾：此后（追问建议阶段）的连接中断不影响本轮结果
+    if (finalized) return 'done';
+
+    if (streamError) {
+        if (fullAnswer.trim()) {
+            // 已经流出的内容保留，把中断原因补在气泡内，避免整段回答凭空消失
+            finalize(fullAnswer, { interrupted: true });
+        } else {
+            // 上游已经报错：再走一次非流式必然同样失败，只会让用户多等一个超时
+            removeQaBotOutput(roundId);
+            renderQaError(roundId, streamError, question);
+        }
+        return 'error';
+    }
+
+    // 上游「成功但没有任何内容」也是失败，绝不能留下一个空气泡
+    if (!fullAnswer.trim()) {
+        removeQaBotOutput(roundId);
+        // 一个事件都没收到 → 流式通道不通（代理缓冲/截断），值得回退到一次性请求；
+        // 收到过事件却始终没有正文 → 上游确实没产出，直接呈现错误态，不再重试一次。
+        if (!sawEvent) return 'fallback';
+        renderQaError(roundId, 'AI 服务未返回内容，请重试', question);
+        return 'error';
+    }
+
+    finalize(fullAnswer);
+    return 'done';
+}
+
+// 极简 SSE 块解析：一个块内可能同时存在 event 行与 data 行
+function parseSseBlock(block) {
+    let event = 'message';
+    const dataLines = [];
+    block.split('\n').forEach(line => {
+        if (line.indexOf('event:') === 0) {
+            event = line.slice(6).trim();
+        } else if (line.indexOf('data:') === 0) {
+            dataLines.push(line.slice(5).replace(/^ /, ''));
+        }
+    });
+    return { event, data: dataLines.join('\n') };
+}
+
+// 解析 SSE 的 data 段为对象。错误事件里同时带 code 与 message，
+// 调用方按 code 判定类型，不再依赖 message 的中文措辞。
+function ssePayload(data) {
+    try {
+        const payload = JSON.parse(data);
+        return (payload && typeof payload === 'object') ? payload : null;
+    } catch (e) {
+        return null;
     }
 }
 
-function escapeHtml(text) {
-    const d = document.createElement('div');
-    d.textContent = text;
-    return d.innerHTML;
+function qaInterruptNoteHtml() {
+    return '<div class="qa-inline-note">回答在中途中断，以上为已生成的内容。</div>';
 }
 
 function formatAnswer(text) {
-    // 简单markdown-like格式化
-    return text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    // 关键：先整体转义，再套格式。
+    // 否则模型输出里的 < & 等会被浏览器当成 HTML 解析（此前的实现存在注入面）。
+    const safe = escapeHtml(String(text == null ? '' : text));
+    return safe
+        .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
         .replace(/\n/g, '<br>')
-        .replace(/(\d+)\./g, '<br>$1.')
-        .replace(/- /g, '<br>- ');
+        // 只把「行首的编号」当列表项；负向断言排除 "3.5"、"10.5公斤" 这类小数被误断行
+        .replace(/(^|<br>)\s*(\d{1,2})[.、](?!\d)\s*/g, '$1$2. ')
+        .replace(/(^|<br>)\s*[-•·]\s+/g, '$1- ');
 }
 
 // ==================== 农时日历 ====================
 
+// 任务分类配色（与后端 tasks[].category 对应）
+const FARMING_CATEGORY_COLORS = {
+    fertilize: '#1f5e43',
+    pest: '#ef4444',
+    harvest: '#d9a227',
+    manage: '#4a6fa5',
+    water: '#4a8a6a'
+};
+
+// 当前渲染的日历接口数据（供格子点击弹窗复用）
+let farmingCalendarData = null;
+// 并发请求序号，避免快速翻月时旧响应覆盖新响应
+let farmingCalendarReqSeq = 0;
+// 当前用户已订阅的作物 id 列表（供「订阅提醒」摘要条同步显示，不依赖全站通知链路）
+let farmingSubscribedIds = [];
+
 function setupCalendar() {
     document.getElementById('prev-month')?.addEventListener('click', () => {
-        AppState.calendarMonth--;
-        if (AppState.calendarMonth < 0) { AppState.calendarMonth = 11; AppState.calendarYear--; }
+        AppState.calendarMonth = (AppState.calendarMonth + 11) % 12;
         updateFarmingCalendar();
     });
 
     document.getElementById('next-month')?.addEventListener('click', () => {
-        AppState.calendarMonth++;
-        if (AppState.calendarMonth > 11) { AppState.calendarMonth = 0; AppState.calendarYear++; }
+        AppState.calendarMonth = (AppState.calendarMonth + 1) % 12;
         updateFarmingCalendar();
     });
 
-    updateFarmingCalendar();
-}
+    document.getElementById('farming-subscribe-btn')?.addEventListener('click', toggleFarmingSubscription);
 
-function updateFarmingCalendar() {
-    const calendarGrid = document.getElementById('calendar-grid');
-    const taskList = document.getElementById('farming-task-list');
-    const monthLabel = document.getElementById('current-month');
-    if (!calendarGrid) return;
-
-    const year = AppState.calendarYear;
-    const month = AppState.calendarMonth;
-    const today = new Date();
-
-    if (monthLabel) monthLabel.textContent = `${year}年${month + 1}月`;
-
-    // 生成日历
-    let html = '';
-    const days = ['日', '一', '二', '三', '四', '五', '六'];
-    days.forEach(d => {
-        html += `<div class="calendar-header">${d}</div>`;
+    // 展开/收起「数据依据」来源清单
+    document.getElementById('farming-date-notice-toggle')?.addEventListener('click', function () {
+        const listEl = document.getElementById('farming-date-notice-sources');
+        if (!listEl) return;
+        const hidden = listEl.classList.toggle('is-hidden');
+        this.setAttribute('aria-expanded', hidden ? 'false' : 'true');
     });
 
+    updateFarmingCalendar();
+    syncFarmingSubscriptionButton();
+}
+
+async function updateFarmingCalendar() {
+    const calendarGrid = document.getElementById('calendar-grid');
+    const taskList = document.getElementById('farming-task-list');
+    if (!calendarGrid) return;
+
+    const month = AppState.calendarMonth;              // 0-indexed
+    const product = AppState.currentProduct || 'lychee';
+    const monthLabel = document.getElementById('current-month');
+
+    if (monthLabel) monthLabel.textContent = `${month + 1}月`;
+
+    // 加载态（避免请求期间白屏）
+    calendarGrid.innerHTML = '<div class="calendar-loading">农事数据加载中…</div>';
+    if (taskList) showSkeleton(taskList, 'row', 2);
+
+    const seq = ++farmingCalendarReqSeq;
+    let data;
+    try {
+        // 不传 year：由后端按服务器当前年计算节气（年周期模板，逐年复现）
+        data = await apiCall(`/api/agriculture/calendar/${encodeURIComponent(product)}?month=${month + 1}`);
+    } catch (e) {
+        if (seq !== farmingCalendarReqSeq) return;
+        farmingCalendarData = null;
+        hideFarmingNotices();
+        showErrorState(calendarGrid, '农事数据加载失败，请重试', () => updateFarmingCalendar());
+        if (taskList) showErrorState(taskList, '农事数据加载失败，请重试', () => updateFarmingCalendar());
+        return;
+    }
+    if (seq !== farmingCalendarReqSeq) return;          // 已有更新的请求，丢弃本次
+    if (!data || !data.success) {
+        farmingCalendarData = null;
+        hideFarmingNotices();
+        showErrorState(calendarGrid, (data && data.message) || '农事数据加载失败，请重试', () => updateFarmingCalendar());
+        if (taskList) taskList.innerHTML = '';
+        return;
+    }
+    farmingCalendarData = data;
+
+    // 数据依据入口：仅在有来源可列时挂出，点击展开该作物全年来源方向（不放说明性文案）
+    renderFarmingDateNotice(data);
+
+    const year = data.year;
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
 
-    // 填充前置空格
-    for (let i = 0; i < firstDay; i++) html += '<div class="calendar-day"></div>';
+    // 按日聚合：节气 + 任务
+    const termByDay = {};
+    (data.solar_terms || []).forEach(t => { termByDay[t.day] = t.name; });
+    const tasksByDay = {};
+    (data.tasks || []).forEach(t => {
+        if (t.day) (tasksByDay[t.day] = tasksByDay[t.day] || []).push(t);
+    });
+    const datedCount = (data.tasks || []).filter(t => t.day).length;
+    const undatedCount = (data.tasks || []).filter(t => !t.day).length;
 
-    // 有农事任务的日期
-    const taskDays = [5, 10, 15, 20, 25];
+    let html = '';
+    ['日', '一', '二', '三', '四', '五', '六'].forEach(d => {
+        html += `<div class="calendar-header">${d}</div>`;
+    });
+    for (let i = 0; i < firstDay; i++) html += '<div class="calendar-day is-blank"></div>';
+
     for (let d = 1; d <= daysInMonth; d++) {
+        const dayTasks = tasksByDay[d] || [];
         const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
-        const hasTask = taskDays.includes(d);
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const term = SOLAR_TERMS[dateStr];
-        let cls = 'calendar-day';
-        if (hasTask) cls += ' has-task';
-        if (isToday) cls += ' today';
-        const marker = term ? `<span class="lunar-marker">${term}</span>` : '';
-        html += `<div class="${cls}">${d}${marker}</div>`;
+        const cls = ['calendar-day'];
+        if (dayTasks.length) cls.push('is-clickable');
+        if (isToday) cls.push('today');
+
+        const dots = dayTasks.slice(0, 3).map(t =>
+            `<span class="day-dot" style="background:${FARMING_CATEGORY_COLORS[t.category] || '#4a6fa5'}"></span>`
+        ).join('');
+        const term = termByDay[d] ? `<span class="lunar-marker">${escapeHtml(termByDay[d])}</span>` : '';
+
+        html += `<div class="${cls.join(' ')}"${dayTasks.length ? ` data-day="${d}" role="button" tabindex="0" aria-label="${d}日，${dayTasks.length}项农事"` : ''}>`
+              + `<span class="day-num">${d}</span>`
+              + (dots ? `<span class="day-dots">${dots}</span>` : '')
+              + term
+              + `</div>`;
     }
+    // 整月只有持续性作业（无固定日期）：格子层给出明确说明，避免「一片空白」被误读为数据缺失
+    if (datedCount === 0 && undatedCount > 0) {
+        html += '<div class="calendar-blank-notice">'
+              + '<strong>本月无固定日期农事</strong><br>'
+              + `该作物本月为持续性作业（如水分管理），共 ${undatedCount} 项，详见右侧「本月农事要点」。`
+              + '</div>';
+    }
+    if (!calendarGrid) return;
     calendarGrid.innerHTML = html;
 
-    // 更新农事任务
-    if (taskList) {
-        const month = AppState.calendarMonth; // 0-indexed
-        const tasks = getFarmingTasks(AppState.currentProduct, month);
-        taskList.innerHTML = tasks.map((t, i) => {
-            const colors = { fertilize: '#10b981', pest: '#ef4444', harvest: '#f59e0b', manage: '#3b82f6', water: '#06b6d4' };
-            const color = colors[t.category] || colors.manage;
-            return `
-            <div class="task-item task-item-rich" style="--task-color: ${color}" data-idx="${i}">
-                <div class="task-header">
-                    <div class="task-icon-wrap" style="background: ${color}15; color: ${color}">
-                        <i class="fas ${t.icon}"></i>
-                    </div>
-                    <div class="task-meta">
-                        <h5>${t.title}</h5>
-                        <div class="task-tags">
-                            <span class="task-tag tag-category" style="background: ${color}18; color: ${color}">${t.categoryLabel}</span>
-                            ${t.priority === 'high' ? '<span class="task-tag tag-urgent"><i class="fas fa-fire"></i> 紧急</span>' : ''}
-                            <span class="task-tag tag-timing"><i class="far fa-clock"></i> ${t.timing}</span>
-                        </div>
-                    </div>
-                    <button class="task-expand-btn" aria-label="展开详情"><i class="fas fa-chevron-down"></i></button>
-                </div>
-                <p class="task-desc">${t.description}</p>
-                <div class="task-detail">
-                    <div class="task-tips">
-                        <i class="fas fa-lightbulb"></i>
-                        <span>${t.tip}</span>
-                    </div>
-                </div>
-            </div>
-            `;
-        }).join('');
+    // 物候期主题色：注入 CSS 变量供格子与色条使用
+    const phase = data.phenophase_current;
+    if (phase && phase.color) {
+        calendarGrid.style.setProperty('--phase-color', phase.color);
+        calendarGrid.classList.add('has-phase');
+    } else {
+        calendarGrid.style.removeProperty('--phase-color');
+        calendarGrid.classList.remove('has-phase');
+    }
+    renderPhenophaseBar(phase);
 
-        // 展开/折叠
-        taskList.querySelectorAll('.task-expand-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const item = this.closest('.task-item-rich');
-                item.classList.toggle('expanded');
-            });
+    // 格子点击 → 当日任务弹窗（键盘可达）
+    calendarGrid.querySelectorAll('.calendar-day.is-clickable').forEach(cell => {
+        const open = () => showDayTasksModal(parseInt(cell.dataset.day, 10));
+        cell.addEventListener('click', open);
+        cell.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
         });
+    });
+
+    renderFarmingTaskList(taskList, data);
+    renderFarmingReminderSummary(data);
+}
+
+// 加载失败时收起农时日历内的提示条，避免残留过期提示
+function hideFarmingNotices() {
+    document.getElementById('farming-date-notice')?.classList.add('is-hidden');
+    document.getElementById('farming-reminder-summary')?.classList.add('is-hidden');
+}
+
+// 数据依据入口：点击可展开该作物全年用到的来源方向（机构 · 文件类型 · 文号）。
+// 设计取舍：**不再放任何说明性句子**，只保留可展开的来源清单；
+// 「日期为参考值」这层意思由日期标签的「约」前缀与当日弹窗的说明承担。
+// 兜底：后端未返回 sources_all（如服务端仍是旧版本）时整条收起，避免出现「本月 0 项」这类伪计数。
+function renderFarmingDateNotice(data) {
+    const notice = document.getElementById('farming-date-notice');
+    if (!notice) return;
+    const toggle = document.getElementById('farming-date-notice-toggle');
+    const listEl = document.getElementById('farming-date-notice-sources');
+
+    if (!data || !data.success || !toggle || !listEl) {
+        notice.classList.add('is-hidden');
+        return;
+    }
+
+    const sources = data.sources_all || [];
+    if (!sources.length) {
+        notice.classList.add('is-hidden');
+        listEl.innerHTML = '';
+        listEl.classList.add('is-hidden');
+        toggle.setAttribute('aria-expanded', 'false');
+        return;
+    }
+
+    notice.classList.remove('is-hidden');
+    toggle.classList.remove('is-hidden');
+    // 来源清单按数量做一次渲染缓存，避免翻月时重建 DOM 导致已展开状态丢失
+    if (listEl.dataset.rendered !== String(sources.length)) {
+        listEl.innerHTML = sources.map(s => {
+            const docNo = s.doc_no || '待核';
+            const link = s.url
+                ? ` <a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">查验</a>`
+                : '';
+            return `<li>`
+                 + `<span class="fdn-src-name">${escapeHtml(s.name || '')}</span>`
+                 + `<span class="fdn-src-meta">${escapeHtml(s.org || '')} · ${escapeHtml(s.doc_type || '')} · 文号：${escapeHtml(docNo)}${link}</span>`
+                 + `</li>`;
+        }).join('');
+        listEl.dataset.rendered = String(sources.length);
+        listEl.classList.add('is-hidden');
+        toggle.setAttribute('aria-expanded', 'false');
     }
 }
 
-function getFarmingTasks(product, month) {
-    const monthNames = ['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
-    const timing = (m) => monthNames[m] || monthNames[month];
+// 「订阅提醒」摘要条（农时日历内闭环）。
+// 设计取舍：不写 AppState.currentUser、不动 updateBadgeCount / loadNotifications，
+// 仅用当前已加载的日历数据 + 订阅状态在本区块内给出可见反馈，
+// 让「订阅后按月收到提醒」这条决策在农时日历里有落点，同时不触碰全站通知链路。
+function renderFarmingReminderSummary(data) {
+    const box = document.getElementById('farming-reminder-summary');
+    if (!box) return;
+    if (!data || !data.success) { box.classList.add('is-hidden'); return; }
 
-    const allTasks = {
-        lychee: {
-            0: [
-                { title: '冬季清园', icon: 'broom', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(0), description: '清除落叶、病枝，集中烧毁，减少越冬病虫源', tip: '清园后喷施3-5波美度石硫合剂，杀灭越冬病菌' },
-                { title: '树干涂白', icon: 'paint-roller', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(0), description: '用石灰水涂白树干，防冻防虫', tip: '涂白高度至第一主枝，石灰中可加入少量硫磺粉' }
-            ],
-            1: [
-                { title: '促花肥施用', icon: 'seedling', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(1), description: '施用速效磷钾肥，促进花芽分化', tip: '每株施复合肥0.5-1公斤，配合有机肥效果更佳' },
-                { title: '花前病虫害预防', icon: 'shield-virus', category: 'pest', categoryLabel: '植保', priority: 'high', timing: timing(1), description: '重点防治霜疫霉病、荔枝蝽蟓', tip: '花前喷施一次杀菌剂+杀虫剂组合' }
-            ],
-            2: [
-                { title: '花期管理', icon: 'spa', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(2), description: '放蜂授粉，遇连续阴雨需人工辅助授粉', tip: '花期忌喷农药，如需防治请在花前完成' },
-                { title: '保花保果', icon: 'hand-holding-heart', category: 'fertilize', categoryLabel: '施肥', priority: 'medium', timing: timing(2), description: '喷施磷酸二氢钾+硼肥，提高坐果率', tip: '浓度0.2%磷酸二氢钾+0.1%硼砂，花期喷2次' }
-            ],
-            3: [
-                { title: '果实膨大期', icon: 'apple-alt', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(3), description: '施壮果肥，保持充足水分供应', tip: '每株施硫酸钾0.5公斤，配合灌水' },
-                { title: '蒂蛀虫防治', icon: 'bug', category: 'pest', categoryLabel: '植保', priority: 'high', timing: timing(3), description: '果实发育期重点防治蒂蛀虫', tip: '成虫羽化高峰期喷药，选用高效氯氰菊酯' }
-            ],
-            4: [
-                { title: '果实转色管理', icon: 'palette', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(4), description: '控制氮肥，增施钾肥促进着色', tip: '转色期减少灌水，提高果实甜度' },
-                { title: '排水防裂果', icon: 'tint', category: 'water', categoryLabel: '水分', priority: 'high', timing: timing(4), description: '果实成熟期遇暴雨易裂果，注意排水', tip: '雨后及时排水，可覆盖地膜减少水分波动' }
-            ],
-            5: [
-                { title: '荔枝采收', icon: 'shopping-basket', category: 'harvest', categoryLabel: '采收', priority: 'high', timing: timing(5), description: '适时采收成熟果实，分批采摘', tip: '果皮转红2/3时采收，保留果穗枝保证品质' },
-                { title: '采后修剪', icon: 'cut', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(5), description: '采果后进行回缩修剪，保持树冠通风', tip: '修剪量不超过树冠的1/3，保留内膛枝' }
-            ],
-            6: [
-                { title: '施用恢复肥', icon: 'fill-drip', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(6), description: '采果后重施有机肥，恢复树势', tip: '每株施有机肥10-20公斤+复合肥1公斤' },
-                { title: '秋梢管理', icon: 'tree', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(6), description: '培养健壮秋梢，为来年结果打基础', tip: '统一放梢，抹除零星早发的芽' }
-            ],
-            7: [
-                { title: '秋梢病虫防治', icon: 'shield-virus', category: 'pest', categoryLabel: '植保', priority: 'medium', timing: timing(7), description: '保护新梢，防治尺蠖、卷叶蛾', tip: '新梢萌发1-2厘米时喷第一次药' },
-                { title: '水分管理', icon: 'tint', category: 'water', categoryLabel: '水分', priority: 'medium', timing: timing(7), description: '秋梢生长期保持充足水分', tip: '干旱时及时灌水，每7-10天一次' }
-            ],
-            8: [
-                { title: '控梢促花', icon: 'hand-paper', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(8), description: '末次秋梢老熟后开始控梢', tip: '可采用环割或喷施控梢药剂' },
-                { title: '深翻改土', icon: 'mountain', category: 'manage', categoryLabel: '管理', priority: 'low', timing: timing(8), description: '结合施有机肥进行深翻改土', tip: '深翻30-40厘米，断根促发新根' }
-            ],
-            9: [
-                { title: '花芽分化期', icon: 'seedling', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(9), description: '控制氮肥，增施磷钾肥促进花芽分化', tip: '叶面喷施0.3%磷酸二氢钾' },
-                { title: '冬季清园准备', icon: 'broom', category: 'manage', categoryLabel: '管理', priority: 'low', timing: timing(9), description: '清理果园杂草，准备冬季管理', tip: '清除园内杂草和落叶，减少病虫越冬场所' }
-            ],
-            10: [
-                { title: '冬季修剪', icon: 'cut', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(10), description: '疏除过密枝、交叉枝、病虫枝', tip: '修剪后涂抹伤口愈合剂' },
-                { title: '防寒措施', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(10), description: '幼树覆盖防寒，树盘覆草', tip: '低温来临前树冠覆盖薄膜' }
-            ],
-            11: [
-                { title: '冬季清园', icon: 'broom', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(11), description: '全面清园，喷施石硫合剂', tip: '落叶后全园喷施3-5波美度石硫合剂' },
-                { title: '施基肥', icon: 'fill-drip', category: 'fertilize', categoryLabel: '施肥', priority: 'medium', timing: timing(11), description: '深施有机肥改良土壤', tip: '沿树冠滴水线开沟施肥，深度30-40厘米' }
-            ]
-        },
-        longan: {
-            0: [{ title: '冬季管理', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(0), description: '清园修剪，防寒防冻', tip: '喷施石硫合剂清园' }],
-            1: [{ title: '促花肥', icon: 'seedling', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(1), description: '施磷钾肥促花', tip: '每株施复合肥0.5公斤' }],
-            2: [{ title: '花穗管理', icon: 'spa', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(2), description: '疏花穗，去除弱花', tip: '保留60-70%花穗' }],
-            3: [{ title: '保果措施', icon: 'hand-holding-heart', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(3), description: '喷施保果药剂', tip: '谢花后喷九二零+磷酸二氢钾' }],
-            4: [{ title: '果实膨大', icon: 'apple-alt', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(4), description: '加强水肥管理', tip: '施壮果肥，保持水分' }],
-            5: [{ title: '龙眼采收', icon: 'shopping-basket', category: 'harvest', categoryLabel: '采收', priority: 'high', timing: timing(5), description: '适时采收', tip: '果壳转黄、果肉饱满时采收' }],
-            6: [{ title: '采后管理', icon: 'cut', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(6), description: '修剪+施恢复肥', tip: '采后尽快施肥恢复树势' }],
-            7: [{ title: '秋梢管理', icon: 'tree', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(7), description: '培养健壮秋梢', tip: '统一放梢，防治新梢害虫' }],
-            8: [{ title: '控梢', icon: 'hand-paper', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(8), description: '控制冬梢萌发', tip: '环割或喷控梢药剂' }],
-            9: [{ title: '花芽分化', icon: 'seedling', category: 'fertilize', categoryLabel: '施肥', priority: 'medium', timing: timing(9), description: '促进花芽分化', tip: '控氮增磷钾' }],
-            10: [{ title: '冬季修剪', icon: 'cut', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(10), description: '修剪整形', tip: '疏除密枝病枝' }],
-            11: [{ title: '清园施肥', icon: 'broom', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(11), description: '冬季清园+施基肥', tip: '有机肥深施改土' }]
-        },
-        aquatic: {
-            0: [{ title: '越冬管理', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(0), description: '保持水温，减少投喂', tip: '加深水位至2米以上保温' }],
-            1: [{ title: '清塘消毒', icon: 'broom', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(1), description: '干塘暴晒，生石灰消毒', tip: '每亩用生石灰75-100公斤' }],
-            2: [{ title: '放苗准备', icon: 'fish', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(2), description: '培水、试水、放苗', tip: '水温稳定15℃以上再放苗' }],
-            3: [{ title: '水质调控', icon: 'tint', category: 'water', categoryLabel: '水分', priority: 'high', timing: timing(3), description: '保持水质稳定', tip: '每7-10天换水一次，每次换1/3' }],
-            4: [{ title: '投喂管理', icon: 'utensils', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(4), description: '根据天气调整投喂量', tip: '阴雨天减量或停喂' }],
-            5: [{ title: '高温防缺氧', icon: 'temperature-high', category: 'water', categoryLabel: '水分', priority: 'high', timing: timing(5), description: '开启增氧机，预防泛塘', tip: '中午和凌晨各开增氧机2-3小时' }],
-            6: [{ title: '病害高发防控', icon: 'shield-virus', category: 'pest', categoryLabel: '植保', priority: 'high', timing: timing(6), description: '高温期病害频发', tip: '定期消毒，拌喂大蒜素预防' }],
-            7: [{ title: '轮捕轮放', icon: 'fishing', category: 'harvest', categoryLabel: '采收', priority: 'medium', timing: timing(7), description: '达到规格的及时捕捞', tip: '降低密度有利于剩余个体生长' }],
-            8: [{ title: '秋季管理', icon: 'leaf', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(8), description: '调整投喂，预防秋瘟', tip: '水温下降时逐步减少投喂量' }],
-            9: [{ title: '越冬准备', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(9), description: '加深水位，减少操作', tip: '达到商品规格的抓紧起捕上市' }],
-            10: [{ title: '干塘起捕', icon: 'fishing', category: 'harvest', categoryLabel: '采收', priority: 'high', timing: timing(10), description: '年底干塘起捕', tip: '捕后清塘消毒准备来年' }],
-            11: [{ title: '设备维护', icon: 'tools', category: 'manage', categoryLabel: '管理', priority: 'low', timing: timing(11), description: '维修增氧机、投饲机', tip: '利用空闲期检修养殖设备' }]
-        },
-        rice: {
-            0: [{ title: '冬闲田管理', icon: 'mountain', category: 'manage', categoryLabel: '管理', priority: 'low', timing: timing(0), description: '翻耕冬闲田，晒田风化', tip: '深翻20-25厘米，利用低温杀灭越冬虫源' }],
-            1: [{ title: '浸种催芽', icon: 'seedling', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(1), description: '早稻浸种催芽', tip: '温水浸种48小时，保持30-35℃催芽' }],
-            2: [{ title: '播种育秧', icon: 'seedling', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(2), description: '适时播种，培育壮秧', tip: '秧田施足基肥，控制播种量' }],
-            3: [{ title: '移栽', icon: 'exchange-alt', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(3), description: '适时移栽，合理密植', tip: '株行距20×25厘米，每穴2-3苗' }],
-            4: [{ title: '分蘖期管理', icon: 'tree', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(4), description: '追施分蘖肥，促进早发', tip: '移栽后7-10天追施尿素10公斤/亩' }],
-            5: [{ title: '晒田控苗', icon: 'sun', category: 'water', categoryLabel: '水分', priority: 'high', timing: timing(5), description: '排水晒田，控制无效分蘖', tip: '田面出现鸡爪裂时复水' }],
-            6: [{ title: '穗肥施用', icon: 'fill-drip', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(6), description: '幼穗分化期施穗肥', tip: '每亩施复合肥5-8公斤' }],
-            7: [{ title: '稻飞虱防治', icon: 'bug', category: 'pest', categoryLabel: '植保', priority: 'high', timing: timing(7), description: '重点防治稻飞虱、纹枯病', tip: '选用吡蚜酮+井冈霉素组合' }],
-            8: [{ title: '抽穗扬花', icon: 'spa', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(8), description: '保持浅水层，遇寒露风灌深水保温', tip: '喷施磷酸二氢钾提高结实率' }],
-            9: [{ title: '灌浆结实', icon: 'apple-alt', category: 'water', categoryLabel: '水分', priority: 'medium', timing: timing(9), description: '干湿交替灌溉', tip: '收割前7天断水，便于机收' }],
-            10: [{ title: '晚稻收割', icon: 'shopping-basket', category: 'harvest', categoryLabel: '采收', priority: 'high', timing: timing(10), description: '适时收割晚稻', tip: '九成黄时收割，减少落粒损失' }],
-            11: [{ title: '稻草还田', icon: 'recycle', category: 'manage', categoryLabel: '管理', priority: 'low', timing: timing(11), description: '稻草粉碎还田改良土壤', tip: '配合施氮肥加速分解' }]
-        },
-        tea: {
-            0: [{ title: '冬季封园', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(0), description: '喷施石硫合剂封园', tip: '全园喷施0.5波美度石硫合剂' }],
-            1: [{ title: '施催芽肥', icon: 'seedling', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(1), description: '施速效氮肥催芽', tip: '每亩施尿素15-20公斤' }],
-            2: [{ title: '春茶准备', icon: 'mug-hot', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(2), description: '检修制茶设备，准备采摘', tip: '提前联系采茶工，春茶季用工紧张' }],
-            3: [{ title: '春茶采摘', icon: 'hand-paper', category: 'harvest', categoryLabel: '采收', priority: 'high', timing: timing(3), description: '采摘一芽一叶或一芽二叶', tip: '晴天上午露水干后采摘品质最佳' }],
-            4: [{ title: '茶园修剪', icon: 'cut', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(4), description: '春茶后轻修剪', tip: '剪去3-5厘米，促进夏芽萌发' }],
-            5: [{ title: '夏茶管理', icon: 'temperature-high', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(5), description: '遮阳降温，防治虫害', tip: '覆盖遮阳网减少高温灼伤' }],
-            6: [{ title: '小绿叶蝉防治', icon: 'bug', category: 'pest', categoryLabel: '植保', priority: 'high', timing: timing(6), description: '防治茶小绿叶蝉', tip: '黄板诱杀+生物农药防治' }],
-            7: [{ title: '秋茶采摘', icon: 'hand-paper', category: 'harvest', categoryLabel: '采收', priority: 'medium', timing: timing(7), description: '采摘秋茶', tip: '秋茶香气好，可制作高香型茶' }],
-            8: [{ title: '施基肥', icon: 'fill-drip', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(8), description: '重施有机基肥', tip: '沿树冠滴水线开沟深施' }],
-            9: [{ title: '秋季修剪', icon: 'cut', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(9), description: '茶树深修剪或重修剪', tip: '衰老茶树可重度修剪更新' }],
-            10: [{ title: '清园管理', icon: 'broom', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(10), description: '清理茶园杂草落叶', tip: '深翻土壤破坏害虫越冬场所' }],
-            11: [{ title: '防寒防冻', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(11), description: '茶树根部培土覆盖', tip: '铺草覆盖保温保湿' }]
-        },
-        vegetable: {
-            0: [{ title: '大棚育苗', icon: 'seedling', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(0), description: '利用大棚培育早春蔬菜苗', tip: '保持棚内温度15-25℃' }],
-            1: [{ title: '整地施基肥', icon: 'mountain', category: 'fertilize', categoryLabel: '施肥', priority: 'high', timing: timing(1), description: '深翻土地，施足基肥', tip: '每亩施有机肥2000-3000公斤' }],
-            2: [{ title: '春季定植', icon: 'exchange-alt', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(2), description: '瓜果类蔬菜定植', tip: '选择晴天下午定植，浇足定根水' }],
-            3: [{ title: '田间管理', icon: 'leaf', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(3), description: '搭架引蔓、整枝打杈', tip: '及时搭架引蔓防止倒伏' }],
-            4: [{ title: '病虫害防治', icon: 'shield-virus', category: 'pest', categoryLabel: '植保', priority: 'high', timing: timing(4), description: '防治蚜虫、白粉病', tip: '优先使用黄板+生物农药' }],
-            5: [{ title: '夏季遮阳', icon: 'umbrella-beach', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(5), description: '覆盖遮阳网降温', tip: '遮光率50-60%的遮阳网' }],
-            6: [{ title: '灌溉管理', icon: 'tint', category: 'water', categoryLabel: '水分', priority: 'high', timing: timing(6), description: '早晚灌溉，避免中午浇水', tip: '滴灌或喷灌节水高效' }],
-            7: [{ title: '秋播准备', icon: 'seedling', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(7), description: '准备秋播蔬菜种子和育苗', tip: '选择耐热品种进行秋播' }],
-            8: [{ title: '秋季定植', icon: 'exchange-alt', category: 'manage', categoryLabel: '管理', priority: 'high', timing: timing(8), description: '叶菜类、根菜类定植', tip: '适当密植提高产量' }],
-            9: [{ title: '采收上市', icon: 'shopping-basket', category: 'harvest', categoryLabel: '采收', priority: 'high', timing: timing(9), description: '秋季蔬菜大量上市', tip: '适时采收保证品质和口感' }],
-            10: [{ title: '大棚蔬菜管理', icon: 'warehouse', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(10), description: '覆盖大棚膜，保温促长', tip: '注意通风排湿预防灰霉病' }],
-            11: [{ title: '越冬蔬菜管理', icon: 'snowflake', category: 'manage', categoryLabel: '管理', priority: 'medium', timing: timing(11), description: '加强保温，减少通风', tip: '多层覆盖保温，寒潮时加温' }]
-        }
-    };
+    const pid = (data.product && data.product.id) || AppState.currentProduct;
+    const subscribed = farmingSubscribedIds.indexOf(pid) !== -1;
+    const tasks = data.tasks || [];
+    const urgent = tasks.filter(t => t.priority === 'high').length;
 
-    const productTasks = allTasks[product] || allTasks.lychee;
-    return productTasks[month] || productTasks[0] || [];
+    if (!AppState.user) {
+        box.classList.remove('is-hidden');
+        box.innerHTML = `<i class="fas fa-bell"></i>`
+            + `<span>登录后可订阅「<span class="frs-strong">${escapeHtml((data.product && data.product.name) || '')}</span>」，登录时会补发当月已到期的农事提醒。</span>`;
+        return;
+    }
+
+    if (!subscribed) {
+        box.classList.remove('is-hidden');
+        box.innerHTML = `<i class="far fa-bell"></i>`
+            + `<span>尚未订阅「<span class="frs-strong">${escapeHtml((data.product && data.product.name) || '')}</span>」。`
+            + `点击右侧「订阅本作物」，登录时会补发当月已到期的农事提醒。</span>`;
+        return;
+    }
+
+    box.classList.remove('is-hidden');
+    box.innerHTML = `<i class="fas fa-bell"></i>`
+        + `<span>已订阅「<span class="frs-strong">${escapeHtml((data.product && data.product.name) || '')}</span>」·`
+        + `本月共 <span class="frs-strong">${tasks.length}</span> 项农事`
+        + (urgent ? `，其中 <span class="frs-urgent">${urgent} 项紧急</span>` : '')
+        + `。登录时会补发当月已到期的提醒，可在消息中心查看。</span>`;
 }
 
-// ==================== 虚拟实训 ====================
+function renderPhenophaseBar(phase) {
+    const bar = document.getElementById('phenophase-bar');
+    if (!bar) return;
+    if (!phase) {
+        bar.classList.add('is-hidden');
+        bar.innerHTML = '';
+        return;
+    }
+    bar.classList.remove('is-hidden');
+    bar.style.setProperty('--phase-color', phase.color || '#1f5e43');
+    bar.innerHTML = `<span class="phase-dot"></span>`
+        + `<strong>当前物候期：${escapeHtml(phase.name)}</strong>`
+        + (phase.description ? `<span class="phase-desc">${escapeHtml(phase.description)}</span>` : '');
+}
 
-function setupSimulationModules() {
-    // 模块卡片点击
-    document.querySelectorAll('.sim-module-card').forEach(module => {
-        module.querySelector('.btn').addEventListener('click', function() {
-            const simType = module.dataset.sim;
-            // 关闭所有面板
-            document.querySelectorAll('.sim-panel').forEach(p => p.classList.add('is-hidden'));
-            const panel = document.getElementById(simType + '-area');
-            if (panel) {
-                panel.classList.remove('is-hidden');
-                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-            // 初始化对应模块
-            if (simType === 'pest-diagnosis') initPestDiagnosis();
-            else if (simType === 'live-practice') initLivePractice();
-            else if (simType === 'craft-ar') initCraftAR();
+// Font Awesome 类名归一化。
+// 历史数据里的 icon 值（seedling / broom / apple-alt ...）不带 fa- 前缀，
+// 直接拼成 class="fas seedling" 不会渲染出图标，这里统一补齐前缀。
+// FA_ICON_ALIASES：修正 FA 6.0.0 Free 中不存在的图标名（已逐个核对，仅 fishing 缺失）。
+const FA_ICON_ALIASES = {
+    fishing: 'fish'
+};
+
+function faIconClass(name) {
+    let n = String(name == null ? '' : name).trim() || 'tasks';
+    if (n.indexOf('fa-') === 0) n = n.slice(3);
+    n = FA_ICON_ALIASES[n] || n;
+    return 'fa-' + n;
+}
+
+function farmingTaskItemHtml(t, idx) {
+    const color = FARMING_CATEGORY_COLORS[t.category] || '#4a6fa5';
+    // is_verified = 0 / 缺省 => 日期为按农时规律推算的参考值，加「约」并套提示色
+    const approx = !t.is_verified;
+    const timingTag = t.day
+        ? `<span class="task-tag tag-timing${approx ? ' tag-approx' : ''}"${approx ? ' title="依据公开技术资料编排的参考日期，尚未经农技人员复核"' : ''}><i class="far fa-clock"></i> ${approx ? '约 ' : ''}${escapeHtml(t.date || (t.task_md || ''))}</span>`
+        : `<span class="task-tag tag-timing"><i class="far fa-clock"></i> 持续性作业</span>`;
+    // 依据等级角标：verified=已复核 / unsourced=无来源登记（不应出现，出现即暴露数据缺口）
+    const evidenceTag = t.evidence_level === 'verified'
+        ? '<span class="task-tag tag-verified"><i class="fas fa-circle-check"></i> 已复核</span>'
+        : (t.evidence_level === 'unsourced'
+            ? '<span class="task-tag tag-unsourced"><i class="fas fa-triangle-exclamation"></i> 来源待补</span>'
+            : '');
+    const src = t.source || null;
+    const basisHtml = t.date_basis
+        ? `<div class="task-basis"><span class="basis-label"><i class="fas fa-book-open"></i> 日期依据</span><p>${escapeHtml(t.date_basis)}</p></div>`
+        : '';
+    const sourceHtml = src
+        ? `<div class="task-basis task-source"><span class="basis-label"><i class="fas fa-landmark"></i> 来源方向</span>`
+          + `<p>${escapeHtml(src.org || '')} · ${escapeHtml(src.doc_type || '')} · ${escapeHtml(src.name || '')}`
+          + `<span class="src-docno">文号：${escapeHtml(src.doc_no || '待核')}</span>`
+          + (src.url ? ` <a href="${escapeHtml(src.url)}" target="_blank" rel="noopener noreferrer">查验</a>` : '')
+          + '</p></div>'
+        : '';
+    return `
+    <div class="task-item task-item-rich" style="--task-color: ${color}" data-idx="${idx}"${t.day ? ` data-day="${t.day}"` : ''}>
+        <div class="task-header">
+            <div class="task-icon-wrap" style="background: ${color}15; color: ${color}">
+                <i class="fas ${faIconClass(t.icon)}"></i>
+            </div>
+            <div class="task-meta">
+                <h5>${escapeHtml(t.title)}</h5>
+                <div class="task-tags">
+                    <span class="task-tag tag-category" style="background: ${color}18; color: ${color}">${escapeHtml(t.category_label || '')}</span>
+                    ${t.priority === 'high' ? '<span class="task-tag tag-urgent"><i class="fas fa-fire"></i> 紧急</span>' : ''}
+                    ${timingTag}
+                    ${evidenceTag}
+                </div>
+            </div>
+            <button class="task-expand-btn" aria-label="展开详情"><i class="fas fa-chevron-down"></i></button>
+        </div>
+        <p class="task-desc">${escapeHtml(t.description || '')}</p>
+        <div class="task-detail">
+            <div class="task-tips">
+                <i class="fas fa-lightbulb"></i>
+                <span>${escapeHtml(t.tip || '')}</span>
+            </div>
+            ${basisHtml}
+            ${sourceHtml}
+        </div>
+    </div>`;
+}
+
+function renderFarmingTaskList(taskList, data) {
+    if (!taskList) return;
+    const tasks = data.tasks || [];
+    if (!data.is_configured || !tasks.length) {
+        showEmptyState(taskList, 'fa-calendar-times', '本月暂无农事数据', '该作物尚未录入本月的农事安排');
+        return;
+    }
+
+    const dated = tasks.filter(t => t.day).sort((a, b) => a.day - b.day);
+    const undated = tasks.filter(t => !t.day);
+
+    let listHtml = '';
+    if (dated.length) {
+        listHtml += `<div class="task-group-label">本月已安排日期${data.dates_provisional ? '（依据公开技术资料编排，待复核）' : ''}</div>`;
+        listHtml += dated.map(farmingTaskItemHtml).join('');
+    }
+    if (undated.length) {
+        listHtml += `<div class="task-group-label">持续性作业（不指定日期）</div>`;
+        listHtml += undated.map(farmingTaskItemHtml).join('');
+    }
+    taskList.innerHTML = listHtml;
+
+    // 展开/折叠
+    taskList.querySelectorAll('.task-expand-btn').forEach(btn => {
+        btn.addEventListener('click', function () {
+            this.closest('.task-item-rich')?.classList.toggle('expanded');
         });
+    });
+
+    // 点击列表项 → 滚动并高亮对应格子
+    taskList.querySelectorAll('.task-item-rich[data-day]').forEach(item => {
+        item.addEventListener('click', e => {
+            if (e.target.closest('.task-expand-btn')) return;
+            highlightCalendarDay(parseInt(item.dataset.day, 10));
+        });
+    });
+}
+
+function highlightCalendarDay(day) {
+    const cell = document.querySelector(`#calendar-grid .calendar-day[data-day="${day}"]`);
+    if (!cell) return;
+    cell.classList.add('is-highlight');
+    setTimeout(() => cell.classList.remove('is-highlight'), 1600);
+    cell.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'nearest' });
+}
+
+// 格子点击 → 当日农事弹窗
+function showDayTasksModal(day) {
+    const data = farmingCalendarData;
+    if (!data) return;
+    const tasks = (data.tasks || []).filter(t => t.day === day);
+    if (!tasks.length) return;
+
+    const phase = data.phenophase_current;
+    const productName = (data.product && data.product.name) || '';
+    const anyApprox = tasks.some(t => !t.is_verified);
+    const html = `
+        <div class="day-task-modal">
+            <div class="day-task-head">
+                <strong>${data.month}月${day}日</strong>
+                ${phase ? `<span class="day-task-phase" style="background:${phase.color}18;color:${phase.color}">${escapeHtml(phase.name)}</span>` : ''}
+            </div>
+            ${anyApprox ? '<div class="day-task-approx-note"><i class="fas fa-circle-info"></i> 该日期为依据公开技术资料编排的参考值，尚未经农技人员复核，请以当地农技站指导为准。</div>' : ''}
+            ${tasks.map(t => {
+                const color = FARMING_CATEGORY_COLORS[t.category] || '#4a6fa5';
+                const src = t.source || null;
+                const evTag = t.evidence_level === 'verified'
+                    ? '<span class="task-tag tag-verified"><i class="fas fa-circle-check"></i> 已复核</span>'
+                    : (t.evidence_level === 'unsourced'
+                        ? '<span class="task-tag tag-unsourced"><i class="fas fa-triangle-exclamation"></i> 来源待补</span>'
+                        : '');
+                return `<div class="day-task-item" style="--task-color:${color}">
+                    <div class="day-task-title">
+                        <i class="fas ${faIconClass(t.icon)}" style="color:${color}"></i>
+                        <span>${escapeHtml(t.title)}</span>
+                        <span class="task-tag tag-category" style="background:${color}18;color:${color}">${escapeHtml(t.category_label || '')}</span>
+                        ${evTag}
+                    </div>
+                    <p>${escapeHtml(t.description || '')}</p>
+                    ${t.tip ? `<div class="task-tips"><i class="fas fa-lightbulb"></i><span>${escapeHtml(t.tip)}</span></div>` : ''}
+                    ${t.date_basis ? `<div class="task-basis"><span class="basis-label"><i class="fas fa-book-open"></i> 日期依据</span><p>${escapeHtml(t.date_basis)}</p></div>` : ''}
+                    ${src ? `<div class="task-basis task-source"><span class="basis-label"><i class="fas fa-landmark"></i> 来源方向</span><p>${escapeHtml(src.org || '')} · ${escapeHtml(src.doc_type || '')} · ${escapeHtml(src.name || '')}<span class="src-docno">文号：${escapeHtml(src.doc_no || '待核')}</span></p></div>` : ''}
+                </div>`;
+            }).join('')}
+        </div>`;
+    showDetailModal(`${productName} · ${data.month}月${day}日农事`, html);
+}
+
+// ==================== 农事订阅 ====================
+
+function updateSubscribeButton(btn, subscribed, disabled) {
+    btn.dataset.subscribed = subscribed ? '1' : '0';
+    btn.classList.toggle('is-subscribed', !!subscribed);
+    btn.innerHTML = subscribed
+        ? '<i class="fas fa-star"></i> 已订阅'
+        : '<i class="far fa-star"></i> 订阅本作物';
+    if (disabled) {
+        btn.setAttribute('title', '登录后可订阅农事提醒');
+    } else {
+        btn.removeAttribute('title');
+    }
+}
+
+function syncFarmingSubscriptionButton() {
+    const btn = document.getElementById('farming-subscribe-btn');
+    if (!btn) return;
+    if (!AppState.user) {
+        farmingSubscribedIds = [];
+        updateSubscribeButton(btn, false, true);
+        renderFarmingReminderSummary(farmingCalendarData);
+        return;
+    }
+    apiCall('/api/agriculture/subscriptions')
+        .then(d => {
+            const ids = (d && d.product_ids) || [];
+            farmingSubscribedIds = ids;
+            updateSubscribeButton(btn, ids.includes(AppState.currentProduct), false);
+            renderFarmingReminderSummary(farmingCalendarData);
+        })
+        .catch(() => {
+            farmingSubscribedIds = [];
+            updateSubscribeButton(btn, false, false);
+            renderFarmingReminderSummary(farmingCalendarData);
+        });
+}
+
+async function toggleFarmingSubscription() {
+    if (!AppState.user) {
+        openLoginModal();
+        showNotification('请先登录后再订阅农事提醒', 'info', { actionLabel: '去登录', action: openLoginModal });
+        return;
+    }
+    const btn = document.getElementById('farming-subscribe-btn');
+    const productId = AppState.currentProduct;
+    const subscribed = btn?.dataset.subscribed === '1';
+    try {
+        if (subscribed) {
+            await apiCall(`/api/agriculture/subscribe/${encodeURIComponent(productId)}`, 'DELETE');
+            showNotification('已取消订阅', 'info');
+        } else {
+            await apiCall('/api/agriculture/subscribe', 'POST', { product_id: productId });
+            showNotification('订阅成功，登录后会收到当月农事提醒', 'success');
+        }
+        syncFarmingSubscriptionButton();
+    } catch (e) {
+        showNotification('操作失败，请稍后重试', 'error');
+    }
+}
+
+// 登录后拉取农事提醒（幂等，失败静默）
+function checkFarmingReminders() {
+    if (!AppState.sessionId) return;
+    apiCall('/api/agriculture/reminders/check', 'POST').catch(() => {});
+}
+
+// ==================== 病虫害诊断入口（农业技能板块） ====================
+
+function setupPestDiagnosisEntry() {
+    // 诊断入口卡片点击：展开/收起诊断面板
+    const entryCard = document.querySelector('.diagnosis-entry-card');
+    const panel = document.getElementById('pest-diagnosis-area');
+    const toggleBtn = document.getElementById('toggle-diagnosis');
+
+    function togglePanel(show) {
+        if (!panel) return;
+        const willShow = show !== undefined ? show : panel.classList.contains('is-hidden');
+        panel.classList.toggle('is-hidden', !willShow);
+        if (willShow) {
+            initPestDiagnosis();
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> 收起诊断面板';
+        } else if (toggleBtn) {
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> 展开诊断面板';
+        }
+    }
+
+    entryCard?.addEventListener('click', () => togglePanel());
+    toggleBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePanel();
     });
 
     // 关闭按钮
-    document.querySelectorAll('.sim-close-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const target = this.dataset.target;
-            document.getElementById(target)?.classList.add('is-hidden');
-        });
-    });
+    panel?.querySelector('.sim-close-btn')?.addEventListener('click', () => togglePanel(false));
 }
 
 // ==================== 病虫害诊断 ====================
 
-const PestState = { selectedCrop: 'lychee', initialized: false };
+// 与服务端约定保持一致：app.py 的 DIAG_SYMPTOMS_MAX_LEN / DIAG_MAX_IMAGES / DIAG_MAX_IMAGE_BYTES
+const DIAG_SYMPTOMS_MAXLEN = 500;
+const DIAG_MAX_IMAGES = 3;
+const DIAG_MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+const DIAG_IMAGE_MAX_EDGE = 1280;      // 压缩后长边上限（像素）
+const DIAG_IMAGE_QUALITY = 0.8;        // 压缩后 JPEG 质量
 
-function initPestDiagnosis() {
-    if (PestState.initialized) return;
-    PestState.initialized = true;
+const PestState = {
+    selectedCrop: 'lychee',
+    initialized: false,
+    images: [],             // 已选照片（本机压缩后的 jpeg data URL）
+    busy: false,            // 在途请求标记，防止连点造成并发请求
+    userSelectedCrop: false // 用户手动选过作物后，不再被农时日历同步覆盖
+};
 
-    // 作物选择
-    document.querySelectorAll('.crop-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            PestState.selectedCrop = this.dataset.crop;
-        });
-    });
+// 症状输入框示例文案按作物分流：水产养殖不是「叶片」场景
+const DIAG_PLACEHOLDER_DEFAULT = '例如：叶片发黄，有褐色斑点，部分果实脱落...';
+const DIAG_PLACEHOLDER_AQUATIC = '例如：虾体甲壳内侧出现白色斑点，游塘、反应迟钝...';
 
-    // 开始诊断
-    document.getElementById('start-diagnosis')?.addEventListener('click', runDiagnosis);
-
-    // 上传照片
-    document.getElementById('upload-photo-btn')?.addEventListener('click', () => {
-        document.getElementById('plant-image')?.click();
-    });
-    document.getElementById('plant-image')?.addEventListener('change', function() {
-        if (this.files.length > 0) runDiagnosis();
-    });
-
-    // 重新诊断
-    document.getElementById('re-diagnose')?.addEventListener('click', () => {
-        document.getElementById('diagnosis-result').classList.add('is-hidden');
-        document.getElementById('symptom-text').value = '';
-        document.getElementById('symptom-text').focus();
-    });
-
-    // 复制结果
-    document.getElementById('copy-diagnosis')?.addEventListener('click', () => {
-        const result = document.getElementById('diagnosis-result');
-        if (result) {
-            const text = result.innerText;
-            navigator.clipboard.writeText(text).then(() => showNotification('诊断结果已复制', 'success'));
-        }
-    });
+function updateDiagSymptomPlaceholder() {
+    const box = document.getElementById('symptom-text');
+    if (!box) return;
+    // 用户已经输入内容时不打断，只更新示例
+    box.placeholder = PestState.selectedCrop === 'aquatic'
+        ? DIAG_PLACEHOLDER_AQUATIC
+        : DIAG_PLACEHOLDER_DEFAULT;
 }
 
-async function runDiagnosis() {
-    const symptoms = document.getElementById('symptom-text')?.value?.trim() || '';
-    showLoading('AI正在分析症状...');
-    try {
-        const data = await apiCall('/api/simulation/diagnose', 'POST', {
-            crop: PestState.selectedCrop,
-            symptoms: symptoms
-        });
-        hideLoading();
-        if (data.success && data.diagnosis) {
-            renderDiagnosis(data.diagnosis);
-            showNotification('诊断完成！', 'success');
-        }
-    } catch(e) {
-        hideLoading();
-        showNotification('诊断服务暂时不可用', 'error');
+function setDiagBusy(busy) {
+    PestState.busy = busy;
+    ['start-diagnosis', 'upload-photo-btn', 're-diagnose'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = busy;
+    });
+    // 在途期间锁定作物选择，避免「按柑橘提交、按水稻渲染」的错位
+    document.querySelectorAll('.crop-btn').forEach(btn => { btn.disabled = busy; });
+    const startBtn = document.getElementById('start-diagnosis');
+    if (startBtn) {
+        startBtn.innerHTML = busy
+            ? '<i class="fas fa-spinner fa-spin"></i> 正在分析...'
+            : '<i class="fas fa-search"></i> 开始诊断';
     }
 }
 
+function initPestDiagnosis() {
+    if (!PestState.initialized) {
+        PestState.initialized = true;
+
+        // 作物选择（仅首次绑定一次事件，避免重复 addEventListener 造成重复触发）
+        document.querySelectorAll('.crop-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                PestState.selectedCrop = this.dataset.crop;
+                PestState.userSelectedCrop = true;
+                updateDiagSymptomPlaceholder();
+            });
+        });
+
+        // 开始诊断
+        document.getElementById('start-diagnosis')?.addEventListener('click', runDiagnosis);
+
+        // 上传照片：文件先在本机压缩，再作为 base64 随诊断请求一起提交。
+        // 此前这里只调 runDiagnosis()、从不读取文件，等于把用户的照片直接丢掉。
+        document.getElementById('upload-photo-btn')?.addEventListener('click', () => {
+            document.getElementById('plant-image')?.click();
+        });
+        document.getElementById('plant-image')?.addEventListener('change', function() {
+            const files = Array.prototype.slice.call(this.files || []);
+            this.value = '';   // 复位，保证再次选择同一张照片也能触发 change
+            handleDiagFiles(files);
+        });
+
+        // 症状字数计数
+        document.getElementById('symptom-text')?.addEventListener('input', function() {
+            const counter = document.getElementById('symptom-count');
+            if (counter) counter.textContent = String(this.value.length);
+        });
+
+        // 重新诊断
+        document.getElementById('re-diagnose')?.addEventListener('click', () => {
+            document.getElementById('diagnosis-result')?.classList.add('is-hidden');
+            const box = document.getElementById('symptom-text');
+            if (box) { box.value = ''; box.focus(); }
+            const counter = document.getElementById('symptom-count');
+            if (counter) counter.textContent = '0';
+            PestState.images = [];
+            renderDiagPhotos();
+        });
+
+        // 复制结果
+        document.getElementById('copy-diagnosis')?.addEventListener('click', () => {
+            const result = document.getElementById('diagnosis-result');
+            if (result) {
+                const text = result.innerText;
+                copyText(text, '诊断结果已复制');
+            }
+        });
+    }
+
+    // 每次打开面板都同步一次默认作物。
+    // 此前该同步被 initialized 门禁包裹，只在首次初始化时执行一次，
+    // 导致「先选水稻（诊断面板未打开）→ 再打开诊断」仍停留在荔枝。
+    syncPestCropFromProduct();
+    updateDiagSymptomPlaceholder();
+}
+
+// 把农时日历当前选中的作物同步为诊断面板的默认作物。
+// 单向同步：只影响诊断面板，不反向影响日历。诊断库未覆盖的作物保持原选择。
+// 用户在面板里手动选过作物之后不再覆盖 —— 否则「收起面板再展开」会把选择静默改回去。
+function syncPestCropFromProduct() {
+    if (PestState.userSelectedCrop) return;
+    const current = AppState.currentProduct;
+    if (!current || PestState.selectedCrop === current) return;
+    const match = document.querySelector(`.crop-btn[data-crop="${current}"]`);
+    if (!match) return;
+    document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('active'));
+    match.classList.add('active');
+    PestState.selectedCrop = current;
+}
+
+// A1：顶部作物切换时调用 —— 复位「用户手选过」门禁后再同步一次。
+// 两条路径的区别就是本项目此前漏掉的那一条：
+//   · 顶部作物变化  -> 学生的主语境真的换了，面板必须跟随（本函数）
+//   · 仅收起/再展开 -> 门禁仍生效，不静默改掉面板内的手选（syncPestCropFromProduct 内部）
+function resetPestCropToCurrent() {
+    PestState.userSelectedCrop = false;
+    syncPestCropFromProduct();
+}
+
+// ---------- 照片读取 / 压缩 / 预览 ----------
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('read_failed'));
+        reader.readAsDataURL(file);
+    });
+}
+
+// 用 canvas 把照片压到长边 <= maxEdge、JPEG 质量 quality。
+// 返回 null 表示浏览器无法解码这张照片（例如部分 HEIC 格式）。
+function compressImage(dataUrl, maxEdge, quality) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            try {
+                const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+                const width = Math.max(1, Math.round(img.width * scale));
+                const height = Math.max(1, Math.round(img.height * scale));
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', quality));
+            } catch (e) {
+                resolve(null);
+            }
+        };
+        img.onerror = () => resolve(null);
+        img.src = dataUrl;
+    });
+}
+
+function dataUrlByteLength(dataUrl) {
+    const text = String(dataUrl || '');
+    const idx = text.indexOf(',');
+    const b64 = idx >= 0 ? text.slice(idx + 1) : text;
+    return Math.floor(b64.length * 3 / 4);
+}
+
+async function handleDiagFiles(files) {
+    const list = Array.prototype.slice.call(files || []);
+    if (!list.length) return;
+
+    const room = DIAG_MAX_IMAGES - PestState.images.length;
+    if (room <= 0) {
+        showNotification(`最多上传 ${DIAG_MAX_IMAGES} 张照片`, 'warning');
+        return;
+    }
+    if (list.length > room) {
+        showNotification(`最多上传 ${DIAG_MAX_IMAGES} 张照片，已保留前 ${room} 张`, 'warning');
+    }
+
+    for (const file of list.slice(0, room)) {
+        let raw = null;
+        try {
+            raw = await readFileAsDataUrl(file);
+        } catch (e) {
+            raw = null;
+        }
+        if (!raw) { showNotification('读取照片失败，请重新选择', 'warning'); continue; }
+
+        const compressed = await compressImage(raw, DIAG_IMAGE_MAX_EDGE, DIAG_IMAGE_QUALITY);
+        if (!compressed) {
+            showNotification('无法识别这张照片的格式，请改用 JPG / PNG', 'warning');
+            continue;
+        }
+        if (dataUrlByteLength(compressed) > DIAG_MAX_IMAGE_BYTES) {
+            showNotification('照片过大，请换一张更小的图片', 'warning');
+            continue;
+        }
+        PestState.images.push(compressed);
+    }
+    renderDiagPhotos();
+}
+
+function renderDiagPhotos() {
+    const box = document.getElementById('diag-photo-preview');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!PestState.images.length) {
+        box.classList.add('is-hidden');
+        return;
+    }
+
+    const tip = document.createElement('span');
+    tip.className = 'diag-photo-tip';
+    tip.textContent = `已选择 ${PestState.images.length} 张照片，将随诊断一并提交`;
+    box.appendChild(tip);
+
+    PestState.images.forEach((src, idx) => {
+        const item = document.createElement('div');
+        item.className = 'diag-photo-item';
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = `待诊断照片 ${idx + 1}`;
+        item.appendChild(img);
+
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'diag-photo-remove';
+        del.setAttribute('aria-label', '移除这张照片');
+        del.innerHTML = '<i class="fas fa-times"></i>';
+        del.addEventListener('click', () => {
+            PestState.images.splice(idx, 1);
+            renderDiagPhotos();
+        });
+        item.appendChild(del);
+        box.appendChild(item);
+    });
+
+    const clear = document.createElement('button');
+    clear.type = 'button';
+    clear.className = 'btn btn-outline btn-sm';
+    clear.textContent = '清空照片';
+    clear.addEventListener('click', () => {
+        PestState.images = [];
+        renderDiagPhotos();
+    });
+    box.appendChild(clear);
+    box.classList.remove('is-hidden');
+}
+
+// ---------- 请求与错误处理 ----------
+
+// 失败类型按服务端下发的 code 判定，不用中文文案正则
+const DIAG_ERROR_TEXT = {
+    bad_request: '请求格式不正确，请刷新页面后重试。',
+    unknown_crop: '暂不支持该作物，请重新选择。',
+    symptoms_too_long: `症状描述请控制在 ${DIAG_SYMPTOMS_MAXLEN} 字以内。`,
+    empty_symptoms: '请先上传一张作物照片，或描述症状后再开始诊断。',
+    bad_image: '照片格式不受支持，请上传 JPG / PNG / WebP 格式的照片。',
+    image_too_large: '照片过大，请换一张更小的图片。',
+    too_many_images: `一次最多上传 ${DIAG_MAX_IMAGES} 张照片。`,
+    rate_limited: '诊断请求过于频繁，请稍后再试。',
+    ai_not_configured: 'AI 服务尚未启用，暂时无法进行图片诊断。你可以改用文字描述症状。',
+    ai_vision_unavailable: '图片诊断功能暂未开放，你可以改用文字描述症状。',
+    ai_unavailable: 'AI 服务暂时不可用，请稍后重试；如需即时帮助可拨打 12316 三农服务热线。',
+    no_match: '未能从描述中匹配到对应的病害，请补充发病部位、病斑颜色与形状等更具体的症状后重试。'
+};
+
+function diagErrorText(status, data) {
+    const code = data && data.code;
+    if (code && DIAG_ERROR_TEXT[code]) return DIAG_ERROR_TEXT[code];
+    if (data && data.message) return String(data.message);
+    if (status === 413) return '照片过大，请换一张更小的图片。';
+    return '诊断服务暂时不可用，请稍后重试。';
+}
+
+// 诊断接口不走 apiCall：需要在非 2xx 时也能读到响应体里的 code。
+async function postDiagnosis(payload) {
+    const options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    };
+    if (AppState.sessionId) options.headers['X-Session-Id'] = AppState.sessionId;
+    const resp = await fetch(`${API_BASE_URL}/api/agriculture/diagnose`, options);
+    let data = null;
+    try { data = await resp.json(); } catch (e) { data = null; }
+    return { ok: resp.ok, status: resp.status, data: data };
+}
+
+function clearDiagError() {
+    const el = document.getElementById('diagnosis-error');
+    if (el) { el.textContent = ''; el.classList.add('is-hidden'); }
+}
+
+// 病名/置信度区、三栏明细区、额外信息区：失败时整体收起，
+// 否则会留下一排空卡片，看起来像渲染坏了。
+const DIAG_SECTION_CLASSES = ['result-info', 'diagnosis-grid', 'diagnosis-extra'];
+
+function setDiagSectionsVisible(visible) {
+    DIAG_SECTION_CLASSES.forEach(cls => {
+        const el = document.querySelector('#diagnosis-result .' + cls);
+        if (el) el.classList.toggle('is-hidden', !visible);
+    });
+}
+
+// 失败时清空上一次的结论：否则旧病名与旧来源角标会继续留在页面上，
+// 被用户误认为本次诊断的结果。
+function renderDiagError(message) {
+    clearDiagError();
+    const errEl = document.getElementById('diagnosis-error');
+    if (errEl) {
+        errEl.textContent = message;
+        errEl.classList.remove('is-hidden');
+    }
+
+    const nameEl = document.getElementById('disease-name');
+    if (nameEl) nameEl.textContent = '';
+    ['symptoms-list', 'treatment-list', 'prevention-list'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '';
+    });
+    ['timing-text', 'note-text'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = '';
+    });
+    document.getElementById('diagnosis-source')?.classList.add('is-hidden');
+    document.getElementById('severity-badge')?.classList.add('is-hidden');
+    const symTitle = document.getElementById('symptoms-title');
+    if (symTitle) symTitle.textContent = '症状表现';
+    const titleEl = document.getElementById('diagnosis-title');
+    if (titleEl) titleEl.textContent = '诊断未完成';
+    setDiagSectionsVisible(false);
+
+    document.getElementById('diagnosis-result')?.classList.remove('is-hidden');
+}
+
+async function runDiagnosis() {
+    if (PestState.busy) return;
+
+    const symptoms = (document.getElementById('symptom-text')?.value || '').trim();
+    const images = PestState.images.slice();
+
+    if (!symptoms && !images.length) {
+        showNotification('请先上传一张作物照片，或描述症状', 'warning');
+        document.getElementById('symptom-text')?.focus();
+        return;
+    }
+
+    setDiagBusy(true);
+    showLoading('正在分析，请稍候...');
+    try {
+        const payload = { crop: PestState.selectedCrop, symptoms: symptoms };
+        if (images.length) payload.image = images;
+
+        const res = await postDiagnosis(payload);
+        const data = res.data || {};
+        if (res.ok && data.success && data.diagnosis) {
+            renderDiagnosis(data.diagnosis);
+        } else {
+            renderDiagError(diagErrorText(res.status, data));
+        }
+    } catch (e) {
+        renderDiagError('诊断服务暂时不可用，请稍后重试。');
+    } finally {
+        hideLoading();
+        setDiagBusy(false);
+    }
+}
+
+// 诊断字段归一化：知识库给的是数组，但模型偶尔会把多条目写成一段字符串，
+// 此处统一成字符串数组，避免 .map is not a function 导致整个结果区渲染中断。
+function diagnosisList(value) {
+    if (Array.isArray(value)) {
+        return value.map(v => String(v == null ? '' : v).trim()).filter(Boolean);
+    }
+    if (value == null || value === '') return [];
+    return [String(value).trim()].filter(Boolean);
+}
+
+// 严重程度归一化：模型可能返回「中度偏重」「轻微」这类值，
+// 归到三档配色；无法归类的原样展示且不套用配色。
+function normalizeSeverity(value) {
+    const text = String(value == null ? '' : value).trim();
+    if (!text) return { text: '', level: '' };
+    if (text.indexOf('重') >= 0) return { text: text, level: '重度' };
+    if (text.indexOf('轻') >= 0 || text.indexOf('微') >= 0) return { text: text, level: '轻度' };
+    if (text.indexOf('中') >= 0) return { text: text, level: '中度' };
+    return { text: text, level: '' };
+}
+
+// 置信度已整块下线（见 renderDiagnosis 注释），原先的 confidencePercent() 归一化函数
+// 随之删除 —— 留一个没有任何调用者的函数，只会让人以为界面上还有这个数值。
+
 function renderDiagnosis(d) {
+    clearDiagError();
+    setDiagSectionsVisible(true);
+    const fromKb = d.source === 'knowledge_base';
+
     // 病名
     const nameEl = document.getElementById('disease-name');
     if (nameEl) nameEl.textContent = (d.crop_icon || '') + ' ' + (d.disease || '待确认');
 
+    // 来源标注：区分 AI 结论与知识库降级结果，并把免责说明常驻展示
+    const titleEl = document.getElementById('diagnosis-title');
+    if (titleEl) titleEl.textContent = fromKb ? '知识库匹配结果' : '诊断结果';
+    const srcEl = document.getElementById('diagnosis-source');
+    if (srcEl) {
+        const label = d.source_label || (fromKb ? '本地知识库匹配' : 'AI 模型生成');
+        const note = d.source_note || '仅供参考，请以当地农技站指导为准。';
+        srcEl.textContent = '结论来源：' + label + ' · ' + note;
+        srcEl.dataset.source = fromKb ? 'knowledge_base' : 'ai';
+        srcEl.classList.remove('is-hidden');
+    }
+
     // 严重程度
     const sevBadge = document.getElementById('severity-badge');
     if (sevBadge) {
-        sevBadge.textContent = d.severity || '中度';
-        sevBadge.dataset.level = d.severity || '中度';
+        const sev = normalizeSeverity(d.severity);
+        sevBadge.textContent = sev.text;
+        sevBadge.dataset.level = sev.level;
+        sevBadge.classList.toggle('is-hidden', !sev.text);
     }
 
-    // 置信度
-    const pct = Math.round((d.confidence || 0.5) * 100);
-    const confFill = document.getElementById('confidence-fill');
-    const confText = document.getElementById('confidence-text');
-    if (confFill) confFill.style.width = pct + '%';
-    if (confText) confText.textContent = pct + '%';
+    // 置信度：整块下线，不再渲染。
+    // 原因有两层，任何一层单独成立都足够：
+    //   ① 知识库条目的 confidence 是 PEST_KNOWLEDGE 里的固定常量，不是真实匹配度；
+    //   ② AI 自评的百分比同样不可信 —— 同一个症状模型曾给出 0.95 却配了错误的病名。
+    // 界面只保留结论与来源标注，不给一个「看着像算过、其实没算过」的数字。
+    // 服务端也已从提示词契约里删掉 confidence，并在 _parse_ai_diagnosis 里兜底剔除。
 
-    // 症状
-    const symptomsList = document.getElementById('symptoms-list');
-    if (symptomsList && d.symptoms) {
-        symptomsList.innerHTML = d.symptoms.map(s => `<li>${s}</li>`).join('');
-    }
+    // 症状区标题：知识库列出的是「该病害的典型症状」，不是用户描述的内容，
+    // 标题必须说清楚，否则匹配错误时会用一串陌生症状反向强化错误结论。
+    const symTitle = document.getElementById('symptoms-title');
+    if (symTitle) symTitle.textContent = fromKb ? '该病典型症状' : '症状表现';
 
-    // 防治方案
-    const treatList = document.getElementById('treatment-list');
-    if (treatList && d.treatment) {
-        treatList.innerHTML = d.treatment.map(t => `<li>${t}</li>`).join('');
-    }
-
-    // 预防措施
-    const prevList = document.getElementById('prevention-list');
-    if (prevList && d.prevention) {
-        prevList.innerHTML = d.prevention.map(p => `<li>${p}</li>`).join('');
-    }
+    // 症状 / 防治方案 / 预防措施
+    // 三处均为模型或知识库产出，一律先转义再拼接，避免 innerHTML 注入
+    const LIST_TARGETS = [
+        ['symptoms-list', d.symptoms],
+        ['treatment-list', d.treatment],
+        ['prevention-list', d.prevention]
+    ];
+    LIST_TARGETS.forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = diagnosisList(value).map(item => `<li>${escapeHtml(item)}</li>`).join('');
+    });
 
     // 额外信息
     const timingText = document.getElementById('timing-text');
@@ -1882,238 +3386,540 @@ function renderDiagnosis(d) {
     document.getElementById('diagnosis-result')?.classList.remove('is-hidden');
 }
 
-// ==================== 直播间实训 ====================
+// ==================== 常见病虫害速查 ====================
+//
+// 数据来自只读接口 /api/agriculture/pest-knowledge：一次取回、本地筛选。
+// 与后台一致的三条硬约定：
+//   1. 来源资料没给出的数值就是「未提供」，界面绝不替用户推断（安全间隔期尤其如此）；
+//   2. 没有授权实拍图时显示「暂无实拍图」占位，绝不用示意图或生成图冒充真实病征；
+//   3. 加载失败必须是可见的错误态 + 重试，不能用空列表冒充「没有数据」。
 
-const PracticeState = { currentScenario: 'opening', initialized: false };
+const PestGuideState = {
+    loaded: false,
+    loading: false,
+    entries: [],
+    crops: [],
+    disclaimer: '',
+    crop: '',                 // '' 表示全部作物
+    // A4：速查的作物筛选默认跟随顶部「当前作物」，理由与诊断面板一致 ——
+    // 同一个页面里「当前作物」只应有一套含义。用户在这里手选过筛选之后不再被覆盖。
+    userSelectedCrop: false,
+    keyword: '',
+    bound: false,
+    lastFocus: null,          // 打开详情前的焦点元素，关闭后还回去
+    prevBodyOverflow: null
+};
 
-function initLivePractice() {
-    if (PracticeState.initialized) return;
-    PracticeState.initialized = true;
+// escapeHtml（textContent → innerHTML）不处理引号，直接拼进 src="" / title="" 并不安全；
+// 属性上下文单独用这一套。
+function pestAttr(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
 
-    // 场景卡片点击
-    document.querySelectorAll('.scenario-card').forEach(card => {
-        card.addEventListener('click', function() {
-            document.querySelectorAll('.scenario-card').forEach(c => c.classList.remove('active'));
-            this.classList.add('active');
-            PracticeState.currentScenario = this.dataset.scenario;
-            loadScenario(PracticeState.currentScenario);
-        });
-    });
+// 只让 http/https 进 href。属性转义挡不住 javascript: / data: 这类伪协议，
+// 而 image.source_url 与 sources[].url 都会拼进 <a href>，所以必须再做一次协议白名单。
+function pestSafeUrl(value) {
+    const u = String(value == null ? '' : value).trim();
+    return /^https?:\/\//i.test(u) ? u : '';
+}
 
-    // 提示标签点击填充
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('prompt-tag')) {
-            const textarea = document.getElementById('practice-text');
-            if (textarea) {
-                textarea.value = e.target.textContent;
-                textarea.focus();
+function pestArray(value) {
+    return Array.isArray(value) ? value : [];
+}
+
+function pestHas(value) {
+    return value !== null && value !== undefined && String(value).trim() !== '';
+}
+
+function pestCropName(cropId) {
+    if (!cropId) return '全部作物';
+    const hit = PestGuideState.crops.filter(function(c) { return c.id === cropId; })[0];
+    return (hit && hit.name) ? hit.name : cropId;
+}
+
+// ---------- 入口与懒加载 ----------
+
+function setupPestGuide() {
+    const section = document.getElementById('pest-guide');
+    if (!section) return;
+    bindPestGuideOnce();
+
+    // 首屏就落在农业技能板块 → 立即取；否则等它真正进入视口再取，不与首屏资源抢带宽。
+    if (section.getClientRects().length > 0) {
+        loadPestKnowledge();
+        return;
+    }
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(function(entries) {
+            for (let i = 0; i < entries.length; i++) {
+                if (entries[i].isIntersecting) {
+                    io.disconnect();
+                    loadPestKnowledge();
+                    return;
+                }
             }
-        }
-    });
-
-    // AI评分
-    document.getElementById('score-practice')?.addEventListener('click', scorePractice);
-
-    // 清空
-    document.getElementById('clear-practice')?.addEventListener('click', () => {
-        document.getElementById('practice-text').value = '';
-        document.getElementById('practice-score')?.classList.add('is-hidden');
-    });
-
-    loadScenario('opening');
-}
-
-function loadScenario(scenarioId) {
-    const scenarios = {
-        opening: { desc: '练习如何在30秒内抓住观众注意力', prompts: ['请用一句话欢迎观众并介绍今天的产品', '设计一个引起好奇心的开场', '用一个故事开头吸引观众'], tips: ['前5秒决定观众去留', '要有悬念或利益点', '声音要有感染力'] },
-        product_intro: { desc: '练习有逻辑地介绍产品卖点', prompts: ['介绍这个产品的3个核心卖点', '用对比法突出产品优势', '讲述产品的产地故事'], tips: ['FAB法则：特点→优势→利益', '用具体数字说话', '配合实物展示'] },
-        interaction: { desc: '练习与观众互动提升参与感', prompts: ['设计一个引导观众扣1的问题', '用选择题引导观众互动', '感谢观众并引导关注'], tips: ['每3分钟一次互动', '点名感谢活跃观众', '用问题引导下单'] },
-        closing: { desc: '练习在关键时刻推动下单', prompts: ['用限时限量制造紧迫感', '用从众心理促单', '给出下单的理由和步骤'], tips: ['强调稀缺性', '降低决策门槛', '给出明确的下单指引'] },
-        objection: { desc: '练习应对观众的质疑和异议', prompts: ['观众说太贵了怎么回应', '观众质疑品质怎么回答', '观众说要考虑一下怎么引导'], tips: ['先认同再引导', '用事实和数据说话', '不要和观众争论'] }
-    };
-    const s = scenarios[scenarioId] || scenarios.opening;
-    const descEl = document.getElementById('scenario-desc');
-    if (descEl) descEl.textContent = s.desc;
-    const examplesEl = document.getElementById('prompt-examples');
-    if (examplesEl) examplesEl.innerHTML = s.prompts.map(p => `<span class="prompt-tag">${p}</span>`).join('');
-    const tipsEl = document.getElementById('practice-tips');
-    if (tipsEl) tipsEl.querySelector('ul').innerHTML = s.tips.map(t => `<li>${t}</li>`).join('');
-    // 隐藏之前的评分
-    document.getElementById('practice-score')?.classList.add('is-hidden');
-}
-
-async function scorePractice() {
-    const text = document.getElementById('practice-text')?.value?.trim();
-    if (!text) { showNotification('请先输入直播话术', 'warning'); return; }
-    showLoading('AI正在评分...');
-    try {
-        const data = await apiCall('/api/simulation/live-score', 'POST', {
-            script: text,
-            scenario: PracticeState.currentScenario
-        });
-        hideLoading();
-        if (data.success && data.score) {
-            renderPracticeScore(data.score);
-        }
-    } catch(e) {
-        hideLoading();
-        showNotification('评分服务暂时不可用', 'error');
+        }, { rootMargin: '120px' });
+        io.observe(section);
+    } else {
+        loadPestKnowledge();
     }
 }
 
-function renderPracticeScore(score) {
-    const container = document.getElementById('score-metrics');
-    if (!container) return;
+function bindPestGuideOnce() {
+    if (PestGuideState.bound) return;
+    PestGuideState.bound = true;
 
-    const metricLabels = {
-        speed: '语速流畅', clarity: '逻辑清晰', engagement: '互动引导',
-        product_knowledge: '产品知识', scenario_match: '场景匹配', overall: '综合得分'
-    };
-    const metricColors = {
-        speed: '#3b82f6', clarity: '#8b5cf6', engagement: '#f59e0b',
-        product_knowledge: '#22c55e', scenario_match: '#06b6d4', overall: '#ec4899'
-    };
+    // 作物筛选：事件委托，筛选栏整体重绘后不需要重新绑定
+    const filter = document.getElementById('pest-crop-filter');
+    if (filter) {
+        filter.addEventListener('click', function(e) {
+            const btn = e.target.closest ? e.target.closest('.pest-crop-btn') : null;
+            if (!btn || !filter.contains(btn)) return;
+            const next = btn.getAttribute('data-pest-crop') || '';
+            if (next === PestGuideState.crop) return;
+            PestGuideState.crop = next;
+            // A4：手选即上锁，此后顶部作物变化不再改这里的筛选（与诊断面板同语义）
+            PestGuideState.userSelectedCrop = true;
+            renderPestCropFilter();
+            renderPestCards();
+        });
+    }
 
-    const keys = Object.keys(metricLabels);
-    container.innerHTML = keys.map(k => {
-        const val = Math.round(score[k] || 0);
-        const color = metricColors[k];
-        return `<div class="score-metric-item">
-            <div class="score-metric-label">${metricLabels[k]}</div>
-            <div class="score-metric-bar"><div class="score-metric-fill" style="width:${val}%;background:${color}"></div></div>
-            <div class="score-metric-value" style="color:${color}">${val}</div>
-        </div>`;
+    // 搜索：本地过滤，不上行，无需防抖
+    const search = document.getElementById('pest-guide-search');
+    if (search) {
+        search.addEventListener('input', function() {
+            PestGuideState.keyword = this.value || '';
+            renderPestCards();
+        });
+    }
+
+    // 卡片打开详情（点击 + 键盘）
+    const grid = document.getElementById('pest-guide-grid');
+    if (grid) {
+        grid.addEventListener('click', function(e) {
+            const card = e.target.closest ? e.target.closest('.pest-card') : null;
+            if (card) openPestModal(card.getAttribute('data-pest-id'));
+        });
+        grid.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const card = e.target.closest ? e.target.closest('.pest-card') : null;
+            if (!card) return;
+            e.preventDefault();
+            openPestModal(card.getAttribute('data-pest-id'));
+        });
+    }
+
+    // 关闭：右上角按钮 + 遮罩 + ESC
+    document.getElementById('pest-modal-close')?.addEventListener('click', closePestModal);
+    const modal = document.getElementById('pest-modal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target.closest && e.target.closest('[data-pest-close]')) closePestModal();
+        });
+    }
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && isPestModalOpen()) closePestModal();
+    });
+
+    // 兜底触发：用户点进「农业技能」就直接取数，不必等滚动到速查区块。
+    // IntersectionObserver 对「display:none 转可见」的响应并不总可靠，
+    // 而这块数据取早了也只是提前 1 个请求，取晚了就是一片空白骨架屏。
+    document.addEventListener('click', function(e) {
+        const nav = e.target.closest ? e.target.closest('.nav-item') : null;
+        if (nav && nav.getAttribute('data-tab') === 'agriculture') loadPestKnowledge();
+    }, true);
+}
+
+function isPestModalOpen() {
+    const modal = document.getElementById('pest-modal');
+    return !!modal && !modal.classList.contains('is-hidden');
+}
+
+// ---------- 取数与状态渲染 ----------
+
+function loadPestKnowledge(force) {
+    if (PestGuideState.loading) return Promise.resolve();
+    if (PestGuideState.loaded && !force) return Promise.resolve();
+
+    const grid = document.getElementById('pest-guide-grid');
+    const emptyEl = document.getElementById('pest-guide-empty');
+    const metaEl = document.getElementById('pest-guide-meta');
+
+    PestGuideState.loading = true;
+    if (emptyEl) emptyEl.classList.add('is-hidden');
+    if (metaEl) metaEl.textContent = '';
+    // 骨架屏复用 core.js 的通用实现，不另造一套加载样式
+    if (grid) showSkeleton(grid, 'card', 6);
+
+    return apiCall('/api/agriculture/pest-knowledge').then(function(data) {
+        if (!data || data.success !== true) {
+            throw new Error((data && data.message) || '数据格式异常');
+        }
+        PestGuideState.entries = pestArray(data.entries);
+        PestGuideState.crops = pestArray(data.crops);
+        PestGuideState.disclaimer = data.disclaimer || '';
+        PestGuideState.loaded = true;
+        // A4：首次拿到数据时按顶部「当前作物」预筛一次（用户此前手选过则不覆盖）
+        applyPestGuideCrop(false);
+        renderPestDisclaimer();
+        renderPestCropFilter();
+        renderPestCards();
+    }).catch(function(err) {
+        // 失败时不能留下空网格，否则会被当成「一条都没有」
+        renderPestGuideError(err);
+    }).then(function() {
+        PestGuideState.loading = false;
+    });
+}
+
+function renderPestGuideError(err) {
+    const grid = document.getElementById('pest-guide-grid');
+    const emptyEl = document.getElementById('pest-guide-empty');
+    const metaEl = document.getElementById('pest-guide-meta');
+    if (emptyEl) emptyEl.classList.add('is-hidden');
+    if (metaEl) metaEl.textContent = '';
+    if (!grid) return;
+    const detail = (err && err.message) ? err.message : '网络异常';
+    showErrorState(grid, '速查数据加载失败（' + detail + '）', function() {
+        loadPestKnowledge(true);
+    });
+}
+
+function renderPestDisclaimer() {
+    const el = document.getElementById('pest-guide-disclaimer');
+    if (el) el.textContent = PestGuideState.disclaimer || '';
+}
+
+// ---------- 作物筛选 ----------
+
+// A4：把速查筛选对齐到顶部「当前作物」。返回是否真的改了筛选值。
+// 两条门禁，与诊断面板（syncPestCropFromProduct / resetPestCropToCurrent）完全一致：
+//   · force=true  —— 顶部作物变化时调用，复位「手选过」的门禁再跟随；
+//   · force=false —— 首次加载时调用，只在用户没手选过时跟随。
+// 另一个必须的判断：速查数据里没有这个作物时不切，否则会筛出「0 条」，看起来像功能坏了。
+function applyPestGuideCrop(force) {
+    if (!force && PestGuideState.userSelectedCrop) return false;
+    const current = AppState.currentProduct;
+    if (!current || PestGuideState.crop === current) return false;
+    const known = (PestGuideState.crops || []).some(function(c) { return c.id === current; });
+    if (!known) return false;
+    PestGuideState.crop = current;
+    return true;
+}
+
+function resetPestGuideCropToCurrent() {
+    PestGuideState.userSelectedCrop = false;
+    if (PestGuideState.loaded && applyPestGuideCrop(true)) {
+        renderPestCropFilter();
+        renderPestCards();
+    }
+}
+
+function renderPestCropFilter() {
+    const wrap = document.getElementById('pest-crop-filter');
+    if (!wrap) return;
+
+    const counts = {};
+    PestGuideState.entries.forEach(function(entry) {
+        const key = entry.crop || '';
+        counts[key] = (counts[key] || 0) + 1;
+    });
+
+    let html = pestCropBtnHTML('', '全部作物', '📚', PestGuideState.entries.length);
+    PestGuideState.crops.forEach(function(crop) {
+        html += pestCropBtnHTML(crop.id, crop.name, crop.icon, counts[crop.id] || 0);
+    });
+    wrap.innerHTML = html;
+}
+
+function pestCropBtnHTML(id, name, icon, count) {
+    const active = PestGuideState.crop === id;
+    return '<button type="button" class="pest-crop-btn' + (active ? ' active' : '') + '"' +
+        ' role="tab" aria-selected="' + (active ? 'true' : 'false') + '"' +
+        ' data-pest-crop="' + pestAttr(id) + '">' +
+        '<span aria-hidden="true">' + escapeHtml(icon || '') + '</span> ' +
+        escapeHtml(name || '') +
+        '<span class="pest-crop-count">' + count + '</span>' +
+        '</button>';
+}
+
+// ---------- 卡片列表 ----------
+
+function pestGuideMatches() {
+    const kw = String(PestGuideState.keyword || '').trim().toLowerCase();
+    return PestGuideState.entries.filter(function(entry) {
+        if (PestGuideState.crop && entry.crop !== PestGuideState.crop) return false;
+        if (!kw) return true;
+        const blob = [
+            entry.disease, entry.alias, entry.pathogen, entry.crop_name,
+            pestArray(entry.symptoms).join(' ')
+        ].join(' ').toLowerCase();
+        return blob.indexOf(kw) !== -1;
+    });
+}
+
+function pestGuideMetaText(shown) {
+    if (!PestGuideState.loaded) return '';
+    const total = PestGuideState.entries.length;
+    const kw = String(PestGuideState.keyword || '').trim();
+    const scope = pestCropName(PestGuideState.crop);
+    if (kw) return '「' + kw + '」匹配 ' + shown + ' 条 · ' + scope + ' · 速查共 ' + total + ' 条';
+    return scope + '：' + shown + ' 条 · 速查共 ' + total + ' 条';
+}
+
+function renderPestCards() {
+    const grid = document.getElementById('pest-guide-grid');
+    const emptyEl = document.getElementById('pest-guide-empty');
+    const metaEl = document.getElementById('pest-guide-meta');
+    if (!grid) return;
+
+    const list = pestGuideMatches();
+    grid.innerHTML = list.map(pestCardHTML).join('');
+    if (metaEl) metaEl.textContent = pestGuideMetaText(list.length);
+
+    // 只有「确实取到数据、但筛完为空」才提示无匹配；
+    // 数据还没取到时不能显示「没有匹配的条目」。
+    if (emptyEl) {
+        emptyEl.classList.toggle('is-hidden', !(PestGuideState.loaded && list.length === 0));
+    }
+}
+
+function pestCardHTML(entry) {
+    const isPest = entry.kind === 'pest';
+    const kindTag = '<span class="pest-kind-tag ' + (isPest ? 'is-pest' : 'is-disease') + '">' +
+        (isPest ? '虫害' : '病害') + '</span>';
+    const cropTag = pestHas(entry.crop_name)
+        ? '<span class="pest-kind-tag">' + escapeHtml(entry.crop_name) + '</span>'
+        : '';
+
+    const thumb = (entry.image && entry.image.file)
+        ? '<img src="' + pestAttr(entry.image.file) + '" alt="' + pestAttr(entry.disease + ' 实拍图') +
+          '" loading="lazy">'
+        : '<div class="pest-card-thumb-empty"><i class="fas fa-image" aria-hidden="true"></i>' +
+          '<span>暂无实拍图</span></div>';
+
+    const alias = pestHas(entry.alias)
+        ? '<p class="pest-card-alias">别名：' + escapeHtml(entry.alias) + '</p>'
+        : '';
+
+    const part = pestHas(entry.part)
+        ? '<span class="pest-card-part" title="' + pestAttr(entry.part) + '">' +
+          '<i class="fas fa-crosshairs" aria-hidden="true"></i> ' + escapeHtml(entry.part) + '</span>'
+        : '<span class="pest-card-part"></span>';
+
+    return '<article class="pest-card" role="button" tabindex="0" data-pest-id="' +
+        pestAttr(entry.id) + '" aria-label="查看' + pestAttr(entry.disease) + '详情">' +
+        '<div class="pest-card-thumb">' +
+            '<div class="pest-card-tags">' + kindTag + cropTag + '</div>' +
+            thumb +
+        '</div>' +
+        '<div class="pest-card-body">' +
+            '<h4>' + escapeHtml(entry.disease) + '</h4>' + alias +
+            '<div class="pest-card-foot">' + part +
+                '<span class="pest-card-part">详情 ›</span>' +
+            '</div>' +
+        '</div>' +
+    '</article>';
+}
+
+// ---------- 详情弹窗 ----------
+
+function openPestModal(id) {
+    const entry = PestGuideState.entries.filter(function(e) { return e.id === id; })[0];
+    if (!entry) return;
+
+    const modal = document.getElementById('pest-modal');
+    const titleEl = document.getElementById('pest-modal-title');
+    const bodyEl = document.getElementById('pest-modal-body');
+    if (!modal || !bodyEl) return;
+
+    if (titleEl) {
+        const sub = [];
+        if (pestHas(entry.crop_name)) sub.push(entry.crop_name);
+        sub.push(entry.kind === 'pest' ? '虫害' : '病害');
+        titleEl.innerHTML = escapeHtml(entry.disease) +
+            '<span class="pest-modal-sub">' + escapeHtml(sub.join(' · ')) + '</span>';
+    }
+    bodyEl.innerHTML = pestModalHTML(entry);
+
+    PestGuideState.lastFocus = document.activeElement;
+    modal.classList.remove('is-hidden');
+    // 锁背景滚动；记下原值，关闭时原样恢复，避免影响其它弹窗
+    if (PestGuideState.prevBodyOverflow === null) {
+        PestGuideState.prevBodyOverflow = document.body.style.overflow || '';
+    }
+    document.body.style.overflow = 'hidden';
+    bodyEl.scrollTop = 0;
+    document.getElementById('pest-modal-close')?.focus();
+}
+
+function closePestModal() {
+    const modal = document.getElementById('pest-modal');
+    if (!modal || modal.classList.contains('is-hidden')) return;
+
+    modal.classList.add('is-hidden');
+    if (PestGuideState.prevBodyOverflow !== null) {
+        document.body.style.overflow = PestGuideState.prevBodyOverflow;
+        PestGuideState.prevBodyOverflow = null;
+    }
+    const bodyEl = document.getElementById('pest-modal-body');
+    if (bodyEl) bodyEl.innerHTML = '';
+
+    const back = PestGuideState.lastFocus;
+    PestGuideState.lastFocus = null;
+    if (back && typeof back.focus === 'function' && document.contains(back)) back.focus();
+}
+
+function pestModalHTML(entry) {
+    const blocks = [];
+    const symptoms = pestArray(entry.symptoms);
+    const treatment = pestArray(entry.treatment);
+    const prevention = pestArray(entry.prevention);
+    const registered = pestArray(entry.registered);
+    const chemTable = pestArray(entry.chem_table);
+
+    // 实拍图 / 明确占位 —— 没有授权图就不放图，绝不用示意图冒充
+    if (entry.image && entry.image.file) {
+        const credit = pestHas(entry.image.credit) ? escapeHtml(entry.image.credit) : '';
+        const license = pestHas(entry.image.license) ? escapeHtml(entry.image.license) : '';
+        const shot = pestHas(entry.image.shot_date) ? '摄于 ' + escapeHtml(entry.image.shot_date) : '';
+        const srcUrl = pestSafeUrl(entry.image.source_url);
+        const link = srcUrl
+            ? '<a href="' + pestAttr(srcUrl) + '" target="_blank" rel="noopener noreferrer">查看图片来源</a>'
+            : '';
+        // 署名 / 许可 / 拍摄日期 / 来源，缺哪个就不占位（CC 类许可要求标注许可类型）
+        const caption = [credit, license, shot, link]
+            .filter(function (s) { return !!s; }).join(' · ');
+        // 图注：单独一行，说明这张照片拍的是哪个**虫态**（若虫/成虫）、哪个**具体种**。
+        // 稻飞虱 / 水稻螟虫 / 荔枝卷叶虫 / 龙眼蚧壳虫 / 蔬菜蚜虫 这些条目名是类群名，
+        // 照片必然只拍到其中一个种；不标出来就等于把「一种」冒充「一类」。
+        const captionNote = pestHas(entry.image.caption)
+            ? '<span class="pest-modal-caption-note">' + escapeHtml(entry.image.caption) + '</span>'
+            : '';
+        blocks.push(
+            '<figure class="pest-modal-figure">' +
+                '<img src="' + pestAttr(entry.image.file) + '" alt="' + pestAttr(entry.disease + ' 实拍图') + '">' +
+                '<figcaption>' + captionNote + caption + '</figcaption>' +
+            '</figure>'
+        );
+    } else {
+        blocks.push(
+            '<p class="pest-modal-noimg">' +
+                '<i class="fas fa-image" aria-hidden="true"></i> ' +
+                '该条目暂无可用授权实拍图，此处不提供示意图。请对照下方症状文字与当地农技员核实。' +
+            '</p>'
+        );
+    }
+
+    // 基本事实
+    const facts = ['<span class="pest-fact"><b>类别：</b>' +
+        (entry.kind === 'pest' ? '虫害' : '病害') + '</span>'];
+    if (pestHas(entry.alias)) facts.push('<span class="pest-fact"><b>别名：</b>' + escapeHtml(entry.alias) + '</span>');
+    if (pestHas(entry.pathogen)) facts.push('<span class="pest-fact"><b>病原/学名：</b>' + escapeHtml(entry.pathogen) + '</span>');
+    if (pestHas(entry.part)) facts.push('<span class="pest-fact"><b>主要为害部位：</b>' + escapeHtml(entry.part) + '</span>');
+    if (pestHas(entry.severity)) facts.push('<span class="pest-fact"><b>危害程度：</b>' + escapeHtml(entry.severity) + '</span>');
+    blocks.push('<div class="pest-facts">' + facts.join('') + '</div>');
+
+    if (symptoms.length) blocks.push(pestBlockHTML('典型症状', 'fas fa-stethoscope', pestListHTML(symptoms)));
+    if (pestHas(entry.occurrence)) {
+        blocks.push(pestBlockHTML('发生规律', 'fas fa-cloud-rain',
+            '<p class="pest-paragraph">' + escapeHtml(entry.occurrence) + '</p>'));
+    }
+    if (treatment.length) blocks.push(pestBlockHTML('化学防治要点', 'fas fa-spray-can', pestListHTML(treatment)));
+    if (prevention.length) blocks.push(pestBlockHTML('农业防治与预防', 'fas fa-shield', pestListHTML(prevention)));
+    if (registered.length) blocks.push(pestBlockHTML('推荐 / 登记药剂', 'fas fa-flask', pestTagsHTML(registered)));
+    if (chemTable.length) blocks.push(pestBlockHTML('用药参考表', 'fas fa-table', pestChemTableHTML(chemTable)));
+    if (pestHas(entry.safety_note)) {
+        blocks.push('<p class="pest-warn"><i class="fas fa-exclamation-triangle" aria-hidden="true"></i>' +
+            '<span>' + escapeHtml(entry.safety_note) + '</span></p>');
+    }
+
+    blocks.push(pestSourcesHTML(entry));
+    return blocks.join('');
+}
+
+function pestBlockHTML(title, iconClass, inner) {
+    return '<section>' +
+        '<h4 class="pest-block-title"><i class="' + pestAttr(iconClass) + '" aria-hidden="true"></i>' +
+        escapeHtml(title) + '</h4>' + inner + '</section>';
+}
+
+function pestListHTML(items) {
+    return '<ul class="pest-list">' + items.map(function(item) {
+        return '<li>' + escapeHtml(item) + '</li>';
+    }).join('') + '</ul>';
+}
+
+function pestTagsHTML(items) {
+    return '<div class="pest-tags">' + items.map(function(item) {
+        return '<span class="pest-tag">' + escapeHtml(item) + '</span>';
+    }).join('') + '</div>';
+}
+
+function pestChemCell(value, unit) {
+    if (!pestHas(value)) return '<td class="is-empty">未提供</td>';
+    return '<td>' + escapeHtml(String(value)) + (unit ? ' ' + unit : '') + '</td>';
+}
+
+function pestChemTableHTML(rows) {
+    const head = '<thead><tr><th>药剂</th><th>参考用量</th><th>安全间隔期</th>' +
+        '<th>每季最多使用</th></tr></thead>';
+    const body = rows.map(function(row) {
+        return '<tr>' +
+            '<td>' + escapeHtml(row.agent || '') + '</td>' +
+            pestChemCell(row.dose, '') +
+            pestChemCell(row.interval_days, '天') +
+            pestChemCell(row.max_times, '次') +
+        '</tr>';
     }).join('');
-
-    // 反馈
-    const feedbackEl = document.getElementById('score-feedback');
-    if (feedbackEl) feedbackEl.textContent = score.feedback || '表现不错，继续练习！';
-
-    // 亮点和改进
-    const highlightsEl = document.getElementById('score-highlights');
-    if (highlightsEl) {
-        let html = '';
-        if (score.highlights && score.highlights.length) {
-            score.highlights.forEach(h => {
-                const label = metricLabels[h] || h;
-                html += `<span class="highlight-tag good">✓ ${label}</span>`;
-            });
-        }
-        if (score.improvements && score.improvements.length) {
-            score.improvements.forEach(h => {
-                const label = metricLabels[h] || h;
-                html += `<span class="highlight-tag improve">↑ 待提升：${label}</span>`;
-            });
-        }
-        highlightsEl.innerHTML = html;
-    }
-
-    document.getElementById('practice-score')?.classList.remove('is-hidden');
-
-    // 动画数字
-    container.querySelectorAll('.score-metric-value').forEach(el => {
-        const target = parseInt(el.textContent);
-        animateNumber(el, target, 800);
-    });
+    return '<div class="pest-table-wrap"><table class="pest-table">' + head +
+        '<tbody>' + body + '</tbody></table></div>' +
+        '<p class="pest-refnote">表中「未提供」表示所引来源未标注该项数值，本速查不作推算，' +
+        '实际以所购农药标签为准。</p>';
 }
 
-// ==================== 手工AR指导 ====================
-
-const CraftARState = { currentCraft: 'embroidery', currentStep: 1, totalSteps: 5, initialized: false };
-
-function initCraftAR() {
-    if (CraftARState.initialized) return;
-    CraftARState.initialized = true;
-
-    // 手艺选择
-    document.querySelectorAll('.craft-ar-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.craft-ar-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            CraftARState.currentCraft = this.dataset.craft;
-            CraftARState.currentStep = 1;
-            loadCraftSteps();
-            loadCraftGuide();
-        });
-    });
-
-    loadCraftSteps();
-    loadCraftGuide();
-}
-
-function loadCraftSteps() {
-    const nav = document.getElementById('ar-steps-nav');
-    if (!nav) return;
-    // 从CRAFT_AR_GUIDES获取步数（默认5步）
-    const stepCount = { embroidery: 5, woodcarving: 5, ceramics: 5 }[CraftARState.currentCraft] || 5;
-    CraftARState.totalSteps = stepCount;
-    nav.innerHTML = '';
-    for (let i = 1; i <= stepCount; i++) {
-        const btn = document.createElement('button');
-        btn.className = 'ar-step-btn' + (i === CraftARState.currentStep ? ' active' : '');
-        btn.textContent = i;
-        btn.addEventListener('click', () => {
-            CraftARState.currentStep = i;
-            nav.querySelectorAll('.ar-step-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            loadCraftGuide();
-        });
-        nav.appendChild(btn);
-    }
-}
-
-async function loadCraftGuide() {
-    const canvas = document.getElementById('ar-canvas');
-    const placeholder = canvas?.querySelector('.ar-placeholder');
-    const stepDisplay = document.getElementById('ar-step-display');
-
-    // 更新3D预览区
-    if (placeholder) placeholder.classList.add('is-hidden');
-    if (stepDisplay) {
-        stepDisplay.classList.remove('is-hidden');
-        document.getElementById('ar-step-number').textContent = CraftARState.currentStep;
+function pestSourcesHTML(entry) {
+    const sources = pestArray(entry.sources);
+    let inner;
+    if (!sources.length) {
+        inner = '<p class="pest-refnote">该条目未登记具体出处，请谨慎参考。</p>';
+    } else {
+        inner = '<div class="pest-sources">' + sources.map(function(src) {
+            const docBits = [];
+            // 「待核」是明确的状态（照实说没核到）；「—」/空 表示这类来源本来就没有文号，直接不显示
+            const docNo = String(src.doc_no == null ? '' : src.doc_no).trim();
+            if (docNo === '待核') docBits.push('文号待核');
+            else if (docNo && docNo !== '—' && docNo !== '-') docBits.push(escapeHtml(docNo));
+            if (pestHas(src.date)) docBits.push(escapeHtml(src.date));
+            const docLine = docBits.length
+                ? ' <span class="pest-source-doc">（' + docBits.join(' · ') + '）</span>' : '';
+            const srcUrl = pestSafeUrl(src.url);
+            const link = srcUrl
+                ? '<br><a href="' + pestAttr(srcUrl) + '" target="_blank" rel="noopener noreferrer">' +
+                  escapeHtml(srcUrl) + '</a>'
+                : '';
+            return '<div class="pest-source-item">' +
+                '<strong>' + escapeHtml(src.name || '') + '</strong>' + docLine +
+                '<br><span>' + escapeHtml(src.org || '') +
+                (pestHas(src.doc_type) ? ' · ' + escapeHtml(src.doc_type) : '') + '</span>' +
+                link +
+            '</div>';
+        }).join('') + '</div>';
     }
 
-    try {
-        const data = await apiCall('/api/simulation/craft-ar', 'POST', {
-            craft: CraftARState.currentCraft,
-            step: CraftARState.currentStep
-        });
-        if (data.success && data.guide) {
-            renderCraftGuide(data.guide, data.total_steps);
-        }
-    } catch(e) {
-        showNotification('加载指导失败', 'error');
-    }
-}
+    const note = Number(entry.is_verified) === 1
+        ? '<p class="pest-refnote">本条已由农技人员复核。</p>'
+        : '<p class="pest-refnote">本条依据公开技术资料编排，尚未经农技人员逐条复核，' +
+          '仅供参考；实际防治请结合当地当期病虫情报。</p>';
 
-function renderCraftGuide(guide, totalSteps) {
-    const stepTitle = document.getElementById('ar-step-title');
-    if (stepTitle) stepTitle.textContent = guide.title || '';
-    const desc = document.getElementById('guide-desc');
-    if (desc) desc.textContent = guide.detailed_desc || guide.desc || '';
-    const action = document.getElementById('guide-action');
-    if (action) action.textContent = guide.action || '';
-    const check = document.getElementById('guide-check');
-    if (check) check.textContent = guide.check || '';
-    const mistakes = document.getElementById('guide-mistakes');
-    if (mistakes && guide.common_mistakes) {
-        mistakes.innerHTML = guide.common_mistakes.map(m => `<li>${m}</li>`).join('');
-    }
-    const tips = document.getElementById('guide-tips');
-    if (tips && guide.pro_tips) {
-        tips.innerHTML = guide.pro_tips.map(t => `<li>${t}</li>`).join('');
-    }
-    const time = document.getElementById('guide-time');
-    if (time) time.innerHTML = `<i class="fas fa-clock"></i> 预计耗时：${guide.estimated_time || '--'}`;
-    const stepCount = document.getElementById('guide-step-count');
-    if (stepCount) stepCount.innerHTML = `<i class="fas fa-list-ol"></i> 步骤 ${guide.step || CraftARState.currentStep}/${totalSteps || CraftARState.totalSteps}`;
-
-    // 更新步骤按钮状态
-    document.querySelectorAll('.ar-step-btn').forEach((btn, idx) => {
-        if (idx < CraftARState.currentStep - 1) btn.classList.add('completed');
-        else btn.classList.remove('completed');
-    });
+    return '<section><h4 class="pest-block-title">' +
+        '<i class="fas fa-book" aria-hidden="true"></i>数据来源</h4>' + inner + note + '</section>';
 }
 
 // ==================== 电商模块 ====================
@@ -2126,14 +3932,11 @@ function setupEventListeners() {
             const module = card.dataset.module;
             if (module === 'live-stream') {
                 document.getElementById('live-simulation').classList.remove('is-hidden');
-                // 更新产品标签
-                const tag = document.getElementById('cam-product-tag');
-                if (tag) tag.querySelector('span').textContent = getProductName(AppState.currentProduct);
+                // 2026-10-05：商品标签改为下拉(#live-product)，打开时同步为当前全局作物
+                syncLiveProductSelect();
                 startLiveSimulation();
             } else if (module === 'product-copy') {
                 openCopywritingPanel();
-            } else if (module === 'store-design') {
-                openStoreDesignPanel();
             } else if (module === 'customer-service') {
                 openCustomerServicePanel();
             }
@@ -2151,18 +3954,61 @@ function setupEventListeners() {
         const box = document.getElementById('live-script');
         const text = box?.innerText || '';
         if (text.trim()) {
-            navigator.clipboard.writeText(text).then(() => showNotification('话术已复制', 'success'));
+            copyText(text, '话术已复制');
         }
     });
 
-    // 重新评分
-    document.getElementById('re-score-btn')?.addEventListener('click', () => {
-        const box = document.getElementById('live-script');
-        const text = box?.innerText || '';
-        if (text.trim() && !text.includes('选择话术风格')) {
-            getLiveFeedback(text);
+    // EC3：把 AI 初稿一键放进「我的稿」文本框，学员在此之上改写
+    document.getElementById('adopt-script')?.addEventListener('click', () => {
+        const src = document.getElementById('live-script');
+        const dst = document.getElementById('live-script-mine');
+        const text = (src?.innerText || '').trim();
+        if (!text || /选择风格后点击/.test(text)) {
+            showNotification('请先生成 AI 初稿', 'warning');
+            return;
         }
+        if (dst) {
+            dst.value = text;
+            dst.dispatchEvent(new Event('input'));
+            dst.focus();
+        }
+        // P0-4：采用了新内容，旧评分失效
+        resetLiveScorePanel();
+        showNotification('已放入「我的稿」——补全【待填写】后再提交', 'success');
     });
+
+    // 「我的稿」字数统计
+    document.getElementById('live-script-mine')?.addEventListener('input', updateMyScriptCount);
+
+    // EC3/EC4：朗读实录（麦克风 → 识别 → 可复现指标）
+    document.getElementById('start-reading')?.addEventListener('click', startLiveReading);
+    document.getElementById('stop-reading')?.addEventListener('click', stopLiveReading);
+    document.getElementById('analyze-reading')?.addEventListener('click', analyzeLiveReading);
+
+    // EC7：提交实训 + 实训记录
+    document.getElementById('submit-live')?.addEventListener('click', submitLiveTraining);
+    document.getElementById('toggle-live-records')?.addEventListener('click', () => {
+        const panel = document.getElementById('live-records');
+        if (!panel) return;
+        const willShow = panel.classList.contains('is-hidden');
+        panel.classList.toggle('is-hidden');
+        if (willShow) loadLiveRecords();
+    });
+    document.getElementById('close-live-records')?.addEventListener('click', () => {
+        document.getElementById('live-records')?.classList.add('is-hidden');
+    });
+
+    // 重新评分：EC3 —— 评的是「我的稿」，不是 AI 初稿
+    document.getElementById('re-score-btn')?.addEventListener('click', () => {
+        const text = currentMyScript();
+        if (!text) {
+            showNotification('请先在「我的稿」里写出你自己的话术', 'warning');
+            return;
+        }
+        getLiveFeedback(text);
+    });
+
+    updateMyScriptCount();
 
     // 话术风格切换
     document.querySelectorAll('.style-btn').forEach(btn => {
@@ -2171,6 +4017,102 @@ function setupEventListeners() {
             this.classList.add('active');
         });
     });
+
+    // 直播间进阶（2026-10-05）：训练难度切换（下次「开始直播/开始朗读」生效，
+    // 运行中切换不追溯已注入的突发状况）
+    document.getElementById('live-difficulty')?.addEventListener('change', function() {
+        LiveState.difficulty = this.value || '新手';
+        showNotification('难度已切换为「' + LiveState.difficulty + '」', 'info');
+    });
+
+    // 2026-10-05：直播间内切换商品 —— 与顶部「选择农产品」双向联动。
+    // 这里程序化触发对应顶部作物卡的 click，复用它的整条同步链
+    // （AppState + localStorage + 农时日历 + 诊断/速查面板跟随），不另写一份同步逻辑。
+    // 评论池/AI 弹幕/AI 话术/提交记录都在各自调用点实时读 AppState.currentProduct。
+    // P1-1（2026-10-05 走查）：切换商品时**清空已生成内容**，否则学员把旧作物的稿子
+    // 提交到新作物名下（名实不符）。有内容时先弹确认，防误触清空。
+    document.getElementById('live-product')?.addEventListener('change', function() {
+        const pid = this.value;
+        if (!pid || pid === AppState.currentProduct) return;
+        const card = document.querySelector('.product-card[data-product="' + pid + '"]');
+        if (!card) { this.value = AppState.currentProduct || 'lychee'; return; }
+        const prevProduct = AppState.currentProduct;
+        const hasContent = currentMyScript() ||
+            /(?:<p|AI|家人们|各位|宝子们|姐妹)/.test(
+                (document.getElementById('live-script')?.innerText || '').trim());
+        const doSwitch = function () {
+            card.click();
+            resetLiveContent();
+            addLiveComment('系统', '已切换商品：' + getProductName(pid) +
+                ' —— 观众提问和 AI 话术将跟随新品，记得重新生成初稿');
+        };
+        if (hasContent) {
+            // 原生 confirm：阻断式确认，语义清晰，不额外引入弹窗组件
+            if (window.confirm('切换商品会清空当前的 AI 初稿、我的稿、评分与朗读实录，确定切换吗？')) {
+                doSwitch();
+            } else {
+                document.getElementById('live-product').value = prevProduct;
+            }
+        } else {
+            doSwitch();
+        }
+    });
+}
+
+// P1-1：清空直播间所有已生成内容（切换商品时调用，防止跨作物名实不符）。
+function resetLiveContent() {
+    // AI 初稿框回到占位
+    const scriptBox = document.getElementById('live-script');
+    if (scriptBox) {
+        scriptBox.innerHTML = '<div class="script-placeholder">' +
+            '<i class="fas fa-magic"></i><p>选择风格后点击"生成 AI 初稿"</p></div>';
+    }
+    document.getElementById('script-degraded')?.classList.add('is-hidden');
+    // 我的稿清空 + 字数归零 + 评分入口隐藏
+    const mine = document.getElementById('live-script-mine');
+    if (mine) { mine.value = ''; updateMyScriptCount(); }
+    document.getElementById('re-score-btn')?.classList.add('is-hidden');
+    // 评分面板复位
+    document.getElementById('feedback-placeholder')?.classList.remove('is-hidden');
+    document.getElementById('feedback-body')?.classList.add('is-hidden');
+    const fm = document.getElementById('feedback-metrics');
+    if (fm) fm.innerHTML = '';
+    document.getElementById('feedback-suggestions')?.classList.add('is-hidden');
+    document.getElementById('feedback-summary')?.classList.add('is-hidden');
+    const src = document.getElementById('feedback-source');
+    if (src) { src.classList.add('is-hidden'); src.innerHTML = ''; }
+    // 朗读实录复位
+    resetLiveReading();
+    document.getElementById('reading-report-placeholder')?.classList.remove('is-hidden');
+    document.getElementById('reading-report-body')?.classList.add('is-hidden');
+    // 状态里的评分/报告一并清掉
+    delete LiveState.lastFeedback;
+    delete LiveState.lastReport;
+}
+
+// P0-4（学员端走查）：清掉「我的稿」的旧评分 —— 重新生成初稿 / 采用新内容后调用。
+// 评分对象是「我的稿」；一旦稿子被替换，旧分必须清掉，否则「评分 → 重新生成 →
+// 采用 → 提交」会把上一版稿子的分数连同新稿一起落库。
+function resetLiveScorePanel() {
+    delete LiveState.lastFeedback;
+    delete LiveState.scoredScript;
+    document.getElementById('feedback-placeholder')?.classList.remove('is-hidden');
+    document.getElementById('feedback-body')?.classList.add('is-hidden');
+    const fm = document.getElementById('feedback-metrics');
+    if (fm) fm.innerHTML = '';
+    document.getElementById('feedback-suggestions')?.classList.add('is-hidden');
+    document.getElementById('feedback-summary')?.classList.add('is-hidden');
+    const src = document.getElementById('feedback-source');
+    if (src) { src.classList.add('is-hidden'); src.innerHTML = ''; }
+}
+
+// 打开直播间时把商品下拉同步为当前全局作物（唯一入口，防止下拉与全局口径脱节）
+function syncLiveProductSelect() {
+    const sel = document.getElementById('live-product');
+    if (!sel) return;
+    const pid = AppState.currentProduct || 'lychee';
+    // 全局作物一定在 8 个白名单内；万一存储了未知值，下拉回退到荔枝
+    sel.value = PRODUCT_NAMES[pid] ? pid : 'lychee';
 }
 
 // ==================== 直播模拟 ====================
@@ -2180,11 +4122,38 @@ const LiveState = {
     seconds: 0,
     commentTimer: null,
     statTimer: null,
+    introTimer: null,
+    challengeTimer: null,   // 「挑战」难度的突发状况注入
     viewers: 0,
     likes: 0,
     comments: 0,
-    isRunning: false
+    isRunning: false,
+    difficulty: '新手',     // 直播间进阶（2026-10-05）：新手/进阶/挑战
+    pendingChallenge: null, // {text, at} 等待学员回应的突发状况
+    // EC4：新增 —— 让直播间对学员的**实际表现**有反应
+    speaking: false,        // 当前是否正在说话（由语音识别驱动）
+    silenceSec: 0,          // 连续未说话秒数
+    maxSilenceSec: 0,       // 本次最长冷场
+    reading: false          // 是否已开始朗读（P3-6：冷场只在朗读后才统计）
 };
+
+// 「进阶/挑战」难度的质疑型评论池（与作物无关，砍价/质疑/要证据）。
+// 直播间进阶（2026-10-05）：难度越高，从这里取评论的概率越大。
+const LIVE_COMMENTS_HARD = [
+    '别家更便宜，凭什么买你的？', '真有你说的那么好吗？', '包邮吗？不包邮就算了',
+    '有农残检测报告吗？口说无凭', '上次买的水果坏了一半', '甜不甜啊？别是酸的吧',
+    '能便宜点吗？贵了', '发什么快递？几天到？', '个头均匀吗？别图文不符',
+    '支持退货吗？坏了怎么办？'
+];
+
+// 「挑战」难度会定期注入的突发状况；学员在 25 秒内给出安抚/解决方案可挽回观众。
+const CHALLENGE_EVENTS = [
+    '有观众刷屏：上次买的有一半是坏的！',
+    '有观众说：别家同款比你便宜 20 块！',
+    '有观众质疑：你说的新鲜，到手蔫了怎么办？',
+    '有观众催：到底什么时候发货？说个准数！',
+    '有观众问：你刚才说的优惠，链接里怎么没有？'
+];
 
 const LIVE_COMMENTS = {
     lychee: [
@@ -2197,6 +4166,18 @@ const LIVE_COMMENTS = {
         '龙眼甜吗？', '肉厚不厚？', '哪里产的？', '几斤装？',
         '可以煲汤吗？', '新鲜的还是干的？', '来一箱试试',
         '去年买过不错', '发货快吗？', '有优惠吗？'
+    ],
+    // EC8：A3 把顶部作物补齐到 8 个之后，这里漏了柑橘与香蕉，
+    // 会导致选柑橘开直播时评论池回退成荔枝（刷出「这个荔枝甜不甜？」）。
+    citrus: [
+        '是砂糖橘还是沃柑？', '甜不甜？', '酸不酸？', '皮薄吗？',
+        '几斤装？', '哪里产的？', '有籽吗？', '什么时候上市？',
+        '可以榨汁吗？', '发货快吗？', '有优惠吗？', '来一箱试试'
+    ],
+    banana: [
+        '什么品种？', '香不香？', '是粉蕉还是香蕉？', '熟了吗？',
+        '几斤装？', '哪里产的？', '怎么保存？', '放几天会坏？',
+        '可以寄吗？', '有优惠吗？', '来一把试试', '甜不甜？'
     ],
     aquatic: [
         '鱼新鲜吗？', '怎么配送？', '什么品种？', '有没有刺少的？',
@@ -2220,53 +4201,133 @@ const LIVE_COMMENTS = {
     ]
 };
 
+// EC4：此前观众/点赞/评论是三个互不相干的随机数定时器 —— 学员说不说话，
+// 数值都一模一样，直播间根本不构成「训练反馈」。现在改为：
+//   · 观众只在开场阶段陆续进入；
+//   · 之后完全由学员的表现驱动（说了互动指令→点赞评论涨；冷场→观众流失）。
+const LIVE_USERS = ['小明', '阿花', '老王', '靓妹', '农家大姐', '吃货小李', '广东阿叔', '深圳打工仔', '佛山靓女', '潮汕老板'];
+
+function liveCommentPool() {
+    const product = AppState.currentProduct || 'lychee';
+    return LIVE_COMMENTS[product] || LIVE_COMMENTS.lychee;
+}
+
+function liveRandomComment() {
+    // 直播间进阶：难度决定「质疑型评论」混入比例（挑战 60% / 进阶 35% / 新手 0%）
+    const diff = LiveState.difficulty || '新手';
+    const hardRatio = diff === '挑战' ? 0.6 : (diff === '进阶' ? 0.35 : 0);
+    let text;
+    if (hardRatio > 0 && Math.random() < hardRatio) {
+        text = LIVE_COMMENTS_HARD[Math.floor(Math.random() * LIVE_COMMENTS_HARD.length)];
+    } else {
+        const pool = liveCommentPool();
+        text = pool[Math.floor(Math.random() * pool.length)];
+    }
+    return {
+        user: LIVE_USERS[Math.floor(Math.random() * LIVE_USERS.length)],
+        text: text
+    };
+}
+
 function startLiveSimulation() {
     if (LiveState.isRunning) return;
     LiveState.isRunning = true;
     LiveState.seconds = 0;
-    LiveState.viewers = Math.floor(Math.random() * 50) + 20;
-    LiveState.likes = Math.floor(Math.random() * 100) + 50;
+    LiveState.viewers = 5;
+    LiveState.likes = 0;
     LiveState.comments = 0;
+    LiveState.speaking = false;
+    LiveState.silenceSec = 0;
+    LiveState.maxSilenceSec = 0;
+    LiveState.pendingChallenge = null;
+    LiveState.reading = false;   // P3-6：重新开始时重置朗读标志
+    // 同步难度选择
+    const diffSel = document.getElementById('live-difficulty');
+    LiveState.difficulty = (diffSel && diffSel.value) || '新手';
 
     updateLiveStats();
     document.getElementById('live-badge')?.classList.add('active');
 
-    // 计时器
+    // 计时器 + 冷场统计
     LiveState.timer = setInterval(() => {
         LiveState.seconds++;
         const mm = String(Math.floor(LiveState.seconds / 60)).padStart(2, '0');
         const ss = String(LiveState.seconds % 60).padStart(2, '0');
         const el = document.getElementById('live-duration');
         if (el) el.textContent = `${mm}:${ss}`;
+
+        if (LiveState.speaking) {
+            LiveState.silenceSec = 0;
+        } else if (LiveState.reading) {
+            // P3-6：只在「开始朗读」之后才做冷场统计 —— 生成初稿阶段学员还没开麦，
+            // 不该把读稿准备时间记成「最长冷场」扣分。
+            LiveState.silenceSec++;
+            if (LiveState.silenceSec > LiveState.maxSilenceSec) {
+                LiveState.maxSilenceSec = LiveState.silenceSec;
+            }
+            // 冷场超过 5 秒，观众开始流失
+            if (LiveState.silenceSec % 5 === 0) {
+                LiveState.viewers = Math.max(0, LiveState.viewers - 2);
+                updateLiveStats();
+            }
+        }
+
+        // 突发状况超时未回应 → 观众流失
+        if (LiveState.pendingChallenge && Date.now() - LiveState.pendingChallenge.at > 25000) {
+            addLiveComment('系统', '主播一直没有回应，有观众离开了…');
+            LiveState.viewers = Math.max(0, LiveState.viewers - 4);
+            updateLiveStats();
+            LiveState.pendingChallenge = null;
+        }
     }, 1000);
 
-    // 观众增长
-    LiveState.statTimer = setInterval(() => {
-        LiveState.viewers += Math.floor(Math.random() * 8) - 2;
-        LiveState.viewers = Math.max(10, LiveState.viewers);
-        LiveState.likes += Math.floor(Math.random() * 15);
+    // 观众陆续进入（仅开场的一段，之后完全由学员表现驱动）
+    let entered = 0;
+    LiveState.introTimer = setInterval(() => {
+        entered++;
+        LiveState.viewers += Math.floor(Math.random() * 4) + 1;
         updateLiveStats();
-    }, 3000);
+        if (entered >= 4) {
+            clearInterval(LiveState.introTimer);
+            LiveState.introTimer = null;
+        }
+    }, 1500);
 
-    // 模拟评论
-    const product = AppState.currentProduct || 'lychee';
-    const comments = LIVE_COMMENTS[product] || LIVE_COMMENTS.lychee;
-    const users = ['小明', '阿花', '老王', '靓妹', '农家大姐', '吃货小李', '广东阿叔', '深圳打工仔', '佛山靓女', '潮汕老板'];
-    LiveState.commentTimer = setInterval(() => {
-        const user = users[Math.floor(Math.random() * users.length)];
-        const text = comments[Math.floor(Math.random() * comments.length)];
-        addLiveComment(user, text);
-        LiveState.comments++;
-        const el = document.getElementById('comment-count');
-        if (el) el.textContent = LiveState.comments;
-    }, 2500 + Math.random() * 3000);
+    // 「挑战」难度：每 40~60 秒注入一条突发状况
+    if (LiveState.difficulty === '挑战') {
+        const inject = () => {
+            if (!LiveState.isRunning) return;
+            const evt = CHALLENGE_EVENTS[Math.floor(Math.random() * CHALLENGE_EVENTS.length)];
+            addLiveComment('⚡ 突发状况', evt, true);   // 观众刷屏，计入评论数
+            LiveState.pendingChallenge = { text: evt, at: Date.now() };
+            LiveState.challengeTimer = setTimeout(inject, 40000 + Math.floor(Math.random() * 20000));
+        };
+        LiveState.challengeTimer = setTimeout(inject, 20000);
+    }
 }
 
 function stopLiveSimulation() {
     LiveState.isRunning = false;
     clearInterval(LiveState.timer);
+    clearInterval(LiveState.introTimer);
     clearInterval(LiveState.statTimer);
     clearInterval(LiveState.commentTimer);
+    clearTimeout(LiveState.challengeTimer);
+    LiveState.introTimer = null;
+    LiveState.challengeTimer = null;
+    LiveState.pendingChallenge = null;
+    // P2-4（2026-10-05 走查）：朗读计时器 + 冷场状态一并清，避免先朗读再关弹窗后
+    // 「分析朗读」的时长/冷场统计错乱。
+    clearInterval(LiveReading.timer);
+    LiveReading.timer = null;
+    // P0-3（学员端走查）：关闭直播间必须同时停掉语音识别 —— 识别器的 onend 在
+    // LiveReading.running 为真时会自动重启，只清 timer 会让麦克风一直被占用到刷新页面。
+    LiveReading.running = false;
+    try { LiveReading.recognition && LiveReading.recognition.stop(); } catch (err) { /* ignore */ }
+    LiveReading.recognition = null;
+    LiveState.speaking = false;
+    LiveState.silenceSec = 0;
+    _lastAiCommentAt = 0;  // 重置 AI 评论节流，避免跨场被 12s 节流卡住
     document.getElementById('live-badge')?.classList.remove('active');
 }
 
@@ -2277,7 +4338,9 @@ function updateLiveStats() {
     if (le) le.textContent = LiveState.likes;
 }
 
-function addLiveComment(user, text) {
+// count=true 表示该评论计入「评论数」统计（观众/突发状况）；系统提示（开播、切换商品、
+// 超时流失）传 false，不计入。P3-7：把计数统一收进这里，避免调用处漏计导致列表与数字对不上。
+function addLiveComment(user, text, count) {
     const container = document.getElementById('live-comments');
     if (!container) return;
     const div = document.createElement('div');
@@ -2285,21 +4348,473 @@ function addLiveComment(user, text) {
     div.innerHTML = `<span class="comment-user">${user}：</span>${text}`;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+    if (count) {
+        LiveState.comments++;
+        const cc = document.getElementById('comment-count');
+        if (cc) cc.textContent = LiveState.comments;
+    }
     // 限制评论数量
     while (container.children.length > 30) container.firstChild.remove();
+}
+
+// ---- EC4：观众对学员所说内容的即时反应 --------------------------------------
+// 命中不同类别的关键词，直播间给出不同反馈。这才是「模拟训练」的反馈回路：
+// 学员能直观看到「说对了什么」带来了什么结果。
+const LIVE_REACTIONS = [
+    { re: /扣\s*\d|扣一|点个赞|点赞|关注|想要的|评论区|公屏/, like: 6, comment: true },
+    { re: /价|元|块|钱|优惠|折扣|包邮|特价|划算/, like: 3, comment: true },
+    { re: /斤|克|公斤|规格|果径|个头|品相|箱|装|份|袋/, like: 2, comment: true },
+    { re: /甜|香|鲜|脆|嫩|糯|口感|风味|好吃|汁水/, like: 3, comment: true },
+    { re: /广东|岭南|产地|原产|种植|养殖|果园|农场|产区/, like: 2, comment: true },
+    { re: /售后|退|换|赔|保障|包退|包赔|放心|时效/, like: 2, comment: true }
+];
+
+function liveAudienceReact(text) {
+    if (!text) return;
+
+    // 「挑战」难度：突发状况的回应判定（安抚/给方案 → 观众回流；无视则在上面的
+    // 计时器里按超时处理）
+    if (LiveState.pendingChallenge &&
+        /抱歉|对不起|包赔|包退|退换|补发|放心|一定|检测|报告|马上|立即|核实/.test(text)) {
+        addLiveComment(LIVE_USERS[Math.floor(Math.random() * LIVE_USERS.length)],
+            '主播回应挺快的，再看看', true);
+        LiveState.viewers += 6;
+        LiveState.likes += 10;
+        LiveState.pendingChallenge = null;
+        updateLiveStats();
+    }
+
+    const fired = LIVE_REACTIONS.filter(function (r) { return r.re.test(text); });
+    if (!fired.length) {
+        // 即使没命中卖点关键词，也试着让 AI 观众顺着话头发问（题库化）
+        maybeAiComment(text);
+        return;
+    }
+
+    let likes = 0;
+    fired.forEach(function (r) {
+        likes += r.like;
+        if (r.comment) {
+            const c = liveRandomComment();
+            addLiveComment(c.user, c.text, true);
+        }
+    });
+    LiveState.likes += likes;
+    LiveState.viewers += Math.floor(fired.length / 2) + 1;   // 讲得对，有人留下来看
+    updateLiveStats();
+
+    maybeAiComment(text);
+}
+
+// ---- 直播间进阶（2026-10-05）·题库化：AI 按学员刚说的话生成针对性观众提问 ----
+let _lastAiCommentAt = 0;
+function maybeAiComment(speech) {
+    if (!LiveState.isRunning) return;
+    // 节流：至少间隔 12 秒，避免跟语音识别节奏打爆接口
+    if (Date.now() - _lastAiCommentAt < 12000) return;
+    _lastAiCommentAt = Date.now();
+    // P3-8（2026-10-05 走查）：优先用累积的朗读全文，而不是当前识别片段，
+    // 否则 AI 只看到半句话，提问会问串、上下文断裂。
+    const full = (LiveReading.transcript || '').trim();
+    const text = full || String(speech || '').trim();
+    if (!text) return;
+    apiCall('/api/ecommerce/live/comments', 'POST', {
+        speech: text.slice(0, 200),
+        product: getProductName(AppState.currentProduct || 'lychee'),
+        difficulty: LiveState.difficulty || '新手'
+    }).then(function (d) {
+        if (d && d.success && d.comments) {
+            d.comments.forEach(function (c) {
+                addLiveComment(LIVE_USERS[Math.floor(Math.random() * LIVE_USERS.length)], c, true);
+            });
+        }
+        // 失败/限流静默回退：规则评论池仍由 liveAudienceReact 的正常路径补充，
+        // 不让「AI 不可用」打断训练。
+    }).catch(function () { /* 静默：AI 评论是增强项，不是必需项 */ });
+}
+
+// ---- EC3/EC4：朗读实录（麦克风 → 识别 → 可复现指标）-------------------------
+// 复用项目里已在方言语音问答使用过的 SpeechRecognition（无需新依赖）。
+const LiveReading = {
+    recognition: null,
+    running: false,
+    timer: null,
+    seconds: 0,
+    transcript: '',
+    interim: '',
+    lastResultAt: 0
+};
+
+function liveReadingSupport() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+}
+
+function resetLiveReading() {
+    LiveReading.transcript = '';
+    LiveReading.interim = '';
+    LiveReading.seconds = 0;
+    LiveReading.lastResultAt = 0;
+    const t = document.getElementById('live-transcript-text');
+    if (t) t.textContent = '（开始朗读后显示识别到的内容）';
+    const tm = document.getElementById('reader-timer');
+    if (tm) tm.textContent = '00:00';
+}
+
+function setMicStatus(status, hint) {
+    const p = document.getElementById('mic-status');
+    const h = document.getElementById('mic-hint');
+    const ic = document.getElementById('mic-icon');
+    if (p && status) p.textContent = status;
+    if (h && hint !== undefined) h.textContent = hint;
+    if (ic) ic.className = 'fas ' + (LiveReading.running ? 'fa-microphone-lines' : 'fa-microphone');
+}
+
+function startLiveReading() {
+    if (LiveReading.running) return;
+    if (!liveReadingSupport()) {
+        showNotification('当前浏览器不支持语音识别，可改用文本方式练习', 'warning');
+        setMicStatus('当前浏览器不支持语音识别',
+            '建议用 Chrome / Edge；识别不可用时仍可提交「我的稿」做文本评分');
+        return;
+    }
+    startLiveSimulation();
+    resetLiveReading();
+    LiveReading.running = true;
+    LiveState.reading = true;   // P3-6：从这里才开始冷场统计
+
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const rec = new SR();
+    rec.lang = 'zh-CN';
+    rec.continuous = true;
+    rec.interimResults = true;
+
+    rec.onstart = function () {
+        setMicStatus('正在聆听……请对着麦克风念你的话术', '识别有延迟，属正常现象');
+    };
+    rec.onresult = function (e) {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            const r = e.results[i];
+            if (r.isFinal) {
+                LiveReading.transcript += r[0].transcript;
+                liveAudienceReact(r[0].transcript);
+            } else {
+                interim += r[0].transcript;
+            }
+        }
+        LiveReading.interim = interim;
+        LiveReading.lastResultAt = Date.now();
+        const t = document.getElementById('live-transcript-text');
+        if (t) t.textContent = (LiveReading.transcript + interim) || '……';
+        LiveState.speaking = true;
+        LiveState.silenceSec = 0;
+    };
+    rec.onerror = function (e) {
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+            setMicStatus('麦克风权限被拒绝', '请在浏览器地址栏允许麦克风后重试');
+        } else if (e.error === 'no-speech') {
+            // 正常：一段时间没听到声音，交由冷场统计处理
+        } else {
+            setMicStatus('语音识别中断：' + e.error, '可点「结束朗读」后重新开始');
+        }
+    };
+    rec.onend = function () {
+        // continuous 模式下浏览器偶尔会自动结束；仍在朗读态则自动续上
+        if (LiveReading.running) {
+            try { rec.start(); } catch (err) { /* 已在运行则忽略 */ }
+        }
+    };
+
+    try {
+        rec.start();
+    } catch (err) {
+        LiveReading.running = false;
+        showNotification('无法启动语音识别', 'error');
+        return;
+    }
+    LiveReading.recognition = rec;
+
+    LiveReading.timer = setInterval(function () {
+        LiveReading.seconds++;
+        const mm = String(Math.floor(LiveReading.seconds / 60)).padStart(2, '0');
+        const ss = String(LiveReading.seconds % 60).padStart(2, '0');
+        const tm = document.getElementById('reader-timer');
+        if (tm) tm.textContent = mm + ':' + ss;
+        // 识别有延迟：超过 2.5 秒没有新结果就视为「没在说话」
+        if (LiveReading.lastResultAt && Date.now() - LiveReading.lastResultAt > 2500) {
+            LiveState.speaking = false;
+        }
+    }, 1000);
+
+    document.getElementById('start-reading')?.classList.add('is-hidden');
+    document.getElementById('stop-reading')?.classList.remove('is-hidden');
+}
+
+function stopLiveReading() {
+    LiveReading.running = false;
+    clearInterval(LiveReading.timer);
+    LiveReading.timer = null;
+    try { LiveReading.recognition && LiveReading.recognition.stop(); } catch (err) { /* ignore */ }
+    LiveReading.recognition = null;
+    LiveState.speaking = false;
+    LiveState.reading = false;   // P3-6：结束朗读后停止冷场统计
+    setMicStatus('朗读已结束', '可点「分析朗读」查看完成度、语速与必卖点命中');
+    document.getElementById('start-reading')?.classList.remove('is-hidden');
+    document.getElementById('stop-reading')?.classList.add('is-hidden');
+}
+
+async function analyzeLiveReading() {
+    const script = currentMyScript();
+    const transcript = (LiveReading.transcript || '').trim();
+    if (!script) { showNotification('请先写出「我的稿」', 'warning'); return; }
+    if (!transcript) { showNotification('还没有识别到朗读内容，请先点「开始朗读」', 'warning'); return; }
+
+    const placeholder = document.getElementById('reading-report-placeholder');
+    const body = document.getElementById('reading-report-body');
+    if (placeholder) placeholder.classList.add('is-hidden');
+    if (body) body.classList.remove('is-hidden');
+
+    try {
+        const data = await apiCall('/api/ecommerce/live/report', 'POST', {
+            script: script,
+            transcript: transcript,
+            duration_sec: LiveReading.seconds || LiveState.seconds,
+            max_silence_sec: LiveState.maxSilenceSec
+        });
+        if (data.success) {
+            renderReadingReport(data.report);
+            LiveState.lastReport = data.report;
+        } else {
+            rollbackReadingReportPanel();
+            showNotification(data.message || '分析失败', 'error');
+        }
+    } catch (e) {
+        rollbackReadingReportPanel();
+        showNotification('分析失败，请稍后重试', 'error');
+    }
+}
+
+/* 朗读分析失败时把面板回滚到「未分析」态。旧实现先展开面板再请求，
+   失败分支不回滚 → 留下一个空白报告面板，看起来像页面坏了。 */
+function rollbackReadingReportPanel() {
+    const placeholder = document.getElementById('reading-report-placeholder');
+    const body = document.getElementById('reading-report-body');
+    if (body) body.classList.add('is-hidden');
+    if (placeholder) placeholder.classList.remove('is-hidden');
+}
+
+function renderReadingReport(rep) {
+    if (!rep) return;
+    LiveState.lastReport = rep;
+
+    const overallEl = document.getElementById('reading-overall');
+    if (overallEl) {
+        const g = getScoreGrade(rep.overall_score);
+        overallEl.textContent = rep.overall_score;
+        overallEl.style.color = g.color;
+    }
+
+    const metrics = document.getElementById('reading-metrics');
+    if (metrics) {
+        const rows = [
+            { label: '稿子完成度', value: rep.coverage + '%', icon: 'fa-check-double' },
+            { label: '真实语速', value: rep.speed_cpm + ' 字/分', icon: 'fa-tachometer-alt' },
+            { label: '必卖点命中', value: rep.rubric_hit + '/' + rep.rubric_total, icon: 'fa-bullseye' },
+            { label: '最长冷场', value: rep.max_silence_sec + ' 秒', icon: 'fa-hourglass-half' }
+        ];
+        metrics.innerHTML = rows.map(function (r) {
+            return '<div class="reading-metric"><label><i class="fas ' + r.icon + '"></i> ' +
+                r.label + '</label><strong>' + r.value + '</strong></div>';
+        }).join('');
+    }
+
+    const rubric = document.getElementById('reading-rubric');
+    if (rubric && rep.rubric_items) {
+        rubric.innerHTML = rep.rubric_items.map(function (it) {
+            const cls = it.said ? 'hit' : (it.in_script ? 'missed' : 'absent');
+            const icon = it.said ? 'fa-check-circle' : (it.in_script ? 'fa-exclamation-circle' : 'fa-times-circle');
+            const note = it.said ? '已说出' : (it.in_script ? '稿里有、没说' : '稿里也缺');
+            return '<span class="rubric-chip ' + cls + '"><i class="fas ' + icon + '"></i> ' +
+                it.name + '<em>' + note + '</em></span>';
+        }).join('');
+    }
+
+    const tips = document.getElementById('reading-tips');
+    if (tips) {
+        tips.innerHTML = (rep.tips || []).map(function (t) {
+            return '<div class="reading-tip"><i class="fas fa-lightbulb"></i> ' + escapeHtml(t) + '</div>';
+        }).join('') || '<div class="reading-tip"><i class="fas fa-check"></i> 没发现明显问题</div>';
+    }
+}
+
+// ---- EC3/EC7：我的稿 / 提交实训 / 实训记录 ---------------------------------
+function currentMyScript() {
+    const el = document.getElementById('live-script-mine');
+    return el ? (el.value || '').trim() : '';
+}
+
+function updateMyScriptCount() {
+    const el = document.getElementById('live-script-mine');
+    const meta = document.getElementById('my-script-count');
+    if (!el || !meta) return;
+    const n = (el.value || '').length;
+    meta.textContent = n + ' 字';
+    // 太短时给出提示色（只是视觉提示，不阻断提交）
+    meta.classList.toggle('is-warn', n > 0 && n < 80);
+    // EC3：评分入口跟随「我的稿」出现 —— 此前自动评分被移除后，
+    // 重新评分按钮若仍等首次评分才显示，用户将永远找不到评分入口。
+    const btn = document.getElementById('re-score-btn');
+    if (n > 0) {
+        btn?.classList.remove('is-hidden');
+        // P1-2：评分入口出现时给一次脉冲动画，让学员注意到「要先评分」
+        if (btn && !LiveState.lastFeedback) {
+            btn.classList.remove('score-pulse');
+            void btn.offsetWidth; // 强制重排以重启动画
+            btn.classList.add('score-pulse');
+        }
+    }
+}
+
+async function submitLiveTraining() {
+    const script = currentMyScript();
+    if (!script) { showNotification('请先写出「我的稿」再提交', 'warning'); return; }
+    // P1-2：还没评分就提交 → 明确引导（不阻断，但分数会记 0，提醒学员先评分）
+    if (!LiveState.lastFeedback) {
+        showNotification('提示：还没评分，提交后本稿分数暂记 0。建议先点右上角「重新评分」', 'warning');
+    }
+    // P0-4：评分只对「评分时的那一版我的稿」有效。若稿子已被改动，旧分不能算在新稿上。
+    let feedbackToSend = LiveState.lastFeedback || {};
+    if (LiveState.lastFeedback && LiveState.scoredScript !== script) {
+        feedbackToSend = {};
+        showNotification('提示：我的稿已改动，上次评分已失效，本次按 0 分提交。请重新评分', 'warning');
+    }
+    try {
+        const data = await apiCall('/api/ecommerce/live/submit', 'POST', {
+            product: getProductName(AppState.currentProduct || 'lychee'),
+            script: script,
+            feedback: feedbackToSend,
+            report: LiveState.lastReport || {}
+        });
+        if (data.success) {
+            showNotification('已保存实训记录（第 ' + data.attempts + ' 次）', 'success');
+            loadLiveRecords();
+        }
+    } catch (e) {
+        if (e && e.status === 401) {
+            showNotification('保存失败：请先登录，登录后即可保存实训记录', 'warning', { actionLabel: '去登录', action: openLoginModal });
+        } else if (e && e.status === 429) {
+            showNotification('提交太频繁，请稍后再试', 'warning');
+        } else {
+            showNotification('保存失败，请稍后重试', 'error');
+        }
+    }
+}
+
+// 实训提交状态文案（与后端 app.py 的 _TRAINING_STATUS_LABELS 保持同口径）
+// graded = 教师已批改；submitted = 待批改；resubmitted = 学员重新提交，教师需复核。
+const TRAINING_STATUS_TEXT = {
+    pending: '待提交',
+    submitted: '待批改',
+    graded: '已批改',
+    resubmitted: '已重新提交·待复核'
+};
+
+async function loadLiveRecords() {
+    const body = document.getElementById('live-records-body');
+    if (!body) return;
+    body.innerHTML = '<p class="records-empty">加载中…</p>';
+    try {
+        const data = await apiCall('/api/ecommerce/live/records', 'GET');
+        if (!data.success) {
+            body.innerHTML = '<p class="records-empty">登录后可保存并查看实训记录</p>';
+            return;
+        }
+        const rows = data.records || [];
+        if (!rows.length) {
+            body.innerHTML = '<p class="records-empty">还没有实训记录 —— 写完「我的稿」后点「提交实训」</p>';
+            return;
+        }
+        body.innerHTML = rows.map(function (r) {
+            const rep = r.report || {};
+            const st = TRAINING_STATUS_TEXT[r.status] || '待批改';
+            const teacherTxt = (r.score === null || r.score === undefined) ? '待老师批改' : (r.score + ' 分');
+            const ruleTxt = (r.rule_score === null || r.rule_score === undefined) ? '—' : (r.rule_score + ' 分');
+            return '<div class="record-item">' +
+                '<div class="record-head"><strong>' + escapeHtml(r.product || '') + '</strong>' +
+                '<span class="record-score">教师评分 ' + teacherTxt + '</span></div>' +
+                '<div class="record-meta">第 ' + (r.attempts || 1) + ' 次 · ' +
+                escapeHtml(r.submitted_at || '') +
+                ' · ' + st + ' · 系统规则分 ' + ruleTxt + '</div>' +
+                (rep.coverage !== undefined
+                    ? '<div class="record-meta">完成度 ' + rep.coverage + '% · 语速 ' + rep.speed_cpm +
+                      ' 字/分 · 必卖点 ' + rep.rubric_hit + '/' + rep.rubric_total +
+                      (rep.overall_score !== undefined ? ' · 朗读分 ' + rep.overall_score : '') + '</div>'
+                    : '') +
+                (r.feedback ? '<div class="record-feedback">教师评语：' + escapeHtml(r.feedback) + '</div>' : '') +
+                '</div>';
+        }).join('');
+    } catch (e) {
+        body.innerHTML = '<p class="records-empty">登录后可保存并查看实训记录</p>';
+    }
+}
+
+// 通用实训记录加载（2026-10-05 文案/客服闭环）：与 loadLiveRecords 同一接口，kind 区分。
+function loadTrainingRecords(kind, bodyId) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    body.innerHTML = '<p class="records-empty">加载中…</p>';
+    apiCall('/api/ecommerce/live/records?kind=' + encodeURIComponent(kind), 'GET')
+        .then(function (data) {
+            if (!data.success) {
+                body.innerHTML = '<p class="records-empty">登录后可保存并查看实训记录</p>';
+                return;
+            }
+            const rows = data.records || [];
+            if (!rows.length) {
+                body.innerHTML = '<p class="records-empty">还没有实训记录</p>';
+                return;
+            }
+            body.innerHTML = rows.map(function (r) {
+                const meta = r.meta || {};
+                const extras = [];
+                if (meta.format) extras.push(meta.format);
+                if (meta.scenario) extras.push(meta.scenario);
+                if (meta.difficulty) extras.push(meta.difficulty);
+                const st = TRAINING_STATUS_TEXT[r.status] || '待批改';
+                // score = 教师批改分；rule_score = 系统规则分（提交时按规则算出，仅作参考）
+                const teacherTxt = (r.score === null || r.score === undefined) ? '待老师批改' : (r.score + ' 分');
+                const ruleTxt = (r.rule_score === null || r.rule_score === undefined) ? '—' : (r.rule_score + ' 分');
+                return '<div class="record-item">' +
+                    '<div class="record-head"><strong>' + escapeHtml(r.product || '') + '</strong>' +
+                    '<span class="record-score">教师评分 ' + teacherTxt + '</span></div>' +
+                    '<div class="record-meta">第 ' + (r.attempts || 1) + ' 次 · ' +
+                    escapeHtml(r.submitted_at || '') +
+                    (extras.length ? ' · ' + escapeHtml(extras.join(' · ')) : '') +
+                    ' · ' + st + ' · 系统规则分 ' + ruleTxt + '</div>' +
+                    (r.feedback ? '<div class="record-feedback">教师评语：' + escapeHtml(r.feedback) + '</div>' : '') +
+                    '</div>';
+            }).join('');
+        })
+        .catch(function () {
+            body.innerHTML = '<p class="records-empty">登录后可保存并查看实训记录</p>';
+        });
 }
 
 async function generateLiveScript() {
     const scriptContent = document.getElementById('live-script');
     const style = document.querySelector('.style-btn.active')?.dataset.style || '热情';
-    const product = AppState.currentProduct || 'lychee';
+    // 2026-10-05：商品标签已改为下拉(#live-product)，商品名以直播间内下拉为准
+    // （下拉值与全局作物双向联动，但生成时显式读下拉，保证所见即所得）。
+    const productSel = document.getElementById('live-product');
+    const product = (productSel && productSel.value) || AppState.currentProduct || 'lychee';
     const productName = getProductName(product);
 
-    // 更新产品标签
-    const tag = document.getElementById('cam-product-tag');
-    if (tag) tag.querySelector('span').textContent = productName;
+    const degradedEl = document.getElementById('script-degraded');
+    if (degradedEl) degradedEl.classList.add('is-hidden');
 
     showSkeleton(scriptContent, 'text', 5);
+    // P0-4：重新生成初稿后上一版稿子的评分已失效，必须清掉（见 resetLiveScorePanel）
+    resetLiveScorePanel();
     startLiveSimulation();
 
     try {
@@ -2308,18 +4823,30 @@ async function generateLiveScript() {
             scriptContent.innerHTML = '<p style="white-space:pre-line;" id="script-typewriter"></p>';
             const tw = document.getElementById('script-typewriter');
             await typewriterEffect(tw, data.script);
-            showNotification(`${style}风格话术已生成！`, 'success');
-            getLiveFeedback(data.script);
+            // EC5：上游不可用时服务端会下发 degraded，明确标注"非 AI 生成"
+            if (data.degraded && degradedEl) degradedEl.classList.remove('is-hidden');
+            showNotification(`${style}风格初稿已生成，记得改写成你自己的稿`, 'success');
+            // EC3：不再自动评分 —— 评分对象是「我的稿」，由学员改写后主动触发
+        } else {
+            showNotification(data.message || '生成失败', 'error');
         }
     } catch(e) {
+        // 失败必须可见：先提示，再给出「系统内置示例」，并用角标说明这不是 AI 生成的
+        let msg = '生成失败，请稍后重试';
+        if (/429/.test(String(e && e.message))) msg = '请求过于频繁，请稍后再试';
+        else if (/400/.test(String(e && e.message))) msg = '当前产品/风格暂不支持';
+        showNotification(msg, 'warning');
+
         const fallbackScripts = {
-            '热情': `家人们！今天给你们带来广东最正宗的${productName}！\n(互动) 想要的扣1，让我看看有多少人识货！\n你们看这个品相，【颗颗饱满】，色泽鲜亮，这可不是随便哪里都能找到的！\n原价128，今天直播间专属价——只要【79元】！没听错，79！\n(引导) 觉得值的给我点个赞，点到500我再送一份赠品！\n最后30单，拍完就恢复原价，手慢无！`,
-            '专业': `各位朋友好，今天给大家带来的是广东${productName}。\n这个品种产自岭南核心产区，年均气温22°C，日照充足，土壤富含矿物质。\n我们每一批都经过【农残检测、甜度筛选】，检测报告大家可以看屏幕。\n和市面上的普通产品相比，我们的优势在于：果径大15%、甜度高3度、保鲜期多5天。\n今天直播间特惠，【买二送一】，性价比非常高的。`,
-            '故事': `在广东的一个小村子里，有位老师傅种了30年${productName}。\n他常说："好东西急不得，要等天时、靠地利、更要用心。"\n(停顿) 每年这个时候，他凌晨4点就下地，只为赶在日出前采摘最新鲜的一批。\n从枝头到你手里，不超过48小时——这就是我们对品质的承诺。\n今天把这份来自岭南的匠心之味带给大家，【尝过的都说好】。\n(引导) 想尝尝这份用心的，点下方链接下单吧。`,
-            '高级': `岭南夏日，最令人期待的，莫过于这口来自广东的${productName}。\n它生长在北回归线以南的沃土，吸饱了亚热带的阳光和雨露。\n【果肉如玉，汁水丰盈】，入口即化的细腻口感，是大自然最好的馈赠。\n古人云"日啖荔枝三百颗"，而今这份岭南风物，只需一键下单便可抵达你的餐桌。\n今日限量供应，【精品礼盒装】，自用送礼皆宜。\n品味不将就，生活要讲究。`
+            '热情': `家人们！今天给你们带来广东的${productName}！\n(互动) 想要的扣1，让我看看有多少人识货！\n你们看这个品相，颜色鲜亮、个头匀称，【待填写：按你手上产品的真实外观描述】。\n今天的优惠价是【待填写：直播间价格】，另有【待填写：本场优惠形式，如满减/赠品】。\n(引导) 觉得值的给我点个赞，【待填写：本场互动活动】！\n【待填写：库存或数量说明】，想要的朋友抓紧下单！`,
+            '专业': `各位朋友好，今天给大家带来的是广东${productName}。\n【待填写：具体产地/产区】，【待填写：品种特性与种植方式】。\n我们每一批都【待填写：检测项目与报告情况】，检测报告大家可以看屏幕。\n和市面上普通产品相比，我们的优势在于【待填写：规格、等级等真实差异】。\n今天直播间优惠，【待填写：优惠形式与到手价】，性价比很高。`,
+            '故事': `在广东的一个村子，有人种了多年${productName}。\n他常说："好东西急不得，要等天时、靠地利、更要用心。"\n(停顿) 到了收获的时候，天不亮就要下地，只为赶在太阳出来前把最新鲜的一批采下来。\n从枝头到你手里，【待填写：采摘与发货时效】——这是我们想做到的事。\n今天把这份来自岭南的风味带给大家，【待填写：口感与品质的真实描述】。\n(引导) 想尝尝的，点下方链接下单吧。`,
+            '高级': `岭南夏日，最令人期待的，莫过于这口来自广东的${productName}。\n它生长在【待填写：产区】，【待填写：气候与风土描述】。\n【待填写：口感与品质的真实描述】，入口的细腻是大自然的馈赠。\n岭南风物，如今一键下单便可抵达你的餐桌。\n今日【待填写：供应与规格说明】，自用送礼皆宜。\n品味不将就，生活要讲究。`
         };
-        scriptContent.innerHTML = `<p style="white-space:pre-line;">${fallbackScripts[style] || fallbackScripts['热情']}</p>`;
-        getLiveFeedback(fallbackScripts[style] || fallbackScripts['热情']);
+        const txt = fallbackScripts[style] || fallbackScripts['热情'];
+        scriptContent.innerHTML = `<p style="white-space:pre-line;">${txt}</p>`;
+        if (degradedEl) degradedEl.classList.remove('is-hidden');
+        // EC3：兜底时同样不自动评分
     }
 }
 
@@ -2332,17 +4859,17 @@ const METRIC_LABELS = {
 };
 
 function getScoreGrade(score) {
-    if (score >= 90) return { text: 'S', color: '#10b981', label: '优秀' };
-    if (score >= 80) return { text: 'A', color: '#22c55e', label: '良好' };
-    if (score >= 70) return { text: 'B', color: '#f59e0b', label: '中等' };
+    if (score >= 90) return { text: 'S', color: '#1f5e43', label: '优秀' };
+    if (score >= 80) return { text: 'A', color: '#2f6b4f', label: '良好' };
+    if (score >= 70) return { text: 'B', color: '#d9a227', label: '中等' };
     if (score >= 60) return { text: 'C', color: '#f97316', label: '及格' };
     return { text: 'D', color: '#ef4444', label: '需改进' };
 }
 
 function getScoreColor(score) {
-    if (score >= 85) return '#10b981';
-    if (score >= 70) return '#22c55e';
-    if (score >= 55) return '#f59e0b';
+    if (score >= 85) return '#1f5e43';
+    if (score >= 70) return '#2f6b4f';
+    if (score >= 55) return '#d9a227';
     return '#ef4444';
 }
 
@@ -2351,16 +4878,23 @@ function renderFeedbackMetrics(metrics) {
     if (!container) return;
     container.innerHTML = '';
     const keys = Object.keys(METRIC_LABELS);
+    // 直播间进阶（2026-10-05）：AI 每维度给 evidence（引用原文的一句话依据），
+    // 随分数展示，让学员知道「分从哪来」；规则路径无 evidence 则只显示分数条。
+    const evidence = (metrics && metrics.evidence) || null;
     keys.forEach((key, i) => {
         const score = metrics[key] || 0;
         const config = METRIC_LABELS[key];
         const color = getScoreColor(score);
+        const evText = evidence ? (evidence[key] || '') : '';
         const div = document.createElement('div');
         div.className = 'metric';
         div.innerHTML = `
-            <label><i class="fas ${config.icon}"></i> ${config.label}</label>
-            <div class="progress-bar"><div class="progress-fill" id="fb-${key}" style="width:0%"></div></div>
-            <span id="fb-${key}-val" style="color:${color}">-</span>
+            <div class="metric-row">
+                <label><i class="fas ${config.icon}"></i> ${config.label}</label>
+                <div class="progress-bar"><div class="progress-fill" id="fb-${key}" style="width:0%"></div></div>
+                <span id="fb-${key}-val" style="color:${color}">-</span>
+            </div>
+            ${evText ? `<div class="metric-evidence"><i class="fas fa-quote-left"></i> ${escapeHtml(evText)}</div>` : ''}
         `;
         container.appendChild(div);
         // 延迟动画
@@ -2369,6 +4903,9 @@ function renderFeedbackMetrics(metrics) {
 }
 
 // 基于话术内容分析生成差异化分数
+// EC2（2026-10-05）：这里原有一层 Math.random() 抖动，导致同一段稿子每次评分都不一样
+// （实测 80/81/78），且它属于「测评类功能」—— 测评必须可复现，故整块去掉随机。
+// 注意：本函数只在「服务端评分接口不可用」时作为本地兜底，正常路径应由服务端给分。
 function analyzeScript(text) {
     const exclamation = (text.match(/[！!]{1,}/g) || []).length;
     const question = (text.match(/[？?]{1,}/g) || []).length;
@@ -2383,11 +4920,10 @@ function analyzeScript(text) {
     let interaction = 60 + Math.min(interactionWords * 8, 30) + Math.min(question * 3, 10);
     let selling = 66 + Math.min(dataMarks * 5, 20) + Math.min(priceWords * 4, 16);
 
-    const jitter = () => Math.floor(Math.random() * 7) - 3;
-    speed = Math.min(98, Math.max(50, speed + jitter()));
-    emotion = Math.min(98, Math.max(50, emotion + jitter()));
-    interaction = Math.min(98, Math.max(50, interaction + jitter()));
-    selling = Math.min(98, Math.max(50, selling + jitter()));
+    speed = Math.min(98, Math.max(50, speed));
+    emotion = Math.min(98, Math.max(50, emotion));
+    interaction = Math.min(98, Math.max(50, interaction));
+    selling = Math.min(98, Math.max(50, selling));
 
     return { speed_score: speed, emotion_score: emotion, interaction_score: interaction, selling_score: selling };
 }
@@ -2408,13 +4944,13 @@ function generateScriptSuggestions(text, scores) {
         suggestions.push('适当加入停顿，制造悬念感，如"(停顿3秒)"');
     }
     if (scores.selling_score < 75 && !hasData) {
-        suggestions.push('用具体数据支撑卖点，如甜度、重量、检测指标');
+        suggestions.push('把产品特点讲具体：真实规格、检测指标等；缺数据处用【待填写】标注，不要编数字');
     }
     if (scores.emotion_score < 72 && !hasEmotion) {
         suggestions.push('增加情绪词和感叹句，如"这也太香了吧！"');
     }
     if (!hasPrice) {
-        suggestions.push('加入价格锚点，如"原价128，今天只要79"');
+        suggestions.push('补上价格信息：按你产品的真实售价填写，不要虚构原价或划线价');
     }
     if (scores.selling_score >= 75 && scores.interaction_score >= 75) {
         suggestions.push('整体不错，可以尝试讲故事增加情感共鸣');
@@ -2422,12 +4958,12 @@ function generateScriptSuggestions(text, scores) {
 
     const general = [
         '开场3秒内抛出核心卖点抓住注意力',
-        '用"最后XX单"制造紧迫感促进下单',
-        '加入用户好评或复购数据增强信任',
+        '表达紧迫感用"数量有限/限时"即可，不要虚构原价与优惠力度',
+        '加入真实的用户好评或复购情况增强信任，没有就不要编',
         '结尾引导关注直播间获取更多优惠',
-        '用对比法突出产品差异化优势'
+        '用对比法突出产品差异化优势，对比对象须为真实同类产品'
     ];
-    general.sort(() => Math.random() - 0.5);
+    // EC2：不再 shuffle —— 建议顺序固定，便于学员与教师对照复现
     let gi = 0;
     while (suggestions.length < 3 && gi < general.length) {
         suggestions.push(general[gi++]);
@@ -2445,10 +4981,12 @@ async function getLiveFeedback(script) {
     const suggestionsList = document.getElementById('suggestions-list');
     const summaryEl = document.getElementById('feedback-summary');
     const reScoreBtn = document.getElementById('re-score-btn');
+    const sourceEl = document.getElementById('feedback-source');
 
     if (placeholder) placeholder.classList.add('is-hidden');
     if (body) body.classList.remove('is-hidden');
     if (reScoreBtn) reScoreBtn.classList.remove('is-hidden');
+    if (sourceEl) { sourceEl.classList.add('is-hidden'); sourceEl.innerHTML = ''; }
 
     // 清空并显示加载
     const metricsContainer = document.getElementById('feedback-metrics');
@@ -2462,6 +5000,10 @@ async function getLiveFeedback(script) {
         const data = await apiCall('/api/ecommerce/feedback', 'POST', { script });
         if (data.success) {
             const f = data.feedback;
+            // 关键：把评分结果存进 LiveState.lastFeedback —— 提交实训时要把分数一起落库，
+            // 且后续「未评分就提交」的提示、切换商品时的清空判断都依赖它。
+            LiveState.lastFeedback = f;
+            LiveState.scoredScript = script;   // P0-4：记录评分对应的稿子
             renderFeedbackMetrics(f);
 
             // 综合评分
@@ -2493,13 +5035,38 @@ async function getLiveFeedback(script) {
                 summaryEl.classList.remove('is-hidden');
                 summaryEl.innerHTML = `<i class="fas fa-comment-dots"></i> ${f.summary}`;
             }
+
+            // EC2：如实标注本次分数来源（AI 评分 / 规则评分）——字段在 feedback 对象内
+            renderFeedbackSource(sourceEl, f.source, f.source_note);
+        } else {
+            // 失败必须可见：不渲染兜底分数，直接告知失败原因
+            showNotification(data.message || '评分失败', 'error');
+            if (placeholder) placeholder.classList.remove('is-hidden');
+            if (body) body.classList.add('is-hidden');
+            if (reScoreBtn) reScoreBtn.classList.add('is-hidden');
         }
     } catch(e) {
+        const errMsg = String((e && e.message) || '');
+        // 限流：明确告知，不伪装成"服务不可用"
+        if (/429/.test(errMsg)) {
+            if (placeholder) placeholder.classList.remove('is-hidden');
+            if (body) body.classList.add('is-hidden');
+            if (reScoreBtn) reScoreBtn.classList.add('is-hidden');
+            showNotification('请求过于频繁，请稍后再试', 'warning');
+            return;
+        }
         // 基于话术内容分析生成差异化分数
         const analyzed = analyzeScript(script);
         renderFeedbackMetrics(analyzed);
 
         const overall = Math.round(Object.values(analyzed).reduce((a, b) => a + b, 0) / 4);
+        // 本地兜底评分同样写入 lastFeedback，保证提交时分数能落库（来源标注为 rule）
+        LiveState.lastFeedback = Object.assign({}, analyzed, {
+            overall_score: overall,
+            source: 'rule',
+            source_note: '服务端暂时不可用，以上为浏览器端规则分析结果（可复现，非 AI 评分）'
+        });
+        LiveState.scoredScript = script;
         const grade = getScoreGrade(overall);
         if (scoreEl) {
             animateNumber(scoreEl, overall, 1000);
@@ -2520,7 +5087,25 @@ async function getLiveFeedback(script) {
                 `<span class="suggestion-tag" style="animation-delay:${i * 0.1}s"><i class="fas fa-check-circle"></i> ${s}</span>`
             ).join('');
         }
+        // 如实说明：这是本地兜底，不是 AI 评分
+        renderFeedbackSource(sourceEl, 'rule',
+            '服务端暂时不可用，以上为浏览器端规则分析结果（可复现，非 AI 评分）');
     }
+}
+
+// EC2：分数来源标签（服务端下发 source / source_note，前端如实展示，不美化）
+function renderFeedbackSource(el, source, note) {
+    if (!el) return;
+    const map = {
+        ai: { cls: 'is-ai', icon: 'fa-robot', text: 'AI 评分' },
+        rule: { cls: 'is-rule', icon: 'fa-calculator', text: '规则评分' }
+    };
+    const meta = map[source];
+    const text = note || (meta ? '' : '');
+    if (!meta && !text) { el.classList.add('is-hidden'); return; }
+    const head = meta ? ('<i class="fas ' + meta.icon + '"></i> ' + meta.text) : '';
+    el.className = 'feedback-source' + (meta ? ' ' + meta.cls : '');
+    el.innerHTML = head + (text ? '<span>' + escapeHtml(text) + '</span>' : '');
 }
 
 function animateScore(fillId, valId, target) {
@@ -2540,18 +5125,9 @@ function animateScore(fillId, valId, target) {
     }
 }
 
-function animateNumber(el, target, duration = 1000) {
-    let start = 0;
-    const startTime = performance.now();
-    function update(now) {
-        const elapsed = now - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        el.textContent = Math.round(start + (target - start) * eased);
-        if (progress < 1) requestAnimationFrame(update);
-    }
-    requestAnimationFrame(update);
-}
+// 清理（2026-10-05 小清理项）：此处原有一个 `animateNumber` 重复声明
+// （本文件尾部另有一个同名函数，JS 中后声明者恒覆盖前者，故此处为死代码）。
+// 已删除，统一使用尾部版本。
 
 // ==================== 电商新面板 ====================
 
@@ -2568,11 +5144,21 @@ function openCopywritingPanel() {
     const preset = COPY_PRESETS[AppState.currentProduct] || COPY_PRESETS.lychee;
     showDetailModal('商品文案创作', `
         <div class="copywriting-panel">
+            <div class="copy-stepper" id="copy-stepper">
+                <div class="copy-step" data-step="1"><span class="copy-step-dot">1</span><span class="copy-step-label">配置</span></div>
+                <div class="copy-step-line"></div>
+                <div class="copy-step" data-step="2"><span class="copy-step-dot">2</span><span class="copy-step-label">生成</span></div>
+                <div class="copy-step-line"></div>
+                <div class="copy-step" data-step="3"><span class="copy-step-dot">3</span><span class="copy-step-label">改写</span></div>
+                <div class="copy-step-line"></div>
+                <div class="copy-step" data-step="4"><span class="copy-step-dot">4</span><span class="copy-step-label">评分提交</span></div>
+            </div>
+
             <div class="copy-config">
                 <div class="copy-config-row">
                     <div class="form-group">
-                        <label><i class="fas fa-box"></i> 产品名称</label>
-                        <input type="text" id="copy-product" placeholder="例如：增城桂味荔枝" value="${preset.name}">
+                        <label><i class="fas fa-box"></i> 产品名称 <span class="hint">（限平台支持的农产品）</span></label>
+                        <input type="text" id="copy-product" placeholder="例如：荔枝（可选：龙眼/柑橘/香蕉/水稻/茶叶/蔬菜/水产养殖）" value="${preset.name}">
                     </div>
                     <div class="form-group">
                         <label><i class="fas fa-users"></i> 目标人群</label>
@@ -2610,8 +5196,281 @@ function openCopywritingPanel() {
             </div>
 
             <div id="copywriting-result"></div>
+
+            <!-- 文案实训闭环（2026-10-05）：AI 只出初稿，学员改写后提交「我的稿」 -->
+            <div class="script-block copy-mine-block" style="margin-top:16px;" id="copy-mine-block">
+                <div class="script-block-title" id="copy-mine-head" style="cursor:pointer;">
+                    <i class="fas fa-pen"></i> 我的稿
+                    <span class="script-block-sub">（把 AI 初稿改写成你自己的版本后提交）</span>
+                    <span class="copy-stage-badge" id="copy-stage-badge">待生成</span>
+                    <span class="script-block-meta" id="copy-mine-count">0 字</span>
+                </div>
+                <div class="copy-mine-body" id="copy-mine-body">
+                <div class="copy-placeholder-bar" id="copy-placeholder-bar" style="display:none;">
+                    <i class="fas fa-flag"></i> 还有 <b id="copy-placeholder-count">0</b> 处【待填写】未补全
+                </div>
+                <textarea id="copy-mine" class="script-input" rows="8" maxlength="4000"
+                    placeholder="用「采用到我的稿」把 AI 初稿放进来，再补上【待填写】里的真实信息、换成你自己的语气……"></textarea>
+                <div class="script-block-note">
+                    认证、检测数据、价格、物流与赔付承诺不能靠 AI 编 —— 没有真实信息就保持占位或删除该句。
+                </div>
+                <div class="script-actions script-actions-submit">
+                    <button class="btn btn-outline btn-sm" id="adopt-copy"><i class="fas fa-arrow-down"></i> 采用到我的稿</button>
+                    <button class="btn btn-outline btn-sm" id="copy-score-btn"><i class="fas fa-chart-bar"></i> 评分</button>
+                    <button class="btn btn-primary btn-sm" id="submit-copy"><i class="fas fa-paper-plane"></i> 提交实训</button>
+                </div>
+                </div>
+                <div class="copy-feedback" id="copy-feedback" style="display:none;">
+                    <div class="copy-feedback-head">
+                        <span class="copy-feedback-overall" id="copy-feedback-overall">-</span>
+                        <span class="copy-feedback-label">文案评分（规则 · 可复现）</span>
+                    </div>
+                    <div class="copy-feedback-metrics" id="copy-feedback-metrics"></div>
+                    <div class="copy-feedback-suggestions" id="copy-feedback-suggestions"></div>
+                </div>
+                <div class="training-submit-info" id="copy-submit-info"></div>
+            </div>
+            <div class="live-records" id="copy-records" style="margin-top:12px;">
+                <div class="records-header">
+                    <h4><i class="fas fa-list"></i> 我的文案实训记录</h4>
+                </div>
+                <div class="records-body" id="copy-records-body">
+                    <p class="records-empty">登录后可保存并查看实训记录</p>
+                </div>
+            </div>
         </div>
     `);
+
+    // 文案实训：字数统计 + 采用 + 提交 + 记录（与直播实训同一套作业链路，kind=copy）
+    const copyMineEl = document.getElementById('copy-mine');
+
+    // P2-4（2026-10-05 走查）：保存最近一次生成的原始 markdown 文本，
+    // 「采用到我的稿」用它而非 innerText（innerText 会丢失 **加粗** 和列表符号）。
+    let lastRawCopy = '';
+    // P1-2（2026-10-05）：文案评分闭环 —— 规则评分、可复现，评「我的稿」。
+    // 评分结果存 copyScore，提交时随 score 落库（对齐直播实训的评分能力）。
+    let copyScore = null;
+    let copyScoreScript = '';   // P0-4：记录评分对应的文案内容
+
+    // ===== 体验优化（2026-10-05）：步骤条 + 状态驱动 + 待填写高亮 =====
+    // 环节状态：生成前折叠「我的稿」，生成后展开；评分后高亮「评分提交」。
+    let copyHasGenerated = false;   // 是否已成功生成过初稿
+    const setCopyStep = (step) => {
+        document.querySelectorAll('#copy-stepper .copy-step').forEach(s => {
+            const n = parseInt(s.dataset.step, 10);
+            s.classList.toggle('active', n === step);
+            s.classList.toggle('done', n < step);
+        });
+    };
+    const setCopyStage = (hasText, scored) => {
+        const badge = document.getElementById('copy-stage-badge');
+        if (badge) {
+            if (scored) { badge.textContent = '已评分'; badge.className = 'copy-stage-badge stage-scored'; }
+            else if (hasText) { badge.textContent = '已改写'; badge.className = 'copy-stage-badge stage-edited'; }
+            else if (copyHasGenerated) { badge.textContent = '待改写'; badge.className = 'copy-stage-badge stage-pending'; }
+            else { badge.textContent = '待生成'; badge.className = 'copy-stage-badge stage-pending'; }
+        }
+    };
+    const refreshCopyStage = () => {
+        const hasText = (copyMineEl?.value || '').trim().length > 0;
+        const scored = !!copyScore;
+        // 步骤条：生成前停在「配置」，生成后推进到「改写」，评分后推进到「评分提交」
+        if (!copyHasGenerated && !hasText) setCopyStep(1);
+        else if (scored) setCopyStep(4);
+        else if (hasText) setCopyStep(3);
+        else setCopyStep(2);
+        setCopyStage(hasText, scored);
+        // 评分/提交按钮状态驱动
+        const scoreBtn = document.getElementById('copy-score-btn');
+        const submitBtn = document.getElementById('submit-copy');
+        if (scoreBtn) scoreBtn.disabled = !hasText;
+        if (submitBtn) submitBtn.disabled = !hasText;
+    };
+    const updateCopyCount = () => {
+        if (!copyMineEl) return;
+        const val = copyMineEl.value || '';
+        const n = val.length;
+        document.getElementById('copy-mine-count').textContent = n + ' 字';
+        // 待填写残留计数（体验优化）：统计【待填写...】占位符数量
+        // （兼容「【待填写】」和「【待填写：说明文字】」两种形态）
+        const phCount = (val.match(/【待填写[^】]*】/g) || []).length;
+        const bar = document.getElementById('copy-placeholder-bar');
+        if (bar) {
+            bar.style.display = phCount > 0 ? 'flex' : 'none';
+            document.getElementById('copy-placeholder-count').textContent = phCount;
+        }
+        refreshCopyStage();
+    };
+    copyMineEl?.addEventListener('input', updateCopyCount);
+    updateCopyCount();
+
+    // 体验优化（2026-10-05）：折叠交互 + 初始折叠状态。
+    // 生成前「我的稿」折叠（避免空表单干扰），生成后自动展开。
+    const mineBody = document.getElementById('copy-mine-body');
+    const mineHead = document.getElementById('copy-mine-head');
+    if (mineHead && mineBody) {
+        mineHead.addEventListener('click', () => {
+            const hidden = mineBody.style.display === 'none';
+            mineBody.style.display = hidden ? 'block' : 'none';
+        });
+        mineBody.style.display = 'none';   // 初始折叠
+    }
+
+    // P0-4：清掉「我的稿」的旧评分（重新生成初稿 / 采用新内容后调用），
+    // 否则步骤条停在「已评分」、提交时把旧分算到新文案上。
+    const resetCopyScore = () => {
+        copyScore = null;
+        copyScoreScript = '';
+        const box = document.getElementById('copy-feedback');
+        if (box) box.style.display = 'none';
+        const cmp = document.getElementById('copy-compare');
+        if (cmp) cmp.style.display = 'none';
+        refreshCopyStage();
+    };
+
+    document.getElementById('adopt-copy')?.addEventListener('click', () => {
+        const text = (lastRawCopy || '').trim();
+        if (!text) { showNotification('请先生成 AI 初稿', 'warning'); return; }
+        copyMineEl.value = text;
+        copyMineEl.dispatchEvent(new Event('input'));
+        copyMineEl.focus();
+        // P0-4：采用了新内容，旧评分失效
+        resetCopyScore();
+        // 体验优化：采用后滚动到「我的稿」，并高亮待填写提示
+        setTimeout(() => {
+            const bar = document.getElementById('copy-placeholder-bar');
+            if (bar && bar.style.display !== 'none') {
+                bar.classList.add('copy-placeholder-pulse');
+                setTimeout(() => bar.classList.remove('copy-placeholder-pulse'), 1600);
+            }
+            const block = document.getElementById('copy-mine-block');
+            if (block && block.scrollIntoView) block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        showNotification('已放入「我的稿」——补全真实信息后再提交', 'success');
+    });
+
+    // P1-2（2026-10-05）：文案评分闭环 —— 规则评分、可复现，评「我的稿」。
+    const renderCopyFeedback = (fb) => {
+        const box = document.getElementById('copy-feedback');
+        if (!box) return;
+        box.style.display = 'block';
+        const overall = document.getElementById('copy-feedback-overall');
+        const g = getScoreGrade(fb.overall_score);
+        overall.textContent = fb.overall_score;
+        overall.style.color = g.color;
+        const metrics = document.getElementById('copy-feedback-metrics');
+        const rows = [
+            { label: '结构完整', key: 'structure_score', icon: 'fa-list-alt' },
+            { label: '卖点具体', key: 'selling_score', icon: 'fa-bullseye' },
+            { label: '格式契合', key: 'format_score', icon: 'fa-file-alt' },
+            { label: '合规自检', key: 'compliance_score', icon: 'fa-shield-alt' }
+        ];
+        metrics.innerHTML = rows.map(r => {
+            const v = fb[r.key] || 0;
+            const c = getScoreColor(v);
+            return '<div class="copy-feedback-metric"><label><i class="fas ' + r.icon + '"></i> ' +
+                r.label + '</label><div class="progress-bar"><div class="progress-fill" style="width:' + v + '%"></div></div>' +
+                '<em style="color:' + c + '">' + v + '</em></div>';
+        }).join('');
+        const sug = document.getElementById('copy-feedback-suggestions');
+        sug.innerHTML = (fb.suggestions || []).map(s =>
+            '<div class="copy-feedback-tip"><i class="fas fa-lightbulb"></i> ' + escapeHtml(s) + '</div>').join('');
+    };
+    // 体验优化（2026-10-05）：AI 初稿 vs 我的稿 评分对比。
+    // 学员改写后，把两份稿的规则评分并列展示，直观看到「改写得如何」。
+    const renderCopyCompare = (mine, ai) => {
+        let box = document.getElementById('copy-compare');
+        if (!box) {
+            const fb = document.getElementById('copy-feedback');
+            box = document.createElement('div');
+            box.id = 'copy-compare';
+            box.className = 'copy-compare';
+            fb.parentNode.insertBefore(box, fb);
+        }
+        const grade = (v) => getScoreGrade(v);
+        const card = (title, icon, fbObj, cls) => {
+            const v = fbObj && fbObj.overall_score != null ? fbObj.overall_score : null;
+            const g = v != null ? grade(v) : { color: 'var(--text-muted)', label: '未评分' };
+            const delta = '';
+            return '<div class="copy-compare-card ' + cls + '">' +
+                '<div class="copy-compare-head"><i class="fas ' + icon + '"></i>' + title + '</div>' +
+                '<div class="copy-compare-score" style="color:' + g.color + '">' + (v != null ? v : '-') + '</div>' +
+                '<div class="copy-compare-label">' + (v != null ? '规则评分' : '尚未评分') + '</div>' +
+            '</div>';
+        };
+        box.innerHTML = card('AI 初稿', 'fa-robot', ai, 'copy-compare-ai') +
+            '<div class="copy-compare-vs">VS</div>' +
+            card('我的稿', 'fa-pen', mine, 'copy-compare-mine');
+        box.style.display = 'flex';
+    };
+    document.getElementById('copy-score-btn')?.addEventListener('click', async () => {
+        const script = (copyMineEl?.value || '').trim();
+        if (!script) { showNotification('请先在「我的稿」里写出你的文案', 'warning'); return; }
+        const btn = document.getElementById('copy-score-btn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 评分中...';
+        try {
+            const data = await apiCall('/api/ecommerce/copy/feedback', 'POST', {
+                script: script, format: currentFormat
+            });
+            if (data.success) {
+                copyScore = data.feedback;
+                copyScoreScript = script;
+                renderCopyFeedback(data.feedback);
+                refreshCopyStage();
+                // 体验优化：若有 AI 初稿，异步评分初稿做对比（不影响我的稿评分展示）
+                if (lastRawCopy && lastRawCopy.trim()) {
+                    try {
+                        const aiData = await apiCall('/api/ecommerce/copy/feedback', 'POST', {
+                            script: lastRawCopy.trim(), format: currentFormat
+                        });
+                        if (aiData.success) renderCopyCompare(data.feedback, aiData.feedback);
+                    } catch (e2) { /* 对比失败静默，不影响主评分 */ }
+                }
+            }
+        } catch (e) {
+            showNotification('评分失败，请稍后重试', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-chart-bar"></i> 评分';
+        }
+    });
+
+    document.getElementById('submit-copy')?.addEventListener('click', async () => {
+        const script = (copyMineEl?.value || '').trim();
+        if (!script) { showNotification('请先在「我的稿」里写出你自己的文案', 'warning'); return; }
+        // P1-2：未评分就提交 → 温和提示（不阻断）
+        if (!copyScore) {
+            showNotification('提示：还没评分，提交后本稿分数暂记 0。建议先点「评分」', 'warning');
+        }
+        // P0-4：评分只对「评分时的那一版我的稿」有效；我的稿已改动则旧分不计入
+        if (copyScore && copyScoreScript !== script) {
+            showNotification('提示：我的稿已改动，上次评分已失效，本次按 0 分提交。请重新评分', 'warning');
+        }
+        const info = document.getElementById('copy-submit-info');
+        try {
+            // P2-3（2026-10-05 走查）：产品名「名实不符」问题。文案产品名是自由文本
+            // （学员可填「增城桂味荔枝」），但后端落库按 8 作物白名单校验。
+            // 这里把「归属作物」用全局当前作物（保证过白名单、记录口径一致），
+            // 学员填的具体产品名放进 meta 留痕，不丢失。
+            const rawProduct = (document.getElementById('copy-product').value || '').trim();
+            const data = await apiCall('/api/ecommerce/copy/submit', 'POST', {
+                product: getProductName(AppState.currentProduct || 'lychee'),
+                script: script,
+                score: (copyScore && copyScoreScript === script) ? copyScore.overall_score : 0,
+                meta: { format: currentFormat, raw_product: rawProduct }
+            });
+            if (data.success) {
+                if (info) info.textContent = '已保存实训记录（第 ' + data.attempts + ' 次）';
+                showNotification('已保存实训记录（第 ' + data.attempts + ' 次）', 'success');
+                loadTrainingRecords('copy', 'copy-records-body');
+            }        } catch (e) {
+            if (e && e.status === 401) showNotification('保存失败：请先登录', 'warning', { actionLabel: '去登录', action: openLoginModal });
+            else showNotification('保存失败，请稍后重试', 'error');
+        }
+    });
+
+    loadTrainingRecords('copy', 'copy-records-body');
 
     // 格式切换
     const formatDescs = {
@@ -2622,6 +5481,10 @@ function openCopywritingPanel() {
         '短视频脚本': '15-30秒短视频带货脚本，按时间轴输出'
     };
     let currentFormat = '详情页';
+    // P3-6（2026-10-05 走查）：format-desc 初始值单一来源 —— 面板打开即用
+    // formatDescs 同步一次，消除 HTML 里硬编码的重复文案。
+    const descEl0 = document.getElementById('format-desc');
+    if (descEl0) descEl0.textContent = formatDescs[currentFormat] || '';
 
     document.querySelectorAll('.format-tab').forEach(tab => {
         tab.addEventListener('click', function() {
@@ -2637,7 +5500,8 @@ function openCopywritingPanel() {
     const regenBtn = document.getElementById('regenerate-copy-btn');
     const resultDiv = document.getElementById('copywriting-result');
 
-    async function generate() {
+    // P3-5（2026-10-05 走查）：区分「首次生成」与「换一版」的 loading 反馈。
+    async function generate(isRegen) {
         const product = document.getElementById('copy-product').value.trim();
         if (!product) { showNotification('请输入产品名称', 'warning'); return; }
 
@@ -2647,202 +5511,88 @@ function openCopywritingPanel() {
         showSkeleton(resultDiv, 'text', 5);
         generateBtn.disabled = true;
         generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+        if (isRegen && regenBtn) {
+            regenBtn.disabled = true;
+            regenBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 换一版中...';
+        }
 
         try {
             const data = await apiCall('/api/ecommerce/copywriting', 'POST', {
                 product, format: currentFormat, audience, selling_points
             });
             if (data.success) {
+                // P1-1（2026-10-05 走查）：上游失败时服务端下发 degraded + 兜底文案，
+                // 必须像直播脚本一样明确标注「非 AI 生成」，否则学员会把【待填写】兜底当成 AI 成果。
+                const degradedTag = data.degraded
+                    ? '<span class="copy-degraded-tag"><i class="fas fa-exclamation-triangle"></i> 系统内置示例 · 非 AI 生成</span>'
+                    : '';
                 resultDiv.innerHTML = `
                     <div class="copy-result">
                         <div class="copy-result-header">
                             <span class="copy-result-tag"><i class="fas fa-file-alt"></i> ${currentFormat}</span>
+                            ${degradedTag}
                             <div class="copy-result-actions">
+                                <button class="btn btn-outline btn-sm" id="copy-result-md-btn"><i class="fab fa-markdown"></i> 复制 Markdown</button>
                                 <button class="btn btn-outline btn-sm" id="copy-result-btn"><i class="fas fa-copy"></i> 复制</button>
                             </div>
                         </div>
                         <div class="copy-result-body" id="copy-result-body"></div>
                     </div>
                 `;
+                // 体验优化（2026-10-05）：状态推进不等 typewriter（纯视觉打字效果），
+                // 生成成功即刻推进步骤、展开「我的稿」，避免长文案打字期间界面停在「配置」。
+                copyHasGenerated = true;
+                const mineBody = document.getElementById('copy-mine-body');
+                if (mineBody) mineBody.style.display = 'block';
+                lastRawCopy = data.copywriting || '';   // P2-4：保存原始文本供「采用」（打字期间也可采用）
+                // P0-4：生成了新初稿，上一版我的稿的评分失效
+                resetCopyScore();
+                refreshCopyStage();
+
                 const body = document.getElementById('copy-result-body');
                 await typewriterEffect(body, data.copywriting);
                 body.innerHTML = formatAnswer(data.copywriting);
 
                 document.getElementById('copy-result-btn')?.addEventListener('click', () => {
-                    navigator.clipboard.writeText(data.copywriting).then(() => showNotification('文案已复制', 'success'));
+                    copyText(data.copywriting, '文案已复制');
+                });
+                document.getElementById('copy-result-md-btn')?.addEventListener('click', () => {
+                    copyText(data.copywriting, '已复制 Markdown 原文');
                 });
 
                 regenBtn.style.display = 'inline-flex';
+
+                // 滚动到结果区，让学员看到产物
+                const res = document.querySelector('.copy-result');
+                if (res && res.scrollIntoView) {
+                    setTimeout(() => res.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 150);
+                }
             }
         } catch(e) {
-            showErrorState(resultDiv, '生成失败，请重试', generate);
+            // P1-10：区分「产品名不在白名单」这类 400 —— 重试无用，必须说清原因。
+            // 此前一律「生成失败，请重试」，学员照着旧的占位示例（自由文本产品名）填，
+            // 会反复失败却不知为何，还会被「重试」误导。
+            if (e && e.code === 'unknown_product') {
+                showErrorState(resultDiv, '产品名称不在支持范围：请从 荔枝 / 龙眼 / 柑橘 / 香蕉 / 水稻 / 茶叶 / 蔬菜 / 水产养殖 中选择', () => generate(false));
+            } else if (e && e.code === 'rate_limited') {
+                showErrorState(resultDiv, '请求过于频繁，请稍后再试', () => generate(false));
+            } else {
+                showErrorState(resultDiv, '生成失败，请重试', () => generate(false));
+            }
         } finally {
             generateBtn.disabled = false;
             generateBtn.innerHTML = '<i class="fas fa-magic"></i> AI生成文案';
-        }
-    }
-
-    generateBtn?.addEventListener('click', generate);
-    regenBtn?.addEventListener('click', generate);
-}
-
-function openStoreDesignPanel() {
-    const productName = getProductName(AppState.currentProduct);
-    showDetailModal('店铺装修指导', `
-        <div class="store-design-panel">
-            <div class="store-config">
-                <div class="store-config-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-store"></i> 店铺类型</label>
-                        <select id="store-type">
-                            <option value="农产品店铺">农产品店铺</option>
-                            <option value="水果生鲜店铺">水果生鲜店铺</option>
-                            <option value="茶叶店铺">茶叶店铺</option>
-                            <option value="手工艺品店铺">手工艺品店铺</option>
-                            <option value="地方特产店铺">地方特产店铺</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-shopping-cart"></i> 电商平台</label>
-                        <select id="store-platform">
-                            <option value="淘宝">淘宝</option>
-                            <option value="拼多多">拼多多</option>
-                            <option value="抖音小店">抖音小店</option>
-                            <option value="微信小程序">微信小程序</option>
-                            <option value="京东">京东</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="store-config-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-palette"></i> 视觉风格</label>
-                        <select id="store-style">
-                            <option value="清新自然">清新自然</option>
-                            <option value="高端大气">高端大气</option>
-                            <option value="年轻活泼">年轻活泼</option>
-                            <option value="传统国风">传统国风</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-box"></i> 主营产品</label>
-                        <input type="text" id="store-product" value="${productName}" placeholder="例如：荔枝、龙眼">
-                    </div>
-                </div>
-            </div>
-
-            <div class="store-modules">
-                <label class="form-label"><i class="fas fa-th-large"></i> 选择指导模块</label>
-                <div class="module-cards" id="store-module-cards">
-                    <button class="module-card-btn active" data-module="首页布局">
-                        <i class="fas fa-home"></i>
-                        <span>首页布局</span>
-                        <small>整体页面规划</small>
-                    </button>
-                    <button class="module-card-btn" data-module="色彩方案">
-                        <i class="fas fa-palette"></i>
-                        <span>色彩方案</span>
-                        <small>配色与色值</small>
-                    </button>
-                    <button class="module-card-btn" data-module="详情页设计">
-                        <i class="fas fa-file-alt"></i>
-                        <span>详情页</span>
-                        <small>商品详情结构</small>
-                    </button>
-                    <button class="module-card-btn" data-module="主图设计">
-                        <i class="fas fa-image"></i>
-                        <span>主图设计</span>
-                        <small>5张主图策略</small>
-                    </button>
-                    <button class="module-card-btn" data-module="分类导航">
-                        <i class="fas fa-bars"></i>
-                        <span>分类导航</span>
-                        <small>导航逻辑设计</small>
-                    </button>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-comment-dots"></i> 补充需求 <span class="hint">（选填）</span></label>
-                <textarea id="store-needs" rows="2" placeholder="描述你的具体需求，如：希望突出岭南特色、适合送礼场景..."></textarea>
-            </div>
-
-            <div class="copy-actions">
-                <button class="btn btn-primary" id="get-store-design-btn">
-                    <i class="fas fa-magic"></i> 生成装修指导
-                </button>
-                <button class="btn btn-outline btn-sm" id="regenerate-store-btn" style="display:none;">
-                    <i class="fas fa-redo"></i> 换一版
-                </button>
-            </div>
-
-            <div id="store-design-result"></div>
-        </div>
-    `);
-
-    let currentModule = '首页布局';
-
-    // 模块切换
-    document.querySelectorAll('.module-card-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.module-card-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            currentModule = this.dataset.module;
-        });
-    });
-
-    // 生成指导
-    const generateBtn = document.getElementById('get-store-design-btn');
-    const regenBtn = document.getElementById('regenerate-store-btn');
-    const resultDiv = document.getElementById('store-design-result');
-
-    async function generate() {
-        const store_type = document.getElementById('store-type').value;
-        const platform = document.getElementById('store-platform').value;
-        const style = document.getElementById('store-style').value;
-        const product = document.getElementById('store-product').value.trim();
-        const needs = document.getElementById('store-needs').value.trim();
-
-        showSkeleton(resultDiv, 'text', 5);
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
-
-        try {
-            const data = await apiCall('/api/ecommerce/store-design', 'POST', {
-                store_type, platform, style, module: currentModule, product, needs
-            });
-            if (data.success) {
-                resultDiv.innerHTML = `
-                    <div class="copy-result">
-                        <div class="copy-result-header">
-                            <span class="copy-result-tag"><i class="fas fa-paint-brush"></i> ${currentModule}</span>
-                            <div class="copy-result-actions">
-                                <button class="btn btn-outline btn-sm" id="store-result-btn"><i class="fas fa-copy"></i> 复制</button>
-                            </div>
-                        </div>
-                        <div class="copy-result-body" id="store-result-body"></div>
-                    </div>
-                `;
-                const body = document.getElementById('store-result-body');
-                await typewriterEffect(body, data.design);
-                body.innerHTML = formatAnswer(data.design);
-
-                document.getElementById('store-result-btn')?.addEventListener('click', () => {
-                    navigator.clipboard.writeText(data.design).then(() => showNotification('指导内容已复制', 'success'));
-                });
-
-                regenBtn.style.display = 'inline-flex';
+            if (regenBtn) {
+                regenBtn.disabled = false;
+                regenBtn.innerHTML = '<i class="fas fa-redo"></i> 换一版';
             }
-        } catch(e) {
-            showErrorState(resultDiv, '生成失败，请重试', generate);
-        } finally {
-            generateBtn.disabled = false;
-            generateBtn.innerHTML = '<i class="fas fa-magic"></i> 生成装修指导';
         }
     }
 
-    generateBtn?.addEventListener('click', generate);
-    regenBtn?.addEventListener('click', generate);
+    generateBtn?.addEventListener('click', () => generate(false));
+    regenBtn?.addEventListener('click', () => generate(true));
 }
+
 
 function openCustomerServicePanel() {
     const productName = getProductName(AppState.currentProduct);
@@ -2900,40 +5650,46 @@ function openCustomerServicePanel() {
                         <div class="cs-welcome">
                             <i class="fas fa-headset"></i>
                             <p>选择场景和客户性格，点击"开始模拟"进行客服训练</p>
+                            <div class="cs-mission-card" id="cs-mission-card" style="display:none;"></div>
                         </div>
                     </div>
                     <div class="cs-input-bar">
                         <input type="text" id="cs-input" placeholder="作为客服回复客户..." disabled>
                         <button class="btn btn-primary" id="cs-send-btn" disabled><i class="fas fa-paper-plane"></i></button>
                     </div>
+                    <!-- 体验优化③：内联参考话术 chip，点击填入输入框 -->
+                    <div class="cs-quick-chips" id="cs-quick-chips" style="display:none;"></div>
                 </div>
                 <div class="cs-sidebar">
                     <div class="cs-score-card" id="cs-score-card">
                         <h4><i class="fas fa-chart-radar"></i> 实时评分</h4>
+                        <div class="cs-score-note" id="cs-score-note">规则关键词评分 · 逐句分析，提交取整场均分</div>
                         <div class="cs-score-overall" id="cs-score-overall">-</div>
                         <div class="cs-score-label">综合得分</div>
                         <div class="cs-score-bars" id="cs-score-bars">
-                            <div class="cs-score-bar">
+                            <div class="cs-score-bar" id="cs-bar-polite">
                                 <span>礼貌度</span>
                                 <div class="progress-bar"><div class="progress-fill" id="cs-polite" style="width:0%"></div></div>
                                 <em id="cs-polite-val">-</em>
                             </div>
-                            <div class="cs-score-bar">
+                            <div class="cs-score-bar" id="cs-bar-pro">
                                 <span>专业度</span>
                                 <div class="progress-bar"><div class="progress-fill" id="cs-pro" style="width:0%"></div></div>
                                 <em id="cs-pro-val">-</em>
                             </div>
-                            <div class="cs-score-bar">
+                            <div class="cs-score-bar" id="cs-bar-solve">
                                 <span>解决力</span>
                                 <div class="progress-bar"><div class="progress-fill" id="cs-solve" style="width:0%"></div></div>
                                 <em id="cs-solve-val">-</em>
                             </div>
-                            <div class="cs-score-bar">
+                            <div class="cs-score-bar" id="cs-bar-empathy">
                                 <span>同理心</span>
                                 <div class="progress-bar"><div class="progress-fill" id="cs-empathy" style="width:0%"></div></div>
                                 <em id="cs-empathy-val">-</em>
                             </div>
                         </div>
+                        <!-- 体验优化②：最弱维度高亮 + 可行动建议 -->
+                        <div class="cs-weak-hint" id="cs-weak-hint" style="display:none;"></div>
                     </div>
                     <div class="cs-tips-card" id="cs-tips-card">
                         <h4><i class="fas fa-lightbulb"></i> 实时建议</h4>
@@ -2941,9 +5697,29 @@ function openCustomerServicePanel() {
                             <div class="cs-tip-item">开始对话后将显示建议</div>
                         </div>
                     </div>
+                    <!-- 体验优化⑥：客户情绪温度条（随每轮回复质量变化） -->
+                    <div class="cs-sentiment-card" id="cs-sentiment-card">
+                        <h4><i class="fas fa-smile"></i> 客户情绪</h4>
+                        <div class="cs-sentiment-label" id="cs-sentiment-label">待开始</div>
+                        <div class="cs-sentiment-track">
+                            <div class="cs-sentiment-fill" id="cs-sentiment-fill" style="width:60%;"></div>
+                        </div>
+                        <div class="cs-sentiment-scale"><span>不满</span><span>满意</span></div>
+                    </div>
                     <div class="cs-history-card">
                         <h4><i class="fas fa-history"></i> 对话轮次</h4>
                         <div class="cs-round-count" id="cs-round-count">0 轮</div>
+                        <!-- 客服实训闭环（2026-10-05）：对话记录提交进作业链路，kind=cs -->
+                        <button class="btn btn-outline btn-sm" id="cs-submit-btn" style="margin-top:10px;">
+                            <i class="fas fa-paper-plane"></i> 提交实训
+                        </button>
+                        <div class="training-submit-info" id="cs-submit-info"></div>
+                    </div>
+                    <div class="cs-history-card">
+                        <h4><i class="fas fa-list"></i> 我的实训记录</h4>
+                        <div class="records-body" id="cs-records-body" style="max-height:220px;">
+                            <p class="records-empty">登录后可保存并查看实训记录</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2952,6 +5728,14 @@ function openCustomerServicePanel() {
 
     const chatHistory = [];
     let isStarted = false;
+    // P1-1（2026-10-06 走查）：提交分数改为「整场所有轮次的平均分」，而非最后一句。
+    // lastCsScore 仅用于实时展示最近一轮；csScoreHistory 累计每一轮，提交时取平均。
+    let lastCsScore = 0;
+    const csScoreHistory = [];
+    // 体验优化⑤（2026-10-06）：每轮明细（分数+文本+提示），供复盘卡取「高光时刻/待改进点」。
+    const csRoundDetails = [];
+    // 体验优化⑥（2026-10-06）：客户情绪温度条当前值（0-100）。
+    let csSentiment = 60;
 
     const startBtn = document.getElementById('cs-start-btn');
     const resetBtn = document.getElementById('cs-reset-btn');
@@ -2959,6 +5743,38 @@ function openCustomerServicePanel() {
     const sendBtn = document.getElementById('cs-send-btn');
     const chatInput = document.getElementById('cs-input');
     const messagesDiv = document.getElementById('cs-messages');
+
+    // 体验优化④（2026-10-06）：场景任务卡——开始前动态说明任务目标。
+    const MISSION = {
+        '售前咨询': '耐心解答产品信息，让客户放心下单',
+        '售后处理': '先安抚情绪，再给出可落地的解决方案',
+        '投诉应对': '稳住客户情绪，把投诉转为可解决的动作',
+        '议价谈判': '在不失底线的前提下促成成交',
+        '产品推荐': '摸清客户需求，精准推荐合适的产品'
+    };
+    const PERSONA_HINT = {
+        '友善型': '客户好说话，正常专业即可',
+        '急躁型': '客户没耐心，回复要快、直给重点',
+        '犹豫型': '客户反复比较，多给信心和证据',
+        '挑剔型': '客户爱挑细节，把专业做扎实'
+    };
+    const updateMissionCard = () => {
+        const card = document.getElementById('cs-mission-card');
+        if (!card) return;
+        const scenario = document.getElementById('cs-scenario').value;
+        const personality = document.getElementById('cs-personality').value;
+        const difficulty = document.getElementById('cs-difficulty').value;
+        card.style.display = 'block';
+        card.innerHTML = `
+            <div class="cs-mission-row"><span class="cs-mission-tag">${scenario}</span><span class="cs-mission-tag">${personality}</span><span class="cs-mission-tag">${difficulty}</span></div>
+            <div class="cs-mission-goal"><i class="fas fa-flag-checkered"></i> 你的目标：${MISSION[scenario] || MISSION['售前咨询']}</div>
+            <div class="cs-mission-persona">${PERSONA_HINT[personality] || ''}</div>
+        `;
+    };
+    ['cs-scenario', 'cs-personality', 'cs-difficulty'].forEach(id => {
+        document.getElementById(id)?.addEventListener('change', updateMissionCard);
+    });
+    updateMissionCard();
 
     // 开始模拟
     startBtn?.addEventListener('click', async () => {
@@ -2982,10 +5798,28 @@ function openCustomerServicePanel() {
             if (data.success) {
                 appendCSMsg('customer', data.message);
                 chatHistory.push({ role: 'assistant', content: data.message });
+                if (data.degraded) {
+                    const dnote = document.createElement('div');
+                    dnote.className = 'cs-degraded-note';
+                    dnote.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 系统兜底开场白（非 AI 生成）';
+                    messagesDiv.appendChild(dnote);
+                }
                 chatInput.focus();
             }
         } catch(e) {
-            appendCSMsg('customer', '你好，我想问一下...');
+            // P2-4（2026-10-06 走查）：开始失败必须可见，不能静默塞一句假开场白。
+            let msg = '生成开场白失败，请稍后重试';
+            if (e && (e.status === 429 || /429/.test(String(e && e.message)))) msg = '操作过于频繁，请稍后再试';
+            showNotification(msg, 'error');
+            // 回滚「开始」状态，让学员可重新点开始
+            isStarted = false;
+            chatInput.disabled = true;
+            sendBtn.disabled = true;
+            messagesDiv.innerHTML = `
+                <div class="cs-welcome">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>开场白生成失败，请重试「开始模拟」</p>
+                </div>`;
         } finally {
             startBtn.innerHTML = '<i class="fas fa-play"></i> 开始模拟';
             startBtn.disabled = false;
@@ -2998,7 +5832,8 @@ function openCustomerServicePanel() {
         if (!msg || !isStarted) return;
         chatInput.value = '';
 
-        appendCSMsg('agent', msg);
+        // 先渲染学员气泡（无得分），评分返回后补得分徽标
+        const agentDiv = appendCSMsg('agent', msg);
 
         const scenario = document.getElementById('cs-scenario').value;
         const personality = document.getElementById('cs-personality').value;
@@ -3024,9 +5859,45 @@ function openCustomerServicePanel() {
                 chatHistory.push({ role: 'user', content: msg });
                 chatHistory.push({ role: 'assistant', content: data.reply });
 
-                // 更新评分
-                if (data.score && data.score.total > 0) {
+                // P1-1（学员端走查）：AI 不可用时后端会下发 degraded，必须如实告知学员，
+                // 否则学员以为在跟 AI 客户练，实际拿到的是规则兜底。
+                if (data.degraded) {
+                    const dnote = document.createElement('div');
+                    dnote.className = 'cs-degraded-note';
+                    dnote.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 系统兜底回复（非 AI 生成，仅供参考）';
+                    messagesDiv.appendChild(dnote);
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                }
+
+                // 更新评分：实时展示最近一轮，累计所有轮次供提交取平均
+                if (data.score && typeof data.score.total === 'number') {
+                    lastCsScore = data.score.total;
+                    csScoreHistory.push(data.score.total);
+                    // 体验优化⑤：记录每轮明细（供复盘卡取高光时刻/待改进点）
+                    csRoundDetails.push({ score: data.score.total, text: msg, tips: data.score.tips || [] });
                     updateCSScore(data.score);
+                    // 体验优化①：给刚渲染的学员气泡补得分徽标 + 扣分原因
+                    if (agentDiv) {
+                        const label = agentDiv.querySelector('.cs-msg-label');
+                        if (label) {
+                            const s = data.score.total;
+                            const grade = s >= 85 ? 'good' : s >= 70 ? 'mid' : s >= 55 ? 'warn' : 'bad';
+                            label.insertAdjacentHTML('beforeend',
+                                ` <span class="cs-msg-score cs-score-${grade}">${s}分</span>`);
+                        }
+                        if (data.score.tips && data.score.tips.length) {
+                            const reason = document.createElement('div');
+                            reason.className = 'cs-msg-reason';
+                            reason.textContent = data.score.tips[0];
+                            agentDiv.querySelector('.cs-msg-content').appendChild(reason);
+                        }
+                    }
+                }
+
+                // 体验优化⑥：更新客户情绪温度条
+                if (data.sentiment) {
+                    csSentiment = data.sentiment.level;
+                    updateCSSentiment(data.sentiment);
                 }
 
                 // 更新轮次
@@ -3034,10 +5905,17 @@ function openCustomerServicePanel() {
                 document.getElementById('cs-round-count').textContent = `${rounds} 轮`;
             }
         } catch(e) {
+            // P1-3 + P2-5（2026-10-06 走查）：失败必须可见，且不得污染对话历史。
+            // 原实现把一句假的客户回复塞进 chatHistory 并显示，既冒充 AI 又污染提交记录。
             typingDiv.remove();
-            chatHistory.push({ role: 'user', content: msg });
-            chatHistory.push({ role: 'assistant', content: '嗯...我想想...' });
-            appendCSMsg('customer', '嗯...我想想...');
+            // 撤回已经渲染的学员气泡？不——学员这句保留，但要明确标注「未得到客户回应」。
+            let msg = '回复失败，请稍后重试';
+            if (e && (e.status === 429 || /429/.test(String(e && e.message)))) msg = '对话过于频繁，请稍后再试';
+            else if (e && e.status === 400) msg = '内容不合法，请调整后重试';
+            showNotification(msg, 'error');
+            // 在消息流里追加一条可见的错误占位（不进入 chatHistory，不冒充客户）
+            appendCSError('客户未回应：' + (e && e.status === 429 ? '请求过于频繁' : '网络或服务异常，请重试'));
+            chatInput.focus();
         }
     }
 
@@ -3050,10 +5928,16 @@ function openCustomerServicePanel() {
             <div class="cs-welcome">
                 <i class="fas fa-headset"></i>
                 <p>选择场景和客户性格，点击"开始模拟"进行客服训练</p>
+                <div class="cs-mission-card" id="cs-mission-card" style="display:none;"></div>
             </div>
         `;
         chatHistory.length = 0;
         isStarted = false;
+        // P3-9（2026-10-06 走查）：重置时清空评分状态，避免残留旧分。
+        lastCsScore = 0;
+        csScoreHistory.length = 0;
+        csRoundDetails.length = 0;
+        csSentiment = 60;
         chatInput.disabled = true;
         sendBtn.disabled = true;
         chatInput.value = '';
@@ -3066,8 +5950,22 @@ function openCustomerServicePanel() {
         ['cs-polite-val','cs-pro-val','cs-solve-val','cs-empathy-val'].forEach(id => {
             document.getElementById(id).textContent = '-';
         });
+        // 体验优化：清空最弱维度高亮、快捷 chip
+        const weakHint = document.getElementById('cs-weak-hint');
+        if (weakHint) weakHint.style.display = 'none';
+        ['cs-bar-polite','cs-bar-pro','cs-bar-solve','cs-bar-empathy'].forEach(id => {
+            document.getElementById(id)?.classList.remove('is-weakest');
+        });
+        const chips = document.getElementById('cs-quick-chips');
+        if (chips) { chips.style.display = 'none'; chips.innerHTML = ''; }
+        // 体验优化⑥：重置情绪温度条
+        const sentFill = document.getElementById('cs-sentiment-fill');
+        const sentLabel = document.getElementById('cs-sentiment-label');
+        if (sentFill) { sentFill.style.width = '60%'; sentFill.style.background = '#d9a227'; }
+        if (sentLabel) { sentLabel.textContent = '待开始'; sentLabel.style.color = 'var(--text-muted)'; }
         document.getElementById('cs-tips-list').innerHTML = '<div class="cs-tip-item">开始对话后将显示建议</div>';
         document.getElementById('cs-round-count').textContent = '0 轮';
+        updateMissionCard();   // 重新渲染任务卡（reset 重建了 DOM）
     });
 
     // 提示 - AI动态生成
@@ -3108,26 +6006,160 @@ function openCustomerServicePanel() {
                         ${h.tips.map(t => `<div class="cs-hint-tip-item"><i class="fas fa-info-circle"></i> ${t}</div>`).join('')}
                     </div>` : ''}
                 `;
+                // P1-1（学员端走查）：hint 接口降级时后端下发 degraded，必须如实标注
+                if (data.degraded) {
+                    const dnote = document.createElement('div');
+                    dnote.className = 'cs-degraded-note';
+                    dnote.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 以下为系统内置建议（非 AI 生成）';
+                    tipsList.appendChild(dnote);
+                }
                 // 点击复制话术
                 tipsList.querySelectorAll('.cs-hint-tpl').forEach(el => {
                     el.addEventListener('click', () => {
-                        navigator.clipboard.writeText(el.dataset.text).then(() => {
-                            showNotification('已复制到剪贴板', 'success');
+                        copyText(el.dataset.text, '已复制到剪贴板').then(function (ok) {
+                            if (!ok) return;
                             el.classList.add('copied');
                             setTimeout(() => el.classList.remove('copied'), 1500);
                         });
                     });
                 });
+
+                // 体验优化③（2026-10-06）：把话术模板同步成输入框下方的快捷 chip，
+                // 点击直接填入输入框，省去「复制→粘贴」两步。
+                const chips = document.getElementById('cs-quick-chips');
+                if (chips && h.templates && h.templates.length) {
+                    chips.style.display = 'flex';
+                    chips.innerHTML = '<span class="cs-quick-chips-label"><i class="fas fa-bolt"></i> 快捷填充</span>' +
+                        h.templates.map(t =>
+                            `<button class="cs-quick-chip" type="button" data-text="${escapeHtml(t)}">${escapeHtml(t)}</button>`
+                        ).join('');
+                    chips.querySelectorAll('.cs-quick-chip').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const inp = document.getElementById('cs-input');
+                            if (inp) { inp.value = btn.dataset.text; inp.focus(); }
+                            showNotification('已填入输入框，可修改后发送', 'success');
+                        });
+                    });
+                }
             }
         } catch(e) {
+            // P2-5（2026-10-06 走查）：限流/失败要可见，区分 429 与一般失败。
             if (tipsList) {
-                tipsList.innerHTML = '<div class="cs-tip-item"><i class="fas fa-exclamation-circle"></i> 获取建议失败，请重试</div>';
+                const limited = e && (e.status === 429 || /429/.test(String(e && e.message)));
+                tipsList.innerHTML = limited
+                    ? '<div class="cs-tip-item"><i class="fas fa-hourglass-half"></i> 建议获取过于频繁，请稍后再试</div>'
+                    : '<div class="cs-tip-item"><i class="fas fa-exclamation-circle"></i> 获取建议失败，请重试</div>';
             }
         }
     });
+
+    // 提交实训（客服闭环）：整段对话 + 规则评分落库，kind=cs
+    document.getElementById('cs-submit-btn')?.addEventListener('click', async () => {
+        if (!isStarted || chatHistory.length === 0) {
+            showNotification('请先开始并完成至少一轮对话', 'warning');
+            return;
+        }
+        // P1-1（2026-10-06 走查）：提交分数 = 整场所有已评分轮次的平均分，
+        // 而非最后一句。若整场没有成功评分过（异常），用 0 并提示。
+        const scored = csScoreHistory.length;
+        const overall = scored > 0
+            ? Math.round(csScoreHistory.reduce((a, b) => a + b, 0) / scored)
+            : 0;
+        if (scored === 0) {
+            showNotification('本场尚无有效评分，提交后分数暂记 0', 'warning');
+        }
+        const info = document.getElementById('cs-submit-info');
+        try {
+            const data = await apiCall('/api/ecommerce/cs/submit', 'POST', {
+                product: document.getElementById('cs-product').value.trim() || '农产品',
+                transcript: chatHistory,
+                score: overall,
+                meta: {
+                    scenario: document.getElementById('cs-scenario').value,
+                    personality: document.getElementById('cs-personality').value,
+                    difficulty: document.getElementById('cs-difficulty').value,
+                    rounds: Math.floor(chatHistory.length / 2),
+                    scored_rounds: scored
+                }
+            });
+            if (data.success) {
+                if (info) info.textContent = `已保存实训记录（第 ${data.attempts} 次，整场均分 ${overall}）`;
+                showNotification(`已保存实训记录（第 ${data.attempts} 次，整场均分 ${overall}）`, 'success');
+                loadTrainingRecords('cs', 'cs-records-body');
+                // 体验优化⑤：提交成功后展示整场复盘卡
+                renderReviewCard(overall, csRoundDetails);
+            }
+        } catch (e) {
+            // P2（2026-10-06 全局走查）：提交失败要读后端下发的 code 区分原因，
+            // 不能让 400 被笼统提示「请稍后重试」掩盖。apiCall 失败时 err.code 直接挂在 error 上。
+            const code = e && e.code;
+            if (e && e.status === 401) {
+                showNotification('保存失败：请先登录', 'warning', { actionLabel: '去登录', action: openLoginModal });
+            } else if (code === 'empty_product') {
+                showNotification('保存失败：请填写产品名称', 'warning');
+            } else if (code === 'empty_transcript') {
+                showNotification('保存失败：对话记录为空，请先完成至少一轮对话', 'warning');
+            } else if (code === 'rate_limited') {
+                showNotification('操作过于频繁，请稍后再试', 'warning');
+            } else {
+                showNotification('保存失败，请稍后重试', 'error');
+            }
+        }
+    });
+
+    loadTrainingRecords('cs', 'cs-records-body');
 }
 
-function appendCSMsg(role, text) {
+// 体验优化⑤（2026-10-06）：整场复盘卡——提交后在对话区顶部展示
+// 整场均分 + 高光时刻 + 待改进点，让一次训练形成闭环。
+function renderReviewCard(overall, roundDetails) {
+    const container = document.getElementById('cs-messages');
+    if (!container) return;
+    // 移除旧的复盘卡
+    container.querySelector('.cs-review-card')?.remove();
+
+    const card = document.createElement('div');
+    card.className = 'cs-review-card';
+
+    // 高光时刻 = 最高分那一句；待改进 = 最低分那一句
+    let best = null, worst = null;
+    (roundDetails || []).forEach(r => {
+        if (!best || r.score > best.score) best = r;
+        if (!worst || r.score < worst.score) worst = r;
+    });
+
+    const gradeColor = overall >= 85 ? '#2e7d32' : overall >= 70 ? '#2f6b4f' : overall >= 55 ? '#d9a227' : '#ef4444';
+    const gradeLabel = overall >= 85 ? '优秀' : overall >= 70 ? '良好' : overall >= 55 ? '及格' : '待提升';
+
+    card.innerHTML = `
+        <div class="cs-review-head">
+            <i class="fas fa-flag-checkered"></i>
+            <span>训练复盘</span>
+        </div>
+        <div class="cs-review-overall">
+            <div class="cs-review-score" style="color:${gradeColor}">${overall}</div>
+            <div class="cs-review-meta">
+                <div class="cs-review-grade" style="color:${gradeColor}">${gradeLabel}</div>
+                <div class="cs-review-note">整场 ${roundDetails.length} 轮均分</div>
+            </div>
+        </div>
+        ${best ? `
+        <div class="cs-review-item cs-review-best">
+            <div class="cs-review-item-label"><i class="fas fa-star"></i> 高光时刻（${best.score}分）</div>
+            <div class="cs-review-item-text">${escapeHtml(best.text)}</div>
+        </div>` : ''}
+        ${worst && worst !== best ? `
+        <div class="cs-review-item cs-review-worst">
+            <div class="cs-review-item-label"><i class="fas fa-arrow-up"></i> 待改进（${worst.score}分）</div>
+            <div class="cs-review-item-text">${escapeHtml(worst.text)}</div>
+            ${worst.tips && worst.tips.length ? `<div class="cs-review-tip">${escapeHtml(worst.tips[0])}</div>` : ''}
+        </div>` : ''}
+    `;
+    container.insertBefore(card, container.firstChild);
+    container.scrollTop = 0;
+}
+
+function appendCSMsg(role, text, meta) {
     const container = document.getElementById('cs-messages');
     if (!container) return;
     // 移除欢迎信息
@@ -3137,10 +6169,41 @@ function appendCSMsg(role, text) {
     div.className = `cs-msg ${role}`;
     const icon = role === 'customer' ? 'fa-user' : 'fa-headset';
     const label = role === 'customer' ? '客户' : '你（客服）';
+    // 体验优化①（2026-10-06）：学员气泡旁标注该句得分（颜色分级）。
+    let scoreBadge = '';
+    let reasonNote = '';
+    if (role === 'agent' && meta && typeof meta.score === 'number') {
+        const s = meta.score;
+        const grade = s >= 85 ? 'good' : s >= 70 ? 'mid' : s >= 55 ? 'warn' : 'bad';
+        scoreBadge = `<span class="cs-msg-score cs-score-${grade}">${s}分</span>`;
+        // 扣分原因（取第一条提示，通常是「答非所问」或最要紧的建议）
+        if (meta.tips && meta.tips.length) {
+            reasonNote = `<div class="cs-msg-reason">${escapeHtml(meta.tips[0])}</div>`;
+        }
+    }
     div.innerHTML = `
         <div class="cs-msg-avatar"><i class="fas ${icon}"></i></div>
         <div class="cs-msg-content">
-            <div class="cs-msg-label">${label}</div>
+            <div class="cs-msg-label">${label} ${scoreBadge}</div>
+            <div class="cs-msg-bubble">${escapeHtml(text)}</div>
+            ${reasonNote}
+        </div>
+    `;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div;
+}
+
+// P1-3（2026-10-06 走查）：客服回复失败时的可见错误占位（不进入 chatHistory、不冒充客户）。
+function appendCSError(text) {
+    const container = document.getElementById('cs-messages');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.className = 'cs-msg cs-error-msg';
+    div.innerHTML = `
+        <div class="cs-msg-avatar"><i class="fas fa-exclamation-triangle"></i></div>
+        <div class="cs-msg-content">
+            <div class="cs-msg-label">系统提示</div>
             <div class="cs-msg-bubble">${escapeHtml(text)}</div>
         </div>
     `;
@@ -3152,16 +6215,16 @@ function updateCSScore(score) {
     const totalEl = document.getElementById('cs-score-overall');
     if (totalEl) {
         animateNumber(totalEl, score.total, 800);
-        const color = score.total >= 85 ? '#10b981' : score.total >= 70 ? '#22c55e' : score.total >= 55 ? '#f59e0b' : '#ef4444';
+        const color = score.total >= 85 ? '#1f5e43' : score.total >= 70 ? '#2f6b4f' : score.total >= 55 ? '#d9a227' : '#ef4444';
         totalEl.style.color = color;
     }
 
     if (score.details) {
         const mapping = [
-            { key: 'politeness', fill: 'cs-polite', val: 'cs-polite-val' },
-            { key: 'professional', fill: 'cs-pro', val: 'cs-pro-val' },
-            { key: 'solving', fill: 'cs-solve', val: 'cs-solve-val' },
-            { key: 'empathy', fill: 'cs-empathy', val: 'cs-empathy-val' }
+            { key: 'politeness', fill: 'cs-polite', val: 'cs-polite-val', bar: 'cs-bar-polite', label: '礼貌度' },
+            { key: 'professional', fill: 'cs-pro', val: 'cs-pro-val', bar: 'cs-bar-pro', label: '专业度' },
+            { key: 'solving', fill: 'cs-solve', val: 'cs-solve-val', bar: 'cs-bar-solve', label: '解决力' },
+            { key: 'empathy', fill: 'cs-empathy', val: 'cs-empathy-val', bar: 'cs-bar-empathy', label: '同理心' }
         ];
         mapping.forEach((m, i) => {
             const v = score.details[m.key] || 0;
@@ -3172,6 +6235,35 @@ function updateCSScore(score) {
                 if (val) val.textContent = v;
             }, i * 100);
         });
+
+        // 体验优化②（2026-10-06）：高亮最弱维度 + 一句可行动建议
+        let weakest = null;
+        mapping.forEach(m => {
+            const v = score.details[m.key] || 0;
+            const bar = document.getElementById(m.bar);
+            if (bar) bar.classList.remove('is-weakest');
+            if (!weakest || v < weakest.v) weakest = { v, m };
+        });
+        const weakHint = document.getElementById('cs-weak-hint');
+        if (weakest && weakest.m && weakHint) {
+            const bar = document.getElementById(weakest.m.bar);
+            if (bar) bar.classList.add('is-weakest');
+            // 各维度的可行动建议映射
+            const advices = {
+                politeness: '试试用「亲 / 您好」开头，语气更亲切',
+                professional: '补上产地、品种、规格等信息更有说服力',
+                solving: '明确告诉客户解决方案，如「帮您补发」',
+                empathy: '先说「理解您的心情」，再给方案效果更好'
+            };
+            const advice = advices[weakest.m.key] || '';
+            if (advice && weakest.v < 85) {
+                weakHint.style.display = 'block';
+                weakHint.innerHTML = '<i class="fas fa-bullseye"></i><span>最弱：<b>' + weakest.m.label +
+                    '</b>（' + weakest.v + '）· ' + escapeHtml(advice) + '</span>';
+            } else {
+                weakHint.style.display = 'none';
+            }
+        }
     }
 
     if (score.tips && score.tips.length > 0) {
@@ -3182,6 +6274,21 @@ function updateCSScore(score) {
             ).join('');
         }
     }
+}
+
+// 体验优化⑥（2026-10-06）：更新客户情绪温度条。
+// sentiment = { level: 0-100, label: '满意'|'较满意'|'一般'|'不满' }
+function updateCSSentiment(sentiment) {
+    const fill = document.getElementById('cs-sentiment-fill');
+    const label = document.getElementById('cs-sentiment-label');
+    if (!fill || !label || !sentiment) return;
+    const lv = sentiment.level;
+    const color = lv >= 70 ? '#2e7d32' : lv >= 52 ? '#d9a227' : '#ef4444';
+    fill.style.transition = 'width 0.8s ease, background 0.5s ease';
+    fill.style.width = lv + '%';
+    fill.style.background = color;
+    label.textContent = sentiment.label || '一般';
+    label.style.color = color;
 }
 
 function appendChatMsg(role, text) {
@@ -3202,52 +6309,243 @@ function setupCaseButtons() {
 }
 
 // ==================== 政策信息 ====================
+// 内容唯一事实源 = 后端 policies_data.py（经 /api/resources/policies 下发）。
+// 卡片动态渲染；正文 + 资料来源 + 免责声明均来自同一份接口数据，避免与后端双份维护。
+let _policiesLoaded = false;
+let _policyList = [];
+let _policyNotes = { source_note: '', disclaimer: '' };
+
+// 分类 → 卡片图标/标签色（仅展示用；未知分类走中性默认，不因缺映射而不渲染）
+const POLICY_CATEGORY_STYLE = {
+    '补贴': { icon: 'fa-hand-holding-usd', tag: 'tag-subsidy' },
+    '电商': { icon: 'fa-shopping-cart',    tag: 'tag-ecommerce' },
+    '非遗': { icon: 'fa-university',       tag: 'tag-heritage' },
+    '培训': { icon: 'fa-graduation-cap',   tag: 'tag-training' },
+    '认证': { icon: 'fa-certificate',      tag: 'tag-cert' },
+    '综合': { icon: 'fa-file-alt',         tag: 'tag-general' }
+};
+
+// ⚠️ 未知分类的默认样式必须是**中性**的。
+//    原实现回退成 tag-subsidy（补贴绿）→ 学员会把一条非补贴政策看成补贴政策。
+const POLICY_CATEGORY_FALLBACK = { icon: 'fa-file-alt', tag: 'tag-general' };
+
+// 已知分类的展示顺序（数据里真实出现的分类按此排序，其它分类按出现顺序追加在后）
+const POLICY_CATEGORY_ORDER = ['补贴', '电商', '非遗', '培训', '认证', '综合'];
+
+// 筛选按钮按数据里**真实出现的分类**动态生成。
+// ⚠️ 原来写死了 5 个分类按钮，而政府端可以发布这 5 类之外的政策（表单里就有「综合」）。
+//    那条政策于是永远筛不到，界面上却没有任何提示 —— 学员会觉得这条政策凭空消失了。
+function renderPolicyFilters(policies) {
+    const box = document.querySelector('.policy-filters');
+    if (!box) return;
+
+    const present = [];
+    policies.forEach(p => {
+        const c = p.category || '综合';
+        if (present.indexOf(c) === -1) present.push(c);
+    });
+    present.sort((a, b) => {
+        const ia = POLICY_CATEGORY_ORDER.indexOf(a), ib = POLICY_CATEGORY_ORDER.indexOf(b);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
+
+    const activeBtn = box.querySelector('.policy-filter.active');
+    const keep = (activeBtn && activeBtn.dataset.filter) || 'all';
+    const items = [{ k: 'all', label: '全部' }].concat(present.map(c => ({ k: c, label: c })));
+    // 之前选中的分类若在新数据里已不存在，退回「全部」，避免出现「高亮了但一条都没有」
+    const keepOk = keep === 'all' || present.indexOf(keep) !== -1;
+
+    box.innerHTML = items.map(x =>
+        `<button class="policy-filter${(keepOk && x.k === keep) ? ' active' : ''}" data-filter="${attrEsc(x.k)}">${escapeHtml(x.label)}</button>`
+    ).join('');
+    if (!box.querySelector('.policy-filter.active')) {
+        box.querySelector('.policy-filter').classList.add('active');
+    }
+}
 
 function setupPolicySection() {
-    // 分类筛选
-    document.querySelectorAll('.policy-filter').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.policy-filter').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            const filter = this.dataset.filter;
-            document.querySelectorAll('.policy-card').forEach(card => {
-                if (filter === 'all' || card.dataset.category === filter) {
-                    card.style.display = '';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
+    // 分类筛选：绑在**容器**上用事件委托。
+    // 按钮是异步按数据重建的（renderPolicyFilters 会重写 innerHTML），
+    // 初始化时 querySelectorAll 绑的监听会随着重建一起丢失。
+    const filters = document.querySelector('.policy-filters');
+    if (filters) {
+        filters.addEventListener('click', function(e) {
+            const btn = e.target.closest('.policy-filter');
+            if (!btn) return;
+            filters.querySelectorAll('.policy-filter').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            applyPolicyFilter(btn.dataset.filter);
         });
-    });
+    }
 
-    // 政策卡片点击 → 弹窗
-    document.querySelectorAll('.policy-card').forEach(card => {
-        card.addEventListener('click', async function() {
-            const title = this.querySelector('h4')?.textContent || '';
-            showLoading('加载政策详情...');
-            try {
-                const data = await apiCall('/api/resources/policies');
-                hideLoading();
-                if (data.success && data.policies) {
-                    const policy = data.policies.find(p => p.title === title);
-                    if (policy) {
-                        showPolicyModal(policy);
-                        return;
-                    }
-                }
+    // 政策卡片点击 → 弹窗。
+    // 卡片是异步渲染的，必须用事件委托，不能在初始化时 querySelectorAll 一次性绑定。
+    const grid = document.getElementById('policy-grid');
+    if (grid) {
+        grid.addEventListener('click', function(e) {
+            const card = e.target.closest('.policy-card');
+            if (!card) return;
+            const policy = _policyList[Number(card.dataset.index)];
+            if (policy) {
+                showPolicyModal(policy);
+            } else {
                 showNotification('未找到该政策详情', 'warning');
-            } catch(e) {
-                hideLoading();
-                showNotification('加载失败，请稍后重试', 'error');
             }
         });
+    }
+}
+
+// 「一条政策都没有」是**合法结果**（政府端尚未发布，或政策已全部下架），
+// 必须与「加载失败」区分开：
+//   原实现把空列表 throw 成错误态 → 学员看到「政策加载失败：暂无政策数据」+ 重试按钮，
+//   会理解成平台故障；而政府端把政策**全部下架**时必然触发，等于把一次正常的下架操作
+//   呈现成了一次故障（配合后端降级 bug 更是双重误判）。
+function renderPoliciesEmpty(message) {
+    const grid = document.getElementById('policy-grid');
+    if (!grid) return;
+    grid.innerHTML = `<div class="policies-empty">
+        <i class="fas fa-folder-open"></i>
+        <p>${escapeHtml(message)}</p>
+        <p class="policies-empty-sub">政策由各地农业农村主管部门发布；未发布或已下架时此处为空。</p>
+        <button class="btn btn-outline btn-sm" onclick="loadPolicies(true)"><i class="fas fa-redo"></i> 刷新</button>
+    </div>`;
+}
+
+function applyPolicyFilter(filter) {
+    let visible = 0;
+    document.querySelectorAll('#policy-grid .policy-card').forEach(card => {
+        const hit = filter === 'all' || card.dataset.category === filter;
+        card.style.display = hit ? '' : 'none';
+        if (hit) visible++;
     });
+
+    // 该分类下一条都没有 → 必须给提示。
+    // 原来只是把卡片全部 display:none，学员看到的是一片空白，会以为页面坏了。
+    // 触发场景很常见：政府端下架了某分类下唯一的一条政策。
+    const grid = document.getElementById('policy-grid');
+    if (!grid) return;
+    if (visible === 0) {
+        renderPoliciesEmpty(filter === 'all'
+            ? '暂时没有可显示的政策'
+            : `「${filter}」分类下暂时没有政策`);
+        return;
+    }
+    const old = grid.querySelector('.policies-empty');
+    if (old) old.remove();
+}
+
+async function loadPolicies(force) {
+    const grid = document.getElementById('policy-grid');
+    if (!grid) return;
+    if (_policiesLoaded && !force) return;
+
+    grid.innerHTML = '<div class="policy-placeholder"><i class="fas fa-spinner fa-spin"></i> 正在加载政策…</div>';
+
+    try {
+        const res = await fetch('/api/resources/policies');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.policies)) {
+            throw new Error(data.message || '返回数据格式异常');
+        }
+        if (data.policies.length === 0) {
+            // 空列表是合法结果（未发布/已全部下架），不是失败 —— 走空态，不走错误态。
+            _policyList = [];
+            _policyNotes = {
+                source_note: data.source_note || '',
+                disclaimer: data.disclaimer || ''
+            };
+            renderPolicyFilters([]);
+            renderPoliciesEmpty('暂时没有可显示的政策');
+            _policiesLoaded = true;
+            return;
+        }
+        _policyList = data.policies;
+        _policyNotes = {
+            source_note: data.source_note || '',
+            disclaimer: data.disclaimer || ''
+        };
+        renderPolicies(data.policies);
+        // 先按「数据里真实出现的分类」重建筛选按钮，再按当前选中项过滤。
+        // （renderPolicyFilters 会把已消失的分类退回「全部」，所以要在它之后再取 active）
+        renderPolicyFilters(data.policies);
+        const active = document.querySelector('.policy-filter.active');
+        applyPolicyFilter(active ? active.dataset.filter : 'all');
+        _policiesLoaded = true;
+    } catch (e) {
+        console.error('加载政策失败:', e);
+        grid.innerHTML = `
+            <div class="policies-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>政策加载失败：${escapeHtml(e.message || '未知错误')}</p>
+                <button class="btn btn-outline btn-sm" onclick="loadPolicies(true)">
+                    <i class="fas fa-redo"></i> 重试
+                </button>
+            </div>`;
+    }
+}
+
+function renderPolicies(policies) {
+    const grid = document.getElementById('policy-grid');
+    if (!grid) return;
+    grid.innerHTML = policies.map((p, i) => {
+        // 分类由后端归一化（general → 综合，见 database.normalize_policy_category），
+        // 前端不假设一定是已知分类：未知分类走中性默认样式，绝不冒充成「补贴」。
+        const cat = p.category || '综合';
+        const style = POLICY_CATEGORY_STYLE[cat] || POLICY_CATEGORY_FALLBACK;
+        // escapeHtml 不转引号，进属性前补一道（分类可能来自政府端输入）
+        const catAttr = attrEsc(cat);
+        // 摘要缺失时整行不渲染（不用"暂无"类占位充数）
+        const summaryHtml = p.summary ? `<p>${escapeHtml(p.summary)}</p>` : '';
+        return `
+        <div class="policy-card" data-category="${catAttr}" data-index="${i}">
+            <div class="policy-card-top">
+                <div class="policy-icon-lg"><i class="fas ${style.icon}"></i></div>
+                <span class="policy-tag ${style.tag}">${escapeHtml(cat)}</span>
+            </div>
+            <h4>${escapeHtml(p.title || '')}</h4>
+            ${summaryHtml}
+            <div class="policy-card-footer">
+                ${p.date ? `<span class="policy-date"><i class="far fa-calendar-alt"></i> ${escapeHtml(p.date)}</span>` : '<span class="policy-date"></span>'}
+                <span class="policy-detail-btn">查看详情 <i class="fas fa-arrow-right"></i></span>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function showPolicyModal(policy) {
-    // 解析内容为HTML
     const html = formatPolicyContent(policy.content);
-    showDetailModal(policy.title, `<div class="policy-detail-content">${html}</div>`);
+
+    // 资料来源（后端 sources 字段；没有就整块不渲染）
+    const sources = Array.isArray(policy.sources) ? policy.sources : [];
+    let srcHtml = '';
+    if (sources.length) {
+        srcHtml = `<div class="policy-sources">
+            <h4><i class="fas fa-book"></i> 资料来源</h4>
+            <ul>${sources.map(s => {
+                const meta = [s.media, s.date].filter(Boolean).join(' · ');
+                const label = escapeHtml(s.title || s.media || s.url || '');
+                const url = safePolicyUrl(s.url);
+                const link = url
+                    ? `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`
+                    : label;
+                return `<li>${link}${meta ? `<span class="src-meta">${escapeHtml(meta)}</span>` : ''}</li>`;
+            }).join('')}</ul>
+        </div>`;
+    }
+
+    // 口径说明 + 免责声明（后端 policy_notes 下发；都缺失则整块不渲染）
+    // ⚠️ source_note（"本页依据公开政策文件整理，文号与数据均可溯源"）是对**来源区块**的背书，
+    //    只有这条政策确实带了 sources 才成立。政府端自建政策没有来源，
+    //    原实现无条件挂上这句 → 等于替一条无出处的政策做了「可溯源」承诺（口径失真）。
+    //    故：无 sources 时只保留免责声明（免责声明对任何政策都成立）。
+    const notes = (sources.length ? [_policyNotes.source_note] : [])
+        .concat([_policyNotes.disclaimer]).filter(Boolean);
+    const noteHtml = notes.length
+        ? `<div class="policy-disclaimer"><i class="fas fa-info-circle"></i> <span>${notes.map(escapeHtml).join('<br>')}</span></div>`
+        : '';
+
+    showDetailModal(policy.title, `<div class="policy-detail-content">${html}${srcHtml}${noteHtml}</div>`);
 }
 
 function formatPolicyContent(text) {
@@ -3270,14 +6568,14 @@ function formatPolicyContent(text) {
         // 标题行：【xxx】
         if (trimmed.startsWith('【') && trimmed.endsWith('】')) {
             if (inList) { html += `</${listType}>`; inList = false; }
-            html += `<h4>${trimmed.slice(1, -1)}</h4>`;
+            html += `<h4>${policyInline(trimmed.slice(1, -1))}</h4>`;
             continue;
         }
 
         // 无序列表：• 开头
         if (trimmed.startsWith('•') || trimmed.startsWith('-')) {
             if (!inList) { html += '<ul>'; inList = true; listType = 'ul'; }
-            html += `<li>${trimmed.slice(1).trim()}</li>`;
+            html += `<li>${policyInline(trimmed.slice(1).trim())}</li>`;
             continue;
         }
 
@@ -3289,17 +6587,31 @@ function formatPolicyContent(text) {
                 inList = true;
                 listType = 'ol';
             }
-            html += `<li>${trimmed.replace(/^\d+\.\s*/, '')}</li>`;
+            html += `<li>${policyInline(trimmed.replace(/^\d+\.\s*/, ''))}</li>`;
             continue;
         }
 
         // 普通段落
         if (inList) { html += `</${listType}>`; inList = false; }
-        html += `<p>${trimmed}</p>`;
+        html += `<p>${policyInline(trimmed)}</p>`;
     }
 
     if (inList) html += `</${listType}>`;
     return html;
+}
+
+// 政策正文行内格式：先做 HTML 转义（正文可能来自政府端用户输入），
+// 再把 **粗体** 转成 <strong>（预置内容只用这一种行内标记）。
+function policyInline(s) {
+    return escapeHtml(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+}
+
+// 政策来源链接：只放行 http(s)，并额外转义引号（escapeHtml 走 textContent 不转引号，
+// 直接拼进 href="..." 不安全）。返回空串表示不可用，调用方退化为纯文本。
+function safePolicyUrl(u) {
+    const s = String(u == null ? '' : u).trim();
+    if (!/^https?:\/\//i.test(s)) return '';
+    return escapeHtml(s).replace(/["']/g, m => (m === '"' ? '%22' : '%27')).replace(/\s/g, '');
 }
 
 // ==================== 就业模块 ====================
@@ -3308,8 +6620,7 @@ function setupEmploymentTab() {
     setupEmploymentSubTabs();
     setupEmploymentSearch();
     setupApplicationStatusTabs();
-    setupStartupSupportLinks();
-    setupPointsExchange();
+    setupResumePanel();
     // 初始加载职位列表（不需要登录）
     loadJobListings();
 }
@@ -3324,8 +6635,9 @@ function setupEmploymentSubTabs() {
             const panel = document.getElementById(`emp-${target}-panel`);
             if (panel) panel.classList.add('active');
             // 切换时加载对应数据
-            if (target === 'applications') loadUserApplications();
+            if (target === 'applications') loadMyJobs();
             if (target === 'saved') loadSavedJobs();
+            if (target === 'resume') loadResumePanel();
         });
     });
 }
@@ -3344,259 +6656,14 @@ function setupApplicationStatusTabs() {
         tab.addEventListener('click', () => {
             document.querySelectorAll('.emp-app-tab').forEach(t => t.classList.remove('active'));
             tab.classList.add('active');
-            loadUserApplications(tab.dataset.status);
+            loadMyJobs(tab.dataset.status);
         });
     });
-}
-
-const STARTUP_SERVICES = [
-    {
-        id: 'project',
-        icon: 'fas fa-file-alt',
-        title: '项目申报指导',
-        subtitle: '专业团队全程辅导',
-        desc: '提供专业的农业项目申报指导服务，覆盖国家及省级各类农业扶持项目。由资深政策分析师一对一辅导，从项目筛选、方案设计到材料准备、提交跟踪，全程陪伴助力成功申报。',
-        steps: [
-            { name: '需求咨询', desc: '了解您的创业方向和资源条件' },
-            { name: '项目评估', desc: '匹配适合的政策扶持项目' },
-            { name: '材料准备', desc: '协助编写商业计划书及申报材料' },
-            { name: '提交申报', desc: '对接主管部门提交申请' },
-            { name: '跟踪反馈', desc: '持续跟进审批进度直至落地' }
-        ],
-        projects: ['农业产业化项目', '乡村振兴示范项目', '农业科技攻关项目', '农产品加工补贴项目', '农村一二三产业融合项目'],
-        stats: { successRate: '87%', avgDays: '30天', totalHelped: '260+' },
-        hotline: '0668-2888-xxx'
-    },
-    {
-        id: 'funding',
-        icon: 'fas fa-money-bill-wave',
-        title: '资金申请协助',
-        subtitle: '对接多种低息贷款渠道',
-        desc: '帮助创业者对接银行、信用社、担保公司等多种资金渠道，提供贷款方案咨询、材料准备、利率谈判等服务，解决创业资金难题。与多家金融机构建立合作关系，享受专属优惠利率。',
-        channels: [
-            { name: '农业银行惠农贷款', rate: '年利率3.85%起', limit: '最高50万', period: '1-3年' },
-            { name: '农村信用社小额贷款', rate: '年利率4.35%起', limit: '最高20万', period: '1-5年' },
-            { name: '创业担保贷款', rate: '政府贴息', limit: '最高30万', period: '2-3年' },
-            { name: '农业保险补贴', rate: '保费补贴80%', limit: '按种植面积', period: '1年' }
-        ],
-        requirements: ['年满18周岁，具有完全民事行为能力', '有明确的创业项目和可行的商业计划', '信用记录良好，无重大不良信用', '有固定的经营场所或种植基地'],
-        hotline: '0668-2888-xxx'
-    },
-    {
-        id: 'market',
-        icon: 'fas fa-store',
-        title: '市场渠道对接',
-        subtitle: '线上线下全渠道覆盖',
-        desc: '提供全方位的市场渠道对接服务，帮助农产品走出乡村、走向全国。整合线上线下资源，对接电商平台、批发市场、商超、社区团购等多种销售渠道，让好产品卖出好价钱。',
-        channels: [
-            { name: '电商平台', items: ['淘宝/天猫', '拼多多', '抖音电商', '京东生鲜'], icon: 'fas fa-globe' },
-            { name: '线下批发', items: ['广州江南市场', '深圳海吉星', '佛山中南市场'], icon: 'fas fa-warehouse' },
-            { name: '社区团购', items: ['美团优选', '多多买菜', '兴盛优选'], icon: 'fas fa-users' },
-            { name: '直播带货', items: ['抖音直播', '快手直播', '视频号直播'], icon: 'fas fa-video' }
-        ],
-        successCases: [
-            { name: '高州荔枝', result: '通过抖音直播单日销售5000斤' },
-            { name: '化州橘红', result: '入驻天猫旗舰店月销20万+' },
-            { name: '信宜三华李', result: '社区团购覆盖珠三角300+社区' }
-        ],
-        hotline: '0668-2888-xxx'
-    }
-];
-
-function setupStartupSupportLinks() {
-    document.querySelectorAll('.emp-startup-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const idx = parseInt(item.dataset.support);
-            openStartupDetail(idx);
-        });
-    });
-    const viewAll = document.getElementById('emp-startup-view-all');
-    if (viewAll) viewAll.addEventListener('click', openStartupOverview);
-}
-
-function openStartupOverview() {
-    const cards = STARTUP_SERVICES.map((s, i) => `
-        <div class="startup-overview-card" data-idx="${i}">
-            <div class="startup-overview-icon"><i class="${s.icon}"></i></div>
-            <div class="startup-overview-info">
-                <div class="startup-overview-title">${s.title}</div>
-                <div class="startup-overview-subtitle">${s.subtitle}</div>
-            </div>
-            <i class="fas fa-arrow-right startup-overview-arrow"></i>
-        </div>
-    `).join('');
-    const html = `
-        <div class="startup-overview-scroll">
-            <div class="startup-overview-intro">
-                <i class="fas fa-info-circle"></i>
-                <span>粤乡智匠为创业者提供从项目申报、资金对接到市场渠道的全链条创业支持服务</span>
-            </div>
-            <div class="startup-overview-list">${cards}</div>
-            <div class="startup-overview-contact">
-                <i class="fas fa-headset"></i>
-                <span>创业热线：<strong>0668-2888-xxx</strong>（工作日 9:00-18:00）</span>
-            </div>
-        </div>
-    `;
-    showDetailModal('创业支持服务', html);
-    document.querySelectorAll('.startup-overview-card').forEach(card => {
-        card.addEventListener('click', () => {
-            document.querySelector('.modal-overlay')?.click();
-            setTimeout(() => openStartupDetail(parseInt(card.dataset.idx)), 200);
-        });
-    });
-}
-
-function openStartupDetail(idx) {
-    const s = STARTUP_SERVICES[idx];
-    if (!s) return;
-    let body = '';
-
-    if (s.id === 'project') {
-        body = `
-            <div class="startup-detail-scroll">
-                <div class="startup-detail-hero">
-                    <div class="startup-detail-hero-icon"><i class="${s.icon}"></i></div>
-                    <div class="startup-detail-hero-info">
-                        <div class="startup-detail-hero-title">${s.title}</div>
-                        <div class="startup-detail-hero-subtitle">${s.subtitle}</div>
-                    </div>
-                </div>
-                <div class="startup-detail-stats">
-                    <div class="startup-detail-stat">
-                        <span class="startup-detail-stat-num">${s.stats.successRate}</span>
-                        <span class="startup-detail-stat-label">申报成功率</span>
-                    </div>
-                    <div class="startup-detail-stat">
-                        <span class="startup-detail-stat-num">${s.stats.avgDays}</span>
-                        <span class="startup-detail-stat-label">平均周期</span>
-                    </div>
-                    <div class="startup-detail-stat">
-                        <span class="startup-detail-stat-num">${s.stats.totalHelped}</span>
-                        <span class="startup-detail-stat-label">已服务客户</span>
-                    </div>
-                </div>
-                <div class="startup-detail-desc">${s.desc}</div>
-                <div class="startup-detail-subsection">
-                    <div class="startup-detail-subtitle"><i class="fas fa-route"></i> 服务流程</div>
-                    <div class="startup-detail-steps">
-                        ${s.steps.map((st, i) => `
-                            <div class="startup-detail-step">
-                                <div class="startup-detail-step-num">${i + 1}</div>
-                                <div class="startup-detail-step-content">
-                                    <div class="startup-detail-step-name">${st.name}</div>
-                                    <div class="startup-detail-step-desc">${st.desc}</div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="startup-detail-subsection">
-                    <div class="startup-detail-subtitle"><i class="fas fa-list-check"></i> 可申报项目</div>
-                    <div class="startup-detail-tags">
-                        ${s.projects.map(p => `<span class="startup-detail-tag">${p}</span>`).join('')}
-                    </div>
-                </div>
-                <div class="startup-detail-contact">
-                    <i class="fas fa-phone-volume"></i>
-                    <span>咨询热线：<strong>${s.hotline}</strong></span>
-                </div>
-            </div>
-        `;
-    } else if (s.id === 'funding') {
-        body = `
-            <div class="startup-detail-scroll">
-                <div class="startup-detail-hero">
-                    <div class="startup-detail-hero-icon"><i class="${s.icon}"></i></div>
-                    <div class="startup-detail-hero-info">
-                        <div class="startup-detail-hero-title">${s.title}</div>
-                        <div class="startup-detail-hero-subtitle">${s.subtitle}</div>
-                    </div>
-                </div>
-                <div class="startup-detail-desc">${s.desc}</div>
-                <div class="startup-detail-subsection">
-                    <div class="startup-detail-subtitle"><i class="fas fa-university"></i> 资金渠道</div>
-                    <div class="startup-funding-grid">
-                        ${s.channels.map(ch => `
-                            <div class="startup-funding-card">
-                                <div class="startup-funding-name">${ch.name}</div>
-                                <div class="startup-funding-detail">
-                                    <span><i class="fas fa-percentage"></i> ${ch.rate}</span>
-                                    <span><i class="fas fa-coins"></i> ${ch.limit}</span>
-                                    <span><i class="fas fa-clock"></i> ${ch.period}</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="startup-detail-subsection">
-                    <div class="startup-detail-subtitle"><i class="fas fa-clipboard-check"></i> 申请条件</div>
-                    <div class="startup-detail-checklist">
-                        ${s.requirements.map(r => `<div class="startup-detail-check"><i class="fas fa-check-circle"></i>${r}</div>`).join('')}
-                    </div>
-                </div>
-                <div class="startup-detail-contact">
-                    <i class="fas fa-phone-volume"></i>
-                    <span>咨询热线：<strong>${s.hotline}</strong></span>
-                </div>
-            </div>
-        `;
-    } else if (s.id === 'market') {
-        body = `
-            <div class="startup-detail-scroll">
-                <div class="startup-detail-hero">
-                    <div class="startup-detail-hero-icon"><i class="${s.icon}"></i></div>
-                    <div class="startup-detail-hero-info">
-                        <div class="startup-detail-hero-title">${s.title}</div>
-                        <div class="startup-detail-hero-subtitle">${s.subtitle}</div>
-                    </div>
-                </div>
-                <div class="startup-detail-desc">${s.desc}</div>
-                <div class="startup-detail-subsection">
-                    <div class="startup-detail-subtitle"><i class="fas fa-th-large"></i> 销售渠道</div>
-                    <div class="startup-market-grid">
-                        ${s.channels.map(ch => `
-                            <div class="startup-market-card">
-                                <div class="startup-market-card-header">
-                                    <i class="${ch.icon}"></i>
-                                    <span>${ch.name}</span>
-                                </div>
-                                <div class="startup-market-items">
-                                    ${ch.items.map(it => `<span class="startup-market-item">${it}</span>`).join('')}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="startup-detail-subsection">
-                    <div class="startup-detail-subtitle"><i class="fas fa-trophy"></i> 成功案例</div>
-                    <div class="startup-detail-cases">
-                        ${s.successCases.map(c => `
-                            <div class="startup-detail-case">
-                                <div class="startup-detail-case-name">${c.name}</div>
-                                <div class="startup-detail-case-result">${c.result}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                <div class="startup-detail-contact">
-                    <i class="fas fa-phone-volume"></i>
-                    <span>咨询热线：<strong>${s.hotline}</strong></span>
-                </div>
-            </div>
-        `;
-    }
-    showDetailModal(s.title, body);
 }
 
 async function loadEmploymentData() {
     // 职位列表不需要登录即可加载
     await loadJobListings();
-    if (!AppState.user) return;
-    await Promise.all([
-        loadEmploymentStats(),
-        loadCertificateSummary()
-    ]);
 }
 
 async function loadJobListings(filters) {
@@ -3625,27 +6692,209 @@ async function loadJobListings(filters) {
         showSkeleton(listEl, 'card', 3);
         const data = await apiCall(`/api/employment/jobs?${params.toString()}`);
         if (data.success) {
-            if (data.jobs.length === 0) {
+            const jobs = data.jobs || [];
+            // 公开招聘（公告）：带薪资筛选时不展示 —— 公告没有薪资字段，
+            // 让它出现在「薪资 5000-8000」的筛选结果里属于误导。
+            // ⚠️ 但「隐了」必须说出来：旧版只把两类都清空、只留一句「未找到匹配的职位」，
+            // 学员选一次薪资就以为岗位全没了（2026-10-07 实测整页 0 条）。见 renderFilterNote。
+            const recs = (!filters.salary && data.recruitments) ? data.recruitments : [];
+            const total = jobs.length + recs.length;
+
+            // 分类下拉按真实条数重建（0 条的标「暂无」）+ 条数构成 + 筛选范围说明 + 空态原因
+            renderCategoryFilter(data.category_options, filters.category);
+            renderJobCount(totalEl, document.getElementById('emp-job-breakdown'), jobs.length, recs.length);
+            renderFilterNote(document.getElementById('emp-filter-note'), filters, data);
+            renderReviewPending(jobs.length, data);
+
+            if (total === 0) {
                 listEl.innerHTML = '';
                 if (emptyEl) emptyEl.style.display = 'block';
+                renderEmptyReason(document.getElementById('emp-jobs-empty-title'),
+                                  document.getElementById('emp-jobs-empty-hint'),
+                                  filters, data);
             } else {
                 if (emptyEl) emptyEl.style.display = 'none';
-                // 获取收藏状态
+                // 获取收藏状态（只有企业岗位可收藏；公告是外链，不进收藏表）
                 let savedIds = [];
                 if (AppState.user) {
                     try {
                         const savedData = await apiCall(`/api/employment/saved/${AppState.user.id}`);
                         if (savedData.success) savedIds = savedData.saved_ids;
-                    } catch(e) {}
+                    } catch(e) { console.warn('[就业对接] 收藏状态加载失败', e); }
                 }
-                listEl.innerHTML = data.jobs.map(job => renderJobCard(job, savedIds)).join('');
+                // 公告详情直接从列表数据渲染（后端已下发全字段，点开不必再请求）
+                RECRUIT_CACHE = {};
+                recs.forEach(r => { RECRUIT_CACHE[r.key] = r; });
+                RECRUIT_NOTES = {
+                    sourceNote: data.recruit_source_note || '',
+                    disclaimer: data.recruit_disclaimer || ''
+                };
+
+                // 招聘公告的报名是有期限的，过期即失效 ——
+                // 可报名的（报名中 / 即将开始）正常展示；已过报名期的默认折叠，
+                // 需要时展开仍能看岗位条件，但不会让首屏看起来"全是不能报的"。
+                const activeRecs = recs.filter(r => r.status === 'open' || r.status === 'upcoming');
+                const expiredRecs = recs.filter(r => r.status !== 'open' && r.status !== 'upcoming');
+
+                let html = '';
+                if (activeRecs.length) {
+                    html += `<div class="emp-list-section-title"><i class="fas fa-bullhorn"></i>公开招聘信息` +
+                            `<span class="emp-list-section-note">官方公告汇编 · 点卡片查看公告原文</span></div>`;
+                    html += activeRecs.map(renderRecruitCard).join('');
+                }
+                if (expiredRecs.length) {
+                    html += `<details class="emp-recruit-expired"><summary>` +
+                            `<i class="fas fa-clock-rotate-left"></i>已过报名期 ${expiredRecs.length} 条` +
+                            `<span class="emp-recruit-expired-note">报名已结束，仅作岗位与条件参考</span>` +
+                            `</summary>` + expiredRecs.map(renderRecruitCard).join('') +
+                            `</details>`;
+                }
+                if (jobs.length) {
+                    if (recs.length) {
+                        html += `<div class="emp-list-section-title"><i class="fas fa-building"></i>企业招聘岗位` +
+                                `<span class="emp-list-section-note">由入驻企业发布，平台审核通过后展示</span></div>`;
+                    }
+                    html += jobs.map(job => renderJobCard(job, savedIds)).join('');
+                }
+                listEl.innerHTML = html;
                 bindJobCardEvents(listEl);
             }
-            if (totalEl) totalEl.textContent = data.jobs.length;
+            if (totalEl) totalEl.textContent = total;   // 与 renderJobCount 同值，见上
+
+            // 公开招聘的口径说明（有公告才展示）—— 文案出自后端 jobs_data.py，前端不硬编码
+            const footEl = document.getElementById('emp-recruit-footnote');
+            if (footEl) {
+                if (recs.length) {
+                    footEl.style.display = 'block';
+                    footEl.innerHTML = '<i class="fas fa-info-circle"></i> ' +
+                        escapeHtml(RECRUIT_NOTES.sourceNote || '') +
+                        (RECRUIT_NOTES.disclaimer ? '<br>' + escapeHtml(RECRUIT_NOTES.disclaimer) : '');
+                } else {
+                    footEl.style.display = 'none';
+                    footEl.innerHTML = '';
+                }
+            }
         }
     } catch(e) {
         showErrorState(listEl, '加载职位失败', () => loadJobListings(filters));
     }
+}
+
+/* ==================== 筛选反馈（条数构成 / 生效范围 / 空态原因 / 分类下拉）====================
+   2026-10-07 学员视角走查：旧版筛选一旦筛空，界面只剩一句「未找到匹配的职位」，
+   学员无从判断是「平台没有这类岗位」「我选错了」还是「筛选把别的内容藏起来了」。
+   下面四个小函数把这四件事分别说清楚。全部对字段缺失兜底（新前端 + 旧后端是常态）。 */
+
+// 分类下拉：老后端没下发 category_options 时保持 index.html 的静态项，不重建
+const CATEGORY_STATIC_FALLBACK = {
+    enterprise: ['农业技术', '电商运营', '手工工艺', '乡村旅游', '物流仓储'],
+    recruit: ['基层服务', '乡村治理']
+};
+
+function renderCategoryFilter(opts, keep) {
+    const sel = document.getElementById('emp-category-filter');
+    if (!sel || !opts || (!opts.enterprise && !opts.recruit)) return;
+    const groups = {
+        enterprise: (opts.enterprise || []).slice(),
+        recruit: (opts.recruit || []).slice()
+    };
+    // 当前选中项若在当前条件下 0 条（因而不在 options 里）也要留住，
+    // 否则 select 会静默跳回「职位类型」，和列表状态对不上，更让人困惑。
+    if (keep) {
+        const inEnt = CATEGORY_STATIC_FALLBACK.enterprise.indexOf(keep) !== -1;
+        const inRec = CATEGORY_STATIC_FALLBACK.recruit.indexOf(keep) !== -1;
+        const g = (inRec && !inEnt) ? 'recruit' : 'enterprise';
+        if (!groups[g].some(o => o.value === keep)) groups[g].push({ value: keep, count: 0 });
+    }
+    const build = (label, list) => {
+        if (!list || !list.length) return '';
+        const items = list.map(o => {
+            const n = (o.count > 0) ? o.count : '暂无';
+            return `<option value="${escapeHtml(o.value)}">${escapeHtml(o.value)}（${n}）</option>`;
+        }).join('');
+        return `<optgroup label="${escapeHtml(label)}">${items}</optgroup>`;
+    };
+    sel.innerHTML = '<option value="">职位类型</option>' +
+        build('企业招聘岗位', groups.enterprise) + build('公开招聘公告', groups.recruit);
+    sel.value = [].some.call(sel.options, o => o.value === keep) ? keep : '';
+}
+
+// 「共 N 条信息（企业岗位 x · 公开招聘 y）」—— 两类混算时数字本身没有含义
+function renderJobCount(totalEl, breakdownEl, entCount, recCount) {
+    if (totalEl) totalEl.textContent = entCount + recCount;
+    if (breakdownEl) {
+        breakdownEl.textContent = (entCount + recCount > 0)
+            ? `（企业岗位 ${entCount} · 公开招聘 ${recCount}）` : '';
+    }
+}
+
+// 企业岗位要经管理员审核通过才展示（后端只下发 review_status='approved'）。
+// 岗位全在审时列表里一条企业岗都没有 —— 必须说出来，
+// 否则学员会以为平台没有企业岗位，或者以为筛选坏了。
+function renderReviewPending(shownCount, data) {
+    const el = document.getElementById('emp-review-pending');
+    if (!el) return;
+    const pending = parseInt(data.enterprise_review_pending, 10) || 0;
+    if (pending > 0 && shownCount === 0) {
+        el.style.display = 'flex';
+        el.innerHTML = '<i class="fas fa-hourglass-half"></i>' +
+            `<span>另有 <b>${pending}</b> 条企业发布的岗位<b>正在审核中</b>，` +
+            '通过平台审核后才会在这里展示。</span>';
+    } else {
+        el.style.display = 'none';
+        el.innerHTML = '';
+    }
+}
+
+// 筛选生效范围的说明：薪资只作用于企业岗位 → 公告被隐藏这件事必须讲出来
+function renderFilterNote(noteEl, filters, data) {
+    if (!noteEl) return;
+    const hidden = parseInt(data.recruit_hidden_by_salary, 10) || 0;
+    if (filters.salary && hidden > 0) {
+        noteEl.style.display = 'block';
+        noteEl.innerHTML = '<i class="fas fa-circle-info"></i> 薪资筛选只作用于<b>企业招聘岗位</b>：' +
+            `${hidden} 条公开招聘公告没有薪资字段、不参与薪资筛选，已暂时隐藏。` +
+            '想同时看公告，把「薪资范围」清空即可。';
+    } else {
+        noteEl.style.display = 'none';
+        noteEl.innerHTML = '';
+    }
+}
+
+// 空态原因：按「哪个筛选条件把结果筛没了」给不同解释，而不是统一一句「未找到」
+function renderEmptyReason(titleEl, hintEl, filters, data) {
+    const cat = (filters.category || '').trim();
+    // 企业岗位要过审才露出（见后端 review_status='approved'），全在待审时这里就是 0 条
+    const pending = parseInt(data.enterprise_review_pending, 10) || 0;
+    let title = '未找到匹配的职位';
+    let hint = '';
+    if (cat && findCategoryCount(data.category_options, cat) === 0) {
+        title = `「${cat}」下暂时没有岗位`;
+        hint = '分类下拉里已标出每一类的真实条数（没有内容的标「暂无」），可以换一个分类看看。';
+    } else if (cat) {
+        title = `「${cat}」在当前搜索 / 地点条件下没有岗位`;
+        hint = '试试清空搜索关键词，或把工作地点改回「工作地点」（不限）。';
+    } else if (filters.salary) {
+        title = '没有薪资落在这个范围内的企业岗位';
+        hint = '公开招聘公告没有薪资字段、不参与薪资筛选；把「薪资范围」清空即可看到全部公告。';
+    } else if (filters.keyword || filters.location) {
+        hint = '试试减少搜索关键词，或把工作地点改回不限。';
+    }
+    // 什么筛选都没设却一条都没有：多半是企业岗位全卡在审核里（学员端只看已通过的）。
+    // 不说清楚的话，学员会以为平台根本没有企业岗位。
+    if (pending > 0 && !cat && !filters.salary && !filters.keyword && !filters.location) {
+        title = '企业岗位正在审核中';
+        hint = `有 ${pending} 条企业发布的岗位尚未通过平台审核，通过后才会在这里展示。`;
+    }
+    if (titleEl) titleEl.textContent = title;
+    if (hintEl) hintEl.textContent = hint;
+}
+
+function findCategoryCount(opts, value) {
+    if (!opts || !value) return -1;
+    const all = [].concat(opts.enterprise || [], opts.recruit || []);
+    const hit = all.filter(o => o.value === value)[0];
+    return hit ? hit.count : -1;
 }
 
 function renderJobCard(job, savedIds = []) {
@@ -3654,26 +6903,30 @@ function renderJobCard(job, savedIds = []) {
     const isSaved = savedIds.includes(job.id);
     const tags = (job.requirements || []).slice(0, 3);
     if (job.category) tags.unshift(job.category);
+    // 演示岗位（is_demo=1）必须打角标 —— 公司名也已带「（演示）」后缀，双重标注防误认
+    const demoTxt = job.is_demo
+        ? '<span class="emp-tag emp-tag-demo"><i class="fas fa-flask"></i>演示数据</span>' : '';
 
     return `
-    <div class="emp-job-card" data-job-id="${job.id}">
+    <div class="emp-job-card ${job.is_demo ? 'is-demo' : ''}" data-job-id="${job.id}">
         <div class="emp-job-card-left">
-            <div class="emp-company-logo">${initial}</div>
+            <div class="emp-company-logo">${escapeHtml(initial)}</div>
         </div>
         <div class="emp-job-card-body">
             <div class="emp-job-header">
-                <span class="emp-job-title">${job.title}</span>
-                <span class="emp-job-salary">${job.salary}</span>
+                <span class="emp-job-title">${escapeHtml(job.title)}</span>
+                <span class="emp-job-salary">${escapeHtml(job.salary)}</span>
             </div>
             <div class="emp-job-company">
-                ${job.company}<span class="emp-dot">·</span>${job.location || '广东'}<span class="emp-dot">·</span>${job.experience || '不限'}<span class="emp-dot">·</span>${job.education || '不限'}
+                ${escapeHtml(job.company)}<span class="emp-dot">·</span>${escapeHtml(job.location || '广东')}<span class="emp-dot">·</span>${escapeHtml(job.experience || '不限')}<span class="emp-dot">·</span>${escapeHtml(job.education || '不限')}
             </div>
             <div class="emp-job-tags">
-                ${tags.map(t => `<span class="emp-tag">${t}</span>`).join('')}
+                ${demoTxt}<span class="emp-tag emp-tag-src"><i class="fas fa-building"></i>企业发布</span>
+                ${tags.map(t => `<span class="emp-tag">${escapeHtml(t)}</span>`).join('')}
             </div>
         </div>
         <div class="emp-job-card-right">
-            <span class="emp-job-date">${dateStr}</span>
+            <span class="emp-job-date">${escapeHtml(dateStr)}</span>
             <button class="btn btn-primary btn-sm emp-apply-btn" data-job-id="${job.id}">申请职位</button>
             <button class="emp-save-btn ${isSaved ? 'saved' : ''}" data-job-id="${job.id}" title="${isSaved ? '取消收藏' : '收藏'}">
                 <i class="${isSaved ? 'fas' : 'far'} fa-heart"></i>
@@ -3682,9 +6935,61 @@ function renderJobCard(job, savedIds = []) {
     </div>`;
 }
 
+/* ============ 公开招聘（招募）公告卡片 ============
+   公告来自 jobs_data.py（策展内容，带官方来源），与「企业岗位」是两回事：
+     · 不做站内申请（去发布单位官方系统报名），按钮是「查看公告」外链；
+     · 不进收藏表（收藏只针对企业岗位）；
+     · 有报名截止期，过期如实标注，不以"在招"迷惑学员。
+   状态色：报名中=绿、即将开始=蓝、已过期=灰。 */
+let RECRUIT_CACHE = {};
+// 后端下发口径说明（source_note / disclaimer 都出自 jobs_data.py，不在前端硬编码）
+let RECRUIT_NOTES = {};
+
+const RECRUIT_STATUS_CLS = { open: 'rec-open', upcoming: 'rec-upcoming', closed: 'rec-closed', unknown: 'rec-unknown' };
+
+function renderRecruitCard(r) {
+    const cls = RECRUIT_STATUS_CLS[r.status] || 'rec-unknown';
+    const chips = [];
+    if (r.category) chips.push(r.category);
+    if (r.headcount) chips.push(r.headcount);
+    if (r.education) chips.push(r.education);
+    const deadlineTxt = r.deadline ? ('报名截止 ' + r.deadline) : '';
+    let leftTxt = '';
+    if (r.status === 'open' && r.days_left != null) leftTxt = `还剩 ${r.days_left} 天`;
+    else if (r.status === 'upcoming' && r.starts_in != null) leftTxt = `距开始报名 ${r.starts_in} 天`;
+    return `
+    <div class="emp-job-card emp-recruit-card ${r.status === 'closed' ? 'is-closed' : ''}" data-recruit-key="${attrEsc(r.key)}">
+        <div class="emp-job-card-left">
+            <div class="emp-company-logo emp-recruit-logo"><i class="fas fa-bullhorn"></i></div>
+        </div>
+        <div class="emp-job-card-body">
+            <div class="emp-job-header">
+                <span class="emp-job-title">${escapeHtml(r.title)}</span>
+                <span class="emp-recruit-status ${cls}">${escapeHtml(r.status_label)}</span>
+            </div>
+            <div class="emp-job-company">
+                ${escapeHtml(r.org || '')}${r.region ? '<span class="emp-dot">·</span>' + escapeHtml(r.region) : ''}${r.job_type ? '<span class="emp-dot">·</span>' + escapeHtml(r.job_type) : ''}
+            </div>
+            <div class="emp-job-tags">
+                <span class="emp-tag emp-tag-src emp-tag-rec"><i class="fas fa-bullhorn"></i>公开招聘</span>
+                ${chips.map(t => `<span class="emp-tag">${escapeHtml(t)}</span>`).join('')}
+            </div>
+        </div>
+        <div class="emp-job-card-right">
+            ${deadlineTxt ? `<span class="emp-job-date">${escapeHtml(deadlineTxt)}</span>` : ''}
+            ${leftTxt ? `<span class="emp-recruit-left">${escapeHtml(leftTxt)}</span>` : ''}
+            <button class="btn btn-outline btn-sm emp-recruit-btn" data-recruit-key="${attrEsc(r.key)}"><i class="fas fa-external-link-alt"></i> 查看公告</button>
+        </div>
+    </div>`;
+}
+
 function bindJobCardEvents(container) {
-    // 卡片点击 → 详情
-    container.querySelectorAll('.emp-job-card').forEach(card => {
+    // 公开招聘公告卡片：点卡片任意处 → 公告详情（无申请/收藏）
+    container.querySelectorAll('.emp-recruit-card').forEach(card => {
+        card.addEventListener('click', () => openRecruitDetail(card.dataset.recruitKey));
+    });
+    // 企业岗位卡片点击 → 职位详情（:not 排除公告卡，避免重复绑定）
+    container.querySelectorAll('.emp-job-card:not(.emp-recruit-card)').forEach(card => {
         card.addEventListener('click', (e) => {
             if (e.target.closest('.emp-apply-btn') || e.target.closest('.emp-save-btn')) return;
             const jobId = card.dataset.jobId;
@@ -3720,6 +7025,17 @@ async function openJobDetail(jobId) {
         const reqsList = (job.requirements || []).map(r => `<li>${r}</li>`).join('');
         const dateStr = computeRelativeDate(job.posted_at);
 
+        // 演示岗位必须在详情页顶部说清楚，避免学员当成真实在招岗位去投递。
+        // 2026-10-07：它们已改为「演示企业账号发布 + 管理员审核通过」的真实链路产物，
+        // 说明里据实写清，别让学员以为这是平台凭空塞的数据。
+        const demoNotice = job.is_demo
+            ? '<div class="emp-demo-notice"><i class="fas fa-flask"></i>' +
+              '<div><strong>这是演示岗位</strong><br>' +
+              '由平台演示企业账号发布、经管理员审核通过后展示，' +
+              '用于演示「企业发布 → 平台审核 → 学员投递 → 企业查看简历」的完整流程，' +
+              '<strong>不是真实招聘信息</strong>，请勿据此做求职决策。</div></div>'
+            : '';
+
         // 标签
         const tags = (job.requirements || []).slice(0, 4);
         if (job.category) tags.unshift(job.category);
@@ -3753,7 +7069,7 @@ async function openJobDetail(jobId) {
         if (job.description && job.description.includes('包')) highlights.push('提供食宿或相关补贴');
         const highlightsHtml = highlights.length > 0 ? `
             <div class="emp-detail-section">
-                <h4><i class="fas fa-star" style="color:#f59e0b;margin-right:6px;"></i>职位亮点</h4>
+                <h4><i class="fas fa-star" style="color:#d9a227;margin-right:6px;"></i>职位亮点</h4>
                 <div class="emp-detail-highlights">
                     ${highlights.map(h => `<div class="emp-detail-highlight-item"><i class="fas fa-check-circle"></i>${h}</div>`).join('')}
                 </div>
@@ -3779,6 +7095,7 @@ async function openJobDetail(jobId) {
         ` : '';
 
         showDetailModal('职位详情', `
+            ${demoNotice}
             <div class="emp-detail-header">
                 <h2>${job.title}</h2>
                 <span class="emp-detail-salary">${job.salary}</span>
@@ -3815,11 +7132,11 @@ async function openJobDetail(jobId) {
             ${highlightsHtml}
 
             <div class="emp-detail-section">
-                <h4><i class="fas fa-lightbulb" style="color:#f59e0b;margin-right:6px;"></i>申请建议</h4>
+                <h4><i class="fas fa-lightbulb" style="color:#d9a227;margin-right:6px;"></i>申请建议</h4>
                 <div class="emp-detail-tips">
                     <p>1. 确保简历中突出了与该岗位相关的技能和经验</p>
                     <p>2. 如持有相关证书，请在简历中标注</p>
-                    <p>3. 申请后可在"我的投递"中查看审核进度</p>
+                    <p>3. 申请后可在"我的求职"中查看审核进度</p>
                 </div>
             </div>
 
@@ -3853,9 +7170,103 @@ async function openJobDetail(jobId) {
     }
 }
 
+/* 公开招聘公告详情。
+   数据来自列表缓存（后端一次下发全字段），不再打接口。
+   关键差异：**没有「立即申请」** —— 报名要去发布单位官方系统，本站只做信息聚合，
+   所以主按钮是「前往公告原文」外链（新窗口打开，带 rel=noopener）。 */
+function openRecruitDetail(key) {
+    const r = RECRUIT_CACHE[key];
+    if (!r) {
+        showNotification('公告信息已失效，请重新加载列表', 'error');
+        return;
+    }
+    // 意向按钮的初始态依赖已登记集合；首次打开时先补一次，避免「已登记却显示未登记」
+    if (MY_INTENT_KEYS === null && AppState.user) {
+        preloadIntentKeys().then(() => openRecruitDetail(key));
+        return;
+    }
+    const cls = RECRUIT_STATUS_CLS[r.status] || 'rec-unknown';
+    const rows = [
+        ['发布单位', r.org],
+        ['地区', r.region],
+        ['岗位类别', r.category],
+        ['用工性质', r.job_type],
+        ['招聘人数', r.headcount],
+        ['学历要求', r.education],
+        ['其他条件', r.experience],
+        ['薪酬待遇', r.salary],
+        ['报名时间', (r.signup_start ? r.signup_start + ' 至 ' : '') + (r.deadline || '')],
+        ['报名方式', r.signup_way],
+        ['咨询方式', r.contact],
+        ['发布日期', r.publish_date],
+    ].filter(x => x[1]);
+    const infoHtml = rows.map(([k, v]) =>
+        `<div class="emp-recruit-row"><span class="emp-recruit-k">${escapeHtml(k)}</span><span class="emp-recruit-v">${escapeHtml(v)}</span></div>`
+    ).join('');
+    const srcHtml = (r.sources || []).map(s => `
+        <li>
+            <a href="${attrEsc(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title || s.url)}</a>
+            <span class="emp-recruit-src-meta">${escapeHtml([s.media, s.date].filter(Boolean).join(' · '))}</span>
+        </li>`).join('');
+    const note = (r.status === 'closed')
+        ? '该公告报名已结束，信息仅供了解岗位与条件；如需跟进，请留意发布单位的下一轮公告。'
+        : (RECRUIT_NOTES.disclaimer || '岗位条件、报名时间以发布单位公告原文为准；本平台不代办报名。');
+
+    // 求职意向登记：平台只记录意向，**不代办报名** —— 主按钮始终是官方原文外链
+    const canIntent = r.status === 'open' || r.status === 'upcoming';
+    const intentOk = !!(MY_INTENT_KEYS && MY_INTENT_KEYS.has(r.key));
+    const intentBlock = canIntent ? `
+        <div class="emp-recruit-intent-box">
+            <div class="emp-recruit-intent-tip">
+                <i class="fas fa-circle-info"></i>
+                想让平台记住你的意向、方便后续查看？可以登记求职意向。
+                <strong>报名仍需你按上方「前往公告原文」自行完成，本平台不代办报名。</strong>
+            </div>
+            <button class="btn btn-outline emp-recruit-intent ${intentOk ? 'active' : ''}" data-recruit-key="${attrEsc(r.key)}">
+                <i class="far fa-bookmark"></i> ${intentOk ? '已登记意向（点击取消）' : '登记求职意向'}
+            </button>
+        </div>` : '';
+
+    showDetailModal('公开招聘公告', `
+        <div class="emp-recruit-detail">
+            <div class="emp-recruit-detail-head">
+                <h2>${escapeHtml(r.title)}</h2>
+                <span class="emp-recruit-status ${cls}">${escapeHtml(r.status_label)}</span>
+            </div>
+            <div class="emp-recruit-info">${infoHtml}</div>
+            <div class="emp-detail-section">
+                <h4>公告内容摘要</h4>
+                <div class="emp-detail-desc">${escapeHtml(r.description || '详见公告原文')}</div>
+            </div>
+            <div class="emp-detail-section">
+                <h4>资料来源</h4>
+                <ul class="emp-recruit-src">${srcHtml}</ul>
+            </div>
+            <div class="emp-recruit-note">${escapeHtml(note)}</div>
+            ${intentBlock}
+            <div class="emp-detail-actions">
+                <a class="btn btn-primary" href="${attrEsc((r.sources && r.sources[0] && r.sources[0].url) || '#')}" target="_blank" rel="noopener noreferrer">
+                    <i class="fas fa-external-link-alt"></i> 前往公告原文
+                </a>
+            </div>
+        </div>
+    `);
+
+    const intentBtn = document.querySelector('.emp-recruit-intent');
+    if (intentBtn) {
+        intentBtn.addEventListener('click', async () => {
+            await toggleJobIntent(r.key, intentBtn);
+            const nowOn = MY_INTENT_KEYS && MY_INTENT_KEYS.has(r.key);
+            intentBtn.classList.toggle('active', !!nowOn);
+            intentBtn.innerHTML = '<i class="far fa-bookmark"></i> ' +
+                (nowOn ? '已登记意向（点击取消）' : '登记求职意向');
+        });
+    }
+}
+
 async function applyForJob(jobId) {
     if (!AppState.user) {
-        showNotification('请先登录', 'error');
+        showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal });
         return;
     }
     try {
@@ -3863,15 +7274,13 @@ async function applyForJob(jobId) {
             user_id: AppState.user.id,
             job_id: parseInt(jobId)
         });
-        showNotification(data.message, data.success ? 'success' : 'error');
-        if (data.success) {
-            loadEmploymentStats();
-            const el = document.getElementById('emp-points-balance');
-            if (el) {
-                const pts = await apiCall(`/api/employment/points/${AppState.user.id}`);
-                if (pts.success) el.textContent = pts.points.toLocaleString();
-            }
+        if (data.success && data.has_resume === false) {
+            // 申请成功但一条简历都没写 —— 企业端看到的其实是「空申请」，必须当场说明，
+            // 否则学员会以为简历已经随申请投出去了（2026-10-07）。
+            showNotification(data.message + ' · 你还没有填写简历，企业看不到简历内容', 'success');
+            return;
         }
+        showNotification(data.message, data.success ? 'success' : 'error');
     } catch(e) {
         showNotification('申请失败', 'error');
     }
@@ -3879,7 +7288,7 @@ async function applyForJob(jobId) {
 
 async function toggleSaveJob(jobId, btnEl) {
     if (!AppState.user) {
-        showNotification('请先登录', 'error');
+        showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal });
         return;
     }
     const isSaved = btnEl.classList.contains('saved') || btnEl.querySelector('.fas.fa-heart');
@@ -3903,221 +7312,563 @@ async function toggleSaveJob(jobId, btnEl) {
             if (icon) { icon.classList.remove('far'); icon.classList.add('fas'); }
             showNotification('收藏成功', 'success');
         }
-        loadEmploymentStats();
     } catch(e) {
         showNotification('操作失败', 'error');
     }
 }
 
-async function loadEmploymentStats() {
-    if (!AppState.user) return;
+/* ============ 我的求职：公开招聘意向 + 企业岗位投递 ============
+   两条通道的数据结构完全不同：
+     · 企业岗位投递 → job_applications，挂在数字 job_id 上，企业端「简历管理」可见并给反馈；
+     · 公开招聘意向 → job_intents，挂在公告的字符串 key 上，**平台不代办报名**。
+   后端 /api/employment/my-jobs 一次下发两组，前端分别渲染并如实标注通道。 */
+
+// 已登记的公告 key 集合（用于公告详情页判断按钮态）。懒加载 + 登记后即时更新。
+let MY_INTENT_KEYS = null;
+
+// 会话失效（401/403）时的统一提示：重试无用，引导重新登录
+const SESSION_TIP_MY_JOBS = '<div class="emp-empty emp-empty-inline"><i class="fas fa-user-lock"></i>' +
+    '<p>登录已过期，请重新登录后再查看求职记录</p></div>';
+
+/* 懒加载意向 key 集合。老后端没有聚合接口时视为「无意向」，不阻断详情页渲染。 */
+async function preloadIntentKeys() {
+    if (MY_INTENT_KEYS !== null || !AppState.user) return;
     try {
-        const data = await apiCall(`/api/employment/stats/${AppState.user.id}`);
-        if (data.success) {
-            const s = data.stats;
-            const el1 = document.getElementById('emp-stat-applied');
-            const el2 = document.getElementById('emp-stat-saved');
-            const el3 = document.getElementById('emp-stat-messages');
-            if (el1) el1.textContent = s.applied;
-            if (el2) el2.textContent = s.saved;
-            if (el3) el3.textContent = s.messages;
-        }
-    } catch(e) {}
+        const d = await apiCall(`/api/employment/my-jobs/${AppState.user.id}`);
+        MY_INTENT_KEYS = new Set(((d && d.intents) || []).map(i => i.recruit_key));
+    } catch (e) {
+        MY_INTENT_KEYS = new Set();
+    }
 }
 
-async function loadCertificateSummary() {
-    if (!AppState.user) return;
-    const container = document.getElementById('emp-cert-summary');
-    if (!container) return;
+async function loadMyJobs(statusFilter) {
+    const intentEl = document.getElementById('emp-intent-list');
+    const appEl = document.getElementById('emp-app-list');
+
+    if (!AppState.user) {
+        const tip = '<div class="emp-empty emp-empty-inline"><i class="fas fa-user-lock"></i>' +
+                    '<p>登录后可查看投递记录与求职意向</p></div>';
+        if (intentEl) intentEl.innerHTML = tip;
+        if (appEl) appEl.innerHTML = '';
+        return;
+    }
+
+    if (intentEl) showSkeleton(intentEl, 'row', 1);
+    if (appEl) showSkeleton(appEl, 'row', 2);
+
+    let apps = null, intents = null;
+    // null = 未知（老后端没这个字段）→ 不下「你没写简历」的判断，宁缺勿错
+    let hasResume = null;
     try {
-        const data = await apiCall(`/api/employment/certificates/${AppState.user.id}`);
-        if (data.success) {
-            const certs = data.certificates;
-            const earned = certs.filter(c => c.status === 'earned').length;
-            const inProgress = certs.filter(c => c.status === 'in_progress').length;
-            const total = certs.length;
-
-            const summaryHeader = `
-                <div class="emp-cert-summary-header">
-                    <div class="emp-cert-stat-row">
-                        <span class="emp-cert-earned-count">${earned}</span>
-                        <span class="emp-cert-total-count">/${total}</span>
-                        <span class="emp-cert-stat-label">已获得</span>
-                    </div>
-                    ${inProgress > 0 ? `<span class="emp-cert-inprogress-badge">${inProgress} 项进行中</span>` : ''}
-                </div>`;
-
-            const certList = certs.map(cert => {
-                const statusClass = cert.status === 'earned' ? 'earned' : cert.status === 'locked' ? 'locked' : '';
-                const statusIcon = cert.status === 'earned' ? 'fa-check-circle' : cert.status === 'locked' ? 'fa-lock' : 'fa-spinner';
-                let detail = '';
-                if (cert.status === 'earned') {
-                    detail = `<div class="emp-cert-detail earned">获得于 ${cert.date || '--'}</div>`;
-                } else if (cert.status === 'in_progress') {
-                    detail = `
-                        <div class="emp-cert-progress-wrap">
-                            <div class="emp-cert-progress-bar">
-                                <div class="emp-cert-progress-fill" style="width:${cert.progress}%"></div>
-                            </div>
-                            <span class="emp-cert-progress-text">${cert.progress}%</span>
-                        </div>`;
-                } else {
-                    detail = `<div class="emp-cert-detail locked">完成相关课程可解锁</div>`;
-                }
-                return `
-                <div class="emp-cert-mini ${statusClass}">
-                    <div class="emp-cert-mini-icon ${statusClass}"><i class="fas ${statusIcon}"></i></div>
-                    <div class="emp-cert-mini-body">
-                        <div class="emp-cert-mini-name">${cert.name}</div>
-                        ${detail}
-                    </div>
-                </div>`;
-            }).join('');
-
-            container.innerHTML = summaryHeader + certList + `
-                <div class="emp-cert-footer">
-                    <span class="emp-cert-footer-link" id="emp-cert-view-all">查看全部证书 <i class="fas fa-arrow-right"></i></span>
-                </div>`;
-
-            document.getElementById('emp-cert-view-all')?.addEventListener('click', () => {
-                const CERT_DETAILS = {
-                    '荔枝种植技术员': {
-                        desc: '掌握荔枝全周期种植管理技术的专业认证，涵盖品种选育、水肥管理、病虫害防治、采收储运等核心技能。',
-                        skills: ['荔枝品种识别与选育', '四季水肥管理方案', '霜疫霉病/炭疽病防治', '花果管理与保果技术', '采后保鲜与储运'],
-                        benefits: ['优先获得农业合作社技术岗位', '享受农资采购优惠', '可申请农业技术推广员资格', '薪资溢价15%-25%'],
-                        courses: ['荔枝春季管理实操', '荔枝病虫害识别与防治', '岭南水果采后处理技术'],
-                        issuer: '广东省农业农村厅'
-                    },
-                    '电商运营师': {
-                        desc: '具备电商平台全流程运营能力的认证，包括店铺搭建、产品上架、营销推广、数据分析、客户服务等核心技能。',
-                        skills: ['淘宝/拼多多/抖音店铺运营', '产品详情页设计与优化', '直通车/巨量引擎推广', '直播带货策划与执行', '数据化运营分析'],
-                        benefits: ['独立运营电商店铺', '可申请电商创业补贴', '对接平台官方资源', '薪资溢价20%-30%'],
-                        courses: ['电商运营基础班', '直播带货实战训练', '短视频内容营销'],
-                        issuer: '广东省商务厅'
-                    },
-                    '广绣工艺师': {
-                        desc: '掌握国家级非物质文化遗产广绣技艺的专业认证，熟练运用直针、扭针、长短针、打籽针等核心针法，能独立完成作品创作。',
-                        skills: ['直针/扭针/长短针/打籽针', '配色与渐变色绣制', '图案设计与转印', '上绷与绣布固定', '装裱与成品处理'],
-                        benefits: ['非遗传承人认定资格', '工艺品销售渠道对接', '文创产品开发支持', '可开设个人工作室'],
-                        courses: ['广绣基础针法入门', '广绣花卉绣制实操', '非遗传承人研修班'],
-                        issuer: '广东省文化和旅游厅'
-                    }
-                };
-
-                const detailHtml = certs.map(cert => {
-                    const info = CERT_DETAILS[cert.name] || {};
-                    const statusLabel = cert.status === 'earned' ? '已获得' : cert.status === 'in_progress' ? '学习中' : '未解锁';
-                    const statusClass = cert.status === 'earned' ? 'earned' : cert.status === 'in_progress' ? 'progress' : 'locked';
-                    const statusIcon = cert.status === 'earned' ? 'fa-check-circle' : cert.status === 'in_progress' ? 'fa-spinner' : 'fa-lock';
-
-                    // 进度条
-                    let progressHtml = '';
-                    if (cert.status === 'in_progress') {
-                        progressHtml = `
-                            <div class="cert-detail-progress">
-                                <div class="cert-detail-progress-bar">
-                                    <div class="cert-detail-progress-fill" style="width:${cert.progress}%"></div>
-                                </div>
-                                <span class="cert-detail-progress-text">${cert.progress}%</span>
-                            </div>`;
-                    }
-
-                    // 获得时间
-                    let dateHtml = '';
-                    if (cert.status === 'earned' && cert.date) {
-                        dateHtml = `<div class="cert-detail-date"><i class="fas fa-calendar-check"></i> 获得时间：${cert.date}</div>`;
-                    }
-
-                    // 描述
-                    let descHtml = '';
-                    if (info.desc) {
-                        descHtml = `<div class="cert-detail-desc">${info.desc}</div>`;
-                    }
-
-                    // 核心技能
-                    let skillsHtml = '';
-                    if (info.skills) {
-                        skillsHtml = `
-                            <div class="cert-detail-subsection">
-                                <h5><i class="fas fa-cogs"></i> 核心技能</h5>
-                                <div class="cert-detail-skills">
-                                    ${info.skills.map(s => `<span class="cert-detail-skill-tag">${s}</span>`).join('')}
-                                </div>
-                            </div>`;
-                    }
-
-                    // 证书收益
-                    let benefitsHtml = '';
-                    if (info.benefits) {
-                        benefitsHtml = `
-                            <div class="cert-detail-subsection">
-                                <h5><i class="fas fa-gift"></i> 证书收益</h5>
-                                <div class="cert-detail-benefits">
-                                    ${info.benefits.map(b => `<div class="cert-detail-benefit"><i class="fas fa-check-circle"></i>${b}</div>`).join('')}
-                                </div>
-                            </div>`;
-                    }
-
-                    // 推荐课程
-                    let coursesHtml = '';
-                    if (info.courses) {
-                        coursesHtml = `
-                            <div class="cert-detail-subsection">
-                                <h5><i class="fas fa-book-open"></i> 推荐课程</h5>
-                                <div class="cert-detail-courses">
-                                    ${info.courses.map((c, i) => `
-                                        <div class="cert-detail-course">
-                                            <span class="cert-detail-course-num">${i + 1}</span>
-                                            <span>${c}</span>
-                                        </div>
-                                    `).join('')}
-                                </div>
-                            </div>`;
-                    }
-
-                    // 发证机构
-                    let issuerHtml = '';
-                    if (info.issuer) {
-                        issuerHtml = `<div class="cert-detail-issuer"><i class="fas fa-landmark"></i> 发证机构：${info.issuer}</div>`;
-                    }
-
-                    // 解锁提示
-                    let unlockHtml = '';
-                    if (cert.status === 'locked') {
-                        unlockHtml = `
-                            <div class="cert-detail-unlock">
-                                <i class="fas fa-info-circle"></i>
-                                <span>完成上方推荐课程即可解锁此证书，获得对应职业技能认证。</span>
-                            </div>`;
-                    }
-
-                    return `
-                        <div class="cert-detail-card ${statusClass}">
-                            <div class="cert-detail-card-header">
-                                <div class="cert-detail-icon ${statusClass}">
-                                    <i class="fas ${statusIcon}"></i>
-                                </div>
-                                <div class="cert-detail-title-area">
-                                    <h3 class="cert-detail-name">${cert.name}</h3>
-                                    <span class="cert-detail-status ${statusClass}">${statusLabel}${cert.status === 'in_progress' ? ` · ${cert.progress}%` : ''}</span>
-                                </div>
-                            </div>
-                            ${dateHtml}
-                            ${progressHtml}
-                            ${descHtml}
-                            ${skillsHtml}
-                            ${benefitsHtml}
-                            ${coursesHtml}
-                            ${issuerHtml}
-                            ${unlockHtml}
-                        </div>`;
-                }).join('');
-
-                showDetailModal('我的技能证书', `<div class="cert-detail-list">${detailHtml}</div>`);
-            });
+        const d = await apiCall(`/api/employment/my-jobs/${AppState.user.id}`);
+        if (d.success) {
+            apps = d.applications || [];
+            intents = d.intents || [];
+            hasResume = (typeof d.has_resume === 'boolean') ? d.has_resume : null;
         }
-    } catch(e) {
-        container.innerHTML = '<p style="font-size:0.85rem;color:var(--text-muted);">加载失败</p>';
+    } catch (e) {
+        const st = e && e.status;
+        // 「新前端 + 旧后端」兜底：聚合接口是新增的，老后端没有 → 退回旧接口，意向区置空
+        if (st !== 404 && st !== 405) {
+            if (intentEl) intentEl.innerHTML = '';
+            // 会话类错误（未登录/非本人）重试没有意义 → 给可操作的提示，不挂「重试」按钮
+            if (st === 401 || st === 403) {
+                if (appEl) appEl.innerHTML = SESSION_TIP_MY_JOBS;
+            } else {
+                showErrorState(appEl, '加载求职记录失败', () => loadMyJobs(statusFilter));
+            }
+            return;
+        }
+    }
+    if (apps === null) {
+        try {
+            const params = statusFilter && statusFilter !== 'all' ? `?status=${statusFilter}` : '';
+            const old = await apiCall(`/api/employment/applications/${AppState.user.id}${params}`);
+            apps = old.success ? (old.applications || []) : [];
+        } catch (e) {
+            const st = e && e.status;
+            if (st === 401 || st === 403) {
+                if (appEl) appEl.innerHTML = SESSION_TIP_MY_JOBS;
+            } else {
+                showErrorState(appEl, '加载投递记录失败', () => loadMyJobs(statusFilter));
+            }
+            return;
+        }
+        intents = [];
+    }
+
+    MY_INTENT_KEYS = new Set(intents.map(i => i.recruit_key));
+
+    // 状态筛选（聚合接口一次取全量，筛选在本地做，省一次请求）
+    if (statusFilter && statusFilter !== 'all') {
+        apps = apps.filter(a => a.status === statusFilter);
+    }
+
+    // —— 意向区 ——
+    if (intentEl) {
+        intents = intents.filter(i => i.recruit_key);
+        if (!intents.length) {
+            intentEl.innerHTML = '<div class="emp-empty emp-empty-inline"><i class="far fa-bookmark"></i>' +
+                '<p>还没有登记求职意向</p>' +
+                '<span class="emp-empty-sub">在「全部职位」里打开任意一条公开招聘公告，点「登记求职意向」即可</span></div>';
+        } else {
+            intentEl.innerHTML = intents.map(renderIntentCard).join('');
+        }
+    }
+
+    // —— 投递区 ——
+    if (appEl) {
+        if (!apps.length) {
+            // 修掉原先的死循环引导（「去投递心仪的职位吧」点过去只有不能投递的公告）
+            // ⚠️ 旧文案写「先完善『我的简历』…即可一键投递」，暗示**必须先有简历才能投**，
+            // 而实际不写简历也能投（只记一条申请 + 给积分）→ 文案与行为不一致（2026-10-07）。
+            showEmptyState(appEl, 'fa-paper-plane', '暂无企业岗位投递记录',
+                '在「全部职位」里找到合适的岗位，点卡片上的「申请职位」即可；建议先到「我的简历」填好简历，企业才能看到你的信息');
+        } else {
+            appEl.innerHTML = apps.map(app => renderApplicationCard(app, hasResume)).join('');
+        }
+    }
+}
+
+function renderIntentCard(it) {
+    const cls = RECRUIT_STATUS_CLS[it.status] || 'rec-unknown';
+    const deadlineTxt = it.deadline ? ('报名截止 ' + it.deadline) : '报名时间以公告原文为准';
+    return `
+    <div class="emp-intent-card" data-recruit-key="${attrEsc(it.recruit_key)}">
+        <div class="emp-intent-main">
+            <div class="emp-intent-head">
+                <span class="emp-intent-title">${escapeHtml(it.title)}</span>
+                <span class="emp-recruit-status ${cls}">${escapeHtml(it.status_label || '')}</span>
+            </div>
+            <div class="emp-intent-meta">
+                ${escapeHtml(it.org || '')}${it.region ? '<span class="emp-dot">·</span>' + escapeHtml(it.region) : ''}
+                <span class="emp-dot">·</span>${escapeHtml(deadlineTxt)}
+            </div>
+            ${it.note ? `<div class="emp-intent-note">备注：${escapeHtml(it.note)}</div>` : ''}
+            <div class="emp-intent-disclaimer">
+                <i class="fas fa-circle-info"></i> 本站仅记录意向，<strong>不代办报名</strong>，请按公告原文自行报名。
+            </div>
+        </div>
+        <div class="emp-intent-actions">
+            <button class="btn btn-outline btn-sm emp-intent-view" data-recruit-key="${attrEsc(it.recruit_key)}">查看公告</button>
+            <button class="btn btn-outline btn-sm emp-intent-drop" data-recruit-key="${attrEsc(it.recruit_key)}">取消意向</button>
+        </div>
+    </div>`;
+}
+
+/* 登记 / 取消求职意向。want === false 时强制取消。
+   ⚠️ 成功提示必须带上「不代办报名」，避免学员以为登记 = 已报名。 */
+async function toggleJobIntent(key, btnEl, want) {
+    if (!AppState.user) {
+        showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal });
+        return;
+    }
+    const currently = MY_INTENT_KEYS ? MY_INTENT_KEYS.has(key) : false;
+    const shouldAdd = (want === undefined) ? !currently : want;
+    try {
+        if (shouldAdd) {
+            const d = await apiCall('/api/employment/intent', 'POST', {
+                user_id: AppState.user.id, recruit_key: key
+            });
+            if (MY_INTENT_KEYS) MY_INTENT_KEYS.add(key);
+            showNotification(d.message + '（' + (d.notice || '本平台不代办报名') + '）', 'success');
+        } else {
+            await apiCall('/api/employment/intent', 'DELETE', {
+                user_id: AppState.user.id, recruit_key: key
+            });
+            if (MY_INTENT_KEYS) MY_INTENT_KEYS.delete(key);
+            showNotification('已取消意向登记', 'success');
+        }
+        // 详情弹窗里的按钮态同步刷新
+        document.querySelectorAll('.emp-recruit-intent').forEach(b => {
+            if (b.dataset.recruitKey === key) b.classList.toggle('active', shouldAdd);
+        });
+        if (btnEl) btnEl.classList.toggle('active', shouldAdd);
+        // 意向区若已渲染过，刷新一次（此时它在后台，不打断当前操作）
+        if (document.getElementById('emp-intent-list') &&
+            document.querySelector('.emp-tab.active') &&
+            document.querySelector('.emp-tab.active').dataset.empTab === 'applications') {
+            loadMyJobs();
+        }
+    } catch (e) {
+        const code = e && e.code;
+        if (code === 'not_found') showNotification('该公告已下架，无法登记意向', 'error');
+        else showNotification('操作失败，请稍后重试', 'error');
+    }
+}
+
+/* ============ 我的简历 ============
+   用法口径（与全项目「不编造」红线一致）：
+     · 「能力档案」区展示的是**平台里真实存在的**学习数据，也是 AI 写作的唯一素材；
+     · AI 只能在素材范围内组织与润色，未提供的信息一律给【待补充】占位；
+     · AI 起草后按钮旁会出现「已用 AI 起草」标注，不隐瞒 AI 参与。 */
+
+let RESUME_CACHE = { profile: null, resume: null };
+
+function setupResumePanel() {
+    const addBtn = document.getElementById('resume-add-exp');
+    if (addBtn) addBtn.addEventListener('click', () => addExpRow({}));
+
+    const saveBtn = document.getElementById('resume-save');
+    if (saveBtn) saveBtn.addEventListener('click', saveResumeForm);
+
+    const printBtn = document.getElementById('resume-print');
+    if (printBtn) printBtn.addEventListener('click', printResume);
+
+    const copyBtn = document.getElementById('resume-copy');
+    if (copyBtn) copyBtn.addEventListener('click', copyResumeText);
+
+    // AI 按钮用事件委托，覆盖动态生成的「经历润色」按钮
+    document.querySelectorAll('.resume-ai-btn').forEach(btn => {
+        if (btn.dataset.bound) return;
+        btn.dataset.bound = '1';
+        btn.addEventListener('click', () => aiDraftResume(btn.dataset.aiSection, btn));
+    });
+    const expList = document.getElementById('resume-exp-list');
+    if (expList) {
+        expList.addEventListener('click', (e) => {
+            const aiBtn = e.target.closest('.resume-exp-ai');
+            if (aiBtn) { aiDraftResume('experience', aiBtn); return; }
+            const delBtn = e.target.closest('.resume-exp-del');
+            if (delBtn) {
+                const row = delBtn.closest('.resume-exp-row');
+                if (row) row.remove();
+            }
+        });
+    }
+
+    const intentEl = document.getElementById('emp-intent-list');
+    if (intentEl) {
+        // 意向区内容会被反复重建，这里用事件委托绑定一次即可（避免每次 render 后重复绑定）
+        intentEl.addEventListener('click', (e) => {
+            const view = e.target.closest('.emp-intent-view');
+            const drop = e.target.closest('.emp-intent-drop');
+            if (view) { e.stopPropagation(); openRecruitDetail(view.dataset.recruitKey); }
+            if (drop) { e.stopPropagation(); toggleJobIntent(drop.dataset.recruitKey, null, false); }
+        });
+    }
+}
+
+/* 打开登录弹窗。全站触发方式统一走这里（原来是各处手写 classList.remove('is-hidden')，
+   漏一处就是一个「点了没反应」的按钮）。 */
+function openLoginModal() {
+    const m = document.getElementById('login-modal');
+    if (!m) return;
+    m.classList.remove('is-hidden');
+}
+
+/* 给容器内所有「去登录」按钮绑事件（用 data 属性选择，幂等：重复调用不会叠加监听——
+   innerHTML 每次重设会重建节点，绑定随之失效，所以每次渲染后都要重新调一次）。 */
+function bindLoginCta(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-login-cta]').forEach(btn => {
+        btn.addEventListener('click', e => { e.stopPropagation(); openLoginModal(); });
+    });
+}
+
+async function loadResumePanel() {
+    const noteEl = document.getElementById('resume-note');
+    const profEl = document.getElementById('resume-profile');
+    if (!AppState.user) {
+        if (noteEl) {
+            noteEl.className = 'resume-note is-warn';
+            // ⚠️ 旧文案只说「登录后可创建并保存你的简历」，而表单本身**是可填的**
+            // （输入框未 disabled），学员填完点保存才被告知要登录，白填一场。
+            // 这里把「不会保存」直接写在最前面，并给一个真的能点的入口（2026-10-07）。
+            noteEl.innerHTML = '<i class="fas fa-user-lock"></i> 你还未登录：' +
+                '<strong>这里填写的内容不会被保存</strong>，「AI 起草」与「保存简历」都会提示登录。' +
+                '<button class="btn btn-primary btn-sm emp-login-cta" data-login-cta="1">去登录</button>';
+            bindLoginCta(noteEl);
+        }
+        if (profEl) profEl.innerHTML = '';
+        return;
+    }
+    try {
+        if (profEl) showSkeleton(profEl, 'row', 4);
+        const [profData, resumeData] = await Promise.all([
+            apiCall(`/api/employment/profile/${AppState.user.id}`),
+            apiCall(`/api/employment/resume/${AppState.user.id}`)
+        ]);
+        RESUME_CACHE.profile = profData.success ? profData.profile : null;
+        RESUME_CACHE.resume = resumeData.success ? resumeData.resume : null;
+        renderResumeProfile(RESUME_CACHE.profile);
+        fillResumeForm(RESUME_CACHE.resume);
+    } catch (e) {
+        const status = e && e.status;
+        // 会话类错误与网络/服务错误要分开：前者重试必然还是失败，给「重新登录」的指引更有用
+        const isSession = (status === 401 || status === 403);
+        const msg = status === 401 ? '登录已过期，请重新登录后再查看简历。'
+                  : status === 403 ? '只能查看本人的简历资料。'
+                  : '简历加载失败，请稍后重试。';
+        if (profEl) {
+            profEl.innerHTML = '<div class="resume-profile-error"><i class="fas fa-triangle-exclamation"></i>' +
+                '<p>' + (isSession ? '未获取到你的能力档案' : '能力档案加载失败') + '</p></div>';
+        }
+        if (noteEl) {
+            noteEl.className = 'resume-note is-error';
+            noteEl.innerHTML = '<i class="fas fa-triangle-exclamation"></i> ' + msg +
+                (isSession ? '' : '<button class="btn btn-outline btn-sm resume-retry">重试</button>');
+            noteEl.querySelector('.resume-retry')?.addEventListener('click', loadResumePanel);
+        }
+    }
+}
+
+function renderResumeProfile(p) {
+    const el = document.getElementById('resume-profile');
+    if (!el) return;
+    if (!p) { el.innerHTML = ''; return; }
+
+    const certHtml = (p.certificates || []).map(c => {
+        let cls = 'is-locked', label = '未开始';
+        if (c.earned) { cls = 'is-earned'; label = '已获得'; }
+        else if (c.status === 'in_progress') { cls = 'is-progress'; label = '学习中 ' + (c.progress || 0) + '%'; }
+        return `<li class="resume-cert ${cls}">
+            <span class="resume-cert-name">${escapeHtml(c.name)}</span>
+            <span class="resume-cert-status">${escapeHtml(label)}${c.earned && c.date ? ' · ' + escapeHtml(c.date) : ''}</span>
+        </li>`;
+    }).join('');
+
+    const trainingHtml = (p.training || []).map(t => `
+        <li class="resume-training">
+            <span>${escapeHtml(t.title)}</span>
+            <span class="resume-training-score">${t.scored ? escapeHtml(String(t.score)) + ' 分' : '待老师批改'}</span>
+        </li>`).join('');
+
+    el.innerHTML = `
+        <div class="resume-profile-head">
+            <i class="fas fa-id-card"></i>
+            <div>
+                <h4>能力档案</h4>
+                <p>平台记录的真实学习数据</p>
+            </div>
+        </div>
+        <ul class="resume-profile-list">
+            <li><span>姓名</span><b>${escapeHtml((p.basic && p.basic.name) || '未填写')}</b></li>
+            <li><span>学习方向</span><b>${escapeHtml((p.learning && p.learning.direction) || '未填写')}</b></li>
+            <li><span>课程完成度</span><b>${p.learning ? escapeHtml(String(p.learning.progress)) + '%' : '—'}</b></li>
+            <li><span>学习积分</span><b>${escapeHtml(String(p.points || 0))}</b></li>
+        </ul>
+        ${certHtml ? `<div class="resume-profile-sub"><i class="fas fa-certificate"></i> 学习证书</div>
+            <ul class="resume-cert-list">${certHtml}</ul>` : ''}
+        ${trainingHtml ? `<div class="resume-profile-sub"><i class="fas fa-flask"></i> 实训成绩</div>
+            <ul class="resume-training-list">${trainingHtml}</ul>` : ''}
+        <div class="resume-profile-foot">
+            以上为 AI 起草时可使用的全部素材；档案里没有的内容，AI 不会替你编造。
+        </div>`;
+}
+
+function fillResumeForm(r) {
+    r = r || {};
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('resume-title', r.title);
+    set('resume-region', r.region);
+    set('resume-education', r.education);
+    set('resume-work-years', r.work_years);
+    set('resume-phone', r.phone || (AppState.user && AppState.user.phone) || '');
+    set('resume-email', r.email || (AppState.user && AppState.user.email) || '');
+    set('resume-self-eval', r.self_eval);
+    set('resume-skills', r.skills);
+    renderExpList(Array.isArray(r.experience) ? r.experience : []);
+
+    const noteEl = document.getElementById('resume-note');
+    if (noteEl) {
+        noteEl.className = 'resume-note' + (r.ai_used ? ' is-ai' : '');
+        noteEl.innerHTML = r.ai_used
+            ? '<i class="fas fa-wand-magic-sparkles"></i> 这份简历使用过 <strong>AI 辅助起草</strong>。' +
+              'AI 只根据你的平台学习数据组织文字，<strong>请逐项核对事实</strong>后再用于投递。'
+            : '<i class="fas fa-shield-halved"></i> AI 起草只会使用左侧「能力档案」里的真实数据，' +
+              '未提供的信息会以【待补充】占位，不会替你编造。';
+    }
+}
+
+function renderExpList(list) {
+    const el = document.getElementById('resume-exp-list');
+    if (!el) return;
+    el.innerHTML = '';
+    if (!list.length) {
+        el.innerHTML = '<p class="resume-hint">还没有添加经历。没有也可以留空 —— 平台不会替你补。</p>';
+        return;
+    }
+    list.forEach(item => addExpRow(item));
+}
+
+function addExpRow(item) {
+    const el = document.getElementById('resume-exp-list');
+    if (!el) return;
+    if (el.querySelector('.resume-hint') && !el.querySelector('.resume-exp-row')) el.innerHTML = '';
+    item = item || {};
+    const row = document.createElement('div');
+    row.className = 'resume-exp-row';
+    row.innerHTML = `
+        <div class="resume-exp-grid">
+            <input type="text" class="exp-company" name="exp_company" autocomplete="off" placeholder="单位 / 合作社名称" value="${attrEsc(item.company || '')}">
+            <input type="text" class="exp-position" name="exp_position" autocomplete="off" placeholder="担任角色" value="${attrEsc(item.position || '')}">
+            <input type="text" class="exp-period" name="exp_period" autocomplete="off" placeholder="时间，如 2024-2025" value="${attrEsc(item.period || '')}">
+        </div>
+        <textarea class="exp-desc" name="exp_desc" rows="2" placeholder="做了什么、学到什么（可点右侧「AI 润色」改善表达）">${escapeHtml(item.desc || '')}</textarea>
+        <div class="resume-exp-actions">
+            <button type="button" class="btn btn-outline btn-sm resume-exp-ai" data-ai-section="experience">
+                <i class="fas fa-wand-magic-sparkles"></i> AI 润色
+            </button>
+            <button type="button" class="btn btn-outline btn-sm resume-exp-del">删除</button>
+        </div>`;
+    el.appendChild(row);
+}
+
+function collectResumeForm() {
+    const val = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const experience = [];
+    document.querySelectorAll('#resume-exp-list .resume-exp-row').forEach(row => {
+        const g = (sel) => { const el = row.querySelector(sel); return el ? el.value.trim() : ''; };
+        const company = g('.exp-company'), position = g('.exp-position');
+        const period = g('.exp-period'), desc = g('.exp-desc');
+        if (company || position || period || desc) experience.push({ company, position, period, desc });
+    });
+    return {
+        title: val('resume-title'),
+        region: val('resume-region'),
+        education: val('resume-education'),
+        work_years: val('resume-work-years'),
+        phone: val('resume-phone'),
+        email: val('resume-email'),
+        self_eval: val('resume-self-eval'),
+        skills: val('resume-skills'),
+        experience
+    };
+}
+
+async function saveResumeForm() {
+    if (!AppState.user) { showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal }); return; }
+    const btn = document.getElementById('resume-save');
+    if (btn) btn.disabled = true;
+    try {
+        const d = await apiCall(`/api/employment/resume/${AppState.user.id}`, 'PUT', collectResumeForm());
+        if (d.success) {
+            RESUME_CACHE.resume = d.resume;
+            showNotification('简历已保存', 'success');
+        } else {
+            showNotification(d.message || '保存失败', 'error');
+        }
+    } catch (e) {
+        const st = e && e.status;
+        showNotification(st === 401 ? '登录已过期，请重新登录'
+                        : st === 403 ? '只能修改本人的简历'
+                        : '保存失败，请稍后重试', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+/* AI 起草 / 润色单段。section ∈ self_eval | skills | experience */
+async function aiDraftResume(section, btn) {
+    if (!AppState.user) { showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal }); return; }
+
+    let draft = '', targetSel = '';
+    if (section === 'self_eval') { draft = document.getElementById('resume-self-eval')?.value.trim() || ''; targetSel = '#resume-self-eval'; }
+    else if (section === 'skills') { draft = document.getElementById('resume-skills')?.value.trim() || ''; targetSel = '#resume-skills'; }
+    else {
+        const row = btn && btn.closest('.resume-exp-row');
+        if (!row) { showNotification('未找到对应的经历条目', 'error'); return; }
+        const g = (sel) => { const el = row.querySelector(sel); return el ? el.value.trim() : ''; };
+        if (!g('.exp-company') && !g('.exp-position') && !g('.exp-desc')) {
+            showNotification('请先填写这条经历的单位或内容 —— AI 不会凭空编造经历', 'error');
+            return;
+        }
+        draft = [g('.exp-company'), g('.exp-position'), g('.exp-period'), g('.exp-desc')]
+            .filter(Boolean).join(' / ');
+        targetSel = null;
+    }
+
+    const oldHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中'; }
+    try {
+        const d = await apiCall('/api/employment/resume/ai', 'POST', {
+            user_id: AppState.user.id, section, draft
+        });
+        if (!d.success) {
+            showNotification(d.message || 'AI 生成失败', 'error');
+            return;
+        }
+        if (section === 'experience') {
+            const row = btn.closest('.resume-exp-row');
+            const ta = row.querySelector('.exp-desc');
+            if (ta) ta.value = d.text;
+            row.querySelector('.exp-desc').focus();
+        } else {
+            const el = document.querySelector(targetSel);
+            if (el) el.value = d.text;
+        }
+        const flag = document.querySelector(`.resume-ai-flag[data-ai-flag="${section}"]`);
+        if (flag) flag.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> 已用 AI 起草 · 请核对事实';
+        showNotification(d.notice || '已生成，请核对后再使用', 'success');
+    } catch (e) {
+        const code = e && e.code;
+        if (code === 'ai_not_configured') showNotification('AI 辅助功能尚未启用，请联系管理员（12316）', 'error');
+        else if (code === 'rate_limited') showNotification('AI 使用过于频繁，请稍后再试', 'error');
+        else if (code === 'draft_too_long') showNotification('这一条内容过长，请精简后再试', 'error');
+        else showNotification(e && e.status === 401 ? '登录已过期，请重新登录' : 'AI 服务暂时不可用，请稍后重试', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = oldHtml; }
+    }
+}
+
+function resumeToText() {
+    const d = collectResumeForm();
+    const p = RESUME_CACHE.profile || {};
+    const basic = p.basic || {};
+    const L = [];
+    L.push((basic.name || '（姓名未填写）') + '　个人简历');
+    L.push('');
+    const head = [
+        ['求职意向', d.title], ['期望地区', d.region], ['最高学历', d.education],
+        ['工作年限', d.work_years], ['联系电话', d.phone], ['电子邮箱', d.email],
+    ].filter(x => x[1]);
+    if (head.length) { L.push('【基本信息】'); head.forEach(([k, v]) => L.push(k + '：' + v)); L.push(''); }
+
+    if (d.self_eval) { L.push('【自我评价】'); L.push(d.self_eval); L.push(''); }
+    if (d.skills) { L.push('【专业技能】'); L.push(d.skills); L.push(''); }
+    if (d.experience.length) {
+        L.push('【工作与实践经历】');
+        d.experience.forEach(e => {
+            L.push('- ' + [e.company, e.position, e.period].filter(Boolean).join(' · '));
+            if (e.desc) L.push('  ' + e.desc);
+        });
+        L.push('');
+    }
+    const certs = (p.certificates || []).filter(c => c.earned);
+    if (certs.length) {
+        L.push('【平台学习证书（已获得）】');
+        certs.forEach(c => L.push('- ' + c.name + (c.date ? '（' + c.date + '）' : '')));
+        L.push('');
+    }
+    return L.join('\n');
+}
+
+function printResume() {
+    if (!AppState.user) { showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal }); return; }
+    const text = resumeToText();
+    const basic = (RESUME_CACHE.profile || {}).basic || {};
+    const win = window.open('', '_blank');
+    if (!win) { showNotification('浏览器拦截了新窗口，请允许弹出窗口后重试', 'error'); return; }
+    win.document.write('<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">' +
+        '<title>' + (basic.name || '个人简历') + ' - 个人简历</title><style>' +
+        'body{font-family:"Microsoft YaHei",system-ui,sans-serif;line-height:1.9;color:#222;' +
+        'max-width:720px;margin:40px auto;padding:0 24px;white-space:pre-wrap;font-size:14px;}' +
+        '@media print{body{margin:0;max-width:none;}}' +
+        '</style></head><body>' + escapeHtml(text) +
+        '<script>window.onload=function(){window.print();}<\/script></body></html>');
+    win.document.close();
+}
+
+function copyResumeText() {
+    if (!AppState.user) { showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal }); return; }
+    const text = resumeToText();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(() => showNotification('已复制简历纯文本', 'success'))
+            .catch(() => showNotification('复制失败，请手动选择文本', 'error'));
+    } else {
+        showNotification('当前浏览器不支持一键复制，请用「打印 / 导出 PDF」', 'error');
     }
 }
 
@@ -4133,7 +7884,7 @@ async function loadUserApplications(statusFilter) {
             if (data.applications.length === 0) {
                 showEmptyState(listEl, 'fa-paper-plane', '暂无投递记录', '去投递心仪的职位吧');
             } else {
-                listEl.innerHTML = data.applications.map(app => renderApplicationCard(app)).join('');
+                listEl.innerHTML = data.applications.map(app => renderApplicationCard(app, null)).join('');
             }
         }
     } catch(e) {
@@ -4141,28 +7892,38 @@ async function loadUserApplications(statusFilter) {
     }
 }
 
-function renderApplicationCard(app) {
+function renderApplicationCard(app, hasResume) {
     const statusMap = {
         'pending': { text: '待审核', class: 'pending' },
         'approved': { text: '已通过', class: 'approved' },
         'rejected': { text: '已拒绝', class: 'rejected' }
     };
     const status = statusMap[app.status] || statusMap.pending;
+    // ⚠️ 旧文案第一步是「投递简历」、第二步是「简历审核中」—— 但学员点「申请职位」时
+    // 平台**并没有**替他投出任何简历（可以一条简历都没写就申请成功）→ 会让人以为
+    // 简历已经发出去了。改为如实描述「提交申请 / 企业查阅」（2026-10-07）。
     const timelineSteps = [
-        { label: `投递简历 ${app.applied_at || ''}`, done: true },
-        { label: '简历审核中', done: app.status !== 'pending', active: app.status === 'pending' },
+        { label: `提交申请 ${app.applied_at || ''}`, done: true },
+        { label: '企业查阅中', done: app.status !== 'pending', active: app.status === 'pending' },
         { label: app.status === 'approved' ? '已通过审核' : app.status === 'rejected' ? '未通过审核' : '面试安排', done: app.status === 'approved' || app.status === 'rejected', active: false }
     ];
     if (app.status === 'approved') timelineSteps[2].done = true;
 
+    // hasResume === false 才提示（null = 老后端没下发，宁缺勿错）
+    const noResumeNote = hasResume === false
+        ? '<div class="emp-app-note"><i class="fas fa-triangle-exclamation"></i> ' +
+          '你还没有填写简历，企业端暂时看不到你的简历内容 —— 建议现在到「我的简历」补充。</div>'
+        : '';
+
     return `
     <div class="emp-app-card">
         <div class="emp-app-header">
-            <h4>${app.title}</h4>
+            <h4>${escapeHtml(app.title || '')}</h4>
             <span class="emp-app-status ${status.class}">${status.text}</span>
         </div>
-        <p class="emp-app-company">${app.company} · ${app.location || '广东'}</p>
-        <p class="emp-app-salary">${app.salary}</p>
+        <p class="emp-app-company">${escapeHtml(app.company || '')} · ${escapeHtml(app.location || '广东')}</p>
+        <p class="emp-app-salary">${escapeHtml(app.salary || '')}</p>
+        ${noResumeNote}
         <div class="emp-app-timeline">
             ${timelineSteps.map(step => `
                 <div class="emp-timeline-item ${step.done ? 'done' : ''} ${step.active ? 'active' : ''}">
@@ -4175,7 +7936,23 @@ function renderApplicationCard(app) {
 }
 
 async function loadSavedJobs() {
-    if (!AppState.user) return;
+    if (!AppState.user) {
+        // ⚠️ 旧版在这里直接 return —— 未登录点进「收藏职位」是一片空白，
+        // 分不清「没收藏任何职位」还是「页面坏了」；而「我的求职」是有提示的，
+        // 同一板块两种表现（2026-10-07）。这里补上同样的提示（放进列表容器，
+        // 不覆盖 #emp-saved-empty 的默认文案，免得登录后残留）。
+        const listEl0 = document.getElementById('emp-saved-list');
+        const emptyEl0 = document.getElementById('emp-saved-empty');
+        if (emptyEl0) emptyEl0.style.display = 'none';
+        if (listEl0) {
+            listEl0.innerHTML = '<div class="emp-empty emp-empty-inline"><i class="fas fa-user-lock"></i>' +
+                '<p>登录后可收藏职位</p>' +
+                '<span class="emp-empty-sub">登录后，在「全部职位」里点卡片右侧的爱心即可收藏</span>' +
+                '<button class="btn btn-primary btn-sm emp-login-cta" data-login-cta="1">去登录</button></div>';
+            bindLoginCta(listEl0);
+        }
+        return;
+    }
     const listEl = document.getElementById('emp-saved-list');
     const emptyEl = document.getElementById('emp-saved-empty');
     if (!listEl) return;
@@ -4251,11 +8028,49 @@ function setupTeacherPanel() {
     // 通知公告
     document.getElementById('teacher-publish-ann-btn')?.addEventListener('click', showPublishAnnouncementModal);
 
-    // 作业管理
-    document.getElementById('teacher-create-assignment-btn')?.addEventListener('click', showCreateAssignmentModal);
+}
 
-    // 签到考勤
-    document.getElementById('teacher-start-attendance-btn')?.addEventListener('click', startAttendance);
+// 可关联的学员账号（role=student 且未被任何名册行占用）—— 教师端两处表单共用
+async function loadLinkableAccountsInto(selectId, hintId, currentUsername) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">加载中…</option>';
+    try {
+        const data = await apiCall('/api/teacher/linkable-accounts');
+        const list = (data && data.accounts) || [];
+        const opts = [];
+        if (currentUsername) {
+            opts.push(`<option value="${escapeHtml(currentUsername)}">${escapeHtml(currentUsername)}（当前已关联）</option>`);
+        } else {
+            opts.push('<option value="">（不关联账号）</option>');
+        }
+        list.forEach(a => opts.push(`<option value="${escapeHtml(a.username)}">${escapeHtml(a.name || a.username)}（${escapeHtml(a.username)}）</option>`));
+        if (!list.length && !currentUsername) opts.push('<option value="">（没有空闲的学员账号）</option>');
+        if (currentUsername) opts.push('<option value="">（改为不关联账号）</option>');
+        sel.innerHTML = opts.join('');
+        const hint = hintId ? document.getElementById(hintId) : null;
+        if (hint) {
+            hint.textContent = list.length
+                ? `只显示尚未被名册占用的学员账号，共 ${list.length} 个。`
+                : '目前没有空闲的学员账号，可改用「新建账号」为学员开一个登录账号。';
+        }
+    } catch (e) {
+        sel.innerHTML = '<option value="">账号列表加载失败</option>';
+        const hint = hintId ? document.getElementById(hintId) : null;
+        if (hint) hint.textContent = '账号列表加载失败，请关闭后重试（本次保存不会改动账号关联）。';
+    }
+}
+
+// 名册「学习方向」的规范选项（唯一来源）。
+// ⚠️ 编辑表单必须用 directionOptionsHtml(student.direction) 生成：如果学员现有方向
+//    不在下面这张表里，直接 `select.value = 方向` 会落到空值，保存时把方向**静默清空**。
+//    该助手会把「不在表里的现有值」原样追加一项，保证不会被改掉。
+const STUDENT_DIRECTIONS = ['荔枝种植', '电商运营', '广绣工艺', '水产养殖'];
+function directionOptionsHtml(current) {
+    const list = STUDENT_DIRECTIONS.slice();
+    const cur = current || '';
+    if (cur && list.indexOf(cur) === -1) list.push(cur);
+    return list.map(d => `<option value="${d}" ${d === cur ? 'selected' : ''}>${d}</option>`).join('');
 }
 
 function showAddStudentModal() {
@@ -4263,33 +8078,64 @@ function showAddStudentModal() {
         <div class="teacher-form">
             <div class="form-group">
                 <label>学员姓名</label>
-                <input type="text" id="new-student-name" placeholder="输入姓名">
-            </div>
-            <div class="form-group">
-                <label>班级</label>
-                <input type="text" id="new-student-class" placeholder="例如：2024春季班" value="2024春季班">
+                <input type="text" id="new-student-name" name="new-student-name" placeholder="输入姓名" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>学习方向</label>
                 <select id="new-student-direction">
-                    <option value="荔枝种植">荔枝种植</option>
-                    <option value="电商运营">电商运营</option>
-                    <option value="广绣工艺">广绣工艺</option>
-                    <option value="水产养殖">水产养殖</option>
+                    ${directionOptionsHtml('')}
                 </select>
+            </div>
+            <div class="form-group">
+                <label>平台账号</label>
+                <select id="new-student-account-mode">
+                    <option value="link">关联已有学员账号</option>
+                    <option value="create">新建账号（我来设用户名和初始密码）</option>
+                    <option value="none">暂不关联（该学员无法登录、收不到通知）</option>
+                </select>
+            </div>
+            <div class="form-group" id="new-student-link-group">
+                <label>选择要关联的账号</label>
+                <select id="new-student-link-username"><option value="">加载中…</option></select>
+                <div class="teacher-form-hint" id="new-student-link-hint"></div>
+            </div>
+            <div class="form-group" id="new-student-create-group" style="display:none">
+                <label>用户名</label>
+                <input type="text" id="new-student-new-username" name="new-student-new-username" placeholder="登录用，如 zhangsan" autocomplete="off">
+                <label style="margin-top:8px;display:block">初始密码</label>
+                <input type="text" id="new-student-new-password" name="new-student-new-password" placeholder="至少 6 位，请线下告知学员" autocomplete="off">
             </div>
             <button class="btn btn-primary teacher-form-submit" id="submit-add-student">
                 <i class="fas fa-plus"></i> 确认添加
             </button>
         </div>
     `);
+    loadLinkableAccountsInto('new-student-link-username', 'new-student-link-hint', '');
+    const modeSel = document.getElementById('new-student-account-mode');
+    modeSel?.addEventListener('change', () => {
+        document.getElementById('new-student-link-group').style.display = modeSel.value === 'link' ? '' : 'none';
+        document.getElementById('new-student-create-group').style.display = modeSel.value === 'create' ? '' : 'none';
+    });
     document.getElementById('submit-add-student')?.addEventListener('click', async () => {
         const name = document.getElementById('new-student-name').value.trim();
-        const class_name = document.getElementById('new-student-class').value;
         const direction = document.getElementById('new-student-direction').value;
+        const mode = document.getElementById('new-student-account-mode').value;
         if (!name) { showNotification('请输入姓名', 'error'); return; }
+        const payload = { name, direction };
+        if (mode === 'link') {
+            const u = document.getElementById('new-student-link-username').value;
+            if (!u) { showNotification('请选择一个要关联的账号，或改选「暂不关联」', 'error'); return; }
+            payload.link_username = u;
+        } else if (mode === 'create') {
+            const nu = document.getElementById('new-student-new-username').value.trim();
+            const npw = document.getElementById('new-student-new-password').value.trim();
+            if (!nu) { showNotification('请输入用户名', 'error'); return; }
+            if (npw.length < 6) { showNotification('初始密码至少 6 位', 'error'); return; }
+            payload.new_username = nu;
+            payload.new_password = npw;
+        }
         try {
-            const data = await apiCall('/api/teacher/students/add', 'POST', { name, class_name, direction });
+            const data = await apiCall('/api/teacher/students/add', 'POST', payload);
             showNotification(data.message, data.success ? 'success' : 'error');
             if (data.success) {
                 document.querySelector('.modal-overlay.detail-modal')?.remove();
@@ -4303,27 +8149,30 @@ function showAddStudentModal() {
 }
 
 function showEditStudentModal(student) {
+    const currentAccount = student.user_id || '';
     showDetailModal(`编辑学员 - ${student.name}`, `
         <div class="teacher-form">
             <div class="form-group">
                 <label>学员姓名</label>
-                <input type="text" id="edit-student-name" value="${student.name}">
-            </div>
-            <div class="form-group">
-                <label>班级</label>
-                <input type="text" id="edit-student-class" value="${student.class_name || ''}">
+                <input type="text" id="edit-student-name" name="edit-student-name" value="${escapeHtml(student.name)}" autocomplete="off">
             </div>
             <div class="form-group">
                 <label>学习方向</label>
                 <select id="edit-student-direction">
-                    ${['荔枝种植','电商运营','广绣工艺','水产养殖'].map(d =>
-                        `<option value="${d}" ${d === student.direction ? 'selected' : ''}>${d}</option>`
-                    ).join('')}
+                    ${directionOptionsHtml(student.direction)}
                 </select>
             </div>
             <div class="form-group">
-                <label>学习进度 (0-100)</label>
-                <input type="number" id="edit-student-progress" min="0" max="100" value="${student.progress}">
+                <label>状态</label>
+                <select id="edit-student-status">
+                    <option value="active" ${student.status === 'active' ? 'selected' : ''}>在读</option>
+                    <option value="suspended" ${student.status === 'suspended' ? 'selected' : ''}>停课</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>平台账号</label>
+                <select id="edit-student-link-username"><option value="">加载中…</option></select>
+                <div class="teacher-form-hint" id="edit-student-link-hint"></div>
             </div>
             <div class="teacher-form-actions">
                 <button class="btn btn-outline" id="cancel-edit-student">取消</button>
@@ -4333,25 +8182,30 @@ function showEditStudentModal(student) {
             </div>
         </div>
     `);
+    loadLinkableAccountsInto('edit-student-link-username', 'edit-student-link-hint', currentAccount);
     document.getElementById('cancel-edit-student')?.addEventListener('click', () => {
         document.querySelector('.modal-overlay.detail-modal')?.remove();
     });
     document.getElementById('submit-edit-student')?.addEventListener('click', async () => {
         const name = document.getElementById('edit-student-name').value.trim();
         if (!name) { showNotification('请输入姓名', 'error'); return; }
+        const direction = document.getElementById('edit-student-direction').value;
+        const status = document.getElementById('edit-student-status').value;
+        const account = document.getElementById('edit-student-link-username').value;
         try {
-            const data = await apiCall(`/api/teacher/students/${student.id}`, 'PUT', {
-                name,
-                class_name: document.getElementById('edit-student-class').value,
-                direction: document.getElementById('edit-student-direction').value,
-                progress: parseInt(document.getElementById('edit-student-progress').value) || 0
-            });
-            showNotification(data.message, data.success ? 'success' : 'error');
-            if (data.success) {
-                document.querySelector('.modal-overlay.detail-modal')?.remove();
-                loadStudents();
-                loadTeacherDashboard();
+            // 先存资料，账号关联单独走 link 接口（各自校验，避免半成功说不清）
+            const data = await apiCall(`/api/teacher/students/${student.id}`, 'PUT', { name, direction, status });
+            if (!data.success) { showNotification(data.message || '更新失败', 'error'); return; }
+            if (account !== currentAccount) {
+                const lr = await apiCall(`/api/teacher/students/${student.id}/link`, 'POST', { username: account });
+                if (!lr.success) { showNotification(lr.message || '账号关联失败', 'error'); loadStudents(); return; }
+                showNotification(lr.message, 'success');
+            } else {
+                showNotification('已保存', 'success');
             }
+            document.querySelector('.modal-overlay.detail-modal')?.remove();
+            loadStudents();
+            loadTeacherDashboard();
         } catch(e) {
             showNotification('更新失败', 'error');
         }
@@ -4374,8 +8228,8 @@ async function loadTeacherDashboard() {
             if (statEls.certs) statEls.certs.textContent = s.certificates_earned;
             if (statEls.completion) statEls.completion.textContent = s.completion_rate + '%';
             if (statEls.score) statEls.score.textContent = s.avg_score;
-            // 动态
-            renderActivities(data.dashboard.recent_activities);
+            // 最近动态：后端已移除硬编码假数据（2026-10-07），此处传空数组走真实空态
+            renderActivities(data.dashboard ? data.dashboard.recent_activities : []);
         }
         loadStudents();
     } catch(e) {
@@ -4385,13 +8239,20 @@ async function loadTeacherDashboard() {
 
 function renderActivities(activities) {
     const list = document.getElementById('teacher-activity-list');
-    if (!list || !activities) return;
+    if (!list) return;
+    const rows = activities || [];
+    // 平台目前没有真实的「最近动态」数据源（原接口返回的是硬编码假名字，已按
+    // 「不编造」红线移除）。这里如实渲染空态，不留一张空白卡片。
+    if (!rows.length) {
+        list.innerHTML = '<div class="teacher-activity-empty">暂无动态</div>';
+        return;
+    }
     const icons = {
-        student_join: { icon: 'fa-user-plus', color: '#0ea5e9' },
-        certificate_earned: { icon: 'fa-award', color: '#10b981' },
-        progress_update: { icon: 'fa-chart-line', color: '#f59e0b' }
+        student_join: { icon: 'fa-user-plus', color: '#4a6fa5' },
+        certificate_earned: { icon: 'fa-award', color: '#1f5e43' },
+        progress_update: { icon: 'fa-chart-line', color: '#d9a227' }
     };
-    list.innerHTML = activities.map(a => {
+    list.innerHTML = rows.map(a => {
         const cfg = icons[a.type] || { icon: 'fa-circle', color: '#94a3b8' };
         return `<div class="teacher-activity-item">
             <div class="teacher-activity-icon" style="color:${cfg.color}"><i class="fas ${cfg.icon}"></i></div>
@@ -4420,15 +8281,22 @@ async function loadStudents(search = '') {
             tbody.innerHTML = data.students.map(s => `
                 <tr>
                     <td><span class="teacher-student-id">${s.id}</span></td>
-                    <td><span class="teacher-student-name">${s.name}</span></td>
-                    <td><span class="teacher-direction-tag">${s.direction}</span></td>
+                    <td><span class="teacher-student-name">${escapeHtml(s.name)}</span></td>
+                    <td><span class="teacher-direction-tag">${escapeHtml(s.direction || '未分类')}</span></td>
                     <td>
-                        <div class="teacher-progress-cell">
-                            <div class="progress-bar small"><div class="progress-fill" style="width:${s.progress}%"></div></div>
-                            <span class="teacher-progress-text">${s.progress}%</span>
-                        </div>
+                        ${s.has_cert_data
+                            ? `<div class="teacher-progress-cell">
+                                    <div class="progress-bar small"><div class="progress-fill" style="width:${s.completion || 0}%"></div></div>
+                                    <span class="teacher-progress-text">${s.completion || 0}%（证书${s.cert_earned || 0}/${s.cert_total || 0}）</span>
+                                </div>`
+                            : `<span class="teacher-progress-text">暂无证书记录${s.user_id ? '' : '（未关联账号）'}</span>`}
                     </td>
-                    <td><span class="cert-badge ${s.progress >= 100 ? '' : 'pending'}">${s.progress >= 100 ? '已获得' : '学习中'}</span></td>
+                    <td>${s.cert_earned > 0
+                        ? '<span class="cert-badge">已获得</span>'
+                        : '<span class="cert-badge pending">暂未获得</span>'}</td>
+                    <td>${s.user_id
+                        ? `<span class="cert-badge">已关联</span><div class="teacher-account-name">${escapeHtml(s.user_id)}</div>`
+                        : `<span class="cert-badge pending">未关联</span><div class="teacher-account-name">无法登录</div>`}</td>
                     <td>
                         <div class="teacher-action-btns">
                             <button class="btn btn-text btn-sm view-student-btn" data-id="${s.id}" title="查看详情"><i class="fas fa-eye"></i></button>
@@ -4467,34 +8335,40 @@ async function openStudentDetail(studentId) {
         const d = await apiCall(`/api/teacher/students/${studentId}`);
         if (!d.success) { showNotification('加载失败', 'error'); return; }
         const st = d.student;
-        const progressColor = st.progress >= 80 ? '#10b981' : st.progress >= 50 ? '#f59e0b' : '#ef4444';
+        // 口径：证书真实完成度（名册 progress 是手填字段，不再展示）
+        const completion = st.completion || 0;
+        const progressColor = completion >= 80 ? '#1f5e43' : completion >= 50 ? '#d9a227' : '#ef4444';
         showDetailModal(`学员详情`, `
             <div class="teacher-detail">
                 <div class="teacher-detail-header">
-                    <div class="teacher-detail-avatar">${st.name.charAt(0)}</div>
+                    <div class="teacher-detail-avatar">${escapeHtml((st.name || '?').charAt(0))}</div>
                     <div class="teacher-detail-info">
-                        <div class="teacher-detail-name">${st.name}</div>
-                        <div class="teacher-detail-id">${st.id} · ${st.class_name || '未分班'}</div>
+                        <div class="teacher-detail-name">${escapeHtml(st.name)}</div>
+                        <div class="teacher-detail-id">${st.id} · ${escapeHtml(st.direction || '未分方向')}</div>
                     </div>
-                    <span class="cert-badge ${st.progress >= 100 ? '' : 'pending'}">${st.progress >= 100 ? '已毕业' : '学习中'}</span>
+                    <span class="cert-badge ${st.cert_earned > 0 ? '' : 'pending'}">${st.cert_earned > 0 ? '已获得证书' : '暂未获得'}</span>
                 </div>
                 <div class="teacher-detail-stats">
                     <div class="teacher-detail-stat">
                         <span class="teacher-detail-stat-label">学习方向</span>
-                        <span class="teacher-detail-stat-value">${st.direction}</span>
+                        <span class="teacher-detail-stat-value">${escapeHtml(st.direction || '未分方向')}</span>
                     </div>
                     <div class="teacher-detail-stat">
-                        <span class="teacher-detail-stat-label">学习进度</span>
-                        <span class="teacher-detail-stat-value" style="color:${progressColor}">${st.progress}%</span>
+                        <span class="teacher-detail-stat-label">完成度（证书）</span>
+                        <span class="teacher-detail-stat-value" style="color:${progressColor}">${st.has_cert_data ? completion + '%（' + (st.cert_earned || 0) + '/' + (st.cert_total || 0) + '）' : '暂无记录'}</span>
+                    </div>
+                    <div class="teacher-detail-stat">
+                        <span class="teacher-detail-stat-label">平台账号</span>
+                        <span class="teacher-detail-stat-value">${st.user_id ? escapeHtml(st.user_id) : '未关联'}</span>
                     </div>
                     <div class="teacher-detail-stat">
                         <span class="teacher-detail-stat-label">状态</span>
-                        <span class="teacher-detail-stat-value">${st.status === 'active' ? '在读' : st.status}</span>
+                        <span class="teacher-detail-stat-value">${st.status === 'active' ? '在读' : escapeHtml(st.status || '')}</span>
                     </div>
                 </div>
-                <div class="teacher-detail-progress-bar">
-                    <div class="progress-bar"><div class="progress-fill" style="width:${st.progress}%; background:${progressColor}"></div></div>
-                </div>
+                ${st.has_cert_data ? `<div class="teacher-detail-progress-bar">
+                    <div class="progress-bar"><div class="progress-fill" style="width:${completion}%; background:${progressColor}"></div></div>
+                </div>` : ''}
                 <div class="teacher-detail-actions">
                     <button class="btn btn-outline btn-sm" onclick="document.querySelector('.modal-overlay.detail-modal')?.remove(); setTimeout(() => openStudentDetail('${st.id}'), 200)">
                         <i class="fas fa-refresh"></i> 刷新
@@ -4583,9 +8457,9 @@ async function generateTeacherReport() {
                 const focus = ov.focus || 'general';
                 const allStats = {
                     total: { value: ov.total, label: '总学员', cls: '' },
-                    avg_progress: { value: ov.avg_progress + '%', label: '平均进度', cls: 'accent' },
+                    avg_progress: { value: ov.avg_progress + '%', label: '平均完成度（证书）', cls: 'accent' },
                     direction_count: { value: ov.direction_count, label: '学习方向', cls: '' },
-                    completed_count: { value: ov.completed_count, label: '已完成', cls: 'success' },
+                    completed_count: { value: ov.completed_count, label: '已获证书', cls: 'success' },
                     excellent_count: { value: ov.excellent_count, label: '优秀学员', cls: 'warn' },
                     risk_count: { value: ov.risk_count, label: '风险学员', cls: 'danger' }
                 };
@@ -4609,7 +8483,7 @@ async function generateTeacherReport() {
                                         <span class="report-risk-name">${s.name}</span>
                                         <span class="report-risk-dir">${s.direction}</span>
                                         <div class="report-risk-bar-track">
-                                            <div class="report-risk-bar-fill" style="width:${s.progress}%;background:${s.progress < 15 ? '#ef4444' : '#f59e0b'}"></div>
+                                            <div class="report-risk-bar-fill" style="width:${s.progress}%;background:${s.progress < 15 ? '#ef4444' : '#d9a227'}"></div>
                                         </div>
                                         <span class="report-risk-pct">${s.progress}%</span>
                                     </div>
@@ -4829,11 +8703,7 @@ function parseReportContent(content) {
 function copyReportContent() {
     const sections = document.querySelectorAll('.report-section-body');
     const text = Array.from(sections).map(s => s.innerText).join('\n\n');
-    navigator.clipboard.writeText(text).then(() => {
-        showNotification('报告内容已复制', 'success');
-    }).catch(() => {
-        showNotification('复制失败', 'error');
-    });
+    copyText(text, '报告内容已复制');
 }
 
 // ==================== 教师子标签 ====================
@@ -4851,8 +8721,6 @@ function setupTeacherTabs() {
             if (panel) panel.classList.add('active');
             // 按需加载数据
             if (tab === 'announcements') loadAnnouncements();
-            else if (tab === 'assignments') loadAssignments();
-            else if (tab === 'attendance') loadAttendances();
             else if (tab === 'analytics') loadAnalytics();
         });
     });
@@ -4948,259 +8816,6 @@ async function deleteAnnouncement(id) {
     }
 }
 
-// ==================== 作业管理 ====================
-
-async function loadAssignments() {
-    const container = document.getElementById('teacher-assignments-list');
-    if (!container) return;
-    container.innerHTML = '<div class="teacher-loading"><div class="spinner"></div> 加载中...</div>';
-    try {
-        const data = await apiCall('/api/teacher/assignments');
-        if (!data.success || !data.assignments.length) {
-            container.innerHTML = '<div class="teacher-empty"><i class="fas fa-book-open"></i><p>暂无作业</p></div>';
-            return;
-        }
-        container.innerHTML = data.assignments.map(a => `
-            <div class="assignment-card" onclick="openAssignmentDetail(${a.id})">
-                <div class="assignment-card-header">
-                    <span class="assignment-direction">${a.direction || '通用'}</span>
-                    <span class="assignment-deadline">${a.deadline ? '截止: ' + a.deadline : '无截止日期'}</span>
-                </div>
-                <h4 class="assignment-title">${a.title}</h4>
-                <p class="assignment-desc">${a.description || '暂无描述'}</p>
-                <div class="assignment-stats">
-                    <span><i class="fas fa-users"></i> 提交 ${a.submission_count || 0}</span>
-                    <span><i class="fas fa-check"></i> 已批 ${a.graded_count || 0}</span>
-                    <span><i class="fas fa-star"></i> 满分 ${a.total_score}</span>
-                </div>
-            </div>
-        `).join('');
-    } catch(e) {
-        container.innerHTML = '<div class="teacher-error">加载失败</div>';
-    }
-}
-
-function showCreateAssignmentModal() {
-    showDetailModal('发布作业', `
-        <div class="teacher-form">
-            <div class="form-group">
-                <label>作业标题</label>
-                <input type="text" id="asgn-title" placeholder="输入作业标题">
-            </div>
-            <div class="form-group">
-                <label>学习方向</label>
-                <select id="asgn-direction">
-                    <option value="">通用</option>
-                    <option value="荔枝种植">荔枝种植</option>
-                    <option value="电商运营">电商运营</option>
-                    <option value="广绣工艺">广绣工艺</option>
-                    <option value="水产养殖">水产养殖</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>截止日期</label>
-                <input type="datetime-local" id="asgn-deadline">
-            </div>
-            <div class="form-group">
-                <label>满分分值</label>
-                <input type="number" id="asgn-score" value="100" min="1" max="1000">
-            </div>
-            <div class="form-group">
-                <label>作业描述</label>
-                <textarea id="asgn-desc" rows="4" placeholder="输入作业要求和描述"></textarea>
-            </div>
-            <button class="btn btn-primary teacher-form-submit" id="submit-assignment">
-                <i class="fas fa-paper-plane"></i> 发布作业
-            </button>
-        </div>
-    `);
-    document.getElementById('submit-assignment')?.addEventListener('click', async () => {
-        const title = document.getElementById('asgn-title').value.trim();
-        const description = document.getElementById('asgn-desc').value.trim();
-        const direction = document.getElementById('asgn-direction').value;
-        const deadline = document.getElementById('asgn-deadline').value;
-        const total_score = parseInt(document.getElementById('asgn-score').value) || 100;
-        if (!title) { showNotification('请填写作业标题', 'error'); return; }
-        try {
-            const data = await apiCall('/api/teacher/assignments', 'POST', { title, description, direction, deadline, total_score });
-            showNotification(data.message, data.success ? 'success' : 'error');
-            if (data.success) {
-                document.querySelector('.modal-overlay.detail-modal')?.remove();
-                loadAssignments();
-            }
-        } catch(e) {
-            showNotification('发布失败', 'error');
-        }
-    });
-}
-
-async function openAssignmentDetail(id) {
-    try {
-        const data = await apiCall('/api/teacher/assignments/' + id);
-        if (!data.success) return;
-        const a = data.assignment;
-        const submissions = data.submissions || [];
-        let submissionsHtml = '';
-        if (submissions.length) {
-            submissionsHtml = `
-                <table class="teacher-table submissions-table">
-                    <thead><tr>
-                        <th>学员ID</th><th>提交时间</th><th>状态</th><th>分数</th><th>操作</th>
-                    </tr></thead>
-                    <tbody>
-                        ${submissions.map(s => `<tr>
-                            <td>${s.student_id}</td>
-                            <td>${s.submitted_at || '-'}</td>
-                            <td><span class="status-badge status-${s.status}">${s.status === 'graded' ? '已批改' : '待批改'}</span></td>
-                            <td>${s.score != null ? s.score + '/' + a.total_score : '-'}</td>
-                            <td>
-                                ${s.status !== 'graded' ? `<button class="btn btn-primary btn-xs" onclick="gradeSubmission(${s.id}, ${a.total_score})"><i class="fas fa-pen"></i> 批改</button>` : '<span class="text-muted">已完成</span>'}
-                            </td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>`;
-        } else {
-            submissionsHtml = '<div class="teacher-empty"><i class="fas fa-inbox"></i><p>暂无提交</p></div>';
-        }
-        showDetailModal(a.title, `
-            <div class="assignment-detail">
-                <div class="assignment-detail-info">
-                    <p><strong>方向：</strong>${a.direction || '通用'}</p>
-                    <p><strong>截止日期：</strong>${a.deadline || '无'}</p>
-                    <p><strong>满分：</strong>${a.total_score}</p>
-                    <p><strong>描述：</strong>${a.description || '暂无'}</p>
-                </div>
-                <h4 style="margin-top:16px">提交列表</h4>
-                ${submissionsHtml}
-            </div>
-        `);
-    } catch(e) {
-        showNotification('加载失败', 'error');
-    }
-}
-
-function gradeSubmission(submissionId, totalScore) {
-    // 关闭当前详情弹窗，打开批改弹窗
-    document.querySelector('.modal-overlay.detail-modal')?.remove();
-    showDetailModal('批改作业', `
-        <div class="teacher-form">
-            <div class="form-group">
-                <label>分数 (满分 ${totalScore})</label>
-                <input type="number" id="grade-score" min="0" max="${totalScore}" placeholder="输入分数">
-            </div>
-            <div class="form-group">
-                <label>评语</label>
-                <textarea id="grade-feedback" rows="4" placeholder="输入评语（可选）"></textarea>
-            </div>
-            <button class="btn btn-primary teacher-form-submit" id="submit-grade">
-                <i class="fas fa-check"></i> 确认批改
-            </button>
-        </div>
-    `);
-    document.getElementById('submit-grade')?.addEventListener('click', async () => {
-        const score = parseInt(document.getElementById('grade-score').value);
-        const feedback = document.getElementById('grade-feedback').value.trim();
-        if (isNaN(score) || score < 0) { showNotification('请输入有效分数', 'error'); return; }
-        try {
-            const data = await apiCall('/api/teacher/assignments/grade', 'POST', {
-                submission_id: submissionId, score, feedback
-            });
-            showNotification(data.message, data.success ? 'success' : 'error');
-            if (data.success) {
-                document.querySelector('.modal-overlay.detail-modal')?.remove();
-                loadAssignments();
-            }
-        } catch(e) {
-            showNotification('批改失败', 'error');
-        }
-    });
-}
-
-// ==================== 签到考勤 ====================
-
-async function loadAttendances() {
-    const container = document.getElementById('teacher-attendance-list');
-    if (!container) return;
-    container.innerHTML = '<div class="teacher-loading"><div class="spinner"></div> 加载中...</div>';
-    try {
-        const data = await apiCall('/api/teacher/attendance');
-        if (!data.success || !data.attendances.length) {
-            container.innerHTML = '<div class="teacher-empty"><i class="fas fa-clipboard-check"></i><p>暂无签到记录</p></div>';
-            return;
-        }
-        container.innerHTML = data.attendances.map(a => `
-            <div class="attendance-card">
-                <div class="attendance-header">
-                    <h4 class="attendance-title">${a.title}</h4>
-                    <span class="attendance-status-badge ${a.status === 'open' ? 'status-open' : 'status-closed'}">
-                        ${a.status === 'open' ? '进行中' : '已结束'}
-                    </span>
-                </div>
-                <div class="attendance-meta">
-                    <span><i class="fas fa-clock"></i> ${a.created_at}</span>
-                    <span><i class="fas fa-users"></i> 出勤 ${a.checkin_count || 0} / ${a.total_students || 0}</span>
-                </div>
-                <div class="attendance-actions">
-                    ${a.status === 'open' ? `<button class="btn btn-danger btn-xs" onclick="closeAttendance(${a.id})"><i class="fas fa-stop"></i> 结束签到</button>` : ''}
-                    <button class="btn btn-outline btn-xs" onclick="openAttendanceDetail(${a.id})"><i class="fas fa-list"></i> 查看详情</button>
-                </div>
-            </div>
-        `).join('');
-    } catch(e) {
-        container.innerHTML = '<div class="teacher-error">加载失败</div>';
-    }
-}
-
-async function startAttendance() {
-    const title = prompt('签到标题：', '日常签到');
-    if (!title) return;
-    try {
-        const data = await apiCall('/api/teacher/attendance', 'POST', { title });
-        showNotification(data.message, data.success ? 'success' : 'error');
-        if (data.success) loadAttendances();
-    } catch(e) {
-        showNotification('发起签到失败', 'error');
-    }
-}
-
-async function closeAttendance(id) {
-    if (!confirm('确定结束此次签到？')) return;
-    try {
-        const data = await apiCall('/api/teacher/attendance/close', 'POST', { attendance_id: id });
-        showNotification(data.message, data.success ? 'success' : 'error');
-        if (data.success) loadAttendances();
-    } catch(e) {
-        showNotification('操作失败', 'error');
-    }
-}
-
-async function openAttendanceDetail(id) {
-    try {
-        const data = await apiCall('/api/teacher/attendance/' + id);
-        if (!data.success) return;
-        const records = data.records || [];
-        let recordsHtml = '';
-        if (records.length) {
-            recordsHtml = `
-                <table class="teacher-table">
-                    <thead><tr><th>学员ID</th><th>状态</th><th>签到时间</th></tr></thead>
-                    <tbody>
-                        ${records.map(r => `<tr>
-                            <td>${r.student_id}</td>
-                            <td><span class="status-badge status-${r.check_status}">${r.check_status === 'present' ? '已签到' : r.check_status === 'late' ? '迟到' : '缺勤'}</span></td>
-                            <td>${r.checked_at || '-'}</td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>`;
-        } else {
-            recordsHtml = '<div class="teacher-empty"><i class="fas fa-user-slash"></i><p>暂无签到记录</p></div>';
-        }
-        showDetailModal('签到详情', recordsHtml);
-    } catch(e) {
-        showNotification('加载失败', 'error');
-    }
-}
-
 // ==================== 学情分析 ====================
 
 async function loadAnalytics() {
@@ -5210,9 +8825,13 @@ async function loadAnalytics() {
     try {
         const data = await apiCall('/api/teacher/analytics');
         if (!data.success) throw new Error();
+        const a = data.analytics || {};
         container.innerHTML = `
+            ${a.no_cert_count > 0
+                ? `<div class="teacher-form-hint" style="margin-bottom:10px">口径：${escapeHtml(a.basis_label || '证书真实完成度')}。另有 <b>${a.no_cert_count}</b> 名学员暂无任何证书记录，未计入分布（不等于 0% 完成）。</div>`
+                : (a.basis_label ? `<div class="teacher-form-hint" style="margin-bottom:10px">口径：${escapeHtml(a.basis_label)}</div>` : '')}
             <div class="analytics-section">
-                <h4 class="analytics-section-title"><i class="fas fa-chart-bar"></i> 学习进度分布</h4>
+                <h4 class="analytics-section-title"><i class="fas fa-chart-bar"></i> 完成度分布</h4>
                 <div class="analytics-chart" id="progress-chart"></div>
             </div>
             <div class="analytics-section">
@@ -5220,15 +8839,15 @@ async function loadAnalytics() {
                 <div class="analytics-chart" id="direction-chart"></div>
             </div>
             <div class="analytics-section">
-                <h4 class="analytics-section-title"><i class="fas fa-table"></i> 各方向进度详情</h4>
+                <h4 class="analytics-section-title"><i class="fas fa-table"></i> 各方向完成度详情</h4>
                 <div id="direction-detail"></div>
             </div>
         `;
-        renderProgressChart(data.progress_distribution || []);
-        renderDirectionChart(data.direction_distribution || []);
-        renderDirectionDetail(data.direction_progress || []);
+        renderProgressChart(a.progress_distribution || []);
+        renderDirectionChart(a.direction_distribution || []);
+        renderDirectionDetail(a.direction_progress || []);
     } catch(e) {
-        container.innerHTML = '<div class="teacher-error">加载失败</div>';
+        container.innerHTML = '<div class="teacher-error">学情数据加载失败，请刷新重试</div>';
     }
 }
 
@@ -5240,7 +8859,7 @@ function renderProgressChart(dist) {
         <div class="bar-chart">
             ${dist.map(d => `
                 <div class="bar-item">
-                    <div class="bar-label">${d.range}</div>
+                    <div class="bar-label">${d.label || d.range || ''}</div>
                     <div class="bar-track">
                         <div class="bar-fill" style="width:${(d.count / max * 100).toFixed(1)}%"></div>
                     </div>
@@ -5255,7 +8874,7 @@ function renderDirectionChart(dist) {
     const el = document.getElementById('direction-chart');
     if (!el || !dist.length) { if (el) el.innerHTML = '<p class="text-muted">暂无数据</p>'; return; }
     const total = dist.reduce((s, d) => s + d.count, 0) || 1;
-    const colors = ['#00b4d8','#ff6b6b','#ffd93d','#6bcb77','#9b59b6','#e67e22'];
+    const colors = ['#1f5e43','#4a6fa5','#d9a227','#4a8a6a','#a9673a','#8fc0a5'];
     el.innerHTML = `
         <div class="pie-list">
             ${dist.map((d, i) => `
@@ -5275,15 +8894,18 @@ function renderDirectionChart(dist) {
 function renderDirectionDetail(data) {
     const el = document.getElementById('direction-detail');
     if (!el || !data.length) { if (el) el.innerHTML = '<p class="text-muted">暂无数据</p>'; return; }
+    // ⚠️ 只渲染后端真的下发了字段：此前这里写死「学员数 / 平均进度 / 平均成绩」三列，
+    //    但接口从不下发 student_count / avg_score，表格里一直是两列 undefined。
+    //    平均成绩没有真实数据来源，按「宁缺勿编」直接不渲染这一列。
     el.innerHTML = `
         <table class="teacher-table">
-            <thead><tr><th>方向</th><th>学员数</th><th>平均进度</th><th>平均成绩</th></tr></thead>
+            <thead><tr><th>方向</th><th>学员数</th><th>平均完成度</th><th>已获证书</th></tr></thead>
             <tbody>
                 ${data.map(d => `<tr>
-                    <td>${d.direction}</td>
-                    <td>${d.student_count}</td>
-                    <td>${(d.avg_progress || 0).toFixed(1)}%</td>
-                    <td>${(d.avg_score || 0).toFixed(1)}</td>
+                    <td>${escapeHtml(d.direction || '未分类')}</td>
+                    <td>${d.student_count ?? '-'}</td>
+                    <td>${d.avg_progress != null ? Number(d.avg_progress).toFixed(1) + '%' : '-'}</td>
+                    <td>${d.cert_earned ?? '-'}</td>
                 </tr>`).join('')}
             </tbody>
         </table>
@@ -5291,14 +8913,283 @@ function renderDirectionDetail(data) {
 }
 
 // ==================== 3D播放控制 ====================
+// 非遗板块「3D互动教学」——把教师上传的已发布模型（models_3d 表 + public-models-3d 接口）
+// 接到 model-viewer 上真实渲染，三个按钮从假提示改为真功能。
+
+// 3D 播放器状态
+const Craft3DState = {
+    models: [],          // 当前手工艺的已发布模型列表
+    activeIndex: -1,     // 当前展示的模型下标
+    paused: false,       // 是否暂停自动旋转
+    slow: false,         // 是否慢放
+    angleStep: 0,        // 多角度切换步进（0 正面 / 1 侧面 / 2 顶部 / 3 特写）
+};
+
+// 多角度预设：orbit 的 theta（绕 Y 轴水平角）+ phi（俯仰角）+ 距离
+const CRAFT_ANGLES = [
+    { label: '正面', theta: '0deg', phi: '75deg', radius: 'auto' },
+    { label: '侧面', theta: '90deg', phi: '75deg', radius: 'auto' },
+    { label: '顶部', theta: '0deg', phi: '15deg', radius: 'auto' },
+    { label: '特写', theta: '0deg', phi: '75deg', radius: '1.5m' },
+];
 
 function setup3DControls() {
-    document.getElementById('slow-play')?.addEventListener('click', () => showNotification('已切换到慢放模式', 'info'));
-    document.getElementById('pause-play')?.addEventListener('click', () => showNotification('已暂停播放', 'info'));
-    document.getElementById('multi-angle')?.addEventListener('click', () => showNotification('已切换多角度视图', 'info'));
+    // 三个播放控制按钮 → 真功能
+    document.getElementById('slow-play')?.addEventListener('click', () => toggleSlowPlay());
+    document.getElementById('pause-play')?.addEventListener('click', () => togglePausePlay());
+    document.getElementById('multi-angle')?.addEventListener('click', () => cycleAngle());
+    // ④ AR 实景查看（移动端增值点）
+    document.getElementById('ar-view')?.addEventListener('click', () => activateCraftAR());
+    // 初始化时载入默认手工艺（刺绣）的模型
+    loadCraftModels();
+}
+
+// 无模型 / 加载中时禁用四个播放控制按钮，并给出原因（P2-B：不再点了没反应）
+function set3DControlsEnabled(enabled, reason) {
+    ['slow-play', 'pause-play', 'multi-angle', 'ar-view'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.disabled = !enabled;
+        if (enabled) {
+            btn.removeAttribute('title');
+        } else {
+            btn.title = reason || '请先加载 3D 模型';
+        }
+    });
+}
+
+function getCraftViewer() {
+    return document.getElementById('craft-3d-viewer');
+}
+
+function getCraftPlaceholder() {
+    return document.getElementById('craft-3d-placeholder');
+}
+
+function getCraftStatus() {
+    return document.getElementById('craft-3d-status');
+}
+
+// 载入当前手工艺的已发布 3D 模型（切手工艺时调用）
+async function loadCraftModels() {
+    const craft = AppState.currentCraft || 'embroidery';
+    const viewer = getCraftViewer();
+    const ph = getCraftPlaceholder();
+    const status = getCraftStatus();
+    const tabs = document.getElementById('craft-model-tabs');
+    if (!viewer || !ph) return;
+
+    Craft3DState.models = [];
+    Craft3DState.activeIndex = -1;
+    if (tabs) tabs.innerHTML = '';
+    // P1/P2（2026-10-06 学员走查）：切手工艺时复位所有播放控制状态，
+    // 避免「暂停/慢放」跨模型残留；同时禁用播放按钮，防止加载期间留下脏状态。
+    resetCraftPlayState();
+    set3DLoading(true, '3D模型加载中...');
+
+    try {
+        const data = await apiCall(`/api/teacher/public-models-3d?craft_type=${encodeURIComponent(craft)}`);
+        const models = (data && data.models) || [];
+        if (!models.length) {
+            set3DLoading(false, null);
+            show3DEmpty('该手工艺暂无可展示的 3D 模型，教师可在后台上传');
+            return;
+        }
+        Craft3DState.models = models;
+        // 渲染切换标签（多于 1 个模型时展示）
+        if (tabs && models.length > 1) {
+            tabs.innerHTML = models.map((m, i) =>
+                `<button class="craft-model-tab${i === 0 ? ' active' : ''}" data-i="${i}">${escapeHtml(m.title || ('模型' + (i + 1)))}</button>`
+            ).join('');
+            tabs.querySelectorAll('.craft-model-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const i = parseInt(btn.dataset.i, 10);
+                    showCraftModel(i);
+                    tabs.querySelectorAll('.craft-model-tab').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                });
+            });
+        }
+        showCraftModel(0);
+    } catch (e) {
+        // 失败必须可见：不冒充「没有模型」，明确提示加载失败可重试
+        set3DLoading(false, null);
+        show3DEmpty('3D 模型加载失败，请稍后重试');
+        console.error('loadCraftModels failed:', e);
+    }
+}
+
+// 展示指定下标模型
+function showCraftModel(index) {
+    const viewer = getCraftViewer();
+    const ph = getCraftPlaceholder();
+    const m = Craft3DState.models[index];
+    if (!m || !viewer || !ph) return;
+    Craft3DState.activeIndex = index;
+
+    // 构造模型文件 URL：file_path 形如 uploads/models_3d/xxx.glb，静态服务已放行该目录与后缀
+    const url = (m.file_path || '').replace(/\\/g, '/');
+    viewer.src = url;
+    viewer.alt = m.title || '';
+    // 重置视角与控制状态（每次展示新模型都从「正面 + 自动旋转」的干净态开始）
+    viewer.setAttribute('camera-orbit', '0deg 75deg auto');
+    viewer.setAttribute('field-of-view', 'auto');
+    Craft3DState.angleStep = 0;
+    resetCraftPlayState();
+
+    viewer.classList.remove('is-hidden');
+    ph.classList.add('is-hidden');
+    set3DControlsEnabled(true);
+    // 同步按钮状态（复位后 paused/slow 均为 false，恢复正常旋转 + 按钮取消激活）
+    applyPlayControls();
+}
+
+// 空状态：无模型 / 加载失败
+function show3DEmpty(msg) {
+    const ph = getCraftPlaceholder();
+    const status = getCraftStatus();
+    const viewer = getCraftViewer();
+    set3DControlsEnabled(false, msg || '暂无 3D 模型');
+    if (viewer) viewer.classList.add('is-hidden');
+    if (ph) ph.classList.remove('is-hidden');
+    if (ph) {
+        const icon = ph.querySelector('i');
+        if (icon) {
+            icon.className = 'fas fa-exclamation-circle';
+        }
+    }
+    if (status) status.textContent = msg || '暂无 3D 模型';
+}
+
+// 加载中 / 恢复占位
+function set3DLoading(loading, msg) {
+    const ph = getCraftPlaceholder();
+    const status = getCraftStatus();
+    const viewer = getCraftViewer();
+    if (loading) {
+        set3DControlsEnabled(false, msg || '3D 模型加载中，请稍候');
+        if (viewer) viewer.classList.add('is-hidden');
+        if (ph) ph.classList.remove('is-hidden');
+        if (ph) {
+            const icon = ph.querySelector('i');
+            if (icon) icon.className = 'fas fa-cube';
+        }
+        if (status) status.textContent = msg || '3D模型加载中...';
+    }
+}
+
+// 复位播放控制状态（paused/slow/angleStep），并取消按钮激活态。
+// P1/P2：切手工艺、展示新模型时调用，避免状态跨模型残留。
+function resetCraftPlayState() {
+    Craft3DState.paused = false;
+    Craft3DState.slow = false;
+    Craft3DState.angleStep = 0;
+    const slowBtn = document.getElementById('slow-play');
+    const pauseBtn = document.getElementById('pause-play');
+    if (slowBtn) slowBtn.classList.remove('active');
+    if (pauseBtn) pauseBtn.classList.remove('active');
+}
+
+// 慢放开关：rotation-per-second 从 30deg 降到 10deg
+function toggleSlowPlay() {
+    const viewer = getCraftViewer();
+    if (!viewer || Craft3DState.activeIndex < 0) return; // P2：无模型时不响应，避免脏状态
+    Craft3DState.slow = !Craft3DState.slow;
+    applyPlayControls();
+    showNotification(Craft3DState.slow ? '已切换慢放模式' : '已恢复正常速度', 'info');
+}
+
+// 暂停开关：停止自动旋转（auto-rotate 属性）
+function togglePausePlay() {
+    const viewer = getCraftViewer();
+    if (!viewer || Craft3DState.activeIndex < 0) return; // P2：无模型时不响应
+    Craft3DState.paused = !Craft3DState.paused;
+    applyPlayControls();
+    showNotification(Craft3DState.paused ? '已暂停自动旋转' : '已恢复自动旋转', 'info');
+}
+
+// 多角度：循环切换 4 个预设视角
+function cycleAngle() {
+    const viewer = getCraftViewer();
+    if (!viewer || Craft3DState.activeIndex < 0) return;
+    Craft3DState.angleStep = (Craft3DState.angleStep + 1) % CRAFT_ANGLES.length;
+    const a = CRAFT_ANGLES[Craft3DState.angleStep];
+    viewer.setAttribute('camera-orbit', `${a.theta} ${a.phi} ${a.radius}`);
+    if (a.radius !== 'auto') {
+        viewer.setAttribute('field-of-view', '35deg');
+    } else {
+        viewer.setAttribute('field-of-view', 'auto');
+    }
+    showNotification(`已切换到${a.label}视角`, 'info');
+}
+
+// ④ AR 实景查看：调用 model-viewer 的 activateAR，把模型「放到现实空间」。
+// 仅支持移动端（iOS Quick Look / Android Scene Viewer）；桌面端给友好提示。
+async function activateCraftAR() {
+    const viewer = getCraftViewer();
+    if (!viewer || Craft3DState.activeIndex < 0) return;
+    if (typeof viewer.activateAR !== 'function') {
+        showNotification('当前设备或浏览器不支持 AR 实景查看', 'warning');
+        return;
+    }
+    try {
+        await viewer.activateAR();
+    } catch (e) {
+        // AR 启动失败（桌面端、无相机权限等）给明确提示，不静默
+        showNotification('AR 启动失败：请在手机端打开本页面重试', 'warning');
+        console.warn('activateAR failed:', e);
+    }
+}
+
+// 统一把状态写到 model-viewer 属性 + 同步按钮激活态
+function applyPlayControls() {
+    const viewer = getCraftViewer();
+    if (!viewer) return;
+    if (Craft3DState.paused) {
+        viewer.removeAttribute('auto-rotate');
+    } else {
+        viewer.setAttribute('auto-rotate', '');
+        viewer.setAttribute('rotation-per-second', Craft3DState.slow ? '10deg' : '30deg');
+    }
+    // 按钮激活态
+    const slowBtn = document.getElementById('slow-play');
+    const pauseBtn = document.getElementById('pause-play');
+    if (slowBtn) slowBtn.classList.toggle('active', Craft3DState.slow);
+    if (pauseBtn) pauseBtn.classList.toggle('active', Craft3DState.paused);
+}
+
+// 步骤 → 视角联动（2026-10-06）：点击制作步骤时，把 3D 视口切到对应视角。
+// 按「步骤序号在总步数中的位置」映射到四个预设视角：
+//   起步步骤 → 整体正面；中段步骤 → 侧面/特写；末段步骤 → 成品顶部。
+// 这样四个手工艺（步骤数不同）都能通用，无需为每个步骤硬编码视角。
+function focusCraftStep(stepIndex, totalSteps) {
+    const viewer = getCraftViewer();
+    if (!viewer || Craft3DState.activeIndex < 0) return; // 无模型时不联动
+
+    // 计算进度（0~1）
+    const progress = totalSteps > 1 ? stepIndex / (totalSteps - 1) : 0;
+    let orbit, fov = 'auto';
+    if (progress < 0.25) {
+        orbit = '0deg 75deg auto';      // 起步：正面整体
+    } else if (progress < 0.6) {
+        orbit = '90deg 60deg auto';     // 中段：侧面观察细节
+    } else if (progress < 0.85) {
+        orbit = '45deg 45deg 1.8m';     // 后段：斜上方特写
+        fov = '40deg';
+    } else {
+        orbit = '0deg 15deg auto';      // 末段：成品顶部俯视
+    }
+    viewer.setAttribute('camera-orbit', orbit);
+    viewer.setAttribute('field-of-view', fov);
 }
 
 // ==================== 消息通知 ====================
+
+// 当前登录学员的真实 user_id（username）。严禁再用 AppState.currentUser（全站从未赋值，
+// 会退化成 sessionId 这个 UUID，导致按 user_id 查不到任何数据 → 消息中心对谁都不可见）。
+function currentUserId() {
+    return AppState.user?.id || '';
+}
 
 function setupQuickMessage() {
     const btn = document.getElementById('quick-message-btn');
@@ -5352,8 +9243,10 @@ function setupQuickMessage() {
 async function updateBadgeCount() {
     const badge = document.getElementById('message-badge');
     if (!badge) return;
+    // 用户关闭了消息通知 → 不拉取、不显示红点
+    if (!isNotifEnabled()) { badge.classList.add('is-hidden'); return; }
     try {
-        const userId = AppState.currentUser?.id || AppState.sessionId || '';
+        const userId = currentUserId();
         if (!userId) return;
         const [notifRes, msgRes] = await Promise.all([
             apiCall(`/api/notifications/unread?user_id=${userId}`),
@@ -5362,51 +9255,118 @@ async function updateBadgeCount() {
         const total = (notifRes.count || 0) + (msgRes.count || 0);
         badge.textContent = total;
         badge.classList.toggle('is-hidden', total === 0);
-    } catch(e) {}
+    } catch(e) { console.warn('[消息中心] 未读红点加载失败', e); }
 }
 
 async function loadNotifications() {
     const container = document.getElementById('msg-notifications-list');
     if (!container) return;
-    const userId = AppState.currentUser?.id || AppState.sessionId || '';
-    if (!userId) { container.innerHTML = '<div class="msg-empty">请先登录</div>'; return; }
+    const uid = currentUserId();
+    if (!uid) { container.innerHTML = '<div class="msg-empty"><i class="fas fa-user-lock"></i><p>登录后可查看通知</p><button type="button" class="btn btn-text btn-sm" data-login-cta="1">去登录</button></div>'; bindLoginCta(container); return; }
+    if (!isNotifEnabled()) {
+        container.innerHTML = '<div class="msg-empty"><i class="fas fa-bell-slash"></i><p>消息通知已关闭</p><button type="button" class="btn btn-text btn-sm" id="msg-notif-enable">开启通知</button></div>';
+        const eb = document.getElementById('msg-notif-enable');
+        if (eb) eb.addEventListener('click', () => { setNotifEnabled(true); loadNotifications(); updateBadgeCount(); });
+        return;
+    }
+    container.innerHTML = '<div class="msg-empty"><i class="fas fa-spinner fa-spin"></i><p>加载中...</p></div>';
+
+    const items = [];
+    let srcFailed = 0;
+    // 1. 管理员系统公告（只读）
     try {
-        const data = await apiCall(`/api/notifications?user_id=${userId}`);
-        if (!data.success || !data.notifications.length) {
-            container.innerHTML = '<div class="msg-empty"><i class="fas fa-bell-slash"></i><p>暂无通知</p></div>';
+        const r = await apiCall('/api/system-announcements');
+        (r.announcements || []).forEach(a => items.push({
+            type: 'announcement', tag: '系统公告', readOnly: true,
+            title: a.title || '系统公告',
+            preview: a.content || '',
+            time: a.created_at || '',
+            ts: new Date((a.created_at || '').replace(' ', 'T')).getTime() || 0
+        }));
+    } catch (e) { srcFailed++; console.warn('[消息中心] 系统公告加载失败', e); }
+
+    // 2. 企业端就业对接（投递状态，可回复企业）
+    try {
+        const r = await apiCall(`/api/employment/my-jobs/${uid}`);
+        const statusMap = { pending: '待处理', approved: '已通过', rejected: '未通过' };
+        (r.applications || []).forEach(a => items.push({
+            type: 'job', tag: '企业通知',
+            replyId: a.enterprise_id || '', replyName: a.company || '企业',
+            title: `投递「${a.title || '岗位'}」`,
+            preview: `状态：${statusMap[a.status] || a.status}　${a.company || ''}　${a.location || ''}`,
+            time: a.applied_at || '',
+            ts: new Date((a.applied_at || '').replace(' ', 'T')).getTime() || 0
+        }));
+    } catch (e) { srcFailed++; console.warn('[消息中心] 投递状态加载失败', e); }
+
+    // 3. 教师/企业互动私信（对方发来的，可回复）
+    try {
+        const r = await apiCall(`/api/messages/inbox?user_id=${uid}`);
+        (r.inbox || []).forEach(m => {
+            if (m.is_mine) return;
+            items.push({
+                type: 'interaction', tag: '互动',
+                replyId: m.other_id || '', replyName: m.other_name || '对方',
+                title: `来自 ${m.other_name || '对方'} 的消息`,
+                preview: m.content || '',
+                time: m.created_at || '',
+                ts: new Date((m.created_at || '').replace(' ', 'T')).getTime() || 0
+            });
+        });
+    } catch (e) { srcFailed++; console.warn('[消息中心] 互动私信加载失败', e); }
+
+    // 4. 平台站内通知（教师公告推送 / 实训批改等，按 username 定向写入 notifications 表）
+    // 2026-10-07 补：notifications 表此前对前端是「只写不读」——
+    // updateBadgeCount 会把未读数算进红点，但列表里看不到任何对应条目（红点有数字却点不出东西）。
+    // 这里接上第 4 个数据源，让红点数与列表内容对得上。
+    // 2026-10-07 再修：「发布作业」下架后，站内通知只剩 announcement / grade / farming_reminder，
+    //   已无 type='assignment' 的通知，故从两张映射表里删掉该分支（保留只会误导）。
+    try {
+        const r = await apiCall(`/api/notifications?user_id=${uid}`);
+        const notifTagMap = { announcement: '公告', grade: '实训批改' };
+        (r.notifications || []).forEach(n => items.push({
+            type: n.type || 'system', tag: notifTagMap[n.type] || '通知', readOnly: true,
+            title: n.title || '通知',
+            preview: n.content || '',
+            time: n.created_at || '',
+            ts: new Date((n.created_at || '').replace(' ', 'T')).getTime() || 0
+        }));
+    } catch (e) { srcFailed++; console.warn('[消息中心] 站内通知加载失败', e); }
+
+    if (!items.length) {
+        if (srcFailed >= 4) {
+            container.innerHTML = '<div class="msg-empty"><i class="fas fa-exclamation-triangle"></i><p>通知加载失败</p><button type="button" class="btn btn-text btn-sm" id="msg-notif-retry">重试</button></div>';
+            const rb = document.getElementById('msg-notif-retry');
+            if (rb) rb.addEventListener('click', loadNotifications);
             return;
         }
-        container.innerHTML = data.notifications.map(n => {
-            const iconMap = {
-                'announcement': 'fa-bullhorn',
-                'assignment': 'fa-book-open',
-                'attendance': 'fa-clipboard-check',
-                'grade': 'fa-star',
-                'system': 'fa-gear'
-            };
-            const icon = iconMap[n.type] || 'fa-bell';
-            const time = formatTimeAgo(n.created_at);
-            return `
-                <div class="msg-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
-                    <div class="msg-item-icon type-${n.type}"><i class="fas ${icon}"></i></div>
-                    <div class="msg-item-text">
-                        <div class="msg-item-title">${n.title}</div>
-                        <div class="msg-item-preview">${n.content || ''}</div>
-                        <div class="msg-item-time">${time}</div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    } catch(e) {
-        container.innerHTML = '<div class="msg-empty">加载失败</div>';
+        container.innerHTML = '<div class="msg-empty"><i class="fas fa-bell-slash"></i><p>暂无通知</p></div>';
+        return;
     }
+    items.sort((a, b) => b.ts - a.ts);
+    const iconMap = { announcement: 'fa-bullhorn', job: 'fa-briefcase', interaction: 'fa-comments',
+                      grade: 'fa-check-circle', system: 'fa-bell' };
+    container.innerHTML = items.map(it => `
+        <div class="msg-item ${it.replyId ? 'has-reply' : ''}">
+            <div class="msg-item-icon type-${it.type}"><i class="fas ${iconMap[it.type] || 'fa-bell'}"></i></div>
+            <div class="msg-item-text">
+                <div class="msg-item-title">${escapeHtml(it.title)} <span class="msg-tag msg-tag-${it.type}">${it.tag}</span></div>
+                <div class="msg-item-preview">${escapeHtml(it.preview)}</div>
+                <div class="msg-item-time">${formatTimeAgo(it.time)}</div>
+                ${it.replyId ? `<button class="msg-reply-btn" data-rid="${escapeHtml(it.replyId)}" data-rname="${escapeHtml(it.replyName || '')}">回复</button>` : ''}
+            </div>
+        </div>
+    `).join('');
+    container.querySelectorAll('.msg-reply-btn').forEach(btn => {
+        btn.addEventListener('click', () => openConversation(btn.dataset.rid, btn.dataset.rname));
+    });
 }
 
 async function loadConversations() {
     const container = document.getElementById('msg-messages-list');
     if (!container) return;
-    const userId = AppState.currentUser?.id || AppState.sessionId || '';
-    if (!userId) { container.innerHTML = '<div class="msg-empty">请先登录</div>'; return; }
+    const userId = currentUserId();
+    if (!userId) { container.innerHTML = '<div class="msg-empty"><i class="fas fa-user-lock"></i><p>登录后可查看私信</p><button type="button" class="btn btn-text btn-sm" data-login-cta="1">去登录</button></div>'; bindLoginCta(container); return; }
     try {
         const data = await apiCall(`/api/messages/inbox?user_id=${userId}`);
         if (!data.success || !data.inbox.length) {
@@ -5448,25 +9408,27 @@ async function openConversation(userId, userName) {
     // 关闭下拉面板
     document.getElementById('msg-dropdown')?.classList.remove('show');
 
-    const myId = AppState.currentUser?.id || AppState.sessionId || '';
+    const myId = currentUserId();
     if (!myId) return;
 
     // 加载会话消息
     let messages = [];
+    let convFailed = false;
     try {
         const data = await apiCall(`/api/messages/conversation/${userId}?user_id=${myId}`);
         if (data.success) messages = data.messages;
-    } catch(e) {}
+        else convFailed = true;
+    } catch(e) { convFailed = true; console.warn('[消息中心] 会话历史加载失败', e); }
 
     showDetailModal(`<i class="fas fa-envelope"></i> 与 ${userName} 的对话`, `
         <div class="conversation-modal">
             <div class="conversation-messages" id="conversation-messages">
-                ${messages.length ? messages.map(m => `
+                ${convFailed ? '<div class="msg-empty">历史消息加载失败</div>' : (messages.length ? messages.map(m => `
                     <div class="msg-bubble ${m.sender_id === myId ? 'mine' : 'theirs'}">
                         <div class="msg-bubble-content">${m.content}</div>
                         <div class="msg-bubble-time">${m.created_at ? m.created_at.slice(11, 16) : ''}</div>
                     </div>
-                `).join('') : '<div class="msg-empty">暂无消息，发送第一条吧</div>'}
+                `).join('') : '<div class="msg-empty">暂无消息，发送第一条吧</div>')}
             </div>
             <div class="conversation-input">
                 <input type="text" id="conversation-msg-input" placeholder="输入消息..." maxlength="500">
@@ -5516,7 +9478,7 @@ async function openConversation(userId, userName) {
 }
 
 async function markAllNotificationsRead() {
-    const userId = AppState.currentUser?.id || AppState.sessionId || '';
+    const userId = currentUserId();
     if (!userId) return;
     try {
         await apiCall('/api/notifications/read', 'POST', { user_id: userId });
@@ -5529,7 +9491,7 @@ async function markAllNotificationsRead() {
 }
 
 async function clearReadNotifications() {
-    const userId = AppState.currentUser?.id || AppState.sessionId || '';
+    const userId = currentUserId();
     if (!userId) return;
     try {
         await apiCall(`/api/notifications/clear?user_id=${userId}`, 'DELETE');
@@ -5544,21 +9506,48 @@ async function showComposeModal() {
     // 关闭下拉面板
     document.getElementById('msg-dropdown')?.classList.remove('show');
 
-    // 获取学员列表作为收件人选项
+    // ⚠️ 名册行 ≠ 平台账号（2026-10-07 修正）：
+    //   此前收件人下拉的 value 用的是**名册号**（STU001），而 messages 表全站按
+    //   username 收发 → 消息写进库里后学员永远看不到（消息中心只会按自己的账号查）。
+    //   现在只列**已关联平台账号**的学员，value 用 user_id（=username）。
+    //   学员/企业等非教师角色没有「可主动发起对话的联系人」数据源，如实说明，
+    //   不再去调教师接口（那会拿到 403，页面显示成「收件人加载失败」）。
+    const role = (AppState.user && AppState.user.role) || '';
+    if (role !== 'teacher') {
+        showDetailModal('<i class="fas fa-pen"></i> 写消息', `
+            <div class="teacher-form">
+                <div class="teacher-form-hint" style="font-size:0.88rem">
+                    平台暂不支持该角色主动发起新对话。对方（老师 / 企业）发来消息后，
+                    可在消息中心对应条目上点「回复」继续沟通。
+                </div>
+            </div>
+        `);
+        return;
+    }
+
     let students = [];
+    let recvFailed = false;
     try {
         const data = await apiCall('/api/teacher/students');
-        if (data.success) students = data.students;
-    } catch(e) {}
+        if (data.success) students = data.students || [];
+        else recvFailed = true;
+    } catch(e) { recvFailed = true; console.warn('[消息中心] 收件人列表加载失败', e); }
+
+    const reachable = students.filter(s => s.user_id);
+    const unlinked = students.length - reachable.length;
 
     showDetailModal('<i class="fas fa-pen"></i> 写消息', `
         <div class="teacher-form">
             <div class="form-group">
                 <label>收件人</label>
                 <select id="compose-receiver">
-                    <option value="">选择收件人</option>
-                    ${students.map(s => `<option value="${s.id}">${s.name}（${s.direction}）</option>`).join('')}
+                    ${recvFailed
+                        ? '<option value="">收件人加载失败，请关闭后重试</option>'
+                        : '<option value="">选择收件人</option>' + reachable.map(s => `<option value="${escapeHtml(s.user_id)}">${escapeHtml(s.name)}（${escapeHtml(s.direction || '未分方向')}）</option>`).join('')}
                 </select>
+                ${(!recvFailed && !reachable.length)
+                    ? '<div class="teacher-form-hint">还没有可发送的学员——学员需要先在「学员管理」里关联平台账号，才能收到站内消息。</div>'
+                    : (unlinked > 0 ? `<div class="teacher-form-hint">另有 ${unlinked} 名学员尚未关联平台账号，无法接收消息（可在「学员管理」里关联）。</div>` : '')}
             </div>
             <div class="form-group">
                 <label>消息内容</label>
@@ -5573,7 +9562,7 @@ async function showComposeModal() {
     document.getElementById('compose-send-btn')?.addEventListener('click', async () => {
         const receiverId = document.getElementById('compose-receiver')?.value;
         const content = document.getElementById('compose-content')?.value.trim();
-        const senderId = AppState.currentUser?.id || AppState.sessionId || '';
+        const senderId = currentUserId();
         if (!receiverId) { showNotification('请选择收件人', 'error'); return; }
         if (!content) { showNotification('请输入消息内容', 'error'); return; }
         try {
@@ -5590,42 +9579,6 @@ async function showComposeModal() {
         }
     });
 }
-
-// ==================== 积分兑换 ====================
-
-function setupPointsExchange() {
-    document.querySelectorAll('.exchange-item').forEach(item => {
-        item.style.cursor = 'pointer';
-        item.addEventListener('click', async () => {
-            if (!AppState.user) {
-                showNotification('请先登录', 'error');
-                return;
-            }
-            const name = item.querySelector('.exchange-item-name')?.textContent || item.querySelector('span:nth-child(2)')?.textContent || '';
-            const cost = parseInt(item.querySelector('.points-cost')?.textContent) || 0;
-            try {
-                const data = await apiCall('/api/employment/exchange', 'POST', {
-                    user_id: AppState.user.id,
-                    item: name, cost
-                });
-                if (data.success) {
-                    const pts = data.remaining_points.toLocaleString();
-                    const el1 = document.getElementById('points-balance');
-                    const el2 = document.getElementById('emp-points-balance');
-                    if (el1) el1.textContent = pts;
-                    if (el2) el2.textContent = pts;
-                    showNotification(data.message, 'success');
-                } else {
-                    showNotification(data.message, 'error');
-                }
-            } catch(e) {
-                showNotification('兑换失败', 'error');
-            }
-        });
-    });
-}
-
-// ==================== 通用详情模态框 ====================
 
 function showDetailModal(title, html) {
     // 移除已有的
@@ -5669,8 +9622,9 @@ async function checkConnection() {
 
 // ==================== 通知 ====================
 
-function showNotification(message, type = 'info') {
+function showNotification(message, type = 'info', opts) {
     const notification = document.getElementById('notification');
+    if (!notification) return;
     const msgSpan = notification.querySelector('.notification-message');
     const icon = notification.querySelector('i');
 
@@ -5685,8 +9639,41 @@ function showNotification(message, type = 'info') {
         case 'warning': icon.classList.add('fa-exclamation-triangle'); break;
         default: icon.classList.add('fa-info-circle');
     }
+    // 可选内联操作按钮（如未登录提示的「去登录」）
+    const actBtn = document.getElementById('notification-action');
+    if (actBtn) {
+        if (opts && opts.actionLabel && typeof opts.action === 'function') {
+            actBtn.textContent = opts.actionLabel;
+            actBtn.classList.remove('is-hidden');
+            actBtn.onclick = function (ev) {
+                ev.stopPropagation();
+                try { opts.action(); } finally { notification.classList.remove('show'); }
+            };
+        } else {
+            actBtn.classList.add('is-hidden');
+            actBtn.textContent = '';
+            actBtn.onclick = null;
+        }
+    }
     notification.classList.add('show');
-    setTimeout(() => notification.classList.remove('show'), 3000);
+    // 定时器防抖：连续多条提示时，旧定时器不应把新提示提前收走
+    clearTimeout(showNotification._hideTimer);
+    const dur = (opts && opts.actionLabel) ? 6000 : 3000;
+    showNotification._hideTimer = setTimeout(() => notification.classList.remove('show'), dur);
+}
+
+/* 统一的「复制到剪贴板」：带能力检测 + 失败提示。
+   非 HTTPS（本项目默认 http://localhost）或写入被拒时，旧实现直接 .then() 无 catch
+   → 点了没反应。此处统一走这里。 */
+function copyText(text, okMsg) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+        showNotification('当前浏览器不支持自动复制，请手动选择文本', 'warning');
+        return Promise.resolve(false);
+    }
+    return navigator.clipboard.writeText(text).then(
+        function () { if (okMsg) showNotification(okMsg, 'success'); return true; },
+        function () { showNotification('复制失败，请手动选择文本', 'warning'); return false; }
+    );
 }
 
 function showLoading(message = '加载中...') {
@@ -5841,25 +9828,40 @@ function setupHeroParticles() {
 // ==================== 数字滚动动画 ====================
 
 function setupStatCounter() {
-    const statNumbers = document.querySelectorAll('.stat-number[data-target]');
+    const statNumbers = document.querySelectorAll('.stat-number[data-key]');
     if (statNumbers.length === 0) return;
 
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const el = entry.target;
-                const target = parseInt(el.getAttribute('data-target'));
-                if (prefersReducedMotion) {
-                    el.textContent = target.toLocaleString();
-                } else {
-                    animateNumber(el, target);
+    // P1-3：统计数字须接真实库计数（红线「不编造」），不再写死假数据。
+    // 先取 /api/home/stats，按 data-key 映射；接口失败则按 0 渲染（不编造兜底值）。
+    let stats = null;
+    apiCall('/api/home/stats').then(function (res) {
+        if (res && res.success && res.stats) stats = res.stats;
+    }).catch(function () {
+        stats = null;
+    }).then(function () {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const el = entry.target;
+                    const target = parseInt(el.getAttribute('data-target')) || 0;
+                    if (prefersReducedMotion) {
+                        el.textContent = target.toLocaleString();
+                    } else {
+                        animateNumber(el, target);
+                    }
+                    observer.unobserve(el);
                 }
-                observer.unobserve(el);
-            }
-        });
-    }, { threshold: 0.5 });
+            });
+        }, { threshold: 0.5 });
 
-    statNumbers.forEach(el => observer.observe(el));
+        statNumbers.forEach(el => {
+            const key = el.getAttribute('data-key');
+            const val = (stats && stats[key] != null) ? parseInt(stats[key], 10) : 0;
+            el.setAttribute('data-target', String(val));
+            el.textContent = '0';
+            observer.observe(el);
+        });
+    });
 }
 
 function animateNumber(el, target) {
@@ -5878,11 +9880,88 @@ function animateNumber(el, target) {
         if (progress < 1) {
             requestAnimationFrame(update);
         } else {
-            el.textContent = target.toLocaleString() + '+';
+            // 小清理（2026-10-05）：原在末尾拼 '+' 后缀（如「86+」），无业务含义且易误读
+            // 为「86 分以上」，已移除。
+            el.textContent = target.toLocaleString();
         }
     }
 
     requestAnimationFrame(update);
+}
+
+// ==================== 本土资源 · 本地成功案例 ====================
+// 内容唯一事实源 = 后端 cases_data.py（经 /api/resources/cases 下发）。
+// 首页卡片与 case-detail.html 详情页共用同一份数据，避免两处写死、各改各的。
+let _casesLoaded = false;
+
+async function loadSuccessCases(force) {
+    const grid = document.getElementById('cases-grid');
+    if (!grid) return;
+    if (_casesLoaded && !force) return;
+
+    grid.innerHTML = '<div class="cases-placeholder"><i class="fas fa-spinner fa-spin"></i> 正在加载案例…</div>';
+
+    try {
+        const res = await fetch('/api/resources/cases');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (!data.success || !Array.isArray(data.cases)) {
+            throw new Error(data.message || '返回数据格式异常');
+        }
+        if (data.cases.length === 0) {
+            // 案例需超级管理员审核后才可见。全部待审 ≠ 接口出错，要分开呈现，
+            // 否则会把"审核中"显示成"加载失败"，让人误判系统坏了。
+            const stat = data.case_review || {};
+            if ((stat.pending || 0) > 0) {
+                grid.innerHTML = `
+                    <div class="cases-pending">
+                        <i class="fas fa-user-shield"></i>
+                        <p>案例内容正在审核中（${stat.pending} 条待审）</p>
+                        <span>本地成功案例需经超级管理员审核通过后展示</span>
+                    </div>`;
+                _casesLoaded = true;
+                return;
+            }
+            // 一条案例都没有 —— 这才是真异常
+            throw new Error('暂无案例数据');
+        }
+        renderSuccessCases(data.cases);
+        _casesLoaded = true;
+    } catch (e) {
+        console.error('加载成功案例失败:', e);
+        grid.innerHTML = `
+            <div class="cases-error">
+                <i class="fas fa-exclamation-circle"></i>
+                <p>案例加载失败：${escapeHtml(e.message || '未知错误')}</p>
+                <button class="btn btn-outline btn-sm" onclick="loadSuccessCases(true)">
+                    <i class="fas fa-redo"></i> 重试
+                </button>
+            </div>`;
+    }
+}
+
+function renderSuccessCases(cases) {
+    const grid = document.getElementById('cases-grid');
+    if (!grid) return;
+    grid.innerHTML = cases.map(c => {
+        // 卡片上只放两条最关键的指标，其余在详情页展开
+        const stats = Array.isArray(c.stats) ? c.stats.slice(0, 2) : [];
+        const statsHtml = stats.map(s =>
+            `<span><i class="fas ${s.icon || 'fa-chart-line'}"></i> ${escapeHtml(s.label)}：${escapeHtml(s.value)}</span>`
+        ).join('');
+        return `
+        <div class="case-card">
+            <div class="case-visual"><i class="fas fa-map-marker-alt"></i></div>
+            <div class="case-body">
+                <h4>${escapeHtml(c.title)}</h4>
+                <p>${escapeHtml(c.description || '')}</p>
+                <div class="case-stats">${statsHtml}</div>
+                <a href="case-detail.html?id=${encodeURIComponent(c.id)}" class="btn btn-outline btn-sm" target="_blank">
+                    查看详情 <i class="fas fa-external-link-alt"></i>
+                </a>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 // ==================== 平滑滚动 ====================
@@ -5905,3 +9984,708 @@ function setupSmoothScroll() {
 
 window.switchTab = switchTab;
 window.toggleShortcutsHelp = toggleShortcutsHelp;
+// 案例/政策卡片错误态里的"重试"按钮走内联 onclick，需挂到 window
+window.loadSuccessCases = loadSuccessCases;
+window.loadPolicies = loadPolicies;
+
+// ==================== 注册/登录 Tab 切换 ====================
+
+function setupAuthTabs() {
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const loginForm = document.getElementById('auth-login-form');
+    const regForm = document.getElementById('auth-register-form');
+    if (!tabLogin || !tabRegister) return;
+
+    tabLogin.addEventListener('click', () => {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+    });
+
+    tabRegister.addEventListener('click', () => {
+        tabRegister.classList.add('active');
+        tabLogin.classList.remove('active');
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+        // 实际切换
+        loginForm.classList.add('is-hidden');
+        regForm.classList.remove('is-hidden');
+    });
+
+    // 注册角色选择 - 显示/隐藏公司名
+    const regRole = document.getElementById('reg-role');
+    const companyGroup = document.getElementById('reg-company-group');
+    if (regRole && companyGroup) {
+        regRole.addEventListener('change', () => {
+            companyGroup.classList.toggle('is-hidden', regRole.value !== 'enterprise');
+        });
+    }
+}
+
+// 重置认证Tab到登录状态
+function resetAuthTabs() {
+    const tabLogin = document.getElementById('auth-tab-login');
+    const tabRegister = document.getElementById('auth-tab-register');
+    const loginForm = document.getElementById('auth-login-form');
+    const regForm = document.getElementById('auth-register-form');
+    if (tabLogin && tabRegister) {
+        tabLogin.classList.add('active');
+        tabRegister.classList.remove('active');
+    }
+    if (loginForm && regForm) {
+        loginForm.classList.remove('is-hidden');
+        regForm.classList.add('is-hidden');
+    }
+}
+
+// ==================== 注册处理 ====================
+
+function setupRegister() {
+    const btn = document.getElementById('register-submit');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+        const username = document.getElementById('reg-username').value.trim();
+        const password = document.getElementById('reg-password').value.trim();
+        const name = document.getElementById('reg-name').value.trim();
+        const role = document.getElementById('reg-role').value;
+        const phone = document.getElementById('reg-phone').value.trim();
+        const region = document.getElementById('reg-region').value.trim();
+        const company = document.getElementById('reg-company')?.value.trim() || '';
+
+        if (!username || !password || !name) {
+            showNotification('请填写用户名、密码和姓名', 'error');
+            return;
+        }
+        if (password.length < 6) {
+            showNotification('密码至少6位', 'error');
+            return;
+        }
+
+        try {
+            const resp = await apiCall('/api/auth/register', 'POST', {
+                username, password, name, role, phone, company_name: company, region
+            });
+            if (resp.success) {
+                AppState.sessionId = resp.session_id;
+                AppState.user = normalizeUser(resp.user);
+                saveSession();
+                document.getElementById('login-modal').classList.add('is-hidden');
+                resetAuthTabs();
+                // 角色分流
+                var _r = resp.user.role;
+                if (_r === 'super_admin') { location.href = 'admin.html'; return; }
+                if (_r === 'government') { location.href = 'government.html'; return; }
+                if (_r === 'enterprise') { location.href = 'enterprise.html'; return; }
+                if (_r === 'teacher') { location.href = 'teacher.html'; return; }
+                onLoginSuccess();
+                showNotification(resp.message || '注册成功', 'success');
+            } else {
+                showNotification(resp.message || '注册失败', 'error');
+            }
+        } catch (e) {
+            showNotification('注册失败：' + e.message, 'error');
+        }
+    });
+}
+
+// ==================== 角色权限配置 ====================
+
+const ROLE_NAV = {
+    student:     ['agriculture', 'ecommerce', 'crafts', 'resources', 'employment'],
+    teacher:     ['agriculture', 'ecommerce', 'crafts', 'resources', 'employment', 'teacher'],
+    super_admin: ['admin'],
+    government:  ['government'],
+    enterprise:  ['enterprise']
+};
+
+const ROLE_DEFAULT = {
+    student: 'agriculture', teacher: 'teacher', super_admin: 'admin',
+    government: 'government', enterprise: 'enterprise'
+};
+
+function getAllowedTabs(role) {
+    return ROLE_NAV[role] || ROLE_NAV['student'];
+}
+
+function isTabAllowed(tabName, role) {
+    return getAllowedTabs(role).includes(tabName);
+}
+
+// ==================== 角色UI切换 ====================
+
+function applyRoleVisibility(role) {
+    // 1) 导航栏：只显示该角色允许的 tab，隐藏其余
+    document.querySelectorAll('#nav-menu .nav-item').forEach(btn => {
+        const tab = btn.getAttribute('data-tab');
+        const allowed = isTabAllowed(tab, role);
+        btn.classList.toggle('is-hidden', !allowed);
+        if (!allowed) {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-selected', 'false');
+        }
+    });
+
+    // 2) 页面区域：隐藏不属于该角色的 Hero
+    const hero = document.getElementById('hero');
+    const isPublicRole = (role === 'student' || role === 'teacher');
+    if (hero) hero.classList.toggle('is-hidden', !isPublicRole);
+
+    // 3) 消息中心：所有已登录角色可见（修正理由见 updateUserUI 内注释）
+    const quickMenu = document.getElementById('teacher-quick-menu');
+    if (quickMenu) quickMenu.classList.toggle('is-hidden', !role);
+}
+
+function onLoginSuccess() {
+    const user = AppState.user;
+    if (!user) return;
+    updateUserUI(user);
+
+    const role = user.role;
+
+    // 角色导航过滤：隐藏该角色无权访问的顶级 tab，并按角色显隐 Hero / 教师快速菜单
+    applyRoleVisibility(role);
+
+    // 登录后：补发当月已到期的农事提醒 + 同步订阅按钮选中态（均幂等，失败静默）
+    checkFarmingReminders();
+    syncFarmingSubscriptionButton();
+
+    // 消息红点：setupQuickMessage() 在 initializeApp 的 setupFns 里排在 restoreSession
+    // **之前**，执行时 AppState.user 仍为 null → currentUserId() 为空 → 直接 return，
+    // 之后再无人调用 → 刷新页面后红点永远停在初始的「0/隐藏」。
+    // 这里在会话就绪后补一次（登录的 handleLogin 路径同样经过 onLoginSuccess）。
+    updateBadgeCount();
+
+    // 元素级角色可见性（散落在页面内的角色专属区块）
+    document.querySelectorAll('.teacher-only').forEach(el => el.classList.toggle('is-hidden', role !== 'teacher'));
+    document.querySelectorAll('.admin-only').forEach(el => el.classList.toggle('is-hidden', role !== 'super_admin'));
+    document.querySelectorAll('.gov-only').forEach(el => el.classList.toggle('is-hidden', role !== 'government'));
+    document.querySelectorAll('.enterprise-only').forEach(el => el.classList.toggle('is-hidden', role !== 'enterprise'));
+
+    // 强制跳转到角色默认首页
+    const defaultTab = ROLE_DEFAULT[role] || 'agriculture';
+    switchTab(defaultTab);
+
+    // 触发首次数据加载
+    if (role === 'super_admin') loadAdminUsers();
+    else if (role === 'government') loadGovDashboard();
+    else if (role === 'enterprise') loadEnterpriseJobs();
+    else if (role === 'teacher') loadTeacherDashboard();
+}
+
+// ==================== 公开视图恢复 ====================
+
+function resetToPublicView() {
+    // 显示所有公开导航项 (student tabs)
+    document.querySelectorAll("#nav-menu .nav-item").forEach(function(btn) {
+        var tab = btn.getAttribute("data-tab");
+        var allowed = ROLE_NAV["student"].indexOf(tab) >= 0;
+        btn.classList.toggle("is-hidden", !allowed);
+        btn.classList.remove("active");
+        btn.setAttribute("aria-selected", "false");
+    });
+    // 恢复 Hero / Features
+    var hero = document.getElementById("hero");
+    var features = document.getElementById("features");
+    if (hero) hero.classList.remove("is-hidden");
+    if (features) features.classList.remove("is-hidden");
+    // 隐藏教师快速菜单
+    var quickMenu = document.getElementById("teacher-quick-menu");
+    if (quickMenu) quickMenu.classList.add("is-hidden");
+    // 更新UI到未登录状态
+    var loginSection = document.getElementById("login-section");
+    var userInfo = document.getElementById("user-info");
+    if (loginSection) loginSection.classList.remove("is-hidden");
+    if (userInfo) userInfo.classList.add("is-hidden");
+    // 回到农业技能首页
+    switchTab("agriculture");
+}
+
+function saveSession() {
+    localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify({
+        sessionId: AppState.sessionId,
+        user: AppState.user
+    }));
+}
+
+// ==================== 超级管理员功能 ====================
+
+function loadAdminUsers() {
+    apiCall('/api/admin/users', 'GET').then(resp => {
+        const list = document.getElementById('admin-users-list');
+        if (!list) return;
+        if (!resp.users || resp.users.length === 0) {
+            list.innerHTML = '<p>暂无用户数据</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>地区</th><th>注册时间</th><th>操作</th></tr></thead><tbody>
+            ${resp.users.map(u => `<tr>
+                <td>${u.username}</td><td>${u.name}</td><td>${u.role}</td>
+                <td><span class="status-badge status-${u.status}">${u.status}</span></td>
+                <td>${u.region || '-'}</td><td>${(u.created_at || '').slice(0,10)}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs" onclick="adminUpdateUser('${u.username}','${u.role}','${u.status}')">编辑</button>
+                    ${u.status !== 'suspended' ? `<button class="btn btn-xs btn-danger" onclick="adminSuspendUser('${u.username}')">停用</button>` : `<button class="btn btn-xs" onclick="adminUnsuspendUser('${u.username}')">启用</button>`}
+                    <button class="btn btn-xs btn-danger" onclick="adminDeleteUser('${u.username}')">删除</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function adminUpdateUser(userId, currentRole, currentStatus) {
+    const newRole = prompt('新角色 (student/teacher/enterprise/government/super_admin)：', currentRole);
+    if (!newRole) return;
+    const newStatus = prompt('新状态 (active/suspended)：', currentStatus);
+    if (!newStatus) return;
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { role: newRole, status: newStatus }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminSuspendUser(userId) {
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'suspended' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminUnsuspendUser(userId) {
+    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'active' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function adminDeleteUser(userId) {
+    if (!confirm(`确定删除用户 ${userId} 吗？此操作不可撤销。`)) return;
+    apiCall(`/api/admin/users/${userId}`, 'DELETE').then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminUsers();
+    });
+}
+
+function loadAdminReviews() {
+    const type = document.getElementById('admin-review-filter')?.value || '';
+    apiCall(`/api/admin/reviews?content_type=${type}`, 'GET').then(resp => {
+        const list = document.getElementById('admin-reviews-list');
+        if (!list) return;
+        if (!resp.reviews || resp.reviews.length === 0) {
+            list.innerHTML = '<p>暂无待审核内容</p>';
+            return;
+        }
+        list.innerHTML = resp.reviews.map(r => `
+            <div class="review-card">
+                <div class="review-header">
+                    <span class="review-type">${r.content_type}</span>
+                    <span class="review-status">${r.status}</span>
+                    <span>${r.created_at?.slice(0,16) || ''}</span>
+                </div>
+                <div class="review-body">
+                    ${r.detail ? `<pre>${JSON.stringify(r.detail, null, 2).slice(0,300)}</pre>` : '无详情'}
+                </div>
+                <div class="review-actions">
+                    <button class="btn btn-sm btn-success" onclick="adminApproveReview(${r.id})">通过</button>
+                    <button class="btn btn-sm btn-danger" onclick="adminRejectReview(${r.id})">驳回</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function adminApproveReview(id) {
+    apiCall(`/api/admin/reviews/${id}/approve`, 'POST').then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminReviews();
+    });
+}
+
+function adminRejectReview(id) {
+    const comment = prompt('驳回理由（可选）：', '');
+    apiCall(`/api/admin/reviews/${id}/reject`, 'POST', { comment: comment || '' }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadAdminReviews();
+    });
+}
+
+function loadAdminCarousels() {
+    apiCall('/api/admin/carousels', 'GET').then(resp => {
+        const list = document.getElementById('admin-carousels-list');
+        if (!list) return;
+        if (!resp.carousels || resp.carousels.length === 0) {
+            list.innerHTML = '<p>暂无轮播图</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>标题</th><th>图片</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
+            ${resp.carousels.map(c => `<tr>
+                <td>${c.title}</td><td><img src="${c.image_url}" style="max-width:120px;max-height:60px"></td>
+                <td>${c.sort_order}</td><td>${c.is_active ? '启用' : '禁用'}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs" onclick="adminToggleCarousel(${c.id},${c.is_active})">${c.is_active ? '禁用' : '启用'}</button>
+                    <button class="btn btn-xs btn-danger" onclick="adminDeleteCarousel(${c.id})">删除</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function adminToggleCarousel(id, active) {
+    apiCall(`/api/admin/carousels/${id}`, 'PUT', { is_active: active ? 0 : 1 }).then(resp => {
+        if (resp.success) loadAdminCarousels();
+    });
+}
+
+function adminDeleteCarousel(id) {
+    if (!confirm('确定删除此轮播图？')) return;
+    apiCall(`/api/admin/carousels/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadAdminCarousels();
+    });
+}
+
+function setupAdminCarouselAdd() {
+    const btn = document.getElementById('admin-add-carousel-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = prompt('轮播图标题：');
+        if (!title) return;
+        const image_url = prompt('图片URL：');
+        if (!image_url) return;
+        const link_url = prompt('链接URL（可选）：', '');
+        const sort_order = parseInt(prompt('排序（数字）：', '0')) || 0;
+        apiCall('/api/admin/carousels', 'POST', { title, image_url, link_url, sort_order }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadAdminCarousels();
+        });
+    });
+}
+
+function loadAdminAnnouncements() {
+    apiCall('/api/admin/system-announcements', 'GET').then(resp => {
+        const list = document.getElementById('admin-announcements-list');
+        if (!list) return;
+        if (!resp.announcements || resp.announcements.length === 0) {
+            list.innerHTML = '<p>暂无公告</p>';
+            return;
+        }
+        list.innerHTML = resp.announcements.map(a => `
+            <div class="announcement-card">
+                <h4>${a.title} ${a.is_pinned ? '📌' : ''}</h4>
+                <p>${a.content.slice(0,200)}</p>
+                <small>${a.created_at?.slice(0,16) || ''}</small>
+                <button class="btn btn-xs btn-danger" onclick="adminDeleteAnnouncement(${a.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function adminDeleteAnnouncement(id) {
+    if (!confirm('确定删除此公告？')) return;
+    apiCall(`/api/admin/system-announcements/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadAdminAnnouncements();
+    });
+}
+
+function setupAdminAnnouncementPublish() {
+    const btn = document.getElementById('admin-publish-ann');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('admin-ann-title').value.trim();
+        const content = document.getElementById('admin-ann-content').value.trim();
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/admin/system-announcements', 'POST', { title, content }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('admin-ann-title').value = '';
+                document.getElementById('admin-ann-content').value = '';
+                loadAdminAnnouncements();
+            }
+        });
+    });
+}
+
+// ==================== 政府人员功能 ====================
+
+function loadGovDashboard() {
+    apiCall('/api/government/dashboard', 'GET').then(resp => {
+        const content = document.getElementById('gov-dashboard-content');
+        if (!content || !resp.success) return;
+        const d = resp.overview;
+        const dirs = (resp.directions || []).map(d => `${d.direction}: ${d.count}人 (均${d.avg_progress}%)`).join('<br>');
+        content.innerHTML = `
+            <div class="dashboard-cards">
+                <div class="dash-card"><h4>👥 用户</h4>
+                    <p>总计 ${d.users.total} | 学员 ${d.users.students} | 教师 ${d.users.teachers} | 企业 ${d.users.enterprises}</p></div>
+                <div class="dash-card"><h4>📚 培训</h4>
+                    <p>学员 ${d.training.total_students} | 平均进度 ${d.training.avg_progress}% | 完成率 ${d.training.completion_rate}%</p></div>
+                <div class="dash-card"><h4>💼 就业</h4>
+                    <p>岗位 ${d.employment.total_jobs} | 申请 ${d.employment.total_applications} | 匹配率 ${d.employment.match_rate}%</p></div>
+                <div class="dash-card"><h4>📄 内容</h4>
+                    <p>课程 ${d.content.courses} | 政策 ${d.content.policies}</p></div>
+                <div class="dash-card"><h4>🎖 证书</h4>
+                    <p>总数 ${d.certificates.total} | 已获 ${d.certificates.earned} | 获证率 ${d.certificates.earn_rate}%</p></div>
+                <div class="dash-card"><h4>💬 社区</h4>
+                    <p>讨论 ${d.community.discussions} | 评论 ${d.community.comments}</p></div>
+            </div>
+            <div class="dashboard-section"><h4>各地区分布</h4><p>${(resp.regions || []).map(r => `${r.region}: ${r.count}人`).join(' | ') || '暂无数据'}</p></div>
+            <div class="dashboard-section"><h4>培训方向分布</h4><p>${dirs || '暂无数据'}</p></div>`;
+    });
+}
+
+function loadGovPolicies() {
+    apiCall('/api/government/policies', 'GET').then(resp => {
+        const list = document.getElementById('gov-policies-list');
+        if (!list) return;
+        if (!resp.policies || resp.policies.length === 0) {
+            list.innerHTML = '<p>暂无政策</p>';
+            return;
+        }
+        list.innerHTML = resp.policies.map(p => `
+            <div class="policy-card">
+                <h4>${p.title} <small>${p.category}</small></h4>
+                <p>${p.content.slice(0,200)}...</p>
+                <div class="table-actions">
+                    <button class="btn btn-xs" onclick="govTogglePolicy(${p.id},${p.is_published})">${p.is_published ? '下架' : '上架'}</button>
+                    <button class="btn btn-xs btn-danger" onclick="govDeletePolicy(${p.id})">删除</button>
+                </div>
+            </div>`).join('');
+    });
+}
+
+function govTogglePolicy(id, published) {
+    apiCall(`/api/government/policies/${id}`, 'PUT', { is_published: published ? 0 : 1 }).then(resp => {
+        if (resp.success) loadGovPolicies();
+    });
+}
+
+function govDeletePolicy(id) {
+    if (!confirm('确定删除此政策？')) return;
+    apiCall(`/api/government/policies/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadGovPolicies();
+    });
+}
+
+function setupGovPolicyPublish() {
+    const btn = document.getElementById('gov-publish-policy');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = document.getElementById('gov-policy-title').value.trim();
+        const content = document.getElementById('gov-policy-content').value.trim();
+        const category = document.getElementById('gov-policy-category').value;
+        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
+        apiCall('/api/government/policies', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) {
+                document.getElementById('gov-policy-title').value = '';
+                document.getElementById('gov-policy-content').value = '';
+                loadGovPolicies();
+            }
+        });
+    });
+}
+
+// ==================== 企业功能 ====================
+
+function loadEnterpriseJobs() {
+    apiCall('/api/enterprise/jobs', 'GET').then(resp => {
+        const list = document.getElementById('ent-jobs-list');
+        if (!list) return;
+        if (!resp.jobs || resp.jobs.length === 0) {
+            list.innerHTML = '<p>暂无职位</p>';
+            return;
+        }
+        list.innerHTML = resp.jobs.map(j => `
+            <div class="job-card">
+                <h4>${j.title}</h4>
+                <p>${j.company} | ${j.salary} | ${j.location}</p>
+                <span class="status-badge">${j.review_status || 'approved'}</span>
+                <button class="btn btn-xs btn-danger" onclick="entDeleteJob(${j.id})">删除</button>
+            </div>`).join('');
+    });
+}
+
+function entDeleteJob(id) {
+    if (!confirm('确定删除此职位？')) return;
+    apiCall(`/api/enterprise/jobs/${id}`, 'DELETE').then(resp => {
+        if (resp.success) loadEnterpriseJobs();
+    });
+}
+
+function setupEntAddJob() {
+    const btn = document.getElementById('ent-add-job-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const title = prompt('职位标题：');
+        if (!title) return;
+        const salary = prompt('薪资（如：5000-8000元/月）：', '');
+        const location = prompt('工作地点：', '');
+        const category = prompt('职位类别：', '');
+        const description = prompt('职位描述：', '');
+        apiCall('/api/enterprise/jobs', 'POST', { title, salary, location, category, description }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadEnterpriseJobs();
+        });
+    });
+}
+
+/* 求购（供应链）相关函数已于 2026-10-06 整体下线：
+   loadEnterpriseProcurements / entDeleteProc / setupEntAddProc
+   原本引用 #ent-procs-list、#ent-add-proc-btn，而这两个节点在现版本 HTML 里
+   早已不存在（属历史遗留死代码）。用户拍板「供应链求购不做」，此处一并清除。 */
+
+function loadEnterpriseApplications() {
+    apiCall('/api/enterprise/applications', 'GET').then(resp => {
+        const list = document.getElementById('ent-apps-list');
+        if (!list) return;
+        if (!resp.applications || resp.applications.length === 0) {
+            list.innerHTML = '<p>暂无简历投递</p>';
+            return;
+        }
+        list.innerHTML = `<table class="data-table"><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>时间</th><th>操作</th></tr></thead><tbody>
+            ${resp.applications.map(a => `<tr>
+                <td>${a.applicant_name || a.user_id}</td><td>${a.job_title}</td><td>${a.applicant_phone || '-'}</td>
+                <td><span class="status-badge">${a.status}</span></td><td>${(a.applied_at || '').slice(0,10)}</td>
+                <td class="table-actions">
+                    <button class="btn btn-xs btn-success" onclick="entUpdateApp(${a.id},'interview')">面试</button>
+                    <button class="btn btn-xs" onclick="entUpdateApp(${a.id},'approved')">通过</button>
+                    <button class="btn btn-xs btn-danger" onclick="entUpdateApp(${a.id},'rejected')">拒绝</button>
+                </td></tr>`).join('')}
+            </tbody></table>`;
+    });
+}
+
+function entUpdateApp(appId, status) {
+    apiCall(`/api/enterprise/applications/${appId}`, 'PUT', { status }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) loadEnterpriseApplications();
+    });
+}
+
+// ==================== 讨论社区 ====================
+
+function loadDiscussions() {
+    const categoryMap = { 'disc-general': 'general', 'disc-agriculture': 'agriculture', 'disc-ecommerce': 'ecommerce', 'disc-crafts': 'crafts' };
+    const activeTab = document.querySelector('#discussions-tab .sub-tab-btn.active');
+    const cat = activeTab ? (categoryMap[activeTab.dataset.subtab] || 'general') : 'general';
+    apiCall(`/api/discussions?category=${cat}`, 'GET').then(resp => {
+        const list = document.getElementById('discussions-list');
+        if (!list) return;
+        if (!resp.discussions || resp.discussions.length === 0) {
+            list.innerHTML = '<p>暂无讨论帖，快来发第一个帖子吧！</p>';
+            return;
+        }
+        list.innerHTML = resp.discussions.map(d => `
+            <div class="discussion-card">
+                <h4><a href="#" onclick="viewDiscussion(${d.id});return false">${d.title}</a> ${d.is_pinned ? '📌' : ''}</h4>
+                <p>${d.content.slice(0,150)}...</p>
+                <small>${d.user_name || d.user_id} | ${d.created_at?.slice(0,16) || ''} | 👁 ${d.view_count} | 💬 ${d.comment_count}</small>
+            </div>`).join('');
+    });
+}
+
+function viewDiscussion(id) {
+    apiCall(`/api/discussions/${id}`, 'GET').then(resp => {
+        if (!resp.success) return showNotification(resp.message, 'error');
+        const d = resp.discussion;
+        const comments = resp.comments || [];
+        let html = `<div class="modal-content" style="max-width:700px">
+            <div class="modal-header"><h3>${d.title}</h3><button class="modal-close" onclick="this.closest('.modal-overlay').remove()"><i class="fas fa-times"></i></button></div>
+            <div class="modal-body">
+                <p>${d.content}</p><small>${d.user_name} | ${d.created_at?.slice(0,16) || ''} | 👁 ${d.view_count}</small>
+                <hr><h4>评论 (${comments.length})</h4>
+                ${comments.map(c => `<div class="comment-item"><strong>${c.user_name || c.user_id}</strong>: ${c.content} <small>${c.created_at?.slice(0,16) || ''}</small></div>`).join('')}
+                ${AppState.user ? `<div class="form-group"><textarea id="disc-comment-content" placeholder="写评论..." rows="2" class="full-width"></textarea></div>
+                <button class="btn btn-primary btn-sm" onclick="postDiscussionComment(${id})">发表评论</button>` : '<p>请登录后评论</p>'}
+            </div></div>`;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    });
+}
+
+function postDiscussionComment(discId) {
+    const content = document.getElementById('disc-comment-content')?.value.trim();
+    if (!content) { showNotification('请输入评论内容', 'error'); return; }
+    apiCall('/api/comments', 'POST', { target_type: 'discussion', target_id: discId, content }).then(resp => {
+        showNotification(resp.message, resp.success ? 'success' : 'error');
+        if (resp.success) {
+            document.querySelectorAll('.modal-overlay').forEach(el => el.remove());
+            viewDiscussion(discId);
+        }
+    });
+}
+
+function setupNewDiscussion() {
+    const btn = document.getElementById('new-discussion-btn');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        if (!AppState.user) { showNotification('请先登录', 'error', { actionLabel: '去登录', action: openLoginModal }); return; }
+        const title = prompt('帖子标题：');
+        if (!title) return;
+        const content = prompt('帖子内容：');
+        if (!content) return;
+        const category = document.querySelector('#discussions-tab .sub-tab-btn.active')?.dataset.subtab?.replace('disc-', '') || 'general';
+        apiCall('/api/discussions', 'POST', { title, content, category }).then(resp => {
+            showNotification(resp.message, resp.success ? 'success' : 'error');
+            if (resp.success) loadDiscussions();
+        });
+    });
+}
+
+// ==================== 子Tab切换（管理员/政府/企业面板） ====================
+
+function setupAdminSubTabs() {
+    document.querySelectorAll('.admin-sub-tabs').forEach(tabBar => {
+        tabBar.addEventListener('click', e => {
+            if (!e.target.classList.contains('sub-tab-btn')) return;
+            const subtab = e.target.dataset.subtab;
+            const panel = e.target.closest('.tab-content');
+            // 更新按钮状态
+            tabBar.querySelectorAll('.sub-tab-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            // 显示对应面板
+            panel.querySelectorAll('.sub-tab-panel').forEach(p => p.classList.add('is-hidden'));
+            const targetPanel = document.getElementById(`${subtab}-panel`);
+            if (targetPanel) targetPanel.classList.remove('is-hidden');
+            // 加载数据
+            if (subtab === 'admin-users') loadAdminUsers();
+            else if (subtab === 'admin-reviews') loadAdminReviews();
+            else if (subtab === 'admin-carousels') loadAdminCarousels();
+            else if (subtab === 'admin-announcements') loadAdminAnnouncements();
+            else if (subtab === 'gov-dashboard') loadGovDashboard();
+            else if (subtab === 'gov-policies') loadGovPolicies();
+            else if (subtab === 'ent-jobs') loadEnterpriseJobs();
+            else if (subtab === 'ent-applications') loadEnterpriseApplications();
+            else if (subtab.startsWith('disc-')) loadDiscussions();
+        });
+    });
+}
+
+// ==================== 初始化所有新功能 ====================
+
+function setupNewFeatures() {
+    setupAuthTabs();
+    setupRegister();
+    setupAdminSubTabs();
+    setupAdminCarouselAdd();
+    setupAdminAnnouncementPublish();
+    setupGovPolicyPublish();
+    setupEntAddJob();
+    setupNewDiscussion();
+}
+
+// 追加到 DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+    try { setupNewFeatures(); } catch(e) { console.error('setupNewFeatures error:', e); }
+});
+
+// 管理员搜索功能
+(function() {
+    document.addEventListener('input', function(e) {
+        if (e.target.id === 'admin-user-search' || e.target.id === 'admin-role-filter') {
+            loadAdminUsers();
+        } else if (e.target.id === 'admin-review-filter') {
+            loadAdminReviews();
+        }
+    });
+})();
+

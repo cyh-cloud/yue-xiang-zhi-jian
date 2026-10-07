@@ -10,6 +10,8 @@ import uuid
 import time
 import json
 import os
+import re
+import sys
 from datetime import datetime
 
 # Vercel 环境使用 /tmp（可写但非持久），本地环境使用 data/ 目录
@@ -58,7 +60,25 @@ def init_db():
             name TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'student',
             email TEXT DEFAULT '',
+            phone TEXT DEFAULT '',
+            avatar_url TEXT DEFAULT '',
+            bio TEXT DEFAULT '',
+            company_name TEXT DEFAULT '',
+            region TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
             created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS content_reviews (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_type TEXT NOT NULL,
+            content_id INTEGER NOT NULL,
+            submitter_id TEXT NOT NULL,
+            status TEXT DEFAULT 'pending',
+            review_comment TEXT DEFAULT '',
+            reviewed_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            reviewed_at TEXT DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS user_sessions (
@@ -126,23 +146,6 @@ def init_db():
             UNIQUE(assignment_id, student_id)
         );
 
-        CREATE TABLE IF NOT EXISTS attendances (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT DEFAULT '日常签到',
-            status TEXT DEFAULT 'open',
-            created_at TEXT DEFAULT (datetime('now','localtime')),
-            closed_at TEXT DEFAULT NULL
-        );
-
-        CREATE TABLE IF NOT EXISTS attendance_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            attendance_id INTEGER NOT NULL,
-            student_id TEXT NOT NULL,
-            check_status TEXT DEFAULT 'present',
-            checked_at TEXT DEFAULT (datetime('now','localtime')),
-            UNIQUE(attendance_id, student_id)
-        );
-
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sender_id TEXT NOT NULL,
@@ -172,20 +175,24 @@ def init_db():
             applied_at TEXT DEFAULT (datetime('now','localtime'))
         );
 
-        CREATE TABLE IF NOT EXISTS success_cases (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            location TEXT NOT NULL,
-            description TEXT NOT NULL,
-            stats TEXT DEFAULT '{}'
-        );
+        -- 注：success_cases 表已废弃。成功案例内容统一由 cases_data.py 提供（唯一事实源），
+        -- 不再落库，避免"改种子数据但旧库不刷新"以及编造数据残留两类问题。
 
         CREATE TABLE IF NOT EXISTS policies (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             category TEXT DEFAULT 'general',
-            date TEXT DEFAULT ''
+            date TEXT DEFAULT '',
+            summary TEXT DEFAULT '',
+            source TEXT DEFAULT ''
+        );
+
+        -- 通用"内容签名"元数据表（预置内容变更后自动重灌，见 _refresh_policies / _seed_farming）
+        CREATE TABLE IF NOT EXISTS seed_meta (
+            key        TEXT PRIMARY KEY,
+            value      TEXT NOT NULL,
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
         );
 
         CREATE TABLE IF NOT EXISTS job_listings (
@@ -204,11 +211,278 @@ def init_db():
             saved_at TEXT DEFAULT (datetime('now','localtime')),
             UNIQUE(user_id, job_id)
         );
+
+        -- 在线简历：一人一份（user_id 唯一）。事实来源 = 学员自填 + 平台真实学习数据，
+        -- AI 只做「组织与表达」，不得生成平台没有的事实（详见 app.py 的简历生成接口）。
+        CREATE TABLE IF NOT EXISTS resumes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT UNIQUE NOT NULL,
+            title TEXT DEFAULT '',            -- 求职意向岗位
+            region TEXT DEFAULT '',           -- 期望工作地区
+            education TEXT DEFAULT '',        -- 学历（学员自填）
+            work_years TEXT DEFAULT '',       -- 工作/实践年限（学员自填）
+            phone TEXT DEFAULT '',
+            email TEXT DEFAULT '',
+            self_eval TEXT DEFAULT '',        -- 自我评价（AI 可起草）
+            skills TEXT DEFAULT '',           -- 专业技能（AI 可起草）
+            experience TEXT DEFAULT '[]',     -- 工作/实践经历 JSON 数组（学员自填，AI 可润色单条描述）
+            ai_used INTEGER DEFAULT 0,        -- 是否使用过 AI 辅助（前端如实标注）
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        -- 公开招聘公告的「求职意向登记」。
+        -- ⚠️ 平台**不是**官方报名系统：这里只记录学员的意向与准备情况，
+        --    报名一律由学员按公告原文自行完成（recruit_key 是 jobs_data.py 里的字符串 key）。
+        CREATE TABLE IF NOT EXISTS job_intents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            recruit_key TEXT NOT NULL,
+            note TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(user_id, recruit_key)
+        );
+
+        CREATE TABLE IF NOT EXISTS carousels (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            image_url TEXT NOT NULL,
+            link_url TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS system_announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_pinned INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS courses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            category TEXT DEFAULT '',
+            teacher_id TEXT NOT NULL,
+            cover_url TEXT DEFAULT '',
+            review_status TEXT DEFAULT 'pending',
+            is_published INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS course_materials (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course_id INTEGER NOT NULL,
+            material_type TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS models_3d (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            craft_type TEXT DEFAULT '',
+            file_path TEXT NOT NULL,
+            file_name TEXT NOT NULL,
+            file_size INTEGER DEFAULT 0,
+            thumbnail_url TEXT DEFAULT '',
+            teacher_id TEXT NOT NULL,
+            review_status TEXT DEFAULT 'pending',
+            is_published INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            target_type TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_deleted INTEGER DEFAULT 0,
+            deleted_by TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS discussions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            user_id TEXT NOT NULL,
+            is_pinned INTEGER DEFAULT 0,
+            is_deleted INTEGER DEFAULT 0,
+            view_count INTEGER DEFAULT 0,
+            comment_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS procurements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_name TEXT NOT NULL,
+            specification TEXT DEFAULT '',
+            quantity TEXT DEFAULT '',
+            price_range TEXT DEFAULT '',
+            delivery_location TEXT DEFAULT '',
+            deadline TEXT DEFAULT '',
+            contact_info TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            enterprise_id TEXT NOT NULL,
+            status TEXT DEFAULT 'active',
+            review_status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS news_articles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'news',
+            author_id TEXT NOT NULL,
+            is_published INTEGER DEFAULT 1,
+            view_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        CREATE TABLE IF NOT EXISTS government_policies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            content TEXT NOT NULL,
+            category TEXT DEFAULT 'general',
+            author_id TEXT NOT NULL,
+            is_published INTEGER DEFAULT 1,
+            date TEXT DEFAULT '',
+            summary TEXT DEFAULT '',
+            source TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ==================== 农时智能日历（v2 重构） ====================
+        -- ① 农产品目录
+        CREATE TABLE IF NOT EXISTS farming_products (
+            id          TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            icon        TEXT DEFAULT 'seedling',
+            summary     TEXT DEFAULT '',
+            region      TEXT DEFAULT '广东',
+            sort_order  INTEGER DEFAULT 0,
+            is_active   INTEGER DEFAULT 1,
+            created_at  TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ② 物候期（月粒度，支持跨年区间）
+        CREATE TABLE IF NOT EXISTS farming_phenophases (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id  TEXT NOT NULL,
+            name        TEXT NOT NULL,
+            start_month INTEGER NOT NULL,
+            end_month   INTEGER NOT NULL,
+            color       TEXT DEFAULT '#1f5e43',
+            description TEXT DEFAULT '',
+            sort_order  INTEGER DEFAULT 0,
+            FOREIGN KEY (product_id) REFERENCES farming_products(id) ON DELETE CASCADE
+        );
+
+        -- ③ 农事任务（年周期模板：task_md 为 MM-DD，逐年复现）
+        CREATE TABLE IF NOT EXISTS farming_tasks (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id  TEXT NOT NULL,
+            phase_id    INTEGER,
+            title       TEXT NOT NULL,
+            category    TEXT NOT NULL,
+            priority    TEXT DEFAULT 'medium',
+            task_md     TEXT,
+            month       INTEGER NOT NULL,
+            icon        TEXT DEFAULT 'tasks',
+            description TEXT DEFAULT '',
+            tip         TEXT DEFAULT '',
+            -- source_key: 指向 farming_sources.key，登记该条日期所依据的技术资料方向
+            -- date_basis: 该日期成立的农艺逻辑（供农技人员复核、供用户理解为什么是这个时间）
+            source_key  TEXT DEFAULT '',
+            date_basis  TEXT DEFAULT '',
+            -- is_verified: 该条 task_md 日期是否已由农技人员复核确认。
+            --   0 = 按农时规律推算的参考日期（前端显示「约」并挂全局提示条）
+            --   1 = 已人工复核，可视作权威日期
+            is_verified INTEGER DEFAULT 0,
+            is_active   INTEGER DEFAULT 1,
+            sort_order  INTEGER DEFAULT 0,
+            FOREIGN KEY (product_id) REFERENCES farming_products(id) ON DELETE CASCADE,
+            FOREIGN KEY (phase_id)   REFERENCES farming_phenophases(id) ON DELETE SET NULL
+        );
+
+        -- ④ 订阅关系（user_id 存 username，与项目既有约定一致）
+        CREATE TABLE IF NOT EXISTS farming_subscriptions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT NOT NULL,
+            product_id  TEXT NOT NULL,
+            created_at  TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(user_id, product_id)
+        );
+
+        -- ⑤ 提醒发送日志（登录时补发的判重依据）
+        CREATE TABLE IF NOT EXISTS farming_reminder_log (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id     TEXT NOT NULL,
+            product_id  TEXT NOT NULL,
+            period      TEXT NOT NULL,
+            sent_at     TEXT DEFAULT (datetime('now','localtime')),
+            UNIQUE(user_id, product_id, period)
+        );
+
+        -- ⑥ 种子数据元信息（内容签名，用于判断是否需要重灌种植日历数据）
+        --    仅比行数无法发现"条数不变但内容变了"（如 task_md 补日期），故改用内容签名
+        CREATE TABLE IF NOT EXISTS farming_seed_meta (
+            key         TEXT PRIMARY KEY,
+            value       TEXT NOT NULL,
+            updated_at  TEXT DEFAULT (datetime('now','localtime'))
+        );
+
+        -- ⑦ 数据来源登记表（来源方向 = 机构 + 文件类型）
+        --    doc_no 一律先落「待核」：具体标准号/文号须由农技人员核实后补填，
+        --    代码侧不得凭空编造标准号，故本表只做"来源方向"登记。
+        CREATE TABLE IF NOT EXISTS farming_sources (
+            key         TEXT PRIMARY KEY,
+            name        TEXT NOT NULL,
+            org         TEXT DEFAULT '',
+            doc_type    TEXT DEFAULT '',
+            doc_no      TEXT DEFAULT '',
+            url         TEXT DEFAULT '',
+            sort_order  INTEGER DEFAULT 0
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_farming_tasks_month    ON farming_tasks(product_id, month);
+        CREATE INDEX IF NOT EXISTS idx_farming_tasks_md       ON farming_tasks(product_id, task_md);
+        CREATE INDEX IF NOT EXISTS idx_farming_phases_product ON farming_phenophases(product_id);
+        CREATE INDEX IF NOT EXISTS idx_farming_subs_user      ON farming_subscriptions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_farming_log_lookup     ON farming_reminder_log(user_id, product_id, period);
     ''')
+
+    # 扩展 users 表结构（兼容已有数据库）
+    user_cols = {row[1] for row in cursor.execute("PRAGMA table_info(users)").fetchall()}
+    user_new_cols = {
+        'phone': "TEXT DEFAULT ''",
+        'avatar_url': "TEXT DEFAULT ''",
+        'bio': "TEXT DEFAULT ''",
+        'company_name': "TEXT DEFAULT ''",
+        'region': "TEXT DEFAULT ''",
+        'status': "TEXT DEFAULT 'active'",
+    }
+    for col, typedef in user_new_cols.items():
+        if col not in user_cols:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
 
     # 扩展 job_listings 表结构
     existing_cols = {row[1] for row in cursor.execute("PRAGMA table_info(job_listings)").fetchall()}
-    new_cols = {
+    job_new_cols = {
         'location': "TEXT DEFAULT ''",
         'category': "TEXT DEFAULT ''",
         'job_type': "TEXT DEFAULT '全职'",
@@ -218,10 +492,36 @@ def init_db():
         'industry': "TEXT DEFAULT ''",
         'company_logo': "TEXT DEFAULT ''",
         'posted_at': "TEXT DEFAULT ''",
+        'enterprise_id': "TEXT DEFAULT ''",
+        'review_status': "TEXT DEFAULT 'approved'",
+        # 演示岗位标记：1 = 平台预置的演示岗位（前端必须打「演示数据」角标）。
+        # 与真实企业发布岗位严格区分，便于一键识别与清理。
+        'is_demo': "INTEGER DEFAULT 0",
     }
-    for col, typedef in new_cols.items():
+    for col, typedef in job_new_cols.items():
         if col not in existing_cols:
             cursor.execute(f"ALTER TABLE job_listings ADD COLUMN {col} {typedef}")
+
+    # 扩展 farming_tasks 表结构（兼容既有数据库：CREATE TABLE IF NOT EXISTS 不会补列）
+    farming_cols = {row[1] for row in cursor.execute("PRAGMA table_info(farming_tasks)").fetchall()}
+    farming_new_cols = {
+        'is_verified': "INTEGER DEFAULT 0",
+        'source_key':  "TEXT DEFAULT ''",
+        'date_basis':  "TEXT DEFAULT ''",
+    }
+    for col, typedef in farming_new_cols.items():
+        if farming_cols and col not in farming_cols:
+            cursor.execute("ALTER TABLE farming_tasks ADD COLUMN %s %s" % (col, typedef))
+
+    # 扩展 policies / government_policies：新增 source 列（存"来源列表"JSON，供前端展示出处）
+    for _tbl in ('policies', 'government_policies'):
+        _cols = {row[1] for row in cursor.execute("PRAGMA table_info(%s)" % _tbl).fetchall()}
+        if _cols and 'source' not in _cols:
+            cursor.execute("ALTER TABLE %s ADD COLUMN source TEXT DEFAULT ''" % _tbl)
+        if _cols and 'summary' not in _cols:
+            cursor.execute("ALTER TABLE %s ADD COLUMN summary TEXT DEFAULT ''" % _tbl)
+        if _cols and 'date' not in _cols:
+            cursor.execute("ALTER TABLE %s ADD COLUMN date TEXT DEFAULT ''" % _tbl)
 
     # 检查是否已有种子数据
     count = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -230,572 +530,122 @@ def init_db():
     else:
         # 已有数据时，刷新政策内容（保证政策详情是最新的）
         _refresh_policies(cursor)
-        # 如果岗位数少于10条，补充新岗位数据
-        job_count = cursor.execute("SELECT COUNT(*) FROM job_listings").fetchone()[0]
-        if job_count < len(JOBS_DATA):
-            _seed_jobs(cursor)
+        # 一次性清理历史遗留的"演示岗位"。
+        # 旧版在 job_listings 里预置了 30 条**编造**岗位（假公司名/假薪资），
+        # 现架构已改为：公开招聘信息走 jobs_data.py（策展、带来源），企业岗位走企业端发布+审核。
+        # 这些演示行会冒充"真实在招职位"（学员可申请、还留真实姓名电话），必须移除。
+        # 判定依据：企业端发布的行 enterprise_id 恒为**非空**的用户名，
+        # 只有旧预置行是空串 —— 该条件精确命中预置行，不会误删企业数据。
+        demo_ids = [r[0] for r in cursor.execute(
+            "SELECT id FROM job_listings WHERE enterprise_id IS NULL OR enterprise_id = ''").fetchall()]
+        if demo_ids:
+            _qm = ','.join('?' * len(demo_ids))
+            cursor.execute("DELETE FROM job_applications WHERE job_id IN (%s)" % _qm, demo_ids)
+            cursor.execute("DELETE FROM saved_jobs WHERE job_id IN (%s)" % _qm, demo_ids)
+            cursor.execute("DELETE FROM job_listings WHERE id IN (%s)" % _qm, demo_ids)
+        # 如果政府政策表为空，填充初始数据
+        gp_count = cursor.execute("SELECT COUNT(*) FROM government_policies").fetchone()[0]
+        if gp_count == 0:
+            _seed_government_policies(cursor)
+        # 如果轮播图为空，填充默认数据
+        car_count = cursor.execute("SELECT COUNT(*) FROM carousels").fetchone()[0]
+        if car_count == 0:
+            _seed_carousels(cursor)
+        # 如果缺少新角色演示账户，补充创建
+        _ensure_demo_accounts(cursor)
+
+    # 农时日历种子数据（幂等，两个分支都需保证存在）
+    _seed_farming(cursor)
+
+    # 预置政策：按内容签名自动重灌（幂等；只重建 author_id='gov_demo' 的预置行，不动自建政策）
+    _refresh_policies(cursor)
+
+    # 成功案例：把 cases_data.py 里新增的案例补一条**待审核**记录（幂等，不覆盖已有审核结果）
+    _seed_case_reviews(cursor)
+
+    # 演示企业岗位（用户 2026-10-06 拍板）：让「投递」链路有可演示的载体。
+    # 只动 is_demo=1 的行，真实企业岗位与其投递/收藏不受影响。
+    _seed_demo_jobs(cursor)
+
+    # 清理历史版本遗留的 success_cases 表（含 3 条编造案例）。
+    # 该表已废弃，内容改由 cases_data.py 提供，此处仅做一次性清库，保证编造数据不残留。
+    cursor.execute("DROP TABLE IF EXISTS success_cases")
+
+    # 清理已下架的「签到考勤」（2026-10-07 用户拍板：学员端从未实现签到，
+    # 教师端也没有入口，整套是死功能）。建表语句已从 init_db 的建表脚本移除，
+    # 这里做一次性清库，避免旧库里那张永远 open、0 人签到的表继续残留。
+    cursor.execute("DROP TABLE IF EXISTS attendance_records")
+    cursor.execute("DROP TABLE IF EXISTS attendances")
+
+    # 一次性迁移（2026-10-07）：assignment_submissions.score 的语义由
+    # 「系统规则分」改为「教师批改分」（见 save_live_training 的说明）。
+    # 历史上 status 还是 submitted/pending（从未被教师批改过）的行，其 score 其实是
+    # 提交时算出的规则分 —— 若原样留着，教师端会把旧规则分显示成「我的评分」，
+    # 学员端也会以为是老师给的成绩。这里把它们搬进 content.rule_score、score 置 NULL。
+    # 幂等：迁完 score 即 NULL，不会再被这条查询命中。
+    _legacy = cursor.execute(
+        "SELECT id, content, score FROM assignment_submissions "
+        "WHERE score IS NOT NULL AND (status IS NULL OR status IN ('submitted', 'pending'))"
+    ).fetchall()
+    for _r in _legacy:
+        try:
+            _d = json.loads(_r['content'] or '{}')
+        except Exception:
+            _d = {}
+        if not isinstance(_d, dict):
+            _d = {}
+        _d.setdefault('rule_score', _r['score'])
+        cursor.execute("UPDATE assignment_submissions SET content = ?, score = NULL WHERE id = ?",
+                       (json.dumps(_d, ensure_ascii=False), _r['id']))
 
     conn.commit()
     conn.close()
 
 
-# 政策数据常量，供 _seed_data 和 _refresh_policies 共用
+# 政策数据常量，供 _seed_data / _refresh_policies / _seed_government_policies 共用。
+# ⚠️ 内容事实源 = policies_data.py（改完重启服务即生效，靠 seed_meta 内容签名自动重灌预置政策）。
+#    本文件不再内联政策正文 —— 历史版本在此内联的 5 篇政策含编造案例与未核实电话，已整体移除。
+import policies_data as _policy_src
+
 POLICIES_DATA = [
-    ("农业补贴申请指南", """【政策概述】
-2026年广东省农业补贴政策涵盖耕地地力保护补贴、农机购置补贴、种粮大户补贴、农业保险补贴等多项内容，旨在保障粮食安全、促进农业现代化、增加农民收入。广东省财政全年安排农业补贴资金超过50亿元，惠及全省800多万农户。
-
-【补贴项目明细】
-一、耕地地力保护补贴
-• 补贴对象：拥有耕地承包权的种地农民
-• 补贴标准：每亩不低于100元，珠三角地区每亩120-150元
-• 发放时间：每年6月30日前一次性发放到户
-• 特别说明：抛荒一年以上的取消补贴资格
-
-二、农机购置补贴
-• 补贴范围：拖拉机、收割机、插秧机、植保无人机等15大类42个小类
-• 补贴标准：一般机具按售价30%补贴，单机最高5万元
-• 植保无人机：按售价40%补贴，单机最高1.6万元
-• 申请上限：个人年度补贴额不超过20万元，合作社不超过80万元
-• 购买渠道：必须在省农机购置补贴系统中的经销商处购买
-
-三、种粮大户补贴
-• 补贴条件：种植水稻30亩以上（含30亩）
-• 补贴标准：每亩补贴150元，早稻和晚稻分别计算
-• 叠加补贴：可同时享受耕地地力保护补贴
-• 申报时间：早稻4月底前，晚稻8月底前
-
-四、农业保险补贴
-• 水稻保险：保费每亩30元，财政补贴80%，农户自缴6元
-• 荔枝保险：保费每亩60元，财政补贴70%，农户自缴18元
-• 能繁母猪：保费每头100元，财政补贴80%
-• 理赔标准：因自然灾害、病虫害等造成的损失，按实际损失赔付
-
-五、其他专项补贴
-• 粮食烘干设施建设补贴：设备投资额的50%，最高50万元
-• 冷链物流设施建设补贴：投资额的30%，最高100万元
-• 高标准农田建设补贴：每亩补助1500-2000元
-
-【申请条件】
-1. 具有广东省农村户籍或在当地从事农业生产经营满1年以上
-2. 拥有合法的土地承包经营权证、流转合同或土地入股协议
-3. 按照规定进行农业生产经营活动，不撂荒耕地
-4. 无骗取套取农业补贴资金的违法违规记录
-5. 同一地块不得重复申领同类补贴
-
-【申请流程】
-1. 农户向村委会提交《农业补贴申请表》及相关材料
-2. 村委会汇总公示7天，无异议后上报乡镇
-3. 乡镇农业服务中心初审、实地核查
-4. 县级农业农村局审核、抽查
-5. 财政部门复核后拨付资金
-6. 补贴资金通过"一卡通"直接发放到户
-
-【所需材料清单】
-• 本人身份证原件及复印件（正反面）
-• 户口簿原件及复印件
-• 土地承包经营权证或土地流转合同
-• 本人银行卡或存折复印件（需为本人名下）
-• 种植面积申报表（村委会领取）
-• 农机购置发票及合格证（申请农机补贴时提供）
-• 农业保险保单复印件（申请保险补贴时提供）
-
-【办理时限】
-• 一般补贴：受理后30个工作日内完成审核
-• 农机补贴：购买后60日内提交申请
-• 保险理赔：报案后15个工作日内完成定损
-
-【常见问题解答】
-问：流转的土地能申请补贴吗？
-答：可以，需提供规范的土地流转合同，且流转期限在3年以上。
-问：补贴资金什么时候到账？
-答：一般在审核通过后30个工作日内发放到银行卡。
-问：在外务工的农民能申请吗？
-答：可以，只要拥有耕地承包权且未撂荒即可申请耕地地力保护补贴。
-
-【咨询渠道】
-• 广东省农业农村厅：020-37288100
-• 全国三农服务热线：12316
-• 粤省事小程序：搜索"农业补贴"在线查询""", "补贴", "2026-06-01"),
-    ("农村电商扶持政策", """【政策概述】
-广东省大力推进"互联网+农业"发展，对从事农产品电商的个人和企业提供创业补贴、培训补贴、物流补贴等多项扶持政策。目标到2026年底，全省农村网络零售额突破3000亿元，培育100个电商示范村。
-
-【扶持项目明细】
-一、创业启动补贴
-• 补贴对象：首次从事农产品电商创业的个人或团队
-• 补贴条件：在主流平台开设店铺并正常经营满6个月
-• 补贴标准：一次性创业补贴10000元
-• 额外奖励：年销售额达50万元，额外奖励5000元
-• 申请时限：店铺开业后6-12个月内申请
-
-二、电商培训补贴
-• 培训内容：店铺运营、直播带货、短视频拍摄、摄影美工、客服管理
-• 培训时长：初级班5天、进阶班10天、高级班15天
-• 补贴标准：培训费用全免，由政府全额补贴
-• 生活补助：参加培训期间每天补助50元生活费
-• 证书补贴：取得电商相关职业技能证书，奖励500-1000元
-
-三、物流仓储补贴
-• 快递补贴：农产品上行快递费用补贴30%，每户每年最高5000元
-• 冷链补贴：建设冷库设施投资额的30%补贴，最高50万元
-• 仓储补贴：入驻电商产业园，首年租金减免50%
-• 包装补贴：农产品包装设计费用补贴50%，最高3000元
-
-四、平台入驻补贴
-• 淘宝/天猫：入驻保证金补贴50%，最高1万元
-• 拼多多：入驻费用补贴50%
-• 抖音电商：开通小店技术费补贴
-• 京东：入驻技术服务费补贴50%
-
-五、品牌建设补贴
-• 商标注册：农产品商标注册费用全额补贴
-• 品牌设计：品牌VI设计费用补贴50%，最高5000元
-• 直播基地：建设村级直播基地补贴投资额的30%，最高20万元
-
-【扶持对象】
-1. 返乡创业大学生（毕业5年内）
-2. 农村致富带头人和新型职业农民
-3. 农民专业合作社和家庭农场
-4. 农业产业化龙头企业
-5. 农村青年创业者（18-45周岁）
-6. 脱贫户和边缘易致贫户（优先扶持）
-
-【申请流程】
-1. 到当地商务局或人社局领取申请表
-2. 提交创业计划书和身份证明材料
-3. 参加政府组织的免费电商培训（5-15天）
-4. 在主流电商平台开设店铺并上架农产品
-5. 正常经营满6个月后提交补贴申请
-6. 主管部门审核、实地核查
-7. 公示无异议后拨付补贴资金
-
-【所需材料】
-• 个人身份证、户口簿复印件
-• 营业执照复印件（个体工商户）
-• 电商平台店铺截图和后台数据
-• 银行账户信息
-• 创业计划书
-• 培训合格证书
-• 农产品来源证明（收购合同或自产证明）
-
-【成功案例】
-案例一：梅州某村电商转型
-梅州丰顺县某村通过电商培训，30户农户开设网店销售客家特产，年销售额突破500万元，户均增收3万元。其中村民张某从零起步，现月销售额超过10万元。
-
-案例二：茂名荔枝直播带货
-茂名高州市某荔枝合作社组建直播团队，通过抖音直播销售荔枝，旺季日销5000斤，带动周边50户果农增收。
-
-案例三：潮州手工艺人数字化传承
-潮州某手工艺人通过短视频展示非遗技艺，粉丝超过50万，通过电商销售手工艺品月入2万+。
-
-【主要电商平台入驻指南】
-• 淘宝店铺：注册支付宝→实名认证→开设店铺→缴纳保证金（1000元起）
-• 拼多多店铺：下载拼多多商家版→注册→上传资质→缴纳保证金（2000元起）
-• 抖音小店：注册抖音账号→开通小店→上传资质→缴纳保证金（5000元起）
-
-【咨询渠道】
-• 广东省商务厅：020-38819900
-• 广东省农村电商协会：020-87654321
-• 各地级市商务局电商科""", "电商", "2026-05-15"),
-    ("非遗传承人认定办法", """【政策概述】
-非物质文化遗产代表性传承人是非遗保护传承的核心力量。广东省目前共有国家级非遗传承人132名、省级传承人729名。对认定的传承人给予传习补助、展示平台、培训机会和荣誉激励等多方面支持。
-
-【非遗项目类别】
-一、传统技艺类
-• 广绣：广州刺绣，以金银线绣著称
-• 广州牙雕：象牙雕刻技艺
-• 石湾陶塑：佛山石湾公仔制作技艺
-• 潮州木雕：潮汕地区金漆木雕
-• 阳江风筝：阳江传统风筝制作技艺
-• 端砚制作：肇庆端砚雕刻技艺
-
-二、传统美术类
-• 广东剪纸：佛山剪纸、潮阳剪纸
-• 粤绣：潮绣、广绣
-• 潮州大吴泥塑
-
-三、传统戏剧类
-• 粤剧：广东最大的地方戏曲剧种
-• 潮剧：潮汕地区传统戏曲
-• 雷剧：雷州半岛传统戏曲
-• 客家山歌剧
-
-四、传统音乐舞蹈类
-• 广东音乐：丝竹乐种
-• 潮州音乐：潮汕传统音乐
-• 英歌舞：潮汕地区传统舞蹈
-
-【认定条件】
-1. 长期从事该项非遗传承实践，连续传承时间不少于10年
-2. 熟练掌握所传承项目的技艺，在同领域内具有代表性和影响力
-3. 积极开展传承活动，已培养后继人才不少于3人
-4. 居住在广东省境内，身体健康能正常开展传承活动
-5. 遵纪守法，无违法犯罪记录
-
-【支持措施】
-一、经费支持
-• 国家级传承人：每年传习补助20000元
-• 省级传承人：每年传习补助10000元
-• 市级传承人：每年传习补助5000元（各地市标准略有差异）
-• 传习所建设补贴：最高10万元
-
-二、展示平台
-• 优先推荐参加国内外非遗展览和交流活动
-• 在省非遗展示馆设专区展示传承人作品
-• 支持传承人开设个人作品展
-• 协助传承人参加文博会、旅博会等展会
-
-三、培训研修
-• 免费参加文化部、省文化厅组织的非遗传承人群研修研习
-• 资助传承人到高等院校进修学习
-• 提供技艺交流和合作创作机会
-
-四、宣传推广
-• 通过省级媒体平台宣传传承人及其技艺
-• 制作传承人口述纪录片
-• 在省非遗官网和公众号展示传承人信息
-• 协助传承人开设社交媒体账号
-
-五、其他优惠
-• 传承人子女就读相关专业可优先录取
-• 传承人可优先申请文化产业发展专项资金
-• 享受公共文化设施免费使用权益
-
-【申报材料】
-1. 《广东省非物质文化遗产代表性传承人申报表》（一式三份）
-2. 申请人身份证、户口簿复印件
-3. 掌握技艺的证明材料：作品照片（不少于10张）、获奖证书、媒体报道等
-4. 传承谱系说明：师承关系、学习经历
-5. 授徒传艺情况说明：徒弟名单、传习活动记录
-6. 当地文化和旅游部门的推荐意见
-7. 项目保护单位的推荐意见
-8. 其他有助于说明申请人代表性的材料
-
-【认定流程】
-1. 个人申请或单位推荐（每年3-4月）
-2. 县级文化和旅游部门初审、实地考察（30个工作日）
-3. 市级文化和旅游部门复审、组织专家评议（20个工作日）
-4. 省级专家评审委员会评审、投票表决（15个工作日）
-5. 社会公示（20个工作日），接受公众监督
-6. 省文化和旅游厅审批、正式公布认定结果
-7. 颁发传承人证书和传习补助
-
-【传承人义务】
-1. 制定并执行传承计划，每年开展传习活动不少于4次
-2. 培养后继人才，每人每年带徒不少于2人
-3. 参加非遗展示、宣传和交流活动
-4. 配合文化和旅游部门做好非遗记录和档案建设
-5. 接受年度考核评估
-
-【年度考核标准】
-• 优秀：传习活动6次以上，带徒3人以上，有创新成果
-• 合格：传习活动4次以上，带徒2人以上
-• 不合格：未完成传习任务，将被约谈整改，连续两年不合格取消资格
-
-【咨询渠道】
-• 广东省文化和旅游厅：020-37803300
-• 广东省非物质文化遗产保护中心：020-87650813
-• 各地级市文化和旅游局非遗科""", "非遗", "2026-05-01"),
-    ("农业技术培训补贴", """【政策概述】
-广东省实施高素质农民培育计划，2026年计划培训新型职业农民10万人次，对参加农业技术培训的农民给予全额免费培训、生活补助、交通补贴等支持。培训涵盖种植技术、养殖技术、电商技能、农机操作、经营管理五大板块。
-
-【培训课程详情】
-一、种植技术类
-• 岭南水果栽培：荔枝、龙眼、香蕉、柑橘、菠萝等品种选择、水肥管理、整形修剪、花果管理
-• 蔬菜种植：叶菜、瓜果、根茎类蔬菜的设施栽培和露地栽培技术
-• 水稻种植：优质稻品种选择、育秧技术、田间管理、病虫害防治
-• 茶叶种植：茶树栽培、茶园管理、茶叶采摘技术
-• 中药材种植：广藿香、巴戟天、何首乌等南药种植技术
-
-二、养殖技术类
-• 水产养殖：对虾、鲈鱼、生鱼、加州鲈等品种养殖技术
-• 畜禽养殖：生猪、家禽养殖管理和疫病防控
-• 蜜蜂养殖：中蜂活框饲养技术、蜂蜜采收加工
-
-三、电商直播类
-• 电商基础：淘宝、拼多多、抖音小店开店运营全流程
-• 直播带货：直播话术、互动技巧、促单方法
-• 短视频制作：拍摄技巧、剪辑软件使用、内容策划
-• 摄影美工：产品拍摄、图片处理、详情页设计
-• 客服管理：售前咨询、售后处理、客户维护
-
-四、农机操作类
-• 无人机植保：大疆T40/T50操作培训、航线规划、飞防施药
-• 智能农机：无人驾驶拖拉机、自动插秧机操作
-• 农机维修：常用农机日常维护和简单故障排除
-• 农机安全：农机安全操作规范和事故预防
-
-五、经营管理类
-• 合作社管理：合作社组建、运营、财务管理
-• 家庭农场：家庭农场认定、经营策略、品牌建设
-• 农产品营销：市场分析、定价策略、渠道拓展
-• 农业品牌：品牌定位、包装设计、品牌推广
-
-【补贴标准明细】
-• 培训费用：全额免费，由政府财政承担
-• 生活补助：培训期间每天50元，按实际天数发放
-• 交通补贴：按实际费用报销，市内最高50元/天，跨市最高200元/次
-• 住宿补贴：跨市培训提供免费住宿
-• 证书奖励：取得农业类职业技能证书奖励500元，高级证书奖励1000元
-• 创业扶持：培训后创业的优先提供贷款贴息支持
-
-【培训安排】
-• 培训时长：初级班7天、中级班10天、高级班15天
-• 培训地点：各地级市农业培训中心、农业院校实训基地
-• 培训方式：理论授课（40%）+ 实操练习（40%）+ 现场观摩（20%）
-• 培训规模：每期30-50人小班教学
-• 培训频次：每月至少开设2期，全年滚动开班
-
-【报名条件】
-1. 年龄16-60周岁，身体健康
-2. 广东省户籍或在粤从事农业生产经营
-3. 有意愿从事农业生产经营或已在从事农业
-4. 脱贫户、返乡大学生、退伍军人优先录取
-
-【报名方式】
-1. 现场报名：到当地农业农村局或乡镇农业服务中心填写报名表
-2. 线上报名：下载"粤农通"APP，搜索"农民培训"在线报名
-3. 电话报名：拨打12316三农服务热线
-4. 微信报名：关注"广东农业农村"公众号，点击"培训报名"
-
-【报名材料】
-• 本人身份证复印件
-• 近期一寸照片2张
-• 学历证书复印件（如有）
-• 从事农业的证明材料（如有）
-
-【培训机构名录】
-• 广东省农业科学院培训中心
-• 华南农业大学继续教育学院
-• 仲恺农业工程学院培训中心
-• 各地级市农业学校
-• 各县级农业广播电视学校
-
-【考核认证】
-• 培训结束参加结业考试，合格者颁发培训结业证书
-• 可自愿报名参加职业技能等级认定
-• 获得证书者享受证书奖励补贴
-
-【咨询渠道】
-• 广东省农业农村厅科教处：020-37288230
-• 全国三农服务热线：12316
-• "粤农通"APP在线客服""", "培训", "2026-04-20"),
-    ("农产品质量安全认证", """【政策概述】
-广东省鼓励农产品生产经营主体开展绿色食品、有机农产品、地理标志农产品认证（简称"两品一标"），提升农产品附加值和市场竞争力。2026年全省有效期内"两品一标"产品超过3000个，位居全国前列。
-
-【认证类型详解】
-一、绿色食品认证
-• 定义：产自优良生态环境，按照绿色食品标准生产，实行全程质量控制
-• 分类：A级绿色食品（限量使用限定化学合成物质）和AA级绿色食品（不使用化学合成物质）
-• 标志有效期：3年
-• 适用产品：蔬菜、水果、粮食、畜禽、水产、茶叶等
-• 产品要求：产地环境符合NY/T391标准，生产过程符合NY/T392标准
-
-二、有机农产品认证
-• 定义：按照有机农业标准生产，不使用化学合成的农药、化肥、生长调节剂
-• 标志有效期：1年（需每年重新认证）
-• 适用产品：蔬菜、水果、粮食、茶叶、中药材等
-• 转换期：一年生作物24个月，多年生作物36个月
-• 产品要求：产地环境未受污染，3年内未使用禁用物质
-
-三、地理标志农产品登记
-• 定义：产自特定地域，所具有的质量、声誉本质上取决于该产地的自然因素和人文因素
-• 标志有效期：长期有效
-• 适用产品：具有地域特色的农产品
-• 广东主要地标产品：增城荔枝、从化荔枝、高州香蕉、德庆贡柑、英德红茶等
-
-【奖补政策明细】
-• 绿色食品认证：每个产品奖补30000元
-• 有机农产品认证：每个产品奖补50000元
-• 地理标志登记：每个产品奖补100000元
-• 续展认证：绿色食品续展每个奖补10000元
-• 产品检测费：首次认证检测费用全额补贴
-• 标志使用费：首年标志使用费全额补贴
-
-【认证流程详解】
-一、绿色食品认证流程
-1. 申请人向省绿色食品发展中心提交申请
-2. 省中心对材料进行文审（5个工作日）
-3. 检查员现场检查（产地环境、生产过程、质量控制）
-4. 产品抽样送检（指定检测机构）
-5. 中国绿色食品发展中心评审
-6. 颁发绿色食品证书
-7. 全程约需3-6个月
-
-二、有机农产品认证流程
-1. 申请人向认证机构提交申请
-2. 认证机构审核申请材料
-3. 检查员现场检查（至少1次/年）
-4. 产品抽样检测（400+项农残检测）
-5. 认证决定
-6. 颁发有机产品证书
-7. 全程约需6-12个月
-
-三、地理标志登记流程
-1. 县级以上人民政府农业主管部门提出申请
-2. 省级农业主管部门初审
-3. 农业农村部农产品质量安全中心审查
-4. 专家评审
-5. 公示（60天）
-6. 登记发证
-
-【申请条件】
-一、基本条件
-1. 具有合法的生产经营资质（营业执照）
-2. 产品符合相关标准要求
-3. 建立完善的质量管理制度和追溯体系
-4. 有稳定的生产基地和加工场所
-
-二、绿色食品专项条件
-• 产地环境符合绿色食品产地环境质量标准
-• 生产过程符合绿色食品生产操作规程
-• 产品质量符合绿色食品产品标准
-• 包装贮运符合绿色食品包装贮运标准
-
-三、有机产品专项条件
-• 产地环境未受污染
-• 转换期内不使用化学合成物质
-• 建立完整的有机生产管理体系
-• 有内部检查员
-
-【所需申请材料】
-• 认证申请书
-• 营业执照复印件
-• 产品执行标准
-• 生产操作规程
-• 质量管理制度
-• 产地环境检测报告
-• 产品检测报告
-• 生产基地位置图和地块图
-• 包装标签设计样张
-
-【认证后管理】
-• 绿色食品：每年至少1次年度检查，3年到期续展
-• 有机产品：每年1次跟踪检查，1年到期重新认证
-• 地理标志：定期抽检产品质量
-• 不合格处理：暂停或撤销标志使用权
-
-【市场价值提升】
-• 绿色食品：价格比普通产品高20-50%
-• 有机产品：价格比普通产品高50-200%
-• 地理标志：品牌溢价30-100%
-• 电商优势：认证产品在各大平台有流量扶持
-
-【广东特色认证产品】
-• 增城荔枝（地理标志）：挂绿、桂味、糯米糍
-• 从化荔枝（地理标志）：井岗红糯、流溪桂味
-• 高州香蕉（地理标志）：品质优良、口感香甜
-• 德庆贡柑（地理标志）：果色金黄、清甜蜜味
-• 英德红茶（地理标志）：英红九号、高香型红茶
-• 新会陈皮（地理标志）：三年以上陈化
-
-【咨询渠道】
-• 中国绿色食品发展中心广州办公室：020-84229060
-• 广东省农产品质量安全中心：020-37288456
-• 各地级市农业农村局质监科
-• 中国绿色食品网：www.greenfood.org.cn""", "认证", "2026-04-01")
+    (p['title'], p['content'], p['category'], p['date'], p.get('summary', ''))
+    for p in _policy_src.POLICIES
 ]
 
-# 岗位数据常量，供 _seed_data 和 _seed_jobs 共用
-JOBS_DATA = [
-    ("荔枝种植技术员", "茂名高州农业合作社", "5000-8000元/月", '["荔枝种植证书","2年以上经验"]',
-     "负责荔枝种植技术指导和病虫害防治，指导农户科学施肥、修剪整形、花果管理。要求熟悉岭南水果栽培技术，有荔枝种植经验优先。",
-     "茂名", "农业技术", "全职", "中专", "2年以上", "50-200人", "农业", "2026-06-18"),
-    ("电商直播运营", "广州鲜果汇电商有限公司", "6000-10000元/月", '["电商运营师证书","直播经验优先"]',
-     "负责农产品直播带货和短视频内容运营，策划直播活动，撰写直播话术，分析直播数据。有抖音/快手直播经验优先。",
-     "广州", "电商运营", "全职", "大专", "1年以上", "20-50人", "电子商务", "2026-06-17"),
-    ("农产品质检员", "深圳绿源食品有限公司", "5500-7500元/月", '["食品检验相关证书","大专以上学历"]',
-     "负责农产品质量检测、抽样检验、出具检测报告，协助建立质量追溯体系。食品科学、农学相关专业优先。",
-     "深圳", "农业技术", "全职", "大专", "不限", "100-500人", "食品加工", "2026-06-15"),
-    ("广绣工艺师", "佛山顺德非遗工作室", "4500-8000元/月", '["手工技能证书","3年以上经验"]',
-     "从事广绣作品的设计与绣制，参与非遗传承活动，指导学员基础针法。要求熟练掌握直针、扭针、长短针等广绣针法。",
-     "佛山", "手工工艺", "全职", "不限", "3年以上", "10人以下", "文化创意", "2026-06-14"),
-    ("乡村旅游导游", "梅州客天下旅游公司", "4000-6000元/月", '["导游证优先","普通话流利"]',
-     "负责乡村旅游线路讲解、游客接待、活动策划组织。了解客家文化，会客家话优先，有导游经验者优先。",
-     "梅州", "乡村旅游", "全职", "中专", "不限", "50-200人", "旅游服务", "2026-06-13"),
-    ("农产品物流专员", "湛江湛农物流有限公司", "5000-7000元/月", '["物流管理经验","有驾照优先"]',
-     "负责农产品仓储管理、物流调度、冷链运输协调，确保果蔬新鲜送达。有冷链物流经验优先。",
-     "湛江", "物流仓储", "全职", "不限", "1年以上", "50-200人", "物流运输", "2026-06-12"),
-    ("短视频内容编辑", "汕头潮创传媒有限公司", "6000-9000元/月", '["短视频运营经验","熟悉剪辑软件"]',
-     "负责农产品和乡村文化短视频的选题策划、脚本撰写、拍摄指导和后期剪辑。熟悉抖音、快手平台规则优先。",
-     "汕头", "电商运营", "全职", "大专", "1年以上", "20-50人", "传媒广告", "2026-06-10"),
-    ("农业技术推广员", "惠州农业科学研究院", "5500-8500元/月", '["农学相关专业","本科以上学历"]',
-     "负责农业新技术的试验示范和推广应用，组织农民培训，编写技术资料。农学、植保、园艺相关专业，有基层工作经验优先。",
-     "惠州", "农业技术", "全职", "本科", "2年以上", "100-500人", "科研机构", "2026-06-08"),
-    ("茶艺师", "潮州凤凰茶业有限公司", "4000-6500元/月", '["茶艺师证优先","形象气质佳"]',
-     "负责茶叶品鉴、茶艺表演、客户接待和茶叶销售。了解潮汕功夫茶文化，有茶艺师资格证优先。",
-     "潮州", "手工工艺", "全职", "不限", "不限", "50-200人", "农业", "2026-06-06"),
-    ("水产养殖技术员", "阳江海纳水产有限公司", "5000-7500元/月", '["水产养殖经验","中专以上学历"]',
-     "负责水产养殖场日常管理，包括水质监测、饲料投喂、病害防治、设备维护。有对虾或鱼类养殖经验优先。",
-     "阳江", "农业技术", "全职", "中专", "1年以上", "50-200人", "水产养殖", "2026-06-05"),
-    # === 以下为新增 20 条 ===
-    ("龙眼种植管理员", "茂名信宜果业公司", "4500-7000元/月", '["农业种植经验","吃苦耐劳"]',
-     "负责龙眼果园日常管理，包括水肥管理、病虫害防治、采收组织。有龙眼或荔枝种植经验优先，提供住宿。",
-     "茂名", "农业技术", "全职", "中专", "1年以上", "20-50人", "农业", "2026-06-18"),
-    ("直播带货主播", "广州花城电商基地", "8000-15000元/月", '["直播经验","形象气质佳"]',
-     "负责农产品直播间带货，与观众互动，促成订单转化。要求口齿伶俐，有直播经验，能接受排班制度。",
-     "广州", "电商运营", "全职", "大专", "1年以上", "50-200人", "电子商务", "2026-06-17"),
-    ("水产饲料销售", "珠海海大饲料有限公司", "6000-12000元/月", '["销售经验","有驾照"]',
-     "负责水产饲料产品的市场开拓和客户维护，完成销售目标。有水产养殖或饲料销售经验优先，底薪+提成。",
-     "珠海", "农业技术", "全职", "大专", "2年以上", "100-500人", "饲料加工", "2026-06-17"),
-    ("潮汕木雕师傅", "汕头金漆木雕工艺厂", "5000-9000元/月", '["木雕经验3年以上","手工技能证书"]',
-     "从事潮汕传统金漆木雕的设计与制作，参与建筑装饰和工艺品雕刻。要求有扎实的木雕基本功，能独立完成作品。",
-     "汕头", "手工工艺", "全职", "不限", "3年以上", "10-50人", "文化创意", "2026-06-16"),
-    ("农业无人机飞手", "梅州丰顺农业科技公司", "5500-8000元/月", '["无人机驾照","植保经验"]',
-     "操作植保无人机进行农药喷洒、施肥作业，负责航线规划和设备维护。有大疆T40/T50操作经验优先。",
-     "梅州", "农业技术", "全职", "中专", "1年以上", "10-50人", "农业科技", "2026-06-16"),
-    ("电商客服主管", "东莞优品电商有限公司", "5000-7500元/月", '["客服管理经验","熟悉电商平台"]',
-     "负责客服团队管理，制定服务规范，处理疑难客诉，分析客服数据。有淘宝/拼多多客服管理经验优先。",
-     "东莞", "电商运营", "全职", "大专", "2年以上", "50-200人", "电子商务", "2026-06-15"),
-    ("乡村旅游策划", "肇庆星湖旅游发展公司", "5000-8000元/月", '["旅游策划经验","创意能力"]',
-     "负责乡村旅游线路策划、活动方案设计、民宿运营指导。有文旅项目策划经验优先，了解肇庆本地文化。",
-     "肇庆", "乡村旅游", "全职", "大专", "2年以上", "50-200人", "旅游服务", "2026-06-14"),
-    ("食品加工技术员", "江门新会陈皮食品公司", "4500-6500元/月", '["食品加工经验","健康证"]',
-     "负责陈皮食品的加工生产，包括原料处理、加工操作、质量监控。有食品加工经验优先，提供岗前培训。",
-     "江门", "农业技术", "全职", "中专", "不限", "100-500人", "食品加工", "2026-06-14"),
-    ("水产养殖技术顾问", "中山万通水产有限公司", "7000-10000元/月", '["水产养殖5年以上","技术指导能力"]',
-     "为合作养殖户提供技术指导，解决养殖过程中的水质、病害问题。要求有丰富的水产养殖实战经验，能独立排查问题。",
-     "中山", "农业技术", "全职", "大专", "5年以上", "50-200人", "水产养殖", "2026-06-13"),
-    ("农产品电商运营", "韶关丹霞农产品公司", "5000-8000元/月", '["电商运营经验","熟悉抖音小店"]',
-     "负责公司农产品在抖音、淘宝等平台的店铺运营，包括产品上架、活动策划、数据分析。有农产品电商经验优先。",
-     "韶关", "电商运营", "全职", "大专", "1年以上", "10-50人", "电子商务", "2026-06-13"),
-    ("石湾陶艺学徒", "佛山石湾陶艺研究所", "3500-5000元/月", '["对手工艺术有兴趣","能吃苦"]',
-     "跟随陶艺大师学习石湾陶塑技艺，从揉泥、拉坯到上釉、烧制全流程学习。提供免费培训，表现优秀可转正。",
-     "佛山", "手工工艺", "全职", "不限", "不限", "10-50人", "文化创意", "2026-06-12"),
-    ("冷链物流司机", "茂名顺丰冷运有限公司", "6000-9000元/月", '["B2驾照","冷链运输经验"]',
-     "负责冷链车辆驾驶，将生鲜农产品从产地运输至分拨中心。要求有B2驾照，熟悉广东省内路线，能接受夜班。",
-     "茂名", "物流仓储", "全职", "不限", "2年以上", "100-500人", "物流运输", "2026-06-12"),
-    ("民宿管家", "惠州龙门南昆山民宿", "4000-6000元/月", '["服务行业经验","会做饭优先"]',
-     "负责民宿日常运营管理，包括客房管理、客人接待、餐饮服务、活动安排。有酒店或民宿管理经验优先，包吃住。",
-     "惠州", "乡村旅游", "全职", "中专", "1年以上", "10人以下", "旅游服务", "2026-06-11"),
-    ("农业会计", "湛江国兴农业发展公司", "4500-6500元/月", '["会计证","农业企业经验"]',
-     "负责公司财务核算、税务申报、成本分析、财务报表编制。有农业企业会计经验优先，熟悉农业补贴核算。",
-     "湛江", "农业技术", "全职", "大专", "2年以上", "50-200人", "农业", "2026-06-11"),
-    ("短视频拍摄", "潮州潮文化传播有限公司", "5000-8000元/月", '["摄影摄像经验","会PR/FCP"]',
-     "负责潮州非遗文化、美食、风景类短视频的拍摄和后期制作。要求有审美能力，能独立完成拍摄任务。",
-     "潮州", "电商运营", "全职", "大专", "1年以上", "10-50人", "传媒广告", "2026-06-10"),
-    ("龙眼干加工技师", "揭阳惠来龙眼加工厂", "4500-6500元/月", '["食品加工经验","了解烘干技术"]',
-     "负责龙眼干的加工生产，包括原料筛选、烘干操作、品质分级、包装入库。有食品加工或烘干设备操作经验优先。",
-     "揭阳", "农业技术", "全职", "中专", "不限", "50-200人", "食品加工", "2026-06-09"),
-    ("园林绿化养护员", "东莞绿美园林有限公司", "4000-5500元/月", '["绿化养护经验","会使用园林机械"]',
-     "负责城市绿化带、公园的苗木养护、修剪整形、病虫害防治、浇灌施肥。有园林绿化工作经验优先。",
-     "东莞", "农业技术", "全职", "不限", "1年以上", "100-500人", "园林绿化", "2026-06-09"),
-    ("电商美工设计", "广州谷雨电商有限公司", "5500-8000元/月", '["PS/AI熟练","电商设计经验"]',
-     "负责农产品详情页设计、主图制作、活动海报设计、店铺装修。要求熟练使用Photoshop和Illustrator，有电商设计作品集。",
-     "广州", "电商运营", "全职", "大专", "1年以上", "20-50人", "电子商务", "2026-06-08"),
-    ("有机蔬菜种植员", "云浮新兴有机农场", "4000-6000元/月", '["有机种植经验","了解有机标准"]',
-     "负责有机蔬菜的种植管理，包括育苗、定植、田间管理、采收。要求了解有机农业标准，不使用化学农药和化肥。",
-     "云浮", "农业技术", "全职", "中专", "2年以上", "10-50人", "农业", "2026-06-07"),
-    ("客家娘酒酿造师", "梅州客家娘酒酿造公司", "4500-7000元/月", '["酿造经验","了解传统工艺"]',
-     "负责客家娘酒的传统酿造工艺操作，包括浸米、蒸饭、发酵、压榨、陈酿。有酿酒经验优先，可提供学徒培训。",
-     "梅州", "手工工艺", "全职", "不限", "不限", "20-50人", "食品加工", "2026-06-06"),
-]
+# 预置政策的「写入结构」版本号。改动写入的列（新增/删除字段）时**必须 +1**，
+# 否则老库里的行不会重建，新列会一直为空（详见 _policies_signature 的说明）。
+POLICIES_SEED_VERSION = 2
+
+# 标题 -> 来源列表，播种时一并写入 source 字段
+POLICY_SOURCES = {p['title']: p['sources'] for p in _policy_src.POLICIES}
+
+
+def _policy_source_json(title):
+    """把某条政策的来源列表序列化为 JSON 文本（存进 source 字段）。"""
+    return json.dumps(POLICY_SOURCES.get(title, []), ensure_ascii=False)
+
+# 注：旧版此处有 JOBS_DATA（30 条**编造**的演示岗位，假公司名/假薪资），已整体移除。
+#     编造岗位会冒充真实在招职位 —— 学员会点「申请」，还会留下真实姓名与电话。
+#     现在两条数据源分工：
+#       · 公开招聘信息 → jobs_data.py（策展内容、带官方来源、不落库、不做站内申请）
+#       · 企业岗位     → 企业端发布 → 内容审核 → 学员端只展示 review_status='approved'
+#     旧库中的遗留预置行由 init_db() 一次性清理（判定：enterprise_id 为空串）。
 
 
 def _seed_data(cursor):
     """填充种子数据"""
     # 用户
+    admin_pw = hash_password('admin123')
+    gov_pw = hash_password('123456')
+    enterprise_pw = hash_password('123456')
     teacher_pw = hash_password('123456')
     student_pw = hash_password('123456')
+    cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                   ('admin_demo', admin_pw, '系统管理员', 'super_admin'))
+    cursor.execute("INSERT INTO users (username, password_hash, name, role, region) VALUES (?, ?, ?, ?, ?)",
+                   ('gov_demo', gov_pw, '王主任', 'government', '广东省农业农村厅'))
+    cursor.execute("INSERT INTO users (username, password_hash, name, role, company_name, region) VALUES (?, ?, ?, ?, ?, ?)",
+                   ('enterprise_demo', enterprise_pw, '陈经理', 'enterprise', '广州鲜果汇电商有限公司', '广州'))
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
                    ('teacher_demo', teacher_pw, '张老师', 'teacher'))
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
@@ -807,8 +657,9 @@ def _seed_data(cursor):
                        {"action": "完成课程", "points": 50, "date": "2024-06-10"},
                        {"action": "通过考试", "points": 100, "date": "2024-06-08"}
                    ])))
-    cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, ?, ?)",
-                   ('teacher_demo', 0, '[]'))
+    for uid in ('admin_demo', 'gov_demo', 'enterprise_demo', 'teacher_demo'):
+        cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, ?, ?)",
+                       (uid, 0, '[]'))
 
     # 证书
     for uid in ('student_demo', 'teacher_demo'):
@@ -825,53 +676,692 @@ def _seed_data(cursor):
     cursor.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
                    ('STU002', '', '李小红', '2024春季班', '电商运营', 62, 'active'))
 
-    # 成功案例
-    cases = [
-        ("梅州某村电商转型之路", "梅州", "从传统农业到年销售额500万的电商村", '{"farmers":30,"income_growth":"300%"}'),
-        ("潮州手工艺人数字化传承", "潮州", "非遗技艺通过短视频平台焕发新生", '{"fans":"50万+","income":"月入2万+"}'),
-        ("韶关有机农场品牌打造", "韶关", "从无名小农场到区域知名品牌", '{"certification":"有机认证","channel":"线上线下结合"}')
+    # 注：成功案例不再入库 —— 见 cases_data.py（唯一事实源）。
+    # 历史版本此处曾写入 3 条编造案例（"梅州某村电商转型之路" 等），已整体移除。
+
+    # 政策（使用共用常量；source 存"来源列表"JSON）
+    for title, content, cat, date, summary in POLICIES_DATA:
+        cursor.execute("INSERT INTO policies (title, content, category, date, summary, source) VALUES (?, ?, ?, ?, ?, ?)",
+                       (title, content, cat, date, summary, _policy_source_json(title)))
+
+    # 注：不再写入演示岗位（见文件上方说明与 jobs_data.py）。
+
+    # 政府政策（存到 government_policies 表）
+    for title, content, cat, date, summary in POLICIES_DATA:
+        cursor.execute("INSERT INTO government_policies (title, content, category, author_id, date, summary, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (title, content, cat, 'gov_demo', date, summary, _policy_source_json(title)))
+
+    # 轮播图种子数据
+    carousels = [
+        ("粤乡智匠正式上线", "https://placehold.co/1200x400/10b981/white?text=粤乡智匠", "", 0),
+        ("乡村振兴政策解读", "https://placehold.co/1200x400/00b4d8/white?text=政策解读", "/resources", 1),
+        ("非遗技艺传承计划", "https://placehold.co/1200x400/8b5cf6/white?text=非遗传承", "/crafts", 2),
     ]
-    for title, loc, desc, stats in cases:
-        cursor.execute("INSERT INTO success_cases (title, location, description, stats) VALUES (?, ?, ?, ?)",
-                       (title, loc, desc, stats))
+    for title, img, link, sort in carousels:
+        cursor.execute("INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
+                       (title, img, link, sort))
 
-    # 政策（使用共用常量）
-    for title, content, cat, date in POLICIES_DATA:
-        cursor.execute("INSERT INTO policies (title, content, category, date) VALUES (?, ?, ?, ?)",
-                       (title, content, cat, date))
+    # 系统公告种子数据
+    cursor.execute("INSERT INTO system_announcements (title, content, is_pinned, created_by) VALUES (?, ?, ?, ?)",
+                   ('欢迎使用粤乡智匠平台', '粤乡智匠是基于AI实训系统的农村本土人才赋能平台，致力于为广东乡村振兴培养实用型人才。', 1, 'admin_demo'))
 
-    # 岗位（使用共用常量）
-    for title, company, salary, reqs, desc, loc, cat, jtype, edu, exp, csize, industry, posted in JOBS_DATA:
-        cursor.execute("INSERT INTO job_listings (title, company, salary, requirements, description, location, category, job_type, education, experience, company_size, industry, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                       (title, company, salary, reqs, desc, loc, cat, jtype, edu, exp, csize, industry, posted))
+    # 讨论区种子数据
+    cursor.execute("INSERT INTO discussions (title, content, category, user_id) VALUES (?, ?, ?, ?)",
+                   ('荔枝种植经验交流', '各位种植荔枝的老乡，今年荔枝花期管理有什么心得？欢迎分享！', 'agriculture', 'student_demo'))
+    cursor.execute("INSERT INTO discussions (title, content, category, user_id) VALUES (?, ?, ?, ?)",
+                   ('电商直播新手问答', '刚开始做直播带货，想请教各位前辈有什么注意事项？', 'ecommerce', 'student_demo'))
+
+
+def _seed_government_policies(cursor):
+    """已有数据库时，补充政府政策数据"""
+    for title, content, cat, date, summary in POLICIES_DATA:
+        cursor.execute("INSERT INTO government_policies (title, content, category, author_id, date, summary, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (title, content, cat, 'gov_demo', date, summary, _policy_source_json(title)))
+
+
+def _seed_carousels(cursor):
+    """已有数据库时，补充默认轮播图"""
+    carousels = [
+        ("粤乡智匠正式上线", "https://placehold.co/1200x400/10b981/white?text=粤乡智匠", "", 0),
+        ("乡村振兴政策解读", "https://placehold.co/1200x400/00b4d8/white?text=政策解读", "/resources", 1),
+        ("非遗技艺传承计划", "https://placehold.co/1200x400/8b5cf6/white?text=非遗传承", "/crafts", 2),
+    ]
+    for title, img, link, sort in carousels:
+        cursor.execute("INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
+                       (title, img, link, sort))
+
+
+def _policies_signature():
+    """预置政策的内容签名：任一政策的 标题/正文/分类/日期/摘要 变了，签名就变。
+
+    ⚠️ 还要带上 POLICIES_SEED_VERSION —— 当"写入哪些列"变了（例如新增 summary/date 字段），
+    即使正文一字未改，也必须让签名变化、把老库里的行重建一遍，否则新列在旧库里恒为空。
+    """
+    h = hashlib.md5()
+    h.update(('seedver:%s\x1e' % POLICIES_SEED_VERSION).encode('utf-8'))
+    for title, content, cat, date, summary in POLICIES_DATA:
+        h.update(('%s\x1f%s\x1f%s\x1f%s\x1f%s\x1e' % (title, content, cat, date, summary)).encode('utf-8'))
+    return h.hexdigest()
 
 
 def _refresh_policies(cursor):
-    """刷新政策内容（已有数据时更新政策详情）"""
-    rows = cursor.execute("SELECT title, length(content) FROM policies").fetchall()
-    need_refresh = any(r[1] < 200 for r in rows) if rows else True
-    if not need_refresh:
+    """按「内容签名」刷新**预置政策**。
+
+    ⚠️ 为什么必须这么改（历史 bug）：
+      旧实现用 `any(len(content) < 200 for ...)` 当刷新条件，而政策正文都远超 200 字
+      → need_refresh 恒为 False → **改了 POLICIES_DATA 界面上永远不变**，
+      表现为"改了政策却没生效"（极易误判成缓存问题）。
+
+    现在的策略：
+      · 用 seed_meta 记录上次灌入的签名；签名一致 → 直接返回（幂等，不会每次启动都 DELETE）；
+      · 签名变化 → 只重建**预置政策**：policies 全表 + government_policies 中「作者=gov_demo 且标题属于预置集」的行；
+      · **不会碰政府端自行发布或管理员创建的政策**（标题不在预置集内，予以保留）。
+
+    ⚠️ 为什么删除条件必须带上「标题 IN 预置集」（历史 bug）：
+      预置政策是**用 `gov_demo` 这个账号的身份**灌进去的，而政府端真实发布时
+      `create_policy(..., author_id=user['username'])` 传的也是 `gov_demo`
+      —— 两者 author_id 完全一样！若只按 `author_id='gov_demo'` 删，
+      那么**用 gov_demo 账号发布的政策会在下次签名变化时被静默抹掉**
+      （即改一次 policies_data.py 就丢数据，且无任何报错）。
+      故删除范围收紧为「预置标题白名单」。
+    """
+    signature = _policies_signature()
+    row = cursor.execute("SELECT value FROM seed_meta WHERE key = 'policies_seed'").fetchone()
+    if row and row[0] == signature:
         return
+
     cursor.execute("DELETE FROM policies")
-    for title, content, cat, date in POLICIES_DATA:
-        cursor.execute("INSERT INTO policies (title, content, category, date) VALUES (?, ?, ?, ?)",
-                       (title, content, cat, date))
+    for title, content, cat, date, summary in POLICIES_DATA:
+        cursor.execute("INSERT INTO policies (title, content, category, date, summary, source) VALUES (?, ?, ?, ?, ?, ?)",
+                       (title, content, cat, date, summary, _policy_source_json(title)))
+
+    # ⚠️ 删除范围必须限定在「预置标题白名单」内：
+    #    预置行与 gov_demo 自己发布的行 author_id 相同，只按 author_id 删会误伤后者。
+    preset_titles = tuple(p[0] for p in POLICIES_DATA)
+    cursor.execute(
+        "DELETE FROM government_policies WHERE author_id = 'gov_demo' AND title IN (%s)"
+        % ','.join('?' * len(preset_titles)),
+        preset_titles)
+    for title, content, cat, date, summary in POLICIES_DATA:
+        cursor.execute(
+            "INSERT INTO government_policies (title, content, category, author_id, date, summary, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (title, content, cat, 'gov_demo', date, summary, _policy_source_json(title)))
+
+    cursor.execute(
+        "INSERT OR REPLACE INTO seed_meta (key, value, updated_at) VALUES ('policies_seed', ?, datetime('now','localtime'))",
+        (signature,))
 
 
-def _refresh_policies_OLD():
-    pass
+def _seed_case_reviews(cursor):
+    """为「本地成功案例」补审核记录（幂等）。
+
+    案例内容在 `cases_data.py`（不落库），但**审核状态必须落库**，
+    否则重启后审核结果就丢了。这里复用通用 `content_reviews` 表：
+      · 案例在库里没有审核记录 → 新增一条 `pending`（提交者 = admin_demo，即内容发布方）；
+      · 已有记录（任何状态）→ **原样保留**，绝不把已通过的案例打回待审；
+      · cases_data.py 里已删掉的案例 → 连带清掉其审核记录，避免脏数据。
+
+    即：**新增案例需要超级管理员审核通过，才会出现在学员端首页**。
+    """
+    import cases_data
+    valid_ids = {c['id'] for c in cases_data.get_cases()}
+
+    rows = cursor.execute(
+        "SELECT id, content_id FROM content_reviews WHERE content_type = ?",
+        (CASE_REVIEW_TYPE,)).fetchall()
+    existing = {r['content_id'] for r in rows}
+
+    # 清理已不存在的案例残留记录
+    for r in rows:
+        if r['content_id'] not in valid_ids:
+            cursor.execute("DELETE FROM content_reviews WHERE id = ?", (r['id'],))
+
+    for cid in sorted(valid_ids - existing):
+        cursor.execute(
+            "INSERT INTO content_reviews (content_type, content_id, submitter_id, status) "
+            "VALUES (?, ?, 'admin_demo', 'pending')",
+            (CASE_REVIEW_TYPE, cid))
 
 
-def _seed_jobs(cursor):
-    """补充岗位种子数据（已有用户但岗位不足时调用）"""
-    # 清除旧数据后重新插入
-    cursor.execute("DELETE FROM job_listings")
-    cursor.execute("DELETE FROM job_applications")
-    cursor.execute("DELETE FROM saved_jobs")
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name='job_listings'")
-    for title, company, salary, reqs, desc, loc, cat, jtype, edu, exp, csize, industry, posted in JOBS_DATA:
-        cursor.execute("INSERT INTO job_listings (title, company, salary, requirements, description, location, category, job_type, education, experience, company_size, industry, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                       (title, company, salary, reqs, desc, loc, cat, jtype, edu, exp, csize, industry, posted))
+def _ensure_demo_accounts(cursor):
+    """已有数据库时，补充缺少的新角色演示账户"""
+    demo_accounts = [
+        ('admin_demo', 'admin123', '系统管理员', 'super_admin', ''),
+        ('gov_demo', '123456', '王主任', 'government', '广东省农业农村厅'),
+        ('enterprise_demo', '123456', '陈经理', 'enterprise', '广州'),
+    ]
+    for username, password, name, role, region in demo_accounts:
+        existing = cursor.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if not existing:
+            pw_hash = hash_password(password)
+            cursor.execute(
+                "INSERT INTO users (username, password_hash, name, role, region) VALUES (?, ?, ?, ?, ?)",
+                (username, pw_hash, name, role, region))
+            cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, 0, '[]')", (username,))
+
+
+# ==================== 演示企业岗位（2026-10-06 建；2026-10-07 改接企业端 + 审核链路）====================
+# 背景：企业岗位表在移除 30 条编造岗位后归零 → 「我的投递」没有真实载体、链路跑不通。
+# 用户 2026-10-06 决定放**少量、明确标注为演示**的岗位；2026-10-07 进一步要求
+# 「**必须与真实链路一致**：由企业端发布，管理员审核通过后才在学员端显示」。
+#
+# ⚠️ 与「不编造」红线的关系：这些行**不是**冒充真实招聘信息，而是**显式声明为演示**：
+#    ① 公司名带「（演示）」后缀；② job_listings.is_demo = 1；③ 前端强制打「演示数据」角标；
+#    ④ 描述正文里写明「本岗位为平台演示数据，仅用于展示投递流程」。
+#    四重标注确保学员不可能把它误认为真实在招岗位。
+#
+# ⚠️ 与真实链路的关系（2026-10-07 起）：
+#    · 归属账号 = `DEMO_JOB_ENTERPRISE_ID`（**真实企业演示账号 `enterprise_demo`**，
+#      不再是早期那个 `'__demo__'` sentinel）→ 企业端「岗位管理」里能看到、能编辑、能删除；
+#    · 新建行 `review_status = 'pending'` 并**同时写一条 content_reviews**，
+#      **必须由管理员审核通过后**才会出现在学员端（与真实企业发布的岗位走同一道门禁）；
+#    · 已有行**只更新内容字段，绝不改写 `review_status`** —— 否则管理员驳回后
+#      一重启就被种子逻辑重置（与政策侧踩过的「种子逻辑静默覆盖数据」同类）。
+DEMO_JOBS = [
+    {
+        'key': 'demo-ec-operator',
+        'title': '农产品电商运营专员',
+        'company': '粤乡优品农业发展有限公司（演示）',
+        'salary': '5K-8K',
+        'location': '广州',
+        'category': '电商运营',
+        'job_type': '全职',
+        'education': '大专',
+        'experience': '1-3年',
+        'company_size': '50-200人',
+        'industry': '农产品电商',
+        'requirements': [
+            '熟悉主流电商平台的店铺运营与活动提报',
+            '具备基础数据复盘能力，能看懂转化率、客单价等指标',
+            '有生鲜或农产品类目经验者优先',
+        ],
+        'description': '负责公司农产品线上店铺的日常运营、活动策划与数据复盘。'
+                       '（本岗位为平台演示数据，仅用于展示站内投递流程，非真实招聘信息）',
+    },
+    {
+        'key': 'demo-lychee-tech',
+        'title': '荔枝种植技术员',
+        'company': '茂名荔乡种植专业合作社（演示）',
+        'salary': '4K-6K',
+        'location': '茂名',
+        'category': '农业技术',
+        'job_type': '全职',
+        'education': '中专',
+        'experience': '不限',
+        'company_size': '20-50人',
+        'industry': '种植业',
+        'requirements': [
+            '掌握荔枝栽培管理与主要病虫害防治基本知识',
+            '能适应田间地头工作环境',
+            '有农技推广或果园管理经验者优先',
+        ],
+        'description': '负责合作社荔枝园的日常栽培管理、物候期记录与技术归档。'
+                       '（本岗位为平台演示数据，仅用于展示站内投递流程，非真实招聘信息）',
+    },
+]
+
+# 演示岗位的归属账号 = **真实存在的企业演示账号**（由 `_ensure_demo_accounts` 创建：
+# `enterprise_demo` / 123456 / 陈经理）。2026-10-07 用户要求「演示岗位要跟企业端挂钩」，
+# 故由 sentinel `'__demo__'` 改为真实账号 —— 这样它在企业端「岗位管理」里可见可管，
+# 审核也走同一个链路。
+# ⚠️ 不要改回 sentinel：企业端列表查询是 `WHERE enterprise_id = <当前登录企业>`。
+DEMO_JOB_ENTERPRISE_ID = 'enterprise_demo'
+
+DEMO_JOBS_SEED_KEY = 'demo_jobs_seed'
+
+
+def _demo_jobs_signature():
+    """演示岗位内容签名：内容有变才重建，避免每次启动都写库。"""
+    payload = json.dumps(
+        [[j['key'], j['title'], j['company'], j['salary'], j['location'], j['category'],
+          j['job_type'], j['education'], j['experience'], j['company_size'], j['industry'],
+          j['requirements'], j['description']] for j in DEMO_JOBS],
+        ensure_ascii=False, sort_keys=True)
+    return hashlib.sha1(payload.encode('utf-8')).hexdigest()
+
+
+def _create_review_with_cursor(cursor, content_type, content_id, submitter_id):
+    """在既有事务里补一条待审记录。
+
+    与 `create_content_review()` 等价，只是复用调用方已开的连接/事务 ——
+    种子函数在 `init_db()` 里跑，不能中途另开连接（会撞 SQLite 写锁）。
+    """
+    cursor.execute(
+        "INSERT INTO content_reviews (content_type, content_id, submitter_id, status) "
+        "VALUES (?, ?, ?, 'pending')",
+        (content_type, content_id, submitter_id))
+
+
+def _seed_demo_jobs(cursor):
+    """灌入/更新演示企业岗位（幂等，按内容签名驱动）。
+
+    ⚠️ 四条红线：
+      1. **只动 `is_demo = 1` 的行** —— 真实企业发布的岗位、以及学员对它们的投递/收藏完全不受影响。
+      2. **按标题就地更新，不删后重建** —— 删后重建会换 id，学员已有的 job_applications
+         会变成指向不存在岗位的孤儿记录（与「_refresh_policies 静默抹数据」同一类坑）。
+      3. **绝不覆盖 `review_status`** —— 那是管理员的审核结论，种子逻辑无权改写。
+         只有「一次性迁移」与「首次新建」两种情形才会把它置为 `pending`。
+      4. 仅当某个演示岗位**确实已从 DEMO_JOBS 中移除**时，才连带清理它的投递/收藏记录。
+
+    2026-10-07 变更（用户要求「演示数据要跟企业端挂钩」）：
+      由「平台预置 + 直接 approved」改为「**挂真实企业演示账号 + 走同一条审核链路**」。
+    """
+    signature = _demo_jobs_signature()
+    row = cursor.execute("SELECT value FROM seed_meta WHERE key = ?", (DEMO_JOBS_SEED_KEY,)).fetchone()
+
+    # ① 一次性迁移（幂等）：早期版本把演示岗位挂在 sentinel '__demo__' 名下、并直接写成
+    #    approved，完全绕过了审核链路。现在改挂真实企业演示账号，并回退成「待审核」。
+    #    ⚠️ 只命中 `is_demo = 1` 的行（真实企业岗位的 is_demo 恒为 0），
+    #    且改完 enterprise_id 后该条件即不再成立 → 再次启动**不会**把管理员后来的
+    #    审核结论又打回 pending。
+    cursor.execute(
+        "UPDATE job_listings SET enterprise_id = ?, review_status = 'pending' "
+        "WHERE is_demo = 1 AND (enterprise_id IS NULL OR enterprise_id = '' "
+        "                       OR enterprise_id = '__demo__')",
+        (DEMO_JOB_ENTERPRISE_ID,))
+
+    # ② 补齐审核记录：没有 content_reviews 的演示岗位在管理端审核列表里不出现，
+    #    「企业发布 → 平台审核」这条链路就是断的（迁移过来的老行本来就没有记录）。
+    #    这一步放在签名短路**之前**，否则老库改不动（签名相同会直接 return）。
+    missing = cursor.execute(
+        "SELECT id FROM job_listings WHERE is_demo = 1 AND id NOT IN ("
+        "  SELECT content_id FROM content_reviews WHERE content_type = 'job')").fetchall()
+    for r in missing:
+        _create_review_with_cursor(cursor, 'job', r[0], DEMO_JOB_ENTERPRISE_ID)
+
+    if row and row[0] == signature:
+        return
+
+    wanted_titles = {j['title'] for j in DEMO_JOBS}
+    existing = {
+        r['title']: r['id']
+        for r in cursor.execute(
+            "SELECT id, title FROM job_listings WHERE is_demo = 1").fetchall()
+    }
+
+    for job in DEMO_JOBS:
+        reqs = json.dumps(job['requirements'], ensure_ascii=False)
+        prev_id = existing.get(job['title'])
+        if prev_id:
+            # ⚠️ 这里**不写 review_status**：pending / approved / rejected 一律保持原样
+            cursor.execute("""
+                UPDATE job_listings
+                   SET company = ?, salary = ?, requirements = ?, description = ?,
+                       location = ?, category = ?, job_type = ?, education = ?,
+                       experience = ?, company_size = ?, industry = ?,
+                       enterprise_id = ?, is_demo = 1
+                 WHERE id = ?
+            """, (job['company'], job['salary'], reqs, job['description'],
+                  job['location'], job['category'], job['job_type'], job['education'],
+                  job['experience'], job['company_size'], job['industry'],
+                  DEMO_JOB_ENTERPRISE_ID, prev_id))
+        else:
+            # 新建 = 企业「刚发布」的状态：待审核，学员端不可见
+            cursor.execute("""
+                INSERT INTO job_listings
+                    (title, company, salary, requirements, description, location, category,
+                     job_type, education, experience, company_size, industry,
+                     posted_at, enterprise_id, review_status, is_demo)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        datetime('now','localtime'), ?, 'pending', 1)
+            """, (job['title'], job['company'], job['salary'], reqs, job['description'],
+                  job['location'], job['category'], job['job_type'], job['education'],
+                  job['experience'], job['company_size'], job['industry'],
+                  DEMO_JOB_ENTERPRISE_ID))
+            prev_id = cursor.lastrowid
+            _create_review_with_cursor(cursor, 'job', prev_id, DEMO_JOB_ENTERPRISE_ID)
+
+    # 已被移出 DEMO_JOBS 的演示岗位：连带清掉指向它的投递/收藏/审核记录，避免孤儿
+    stale_ids = [jid for title, jid in existing.items() if title not in wanted_titles]
+    if stale_ids:
+        _qm = ','.join('?' * len(stale_ids))
+        cursor.execute("DELETE FROM job_applications WHERE job_id IN (%s)" % _qm, stale_ids)
+        cursor.execute("DELETE FROM saved_jobs WHERE job_id IN (%s)" % _qm, stale_ids)
+        cursor.execute("DELETE FROM content_reviews WHERE content_type = 'job' AND content_id IN (%s)" % _qm, stale_ids)
+        cursor.execute("DELETE FROM job_listings WHERE id IN (%s)" % _qm, stale_ids)
+
+    cursor.execute(
+        "INSERT OR REPLACE INTO seed_meta (key, value, updated_at) VALUES (?, ?, datetime('now','localtime'))",
+        (DEMO_JOBS_SEED_KEY, signature))
+
+
+# ==================== 农时智能日历 种子数据 ====================
+
+def _farming_seed_signature(sources, products, phases, tasks):
+    """计算种子数据内容签名（sha1）。
+
+    仅比行数无法发现"条数不变但内容变了"的情况（例如为已有任务补 task_md、
+    修正物候期月份区间、补齐 source_key / date_basis）。此处对全部字段做规范化
+    JSON 序列化后取 sha1，内容有任何变化都会导致签名不同，从而触发重灌。
+    """
+    payload = {
+        'sources': [
+            [s['key'], s.get('name', ''), s.get('org', ''), s.get('doc_type', ''),
+             s.get('doc_no', ''), s.get('url', '')]
+            for s in sources
+        ],
+        'products': [
+            [p['id'], p.get('name', ''), p.get('icon', 'seedling'),
+             p.get('summary', ''), p.get('region', '广东'), p.get('sort_order', 0)]
+            for p in products
+        ],
+        'phases': [
+            [ph['product_id'], ph.get('name', ''), ph.get('start_month'),
+             ph.get('end_month'), ph.get('color', ''), ph.get('description', ''),
+             ph.get('sort_order', 0)]
+            for ph in phases
+        ],
+        'tasks': [
+            [t['product_id'], t.get('phase'), t.get('title', ''), t.get('category', ''),
+             t.get('priority', 'medium'), t.get('task_md'), t.get('month'),
+             t.get('icon', 'tasks'), t.get('description', ''), t.get('tip', ''),
+             t.get('is_verified', 0), t.get('source_key', ''),
+             t.get('date_basis', '')]
+            for t in tasks
+        ],
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
+    return hashlib.sha1(raw.encode('utf-8')).hexdigest()
+
+
+def _seed_farming(cursor):
+    """写入农时日历种子数据（幂等，按内容签名判断是否需要重灌）。
+
+    - 数据源：同目录 farming_data.py
+    - 仅当数据模块的**内容签名**与 farming_seed_meta 中记录的不一致时才重写，
+      避免每次启动都产生写放大；同时可捕获"条数不变但内容变了"的更新
+    - 重写时先删后插：farming_subscriptions / farming_reminder_log 不含外键指向任务 id，
+      且均以 (user_id, product_id[, period]) 为业务键，因此用户订阅数据不受影响
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        import farming_data as fd
+    except Exception:
+        return  # 数据模块缺失时静默跳过，不阻断建库
+
+    sources = getattr(fd, 'FARMING_SOURCES', [])
+    products = getattr(fd, 'FARMING_PRODUCTS', [])
+    phases = getattr(fd, 'FARMING_PHENOPHASES', [])
+    tasks = getattr(fd, 'FARMING_TASKS', [])
+    if not (products and phases and tasks):
+        return
+
+    signature = _farming_seed_signature(sources, products, phases, tasks)
+    row = cursor.execute(
+        "SELECT value FROM farming_seed_meta WHERE key = 'farming_seed'").fetchone()
+    if row and row[0] == signature:
+        return  # 内容未变化，跳过
+
+    # ① 数据来源登记表（整体替换：来源集合只随数据模块变化）
+    cursor.execute("DELETE FROM farming_sources")
+    for idx, s in enumerate(sources):
+        cursor.execute(
+            """INSERT INTO farming_sources (key, name, org, doc_type, doc_no, url, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (s['key'], s.get('name', ''), s.get('org', ''), s.get('doc_type', ''),
+             s.get('doc_no', '') or '待核', s.get('url', ''), idx))
+
+    # ② 产品目录（upsert，不动订阅）
+    for p in products:
+        cursor.execute(
+            """INSERT INTO farming_products (id, name, icon, summary, region, sort_order, is_active)
+               VALUES (?, ?, ?, ?, ?, ?, 1)
+               ON CONFLICT(id) DO UPDATE SET
+                   name=excluded.name, icon=excluded.icon, summary=excluded.summary,
+                   region=excluded.region, sort_order=excluded.sort_order, is_active=1""",
+            (p['id'], p['name'], p.get('icon', 'seedling'), p.get('summary', ''),
+             p.get('region', '广东'), p.get('sort_order', 0)))
+
+    # ③ 物候期（按产品删后重建）
+    for p in products:
+        cursor.execute("DELETE FROM farming_phenophases WHERE product_id = ?", (p['id'],))
+    for ph in phases:
+        cursor.execute(
+            """INSERT INTO farming_phenophases
+                   (product_id, name, start_month, end_month, color, description, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (ph['product_id'], ph['name'], ph['start_month'], ph['end_month'],
+             ph.get('color', '#1f5e43'), ph.get('description', ''), ph.get('sort_order', 0)))
+
+    # ④ 任务（按产品删后重建；phase 名称 -> phase_id）
+    phase_map = {}
+    for r in cursor.execute("SELECT id, product_id, name FROM farming_phenophases").fetchall():
+        phase_map[(r[1], r[2])] = r[0]
+
+    for p in products:
+        cursor.execute("DELETE FROM farming_tasks WHERE product_id = ?", (p['id'],))
+    for idx, t in enumerate(tasks):
+        phase_id = phase_map.get((t['product_id'], t.get('phase')))
+        cursor.execute(
+            """INSERT INTO farming_tasks
+                   (product_id, phase_id, title, category, priority, task_md, month,
+                    icon, description, tip, is_verified, source_key, date_basis,
+                    is_active, sort_order)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
+            (t['product_id'], phase_id, t['title'], t['category'],
+             t.get('priority', 'medium'), t.get('task_md'), t['month'],
+             t.get('icon', 'tasks'), t.get('description', ''), t.get('tip', ''),
+             int(t.get('is_verified', 0) or 0), t.get('source_key', '') or '',
+             t.get('date_basis', '') or '', idx))
+
+    # ⑤ 记录本次签名
+    cursor.execute(
+        """INSERT INTO farming_seed_meta (key, value, updated_at)
+           VALUES ('farming_seed', ?, datetime('now','localtime'))
+           ON CONFLICT(key) DO UPDATE SET
+               value=excluded.value, updated_at=excluded.updated_at""",
+        (signature,))
+
+
+
+# ==================== 农时智能日历 数据访问 ====================
+
+def get_farming_products(active_only=True):
+    """返回农产品目录列表"""
+    conn = get_connection()
+    sql = "SELECT * FROM farming_products"
+    if active_only:
+        sql += " WHERE is_active = 1"
+    sql += " ORDER BY sort_order, id"
+    rows = [dict(r) for r in conn.execute(sql).fetchall()]
+    conn.close()
+    return rows
+
+
+def get_farming_product(product_id):
+    """按 id 取单个农产品（含停用状态），不存在返回 None"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM farming_products WHERE id = ?", (product_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def get_farming_sources():
+    """返回数据来源登记表（key -> 来源方向）。doc_no 可能为「待核」。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM farming_sources ORDER BY sort_order, key").fetchall()
+    except sqlite3.OperationalError:
+        rows = []          # 旧库尚未建表时降级为空
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_farming_source_map():
+    """返回 {source_key: 来源对象} 映射，供接口把任务的 source_key 展开成可读信息。"""
+    return {s['key']: s for s in get_farming_sources()}
+
+
+def get_farming_category_labels():
+    """返回 {分类key: 中文标签}，来自种子数据模块"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    try:
+        import farming_data as fd
+        return dict(getattr(fd, 'FARMING_CATEGORY_LABELS', {}) or {})
+    except Exception:
+        return {}
+
+
+def get_farming_phenophases(product_id=None):
+    """返回物候期列表（可按产品过滤）"""
+    conn = get_connection()
+    if product_id:
+        rows = conn.execute(
+            "SELECT * FROM farming_phenophases WHERE product_id = ? ORDER BY sort_order, id",
+            (product_id,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM farming_phenophases ORDER BY product_id, sort_order, id").fetchall()
+    out = [dict(r) for r in rows]
+    conn.close()
+    return out
+
+
+def get_farming_tasks(product_id, month=None):
+    """返回某产品的农事任务（可按月过滤）。phase 以名称形式一并返回，便于前端直接渲染。"""
+    conn = get_connection()
+    sql = """SELECT t.*, p.name AS phase_name, p.color AS phase_color
+             FROM farming_tasks t
+             LEFT JOIN farming_phenophases p ON p.id = t.phase_id
+             WHERE t.product_id = ? AND t.is_active = 1"""
+    params = [product_id]
+    if month is not None:
+        sql += " AND t.month = ?"
+        params.append(int(month))
+    sql += " ORDER BY t.month, t.sort_order, t.id"
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+
+def get_farming_task_by_id(task_id):
+    """按 id 取单条任务（含物候期名称）"""
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT t.*, p.name AS phase_name, p.color AS phase_color
+           FROM farming_tasks t
+           LEFT JOIN farming_phenophases p ON p.id = t.phase_id
+           WHERE t.id = ?""", (task_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ---------- 订阅 ----------
+
+def get_farming_subscriptions(user_id):
+    """返回某用户订阅的产品 id 列表"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT product_id FROM farming_subscriptions WHERE user_id = ? ORDER BY id",
+        (user_id,)).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+
+def is_farming_subscribed(user_id, product_id):
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT 1 FROM farming_subscriptions WHERE user_id = ? AND product_id = ? LIMIT 1",
+        (user_id, product_id)).fetchone()
+    conn.close()
+    return row is not None
+
+
+def set_farming_subscription(user_id, product_id, subscribe=True):
+    """订阅/退订。返回操作后的订阅状态。"""
+    conn = get_connection()
+    if subscribe:
+        conn.execute(
+            "INSERT OR IGNORE INTO farming_subscriptions (user_id, product_id) VALUES (?, ?)",
+            (user_id, product_id))
+    else:
+        conn.execute(
+            "DELETE FROM farming_subscriptions WHERE user_id = ? AND product_id = ?",
+            (user_id, product_id))
+    conn.commit()
+    conn.close()
+    return bool(subscribe)
+
+
+def get_farming_subscribers(product_id):
+    """返回订阅某产品的用户 id 列表（供管理/推送使用）"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT user_id FROM farming_subscriptions WHERE product_id = ? ORDER BY id",
+        (product_id,)).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+
+# ---------- 提醒补发 ----------
+
+def has_farming_reminder_sent(user_id, product_id, period):
+    conn = get_connection()
+    row = conn.execute(
+        """SELECT 1 FROM farming_reminder_log
+           WHERE user_id = ? AND product_id = ? AND period = ? LIMIT 1""",
+        (user_id, product_id, period)).fetchone()
+    conn.close()
+    return row is not None
+
+
+def mark_farming_reminder_sent(user_id, product_id, period):
+    conn = get_connection()
+    conn.execute(
+        """INSERT OR IGNORE INTO farming_reminder_log (user_id, product_id, period)
+           VALUES (?, ?, ?)""",
+        (user_id, product_id, period))
+    conn.commit()
+    conn.close()
+
+
+def clear_farming_reminder_log(user_id, product_id, period=None):
+    """清除某用户在某作物上的提醒发送记录。
+
+    退订时调用：幂等键是 (user_id, product_id, period)，日志一旦存在就永久跳过当期，
+    若退订时不清理，用户「退订 → 重新订阅」在当月将静默收不到提醒。
+    清除后语义为「重新订阅 = 重新开始接收」。
+    """
+    conn = get_connection()
+    if period is None:
+        conn.execute(
+            "DELETE FROM farming_reminder_log WHERE user_id = ? AND product_id = ?",
+            (user_id, product_id))
+    else:
+        conn.execute(
+            "DELETE FROM farming_reminder_log WHERE user_id = ? AND product_id = ? AND period = ?",
+            (user_id, product_id, period))
+    conn.commit()
+    conn.close()
+
+
+def get_due_farming_tasks(product_id, year, month, until_day=None):
+    """取某产品在指定年月、且已到期的任务。
+
+    - until_day 为空 -> 该月全部任务（含尚未指定日期的，供列表展示）
+    - until_day 有值 -> 仅 task_md 落在 1..until_day 之间的任务（供补发提醒，避免预告未来任务）
+    """
+    tasks = get_farming_tasks(product_id, month=month)
+    if until_day is None:
+        return tasks
+    prefix = '%02d-' % month
+    out = []
+    for t in tasks:
+        md = t.get('task_md')
+        if not md or not md.startswith(prefix):
+            continue
+        try:
+            day = int(md[3:5])
+        except ValueError:
+            continue
+        if day <= int(until_day):
+            out.append(t)
+    return out
 
 
 # ==================== 认证 ====================
@@ -1030,13 +1520,18 @@ def get_certificates(user_id):
 # ==================== 学员 ====================
 
 def get_students(search=None):
-    """获取学员列表"""
+    """获取学员列表（按学号稳定排序）。
+
+    ⚠️ 必须 ORDER BY：名册行的 rowid 会因删除/重建而变化，不加排序时
+    教师端列表的展示顺序会「看起来随机」。
+    """
     conn = get_connection()
     if search:
-        rows = conn.execute("SELECT * FROM students WHERE name LIKE ? OR id LIKE ? OR direction LIKE ?",
+        rows = conn.execute("SELECT * FROM students WHERE name LIKE ? OR id LIKE ? OR direction LIKE ? "
+                            "ORDER BY id",
                             (f'%{search}%', f'%{search}%', f'%{search}%')).fetchall()
     else:
-        rows = conn.execute("SELECT * FROM students").fetchall()
+        rows = conn.execute("SELECT * FROM students ORDER BY id").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -1049,8 +1544,13 @@ def get_student(student_id):
     return dict(row) if row else None
 
 
-def add_student(name, class_name, direction):
-    """添加学员"""
+def add_student(name, class_name, direction, user_id=''):
+    """添加学员（只写名册行）。
+
+    ⚠️ 名册行与平台账号是**两套数据**：不传 user_id 就只是一行名册记录，
+       该学员无法登录、收不到通知、其证书也不会进入教师端统计。
+       调用方（app.add_student）负责在需要时关联/创建账号。
+    """
     conn = get_connection()
     # 生成ID
     last = conn.execute("SELECT id FROM students ORDER BY id DESC LIMIT 1").fetchone()
@@ -1059,11 +1559,56 @@ def add_student(name, class_name, direction):
     else:
         num = 1
     sid = f"STU{num:03d}"
-    conn.execute("INSERT INTO students (id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?)",
-                 (sid, name, class_name, direction, 0, 'active'))
+    conn.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                 (sid, user_id or '', name, class_name, direction, 0, 'active'))
     conn.commit()
     conn.close()
     return sid
+
+
+def get_linkable_student_accounts():
+    """可被名册关联的学员账号：role='student' 且尚未被任何名册行占用。
+
+    已被占用的账号不出现，避免一个账号挂到两个学员上（统计会串）。
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT u.username, u.name FROM users u "
+        "WHERE u.role = 'student' AND u.username NOT IN "
+        "      (SELECT user_id FROM students WHERE user_id IS NOT NULL AND user_id != '') "
+        "ORDER BY u.username"
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def set_student_account(student_id, username):
+    """把名册行关联到平台账号；username 为空串 = 解除关联。
+
+    返回 (是否成功, 提示语)。所有校验都在这里做，调用方不必重复判断。
+    """
+    conn = get_connection()
+    row = conn.execute("SELECT id FROM students WHERE id = ?", (student_id,)).fetchone()
+    if not row:
+        conn.close()
+        return False, '未找到学员'
+    if username:
+        u = conn.execute("SELECT username, role FROM users WHERE username = ?", (username,)).fetchone()
+        if not u:
+            conn.close()
+            return False, f'账号 {username} 不存在'
+        if u['role'] != 'student':
+            conn.close()
+            return False, f'账号 {username} 不是学员角色，不能关联'
+        other = conn.execute("SELECT id FROM students WHERE user_id = ? AND id <> ?",
+                             (username, student_id)).fetchone()
+        if other:
+            conn.close()
+            return False, f'该账号已关联到名册 {other["id"]}，请先解除'
+    conn.execute("UPDATE students SET user_id = ? WHERE id = ?", (username or '', student_id))
+    conn.commit()
+    conn.close()
+    return True, (f'已关联账号 {username}' if username else '已解除账号关联')
 
 
 def update_student(student_id, name=None, class_name=None, direction=None, progress=None, status=None):
@@ -1134,65 +1679,14 @@ def delete_announcement(ann_id):
     return deleted
 
 
-# ==================== 作业管理 ====================
-
-def create_assignment(title, description='', direction='', deadline='', total_score=100):
-    conn = get_connection()
-    cursor = conn.execute("INSERT INTO assignments (title, description, direction, deadline, total_score) VALUES (?, ?, ?, ?, ?)",
-                          (title, description, direction, deadline, total_score))
-    conn.commit()
-    aid = cursor.lastrowid
-    conn.close()
-    return aid
-
-def get_assignments():
-    conn = get_connection()
-    rows = conn.execute("SELECT * FROM assignments ORDER BY created_at DESC").fetchall()
-    conn.close()
-    result = []
-    for r in rows:
-        d = dict(r)
-        # 统计提交数
-        d['submission_count'] = conn.execute if False else 0
-        result.append(d)
-    # 需要重新连接来统计
-    conn2 = get_connection()
-    for a in result:
-        a['submission_count'] = conn2.execute(
-            "SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id = ?", (a['id'],)
-        ).fetchone()[0]
-        a['graded_count'] = conn2.execute(
-            "SELECT COUNT(*) FROM assignment_submissions WHERE assignment_id = ? AND status = 'graded'", (a['id'],)
-        ).fetchone()[0]
-    conn2.close()
-    return result
-
-def get_assignment(assignment_id):
-    conn = get_connection()
-    row = conn.execute("SELECT * FROM assignments WHERE id = ?", (assignment_id,)).fetchone()
-    if not row:
-        conn.close()
-        return None
-    a = dict(row)
-    a['submissions'] = [dict(r) for r in conn.execute(
-        "SELECT s.*, st.name as student_name FROM assignment_submissions s LEFT JOIN students st ON s.student_id = st.id WHERE s.assignment_id = ? ORDER BY s.submitted_at DESC",
-        (assignment_id,)
-    ).fetchall()]
-    conn.close()
-    return a
-
-def submit_assignment(assignment_id, student_id, content=''):
-    conn = get_connection()
-    try:
-        conn.execute("INSERT INTO assignment_submissions (assignment_id, student_id, content, status) VALUES (?, ?, ?, 'submitted')",
-                     (assignment_id, student_id, content))
-        conn.commit()
-        conn.close()
-        return True
-    except:
-        conn.close()
-        return False
-
+# ==================== 实训批改（原「作业管理」） ====================
+# 2026-10-07 用户拍板：**「发布作业」整块下架**。
+# ⚠️ `assignments` 表**必须保留** —— 它现在的唯一用途是承载三种电商实训的题目
+#    （`TRAINING_TITLE_FMTS` 用 title 前缀反推 kind，见下方「直播带货实训（EC7）」段），
+#    `get_or_create_*_assignment` / `grade_submission` 都依赖它。
+#    删掉的只是「教师手动建作业/看作业」这条链路：
+#    create_assignment / get_assignments / get_assignment / submit_assignment /
+#    get_student_submissions（经核查前端零调用）。
 def grade_submission(submission_id, score, feedback=''):
     conn = get_connection()
     conn.execute("UPDATE assignment_submissions SET score = ?, feedback = ?, status = 'graded', graded_at = datetime('now','localtime') WHERE id = ?",
@@ -1202,106 +1696,255 @@ def grade_submission(submission_id, score, feedback=''):
     conn.close()
     return updated
 
-def get_student_submissions(student_id):
+
+# ---- 直播带货实训（EC7）：复用既有作业链路，不新建数据表 --------------------
+# 设计取舍：一次直播实训 = 一条 assignment_submissions。
+#  · 每个作物复用一个实训题目，避免每提交一次就往教师端塞一条新作业；
+#  · assignment_submissions 有 UNIQUE(assignment_id, student_id)，故同一学员同一作物
+#    只保留**最新一次**提交，历史尝试次数记在 content 的 JSON 里（attempts）。
+LIVE_ASSIGNMENT_DIRECTION = 'ecommerce'
+LIVE_ASSIGNMENT_TITLE_FMT = '直播带货实训 · {}'
+
+# 2026-10-05 文案 / 客服闭环：三种实训共用同一套题目/提交机制，只用 title 前缀区分 kind。
+# title 前缀即 records 接口的过滤依据 —— 改前缀必须同步改 app.py 的 kind 校验与前端。
+TRAINING_TITLE_FMTS = {
+    'live': LIVE_ASSIGNMENT_TITLE_FMT,
+    'copy': '商品文案实训 · {}',
+    'cs':   '客服对练实训 · {}',
+}
+TRAINING_DESCRIPTIONS = {
+    'live': '{product} 直播带货实训：提交学员自己的话术稿，并附朗读实录分析。'
+            '指标由规则分析给出、可复现；教师可复核。',
+    'copy': '{product} 商品文案实训：AI 只出初稿，学员改写后提交自己的版本。'
+            '具体认证/数据/价格必须用真实信息，不得编造；教师可复核。',
+    'cs':   '{product} 客服对练实训：学员扮演客服逐轮回复模拟客户，提交完整对话记录'
+            '与规则评分明细；教师可复核。',
+}
+
+
+def get_or_create_training_assignment(product, kind='live'):
+    """按 kind + 作物取/建实训题目，返回 assignment_id。"""
+    fmt = TRAINING_TITLE_FMTS.get(kind)
+    if not fmt:
+        raise ValueError('unknown training kind: %r' % kind)
+    title = fmt.format(product)
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT s.*, a.title as assignment_title, a.total_score FROM assignment_submissions s LEFT JOIN assignments a ON s.assignment_id = a.id WHERE s.student_id = ? ORDER BY s.submitted_at DESC",
-        (student_id,)
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-# ==================== 签到考勤 ====================
-
-def create_attendance(title='日常签到'):
-    conn = get_connection()
-    cursor = conn.execute("INSERT INTO attendances (title, status) VALUES (?, 'open')", (title,))
+    row = conn.execute(
+        "SELECT id FROM assignments WHERE title = ? AND direction = ? LIMIT 1",
+        (title, LIVE_ASSIGNMENT_DIRECTION)
+    ).fetchone()
+    if row:
+        conn.close()
+        return row['id']
+    cur = conn.execute(
+        "INSERT INTO assignments (title, description, direction, deadline, total_score) "
+        "VALUES (?, ?, ?, '', 100)",
+        (title, TRAINING_DESCRIPTIONS.get(kind, '').format(product=product),
+         LIVE_ASSIGNMENT_DIRECTION)
+    )
     conn.commit()
-    aid = cursor.lastrowid
+    aid = cur.lastrowid
     conn.close()
     return aid
 
-def close_attendance(att_id):
-    conn = get_connection()
-    conn.execute("UPDATE attendances SET status = 'closed', closed_at = datetime('now','localtime') WHERE id = ?", (att_id,))
-    conn.commit()
-    conn.close()
 
-def get_attendances():
-    conn = get_connection()
-    rows = conn.execute("SELECT * FROM attendances ORDER BY created_at DESC").fetchall()
-    result = []
-    for r in rows:
-        d = dict(r)
-        d['total_checked'] = conn.execute(
-            "SELECT COUNT(*) FROM attendance_records WHERE attendance_id = ?", (d['id'],)
-        ).fetchone()[0]
-        d['present_count'] = conn.execute(
-            "SELECT COUNT(*) FROM attendance_records WHERE attendance_id = ? AND check_status = 'present'", (d['id'],)
-        ).fetchone()[0]
-        d['late_count'] = conn.execute(
-            "SELECT COUNT(*) FROM attendance_records WHERE attendance_id = ? AND check_status = 'late'", (d['id'],)
-        ).fetchone()[0]
-        result.append(d)
-    conn.close()
-    return result
+def get_or_create_live_assignment(product):
+    """按作物取/建实训题目，返回 assignment_id。"""
+    return get_or_create_training_assignment(product, 'live')
 
-def check_in(attendance_id, student_id, check_status='present'):
+
+def save_live_training(assignment_id, student_id, payload, rule_score=None):
+    """写入/更新一次实训提交。
+
+    ⚠️ score 列语义 = **教师批改分**，只由 grade_submission() 写。
+       系统规则分存进 content 的 rule_score，**不再写进 score**。
+       2026-10-07 前这里是 `SET score = ?` 直接写规则分，造成三个后果：
+         ① 教师端出现「85 分 + 待批改」「0 分 + 待批改」这种自相矛盾的行；
+         ② 教师批改后学员重新提交，教师给的分被规则分**静默覆盖**；
+         ③ 评语被清空、graded_at 归零，而没人告诉教师批改结果已经失效。
+       现在重新提交的规则：
+         · 从未批改过 → status 保持 'submitted'（待批改），score/feedback 本来就是空；
+         · 已批改过   → **保留** score / feedback / graded_at，status 改 'resubmitted'
+                        （已重新提交·待复核），教师端会醒目提示。
+    返回 (提交 id, 累计尝试次数)。
+    """
     conn = get_connection()
+    row = conn.execute(
+        "SELECT id, content, status, score, feedback FROM assignment_submissions "
+        "WHERE assignment_id = ? AND student_id = ?",
+        (assignment_id, student_id)
+    ).fetchone()
+    attempts = 1
+    if row:
+        try:
+            attempts = int(json.loads(row['content'] or '{}').get('attempts', 0)) + 1
+        except Exception:
+            attempts = 1
+    payload = dict(payload or {})
+    payload['attempts'] = attempts
     try:
-        conn.execute("INSERT INTO attendance_records (attendance_id, student_id, check_status) VALUES (?, ?, ?)",
-                     (attendance_id, student_id, check_status))
+        payload['rule_score'] = int(rule_score or 0)
+    except (TypeError, ValueError):
+        payload['rule_score'] = 0
+    content_json = json.dumps(payload, ensure_ascii=False)
+    if row:
+        prev_status = (row['status'] or 'submitted')
+        # 判据用「有没有教师批改结果」而不是 status 字符串：
+        # 历史数据里 status 可能被老逻辑重置过，而 score 一旦有值就是教师给的。
+        already_graded = (row['score'] is not None) or (prev_status == 'graded')
+        new_status = 'resubmitted' if already_graded else 'submitted'
+        conn.execute(
+            "UPDATE assignment_submissions SET content = ?, status = ?, "
+            "submitted_at = datetime('now','localtime') WHERE id = ?",
+            (content_json, new_status, row['id'])
+        )
         conn.commit()
-        conn.close()
-        return True
-    except:
-        conn.close()
-        return False
+        sid = row['id']
+    else:
+        cur = conn.execute(
+            "INSERT INTO assignment_submissions (assignment_id, student_id, content, score, status) "
+            "VALUES (?, ?, ?, NULL, 'submitted')",
+            (assignment_id, student_id, content_json)
+        )
+        conn.commit()
+        sid = cur.lastrowid
+    conn.close()
+    return sid, attempts
 
-def get_attendance_records(attendance_id):
+
+def get_trainings(student_id, kind=None):
+    """取某学员的实训记录（每个作物各一条）。
+
+    kind 为 None 时返回全部电商实训（三种混合）；否则按 title 前缀过滤。
+    """
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT ar.*, s.name as student_name FROM attendance_records ar LEFT JOIN students s ON ar.student_id = s.id WHERE ar.attendance_id = ? ORDER BY ar.checked_at",
-        (attendance_id,)
-    ).fetchall()
+    if kind and kind in TRAINING_TITLE_FMTS:
+        rows = conn.execute(
+            "SELECT s.*, a.title AS assignment_title FROM assignment_submissions s "
+            "LEFT JOIN assignments a ON s.assignment_id = a.id "
+            "WHERE s.student_id = ? AND a.direction = ? AND a.title LIKE ? "
+            "ORDER BY s.submitted_at DESC",
+            (student_id, LIVE_ASSIGNMENT_DIRECTION,
+             TRAINING_TITLE_FMTS[kind].format('%'))
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT s.*, a.title AS assignment_title FROM assignment_submissions s "
+            "LEFT JOIN assignments a ON s.assignment_id = a.id "
+            "WHERE s.student_id = ? AND a.direction = ? ORDER BY s.submitted_at DESC",
+            (student_id, LIVE_ASSIGNMENT_DIRECTION)
+        ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_student_attendance_history(student_id):
-    """获取某个学员的所有签到记录"""
+def get_live_trainings(student_id):
+    """取某学员的全部直播实训记录（每个作物各一条）。"""
+    return get_trainings(student_id, 'live')
+
+
+def get_all_trainings():
+    """教师端：全部学员的电商实训提交（按提交时间倒序）。
+
+    复用既有作业链路（assignments + assignment_submissions），
+    kind 由作业标题前缀反推（见 TRAINING_TITLE_FMTS），不改表结构。
+
+    另带出**名册姓名**：assignment_submissions.student_id 存的是 username（如 student_demo），
+    教师端直接显示登录名不好认人（2026-10-07）。
+    ⚠️ 姓名用**标量子查询**取，不用 LEFT JOIN —— 名册允许同一 user_id 出现多行时
+       JOIN 会让同一条提交重复出现。
+    """
     conn = get_connection()
     rows = conn.execute(
-        """SELECT a.id as attendance_id, a.title, a.created_at as session_time,
-                  ar.check_status, ar.checked_at
-           FROM attendances a
-           LEFT JOIN attendance_records ar ON a.id = ar.attendance_id AND ar.student_id = ?
-           ORDER BY a.created_at DESC""",
-        (student_id,)
+        "SELECT s.*, a.title AS assignment_title, "
+        "       (SELECT st.name FROM students st "
+        "         WHERE st.user_id = s.student_id AND st.user_id != '' LIMIT 1) AS student_name "
+        "FROM assignment_submissions s "
+        "LEFT JOIN assignments a ON s.assignment_id = a.id "
+        "WHERE a.direction = ? ORDER BY s.submitted_at DESC"
+        , (LIVE_ASSIGNMENT_DIRECTION,)
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    out = []
+    for r in rows:
+        item = dict(r)
+        title = item.get('assignment_title') or ''
+        item['kind'] = ''
+        for k, fmt in TRAINING_TITLE_FMTS.items():
+            if title.startswith(fmt.format('')):
+                item['kind'] = k
+                break
+        out.append(item)
+    return out
 
 
 # ==================== 学情分析 ====================
 
-def get_analytics_data():
+def get_roster_completion():
+    """名册每位学员的「证书真实完成度」。
+
+    口径（2026-10-07 用户拍板：学情分析 / AI 教学报告 / 仪表板统计不再使用
+    students.progress 这个**手填**字段）：
+      · 完成度 = 该学员名下 certificates.progress 的平均值（0-100 整数）；
+      · 没有任何证书记录 → completion = 0 且 has_cert_data = 0
+        （统计里单独说明「暂无证书记录」，不冒充「0% 完成」）；
+      · 证书按 user_id（= username）归属，未关联账号的名册行必然没有证书记录。
+    """
     conn = get_connection()
-    # 进度分布
+    rows = conn.execute("SELECT id, name, direction, user_id, status FROM students ORDER BY id").fetchall()
+    out = []
+    for r in rows:
+        uid = r['user_id'] or ''
+        certs = []
+        if uid:
+            certs = conn.execute(
+                "SELECT progress, status FROM certificates WHERE user_id = ?", (uid,)).fetchall()
+        earned = sum(1 for c in certs if c['status'] == 'earned')
+        has_data = len(certs) > 0
+        completion = int(round(sum((c['progress'] or 0) for c in certs) / len(certs))) if has_data else 0
+        out.append({
+            'id': r['id'], 'name': r['name'], 'direction': r['direction'] or '未分类',
+            'user_id': uid, 'status': r['status'],
+            'has_account': bool(uid), 'has_cert_data': has_data,
+            'cert_total': len(certs), 'cert_earned': earned,
+            'completion': completion,
+        })
+    conn.close()
+    return out
+
+
+def get_analytics_data():
+    """学情分析数据 —— 口径：**证书真实完成度**（见 get_roster_completion）。
+
+    2026-10-07 修正：原实现直接聚合 students.progress（教师手填、学员端没有任何
+    入口会更新它），画出来的「进度分布」与学员真实学习情况无关。
+    """
+    roster = get_roster_completion()
     ranges = [(0, 20, '0-20%'), (21, 40, '21-40%'), (41, 60, '41-60%'), (61, 80, '61-80%'), (81, 100, '81-100%')]
     progress_dist = []
     for low, high, label in ranges:
-        count = conn.execute("SELECT COUNT(*) FROM students WHERE progress >= ? AND progress <= ?", (low, high)).fetchone()[0]
+        count = sum(1 for r in roster if r['has_cert_data'] and low <= r['completion'] <= high)
         progress_dist.append({'label': label, 'count': count})
-    # 方向分布
-    rows = conn.execute("SELECT direction, COUNT(*) as count FROM students GROUP BY direction").fetchall()
-    direction_dist = [dict(r) for r in rows]
-    # 各方向平均进度
-    rows2 = conn.execute("SELECT direction, AVG(progress) as avg_progress FROM students GROUP BY direction").fetchall()
-    direction_progress = [{'direction': r['direction'], 'avg_progress': round(r['avg_progress'], 1)} for r in rows2]
-    conn.close()
+
+    no_cert = [r for r in roster if not r['has_cert_data']]
+
+    by_dir = {}
+    for r in roster:
+        by_dir.setdefault(r['direction'], []).append(r)
+    direction_dist = [{'direction': d, 'count': len(v)} for d, v in by_dir.items()]
+    direction_progress = [{
+        'direction': d,
+        'student_count': len(v),
+        'avg_progress': round(sum(x['completion'] for x in v) / len(v), 1),
+        'cert_earned': sum(x['cert_earned'] for x in v),
+        'no_cert_count': sum(1 for x in v if not x['has_cert_data']),
+    } for d, v in by_dir.items()]
+
     return {
+        'basis': 'certificates',
+        'basis_label': '证书真实完成度（学员名下证书进度的平均值）',
+        'roster_count': len(roster),
+        'no_cert_count': len(no_cert),
         'progress_distribution': progress_dist,
         'direction_distribution': direction_dist,
         'direction_progress': direction_progress
@@ -1333,10 +1976,16 @@ def get_messages(user1_id, user2_id, limit=50):
 
 
 def get_inbox(user_id):
+    """会话列表（按最近一条消息分组）。
+
+    ⚠️ messages 表的 sender_id / receiver_id 全站是 **username**（与 user_id 红线一致）。
+    原实现拿它去 JOIN students.id（名册号 STU001…）必然 JOIN 不上 → 对方名字
+    只能显示成裸用户名（student_demo / teacher_demo）。现在按优先级解析：
+    名册（students.user_id = username）→ 账号表（users.name）→ 才回退用户名。
+    """
     conn = get_connection()
     rows = conn.execute(
-        """SELECT m.*, s.name as sender_name FROM messages m
-           LEFT JOIN students s ON m.sender_id = s.id
+        """SELECT m.* FROM messages m
            WHERE m.id IN (
                SELECT MAX(id) FROM messages
                WHERE sender_id = ? OR receiver_id = ?
@@ -1345,21 +1994,25 @@ def get_inbox(user_id):
            ORDER BY m.created_at DESC""",
         (user_id, user_id, user_id)
     ).fetchall()
+
+    def _resolve_name(other_id):
+        if not other_id:
+            return other_id or ''
+        r = conn.execute("SELECT name FROM students WHERE user_id = ? LIMIT 1", (other_id,)).fetchone()
+        if r and r['name']:
+            return r['name']
+        r = conn.execute("SELECT name FROM users WHERE username = ?", (other_id,)).fetchone()
+        if r and r['name']:
+            return r['name']
+        return other_id
+
     conn.close()
     result = []
     for r in rows:
         d = dict(r)
         other_id = d['receiver_id'] if d['sender_id'] == user_id else d['sender_id']
-        other_name = d.get('sender_name', other_id) if d['sender_id'] != user_id else other_id
-        # 如果对方不是学生，尝试用ID作为名称
-        if other_name == other_id:
-            conn2 = get_connection()
-            row2 = conn2.execute("SELECT name FROM students WHERE id = ?", (other_id,)).fetchone()
-            conn2.close()
-            if row2:
-                other_name = row2['name']
         d['other_id'] = other_id
-        d['other_name'] = other_name
+        d['other_name'] = _resolve_name(other_id)
         d['is_mine'] = d['sender_id'] == user_id
         result.append(d)
     return result
@@ -1398,12 +2051,19 @@ def create_notification(user_id, ntype, title, content='', link_type='', link_id
 
 
 def create_notification_for_all_students(ntype, title, content='', link_type='', link_id=None):
+    """给所有**已关联平台账号**的学员发站内通知。
+
+    ⚠️ notifications.user_id 的语义是全站统一的 username（见全局红线）。
+    名册表 students 有自己的 id（STU001…）与可选的 user_id（= username）。
+    早期实现误把 students.id 当作收件人写入，导致真实登录学员收不到任何通知
+    （2026-10-07 修复）。没有关联账号的名册行直接跳过，不写无人认领的脏行。
+    """
     conn = get_connection()
-    students = conn.execute("SELECT id FROM students").fetchall()
-    for s in students:
+    rows = conn.execute("SELECT user_id FROM students WHERE user_id != ''").fetchall()
+    for r in rows:
         conn.execute(
             "INSERT INTO notifications (user_id, type, title, content, link_type, link_id) VALUES (?, ?, ?, ?, ?, ?)",
-            (s['id'], ntype, title, content, link_type, link_id)
+            (r['user_id'], ntype, title, content, link_type, link_id)
         )
     conn.commit()
     conn.close()
@@ -1465,17 +2125,30 @@ def get_job_listings():
 
 
 def apply_for_job(user_id, job_id):
-    """申请职位"""
+    """申请职位。
+
+    返回值（三态，勿再当布尔用）：
+      'ok'          —— 申请成功
+      'dup'         —— 已申请过
+      'unavailable' —— 职位不存在，或**未通过审核**（企业发布后处于 pending）
+
+    ⚠️ 必须校验 review_status：申请会写进 job_applications 并给学员加积分，
+    若允许对未审核/不存在的岗位申请，等于绕过了审核门禁（2026-10-06 修复）。
+    """
     conn = get_connection()
-    existing = conn.execute("SELECT * FROM job_applications WHERE user_id = ? AND job_id = ?",
+    row = conn.execute("SELECT review_status FROM job_listings WHERE id = ?", (job_id,)).fetchone()
+    if not row or (row['review_status'] or '') != 'approved':
+        conn.close()
+        return 'unavailable'
+    existing = conn.execute("SELECT 1 FROM job_applications WHERE user_id = ? AND job_id = ?",
                             (user_id, job_id)).fetchone()
     if existing:
         conn.close()
-        return False  # 已申请
+        return 'dup'
     conn.execute("INSERT INTO job_applications (user_id, job_id) VALUES (?, ?)", (user_id, job_id))
     conn.commit()
     conn.close()
-    return True
+    return 'ok'
 
 
 def get_job_by_id(job_id):
@@ -1490,10 +2163,91 @@ def get_job_by_id(job_id):
     return d
 
 
-def get_job_listings_filtered(keyword=None, location=None, salary_range=None, category=None):
-    """按条件筛选职位"""
+#### 企业岗位分类（学员端下拉 + 条数统计的口径来源）####
+# ⚠️ 必须与 index.html 里 `#emp-category-filter` 的静态 <optgroup label="企业招聘岗位"> 保持一致
+#    （静态项只是老后端/无脚本时的回退）。这里刻意把「当前 0 条」的分类也列出来，
+#    前端会标成「（暂无）」—— 直接把死分类从下拉里藏掉，反而让人以为平台不支持这类岗位。
+ENTERPRISE_JOB_CATEGORIES = ['农业技术', '电商运营', '手工工艺', '乡村旅游', '物流仓储']
+
+
+#### 薪资区间解析（学员端薪资筛选用） ####
+# 把「5K-8K」「5000-8000」「1万-1.5万」「2040元/月」里的数字抠出来。
+# ⚠️ 只认 **≥100** 的数：否则「试用期2个月」里的 2 会被当成薪资，
+#    把一条本来解析不出薪资的文本变成 (2, 2) 的假区间。
+_SALARY_NUM_RE = re.compile(r'(\d+(?:\.\d+)?)\s*([kK千万元]?)')
+_SALARY_MIN_ABS = 100.0
+
+
+def parse_salary_bounds(text):
+    """把一段薪资文本解析成 `(下界, 上界)`，解析不出来返回 None。
+
+    · `5K-8K`      -> (5000, 8000)
+    · `4K-6K`      -> (4000, 6000)
+    · `5000-8000`  -> (5000, 8000)
+    · `1万-1.5万`   -> (10000, 15000)
+    · `12000+`     -> (12000, None)   ← 上界未知
+    · `2040元/月`   -> (2040, 2040)
+    · `面议` / 空 / 含数字但都不像薪资 -> None
+    """
+    if text is None:
+        return None
+    nums = []
+    for m in _SALARY_NUM_RE.finditer(str(text)):
+        v = float(m.group(1))
+        unit = m.group(2)
+        if unit in ('k', 'K', '千'):
+            v *= 1000
+        elif unit == '万':
+            v *= 10000
+        if v >= _SALARY_MIN_ABS:
+            nums.append(v)
+    if not nums:
+        return None
+    if len(nums) == 1:
+        # `12000+` / `5K以上` 这类开放上界；其余单值按「恰好这个数」处理
+        if '+' in str(text) or '以上' in str(text):
+            return (nums[0], None)
+        return (nums[0], nums[0])
+    return (min(nums), max(nums))
+
+
+def _salary_matches(job_salary, want_bounds):
+    """岗位薪资与筛选区间必须有**长度大于 0 的交集**才算命中。
+
+    ⚠️ 旧实现是 `salary LIKE '%5000%'`，而 `job_listings.salary` 存的是 `5K-8K`
+    → **永远匹配不上**，学员选任意薪资都会得到 0 条（2026-10-07 实测）。
+
+    为什么不用「端点相触也算」：三个可选区间是 3K-5K / 5K-8K / 8K-12K，彼此共用端点。
+    若把 5K 既算进「3K-5K」又算进「5K-8K」，学员选「3K-5K」会看到一张写着「5K-8K」的
+    卡片 —— 薪资数字明晃晃地对不上（卡片本身会显示薪资），比漏掉更让人困惑。
+    所以：区间有真实重叠才命中。
+    解析不出薪资（如「面议」）的岗位**不参与薪资筛选**，不静默算成 0。
+    """
+    if not want_bounds:
+        return True
+    jb = parse_salary_bounds(job_salary)
+    if not jb:
+        return False
+    jmin, jmax = jb
+    wmin, wmax = want_bounds
+
+    if jmin == jmax:            # 岗位只给了一个确切数字（如「2040元/月」）
+        return jmin >= wmin if wmax is None else (wmin <= jmin <= wmax)
+    if jmax is None:            # 岗位「X 以上」
+        return True if wmax is None else (jmin < wmax)
+    if wmax is None:            # 筛选「X 以上」
+        return jmax > wmin
+    return max(jmin, wmin) < min(jmax, wmax)
+
+
+def get_job_listings_base(keyword=None, location=None, salary_range=None):
+    """企业岗位基础集合：应用 关键词 / 地点 / 薪资，**不应用分类**。
+
+    分类单独一步做，是为了让前端的下拉能显示「每个分类各有多少条」
+    —— 若在这里就把 category 过滤掉，统计永远只剩当前选中项（条数全是 1）。
+    """
     conn = get_connection()
-    query = "SELECT * FROM job_listings WHERE 1=1"
+    query = "SELECT * FROM job_listings WHERE review_status = 'approved'"
     params = []
     if keyword:
         query += " AND (title LIKE ? OR company LIKE ? OR description LIKE ?)"
@@ -1501,33 +2255,67 @@ def get_job_listings_filtered(keyword=None, location=None, salary_range=None, ca
     if location:
         query += " AND location = ?"
         params.append(location)
-    if category:
-        query += " AND category = ?"
-        params.append(category)
-    if salary_range:
-        if salary_range == '12000+':
-            query += " AND salary LIKE '%1%'"
-        else:
-            parts = salary_range.split('-')
-            if len(parts) == 2:
-                query += " AND salary LIKE ?"
-                params.append(f'%{parts[0]}%')
     query += " ORDER BY posted_at DESC"
     rows = conn.execute(query, params).fetchall()
     conn.close()
+
+    want = parse_salary_bounds(salary_range) if salary_range else None
     result = []
     for r in rows:
         d = dict(r)
+        if not _salary_matches(d.get('salary'), want):
+            continue
         d['requirements'] = json.loads(d['requirements'])
         result.append(d)
     return result
 
 
-def get_similar_jobs(job_id, category, limit=3):
-    """获取同分类相似职位"""
+def get_job_category_counts(keyword=None, location=None, salary_range=None):
+    """`{分类: 条数}`，口径与 `get_job_listings_base()` 完全一致（不含分类过滤）。"""
+    counts = {}
+    for j in get_job_listings_base(keyword, location, salary_range):
+        cat = (j.get('category') or '').strip() or '未分类'
+        counts[cat] = counts.get(cat, 0) + 1
+    return counts
+
+
+def get_job_listings_filtered(keyword=None, location=None, salary_range=None, category=None):
+    """按条件筛选职位（**学员端公开接口专用**）。
+
+    ⚠️ 这里必须过滤 `review_status='approved'`：企业发布的岗位初始为 `pending`，
+    只有管理员审核通过后才应出现在学员端。此前 SQL 是 `WHERE 1=1`，
+    导致**未审核岗位发布即可见**、内容审核形同虚设（2026-10-06 修复）。
+    历史遗留行的 review_status 默认即 `'approved'`，不受影响；
+    取值用 `= 'approved'`（fail-closed：万一为 NULL 也不会漏出）。
+    """
+    result = get_job_listings_base(keyword, location, salary_range)
+    if category:
+        result = [j for j in result if (j.get('category') or '') == category]
+    return result
+
+
+def count_pending_job_listings():
+    """尚未通过审核（待审 / 已驳回）的企业岗位条数。
+
+    学员端拿不到这些岗位，所以当它们在库里占满全部企业岗位时，
+    列表会出现「一条企业岗都没有」的现象。前端需要据此说明
+    「不是平台没有岗位，而是岗位正在审核中」——
+    否则学员只会看到一句「未找到匹配的职位」，以为平台是空的。
+    """
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM job_listings WHERE category = ? AND id != ? LIMIT ?",
-                        (category, job_id, limit)).fetchall()
+    n = conn.execute(
+        "SELECT COUNT(*) FROM job_listings WHERE COALESCE(review_status, '') != 'approved'"
+    ).fetchone()[0]
+    conn.close()
+    return n
+
+
+def get_similar_jobs(job_id, category, limit=3):
+    """获取同分类相似职位（同样只返回已通过审核的，避免从"相似职位"绕出未审核岗位）"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM job_listings WHERE category = ? AND id != ? AND review_status = 'approved' LIMIT ?",
+        (category, job_id, limit)).fetchall()
     conn.close()
     result = []
     for r in rows:
@@ -1573,7 +2361,7 @@ def get_user_applications(user_id, status_filter=None):
     if status_filter and status_filter != 'all':
         rows = conn.execute("""
             SELECT ja.id, ja.user_id, ja.job_id, ja.status, ja.applied_at,
-                   jl.title, jl.company, jl.salary, jl.location, jl.category
+                   jl.title, jl.company, jl.salary, jl.location, jl.category, jl.enterprise_id
             FROM job_applications ja
             JOIN job_listings jl ON ja.job_id = jl.id
             WHERE ja.user_id = ? AND ja.status = ?
@@ -1582,7 +2370,7 @@ def get_user_applications(user_id, status_filter=None):
     else:
         rows = conn.execute("""
             SELECT ja.id, ja.user_id, ja.job_id, ja.status, ja.applied_at,
-                   jl.title, jl.company, jl.salary, jl.location, jl.category
+                   jl.title, jl.company, jl.salary, jl.location, jl.category, jl.enterprise_id
             FROM job_applications ja
             JOIN job_listings jl ON ja.job_id = jl.id
             WHERE ja.user_id = ?
@@ -1608,23 +2396,367 @@ def get_employment_stats(user_id):
     conn = get_connection()
     applied = conn.execute("SELECT COUNT(*) FROM job_applications WHERE user_id = ?", (user_id,)).fetchone()[0]
     saved = conn.execute("SELECT COUNT(*) FROM saved_jobs WHERE user_id = ?", (user_id,)).fetchone()[0]
+    intents = conn.execute("SELECT COUNT(*) FROM job_intents WHERE user_id = ?", (user_id,)).fetchone()[0]
     conn.close()
-    return {'applied': applied, 'saved': saved, 'messages': 0}
+    return {'applied': applied, 'saved': saved, 'intents': intents, 'messages': 0}
+
+
+# ==================== 就业对接：能力档案 / 在线简历 / 求职意向 ====================
+
+# 简历可写字段白名单。`ai_used` 刻意不在其中 —— 它只能由 AI 生成接口置位，
+# 否则学员可以传 ai_used=0 伪装成「完全自己写的」。
+RESUME_FIELDS = ('title', 'region', 'education', 'work_years', 'phone', 'email',
+                 'self_eval', 'skills', 'experience')
+
+
+def get_learner_profile(user_id):
+    """聚合学员的**真实**学习数据，作为「能力档案」与 AI 简历的唯一素材来源。
+
+    ⚠️ 每一项都必须来自库里真实存在的数据，**代码不得补默认值凑数**：
+    这些数据会原样交给 AI 当写作素材，凭空补的默认值等于让 AI 编造。
+    某项没有数据就返回空列表 / 0，由前端决定「暂无」怎么呈现（宁缺勿编）。
+    """
+    conn = get_connection()
+    profile = {
+        'basic': {}, 'certificates': [], 'points': 0,
+        'learning': None, 'training': [],
+    }
+
+    u = conn.execute(
+        "SELECT username, name, email, phone, bio, region FROM users WHERE username = ?",
+        (user_id,)).fetchone()
+    if u:
+        profile['basic'] = {
+            'username': u['username'], 'name': u['name'] or '',
+            'email': u['email'] or '', 'phone': u['phone'] or '',
+            'bio': u['bio'] or '', 'region': u['region'] or '',
+        }
+
+    # 证书：只有 status='earned' 才算「已获得」，其余如实带出状态
+    #（否则 AI 会把「进行中 75%」的证书写成「已获得」，属于事实性错误）
+    for r in conn.execute(
+            "SELECT name, status, progress, date FROM certificates WHERE user_id = ? ORDER BY id",
+            (user_id,)):
+        profile['certificates'].append({
+            'name': r['name'], 'status': r['status'],
+            'earned': (r['status'] == 'earned'),
+            'progress': r['progress'] or 0, 'date': r['date'] or '',
+        })
+
+    p = conn.execute("SELECT balance FROM points WHERE user_id = ?", (user_id,)).fetchone()
+    if p:
+        profile['points'] = p['balance'] or 0
+
+    # 学习进度：历史数据里 students.user_id 常为空串，故用姓名兜底匹配
+    name = profile['basic'].get('name') or ''
+    st = conn.execute(
+        "SELECT direction, progress FROM students "
+        "WHERE user_id = ? OR (name <> '' AND name = ?) LIMIT 1",
+        (user_id, name)).fetchone()
+    if st:
+        profile['learning'] = {'direction': st['direction'] or '',
+                               'progress': st['progress'] or 0}
+
+    # 实训成绩：assignment_submissions.student_id 存的是 username。
+    # ⚠️ score 列 = **教师批改分**（2026-10-07 起语义变更，系统规则分存 content.rule_score）。
+    #    未批改时为 NULL → scored=False，让 AI 说「待老师批改」，绝不能把规则分或 0 说成成绩。
+    for r in conn.execute("""
+            SELECT a.title, s.score, s.status, s.submitted_at
+              FROM assignment_submissions s
+              LEFT JOIN assignments a ON s.assignment_id = a.id
+             WHERE s.student_id = ?
+             ORDER BY s.submitted_at DESC LIMIT 10
+    """, (user_id,)):
+        score = r['score']
+        graded = isinstance(score, int)
+        profile['training'].append({
+            'title': (r['title'] or '实训作业'),
+            'score': score if graded else None,
+            'scored': graded,
+            'status': r['status'] or '',
+            'submitted_at': r['submitted_at'] or '',
+        })
+
+    conn.close()
+    return profile
+
+
+def get_resume(user_id):
+    """读取学员的在线简历（没有则返回 None）。experience 解析为列表。"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM resumes WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    d = dict(row)
+    try:
+        d['experience'] = json.loads(d.get('experience') or '[]')
+    except Exception:
+        d['experience'] = []
+    return d
+
+
+def save_resume(user_id, data):
+    """新增或更新在线简历（一人一份），返回保存后的记录。
+
+    ⚠️ 只接受 RESUME_FIELDS 白名单字段（防越权改写 user_id / ai_used）。
+    ⚠️ 更新时用 UPDATE 而非「先删后插」，否则 id 会变、创建时间会丢。
+    """
+    existing = get_resume(user_id)
+    payload = {}
+    for k in RESUME_FIELDS:
+        if k not in data:
+            continue
+        v = data[k]
+        if k == 'experience':
+            clean = []
+            for item in (v if isinstance(v, list) else [])[:20]:
+                if not isinstance(item, dict):
+                    continue
+                clean.append({
+                    'company': str(item.get('company') or '')[:100],
+                    'position': str(item.get('position') or '')[:100],
+                    'period': str(item.get('period') or '')[:50],
+                    'desc': str(item.get('desc') or '')[:2000],
+                })
+            payload[k] = json.dumps(clean, ensure_ascii=False)
+        else:
+            payload[k] = str(v or '')[:5000]
+
+    conn = get_connection()
+    if not existing:
+        cols = ['user_id'] + list(payload.keys())
+        vals = [user_id] + list(payload.values())
+        conn.execute(
+            "INSERT INTO resumes (%s) VALUES (%s)" % (', '.join(cols), ', '.join('?' * len(cols))),
+            vals)
+    elif payload:
+        sets = ', '.join('%s = ?' % c for c in payload)
+        conn.execute(
+            "UPDATE resumes SET %s, updated_at = datetime('now','localtime') WHERE user_id = ?" % sets,
+            list(payload.values()) + [user_id])
+    conn.commit()
+    conn.close()
+    return get_resume(user_id)
+
+
+def mark_resume_ai_used(user_id):
+    """把简历标记为「使用过 AI 辅助」。前端据此如实提示，不隐瞒 AI 参与。"""
+    conn = get_connection()
+    row = conn.execute("SELECT id FROM resumes WHERE user_id = ?", (user_id,)).fetchone()
+    if row:
+        conn.execute("UPDATE resumes SET ai_used = 1, updated_at = datetime('now','localtime') "
+                     "WHERE user_id = ?", (user_id,))
+    else:
+        conn.execute("INSERT INTO resumes (user_id, ai_used) VALUES (?, 1)", (user_id,))
+    conn.commit()
+    conn.close()
+
+
+def add_job_intent(user_id, recruit_key, note=''):
+    """登记对某条公开招聘公告的求职意向（幂等，重复登记只更新备注）。
+
+    返回 True 表示新建、False 表示更新已有。
+    ⚠️ 这里**只记录意向**，不代表报名成功 —— 报名由学员按公告原文自行完成。
+    """
+    conn = get_connection()
+    row = conn.execute("SELECT id FROM job_intents WHERE user_id = ? AND recruit_key = ?",
+                       (user_id, recruit_key)).fetchone()
+    if row:
+        conn.execute("UPDATE job_intents SET note = ? WHERE id = ?",
+                     (str(note or '')[:500], row['id']))
+        created = False
+    else:
+        conn.execute("INSERT INTO job_intents (user_id, recruit_key, note) VALUES (?, ?, ?)",
+                     (user_id, recruit_key, str(note or '')[:500]))
+        created = True
+    conn.commit()
+    conn.close()
+    return created
+
+
+def remove_job_intent(user_id, recruit_key):
+    """取消求职意向登记。返回 True 表示确有记录被删除。"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM job_intents WHERE user_id = ? AND recruit_key = ?",
+                       (user_id, recruit_key))
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected > 0
+
+
+def get_job_intents(user_id):
+    """获取学员登记的全部求职意向（按登记时间倒序）。"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT recruit_key, note, created_at FROM job_intents "
+        "WHERE user_id = ? ORDER BY created_at DESC, id DESC", (user_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 # ==================== 资源 ====================
 
-def get_success_cases():
-    """获取成功案例"""
+# 成功案例的审核类型标识（走通用 content_reviews 链路，与 course/job/procurement/model_3d 同级）
+CASE_REVIEW_TYPE = 'success_case'
+
+
+def get_success_cases(only_approved=True):
+    """获取成功案例
+
+    内容唯一事实源 = cases_data.py（不读数据库）。
+    按 pest_data.py 的既有约定：改完 cases_data.py 重启服务即生效，无需 init_db()。
+
+    ⚠️ 审核：案例需经**超级管理员**审核通过才对学员端可见。
+    审核状态复用 `content_reviews`（`content_type='success_case'`、`content_id=案例 id`），
+    由 `_seed_case_reviews()` 在 init_db() 时为每条案例补一条 pending 记录。
+    `only_approved=False` 仅给管理端/自检用（看到含未通过的全部案例）。
+    """
+    import cases_data
+    cases = cases_data.get_cases()
+    if not only_approved:
+        return cases
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM success_cases").fetchall()
+    rows = conn.execute(
+        "SELECT content_id FROM content_reviews WHERE content_type = ? AND status = 'approved'",
+        (CASE_REVIEW_TYPE,)).fetchall()
     conn.close()
-    result = []
+    approved = {r['content_id'] for r in rows}
+    return [c for c in cases if c['id'] in approved]
+
+
+def get_case_review_stats():
+    """案例审核统计（供前端区分"审核中"与"加载失败"，避免把待审当成没数据）。"""
+    import cases_data
+    cases = cases_data.get_cases()
+    valid = {c['id'] for c in cases}
+    total = len(cases)
+
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT content_id, status, COUNT(*) AS n FROM content_reviews "
+        "WHERE content_type = ? GROUP BY content_id, status",
+        (CASE_REVIEW_TYPE,)).fetchall()
+    conn.close()
+
+    stat = {'approved': 0, 'pending': 0, 'rejected': 0}
+    covered = 0
     for r in rows:
-        d = dict(r)
-        d['stats'] = json.loads(d['stats'])
-        result.append(d)
-    return result
+        if r['content_id'] not in valid:
+            continue          # 已被 cases_data 删掉的案例，不计入
+        covered += r['n']
+        if r['status'] in stat:
+            # 查询按 (content_id, status) 分组 —— 这里必须**累加**，不能赋值
+            stat[r['status']] += r['n']
+
+    stat['total'] = total
+    # 还没有任何审核记录的案例（如刚加进 cases_data.py、尚未跑过 init_db）一律按待审计。
+    # ⚠️ 这里必须用 total - covered（未被覆盖的数），不能只减 approved/rejected ——
+    #    否则已计入 pending 的行会被重复统计（混合状态时 pending 虚高）。
+    stat['pending'] += max(0, total - covered)
+    return {'case_review': stat}
+
+
+def get_case_notes():
+    """案例页口径说明文案（与内容同源，避免前端硬编码漂移）。"""
+    import cases_data
+    return {
+        "source_note": cases_data.CASE_SOURCE_NOTE,
+        "lessons_note": cases_data.LESSONS_NOTE,
+    }
+
+
+def get_policy_notes():
+    """政策页口径说明文案（来源说明 + 免责声明，与内容同源）。"""
+    import policies_data
+    return policies_data.get_policy_notes()
+
+
+# ---- 政策分类归一化 ----
+# ⚠️ 政府端发布表单里「综合」那一项的 value 是**英文** general
+#    （government.html: `<option value="general">综合</option>`），
+#    而后端原先不做任何归一化、直接入库。
+#    学员端的分类筛选按钮与标签配色都按**中文**分类走 →
+#    结果是：学员会看到一张标签写着英文「general」、底色还是「补贴」绿的政策卡片，
+#    而且点任何分类筛选都找不到它（界面看起来像这条政策凭空消失了）。
+#    历史库里已经可能存有 general，故在 getter 收口处（_attach_policy_sources）也归一化一次。
+_POLICY_CATEGORY_ALIASES = {
+    'general': '综合',
+    'other': '综合',
+    '综合': '综合',
+    '其他': '综合',
+}
+
+
+def normalize_policy_category(value):
+    """把政策分类归一化成面向学员的中文分类。
+
+    未知分类**原样返回**（不臆造、不强行塞进已有分类）——
+    真实出现了新分类时，前端会按数据动态生成对应的筛选项。
+    """
+    v = str(value or '').strip()
+    if not v:
+        return '综合'
+    return _POLICY_CATEGORY_ALIASES.get(v.lower(), v)
+
+
+def _attach_policy_sources(d):
+    """把 policy 行的 source 字段（JSON 文本）解析成 sources 列表，供前端直接渲染出处。"""
+    raw = d.pop('source', '') or ''
+    try:
+        d['sources'] = json.loads(raw) if raw else []
+    except (ValueError, TypeError):
+        d['sources'] = []
+    # 分类归一化也放在这里：本函数是**所有**政策 getter 的公共收口
+    # （get_policies / get_government_policies / get_all_government_policies / get_policy_by_id），
+    # 在这里统一处理，历史脏数据（category='general'）无需迁移即可被修正。
+    d['category'] = normalize_policy_category(d.get('category'))
+    return d
+
+
+# ---- 政府端政策输入归一化 ----
+# 政府端表单收的是「人写的文本」，落库前统一转成学员端渲染器认识的形状。
+# ⚠️ 这三个函数是**唯一**的转换入口：create_policy / update_policy 都从这里过，
+#    别在 app.py 里另写一份（历史坑：写入侧与读取侧对同一列的理解不一致）。
+
+def policy_sources_to_json(text):
+    """把「资料来源」文本框转成 source 列要的 JSON 数组。
+
+    约定：一行一条来源，写作 `来源名称` 或 `来源名称 | URL`。
+    · 空输入 → `[]`（**宁缺勿编**：学员端据此不显示「文号与数据均可溯源」的口径说明，
+      因为那条口径是对来源区块的背书，没有来源就不成立）；
+    · URL 必须是 http(s)，否则只留名称（前端也能渲染成纯文本）。
+    """
+    items = []
+    for line in str(text or '').splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [x.strip() for x in line.split('|')]
+        title = parts[0]
+        if not title:
+            continue
+        item = {'title': title}
+        url = parts[1] if len(parts) > 1 else ''
+        if re.match(r'^https?://', url, re.I):
+            item['url'] = url
+        items.append(item)
+    return json.dumps(items, ensure_ascii=False)
+
+
+def default_policy_summary(content, limit=60):
+    """摘要留空时，从**正文自己**取首段（不是另写一句通用话术）。
+
+    跳过 `【小标题】` 行与 `•`/`-` 列表符号行，取第一段真正的正文；
+    超长才省略号。正文为空则返回空串 —— 此时学员端卡片不渲染摘要行（不用占位充数）。
+    """
+    for line in str(content or '').splitlines():
+        s = line.strip().lstrip('•-').strip()
+        if not s or (s.startswith('【') and s.endswith('】')):
+            continue
+        return s[:limit] + ('…' if len(s) > limit else '')
+    return ''
 
 
 def get_policies():
@@ -1632,24 +2764,804 @@ def get_policies():
     conn = get_connection()
     rows = conn.execute("SELECT * FROM policies").fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    return [_attach_policy_sources(dict(r)) for r in rows]
 
 
 # ==================== 教师仪表板 ====================
 
 def get_dashboard_stats():
-    """获取教师仪表板统计"""
-    conn = get_connection()
-    total = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-    earned = conn.execute("SELECT COUNT(*) FROM certificates WHERE status = 'earned'").fetchone()[0]
-    total_certs = conn.execute("SELECT COUNT(*) FROM certificates").fetchone()[0]
-    avg_progress = conn.execute("SELECT AVG(progress) FROM students").fetchone()[0] or 0
-    conn.close()
+    """获取教师仪表板统计（口径：教师名册表 students + 证书真实完成度）。
 
-    completion_rate = int((earned / total_certs * 100)) if total_certs > 0 else 0
+    2026-10-07 修正（两处）：
+    ① 原实现把 certificates **全表**（含教师本人等非学员的证书）当作「学员已获证书」，
+       现改为只统计名册中**已关联平台账号**（students.user_id = username）的学员证书；
+       完成率 = 名册中至少获得 1 张证书的学员占比。
+    ② avg_score（界面文案「平均进度」）原取 students.progress 的平均值 —— 那是**手填**
+       字段，学员端没有任何入口会更新它。现改用证书真实完成度（见 get_roster_completion）。
+    """
+    roster = get_roster_completion()
+    total = len(roster)
+    earned = sum(r['cert_earned'] for r in roster)
+    with_cert = sum(1 for r in roster if r['cert_earned'] > 0)
+    with_data = [r for r in roster if r['has_cert_data']]
+    avg_completion = (sum(r['completion'] for r in with_data) / len(with_data)) if with_data else 0
     return {
         "total_students": total,
         "certificates_earned": earned,
-        "completion_rate": completion_rate,
-        "avg_score": int(avg_progress)
+        "completion_rate": int(with_cert / total * 100) if total > 0 else 0,
+        "avg_score": int(round(avg_completion)),
+        "no_cert_count": total - len(with_data)
+    }
+
+# ==================== 用户注册和管理 ====================
+
+def register_user(username, password, name, role='student', email='', phone='',
+                  company_name='', region=''):
+    """注册新用户"""
+    conn = get_connection()
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        conn.close()
+        return None, "用户名已存在"
+    pw_hash = hash_password(password)
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO users (username, password_hash, name, role, email, phone, company_name, region) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (username, pw_hash, name, role, email, phone, company_name, region))
+    conn.commit()
+    conn.close()
+    return username, "注册成功"
+
+
+def get_user_by_id(user_id):
+    """根据用户名获取用户信息"""
+    conn = get_connection()
+    user = conn.execute("SELECT * FROM users WHERE username = ?", (user_id,)).fetchone()
+    conn.close()
+    return dict(user) if user else None
+
+
+def get_all_users(search=None, role=None):
+    """获取所有用户列表（管理员视角）"""
+    conn = get_connection()
+    query = "SELECT * FROM users WHERE 1=1"
+    params = []
+    if search:
+        query += " AND (username LIKE ? OR name LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%'])
+    if role:
+        query += " AND role = ?"
+        params.append(role)
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def update_user_by_admin(user_id, name=None, role=None, status=None, phone=None, email=None):
+    """管理员编辑用户"""
+    conn = get_connection()
+    user = conn.execute("SELECT * FROM users WHERE username = ?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return False
+    updates = []
+    params = []
+    if name is not None:
+        updates.append("name = ?"); params.append(name)
+    if role is not None:
+        updates.append("role = ?"); params.append(role)
+    if status is not None:
+        updates.append("status = ?"); params.append(status)
+    if phone is not None:
+        updates.append("phone = ?"); params.append(phone)
+    if email is not None:
+        updates.append("email = ?"); params.append(email)
+    if updates:
+        params.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = ?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_user_by_admin(user_id):
+    """管理员删除用户"""
+    conn = get_connection()
+    conn.execute("DELETE FROM users WHERE username = ?", (user_id,))
+    conn.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+    conn.execute("DELETE FROM points WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+def update_user_profile(user_id, name=None, email=None, phone=None, avatar_url=None,
+                        bio=None, company_name=None, region=None):
+    """更新用户个人资料（扩展版）"""
+    conn = get_connection()
+    updates = []
+    params = []
+    if name is not None: updates.append("name = ?"); params.append(name)
+    if email is not None: updates.append("email = ?"); params.append(email)
+    if phone is not None: updates.append("phone = ?"); params.append(phone)
+    if avatar_url is not None: updates.append("avatar_url = ?"); params.append(avatar_url)
+    if bio is not None: updates.append("bio = ?"); params.append(bio)
+    if company_name is not None: updates.append("company_name = ?"); params.append(company_name)
+    if region is not None: updates.append("region = ?"); params.append(region)
+    if updates:
+        params.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE username = ?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 内容审核 ====================
+
+def create_content_review(content_type, content_id, submitter_id):
+    """创建内容审核记录"""
+    conn = get_connection()
+    conn.execute(
+        "INSERT INTO content_reviews (content_type, content_id, submitter_id) VALUES (?, ?, ?)",
+        (content_type, content_id, submitter_id))
+    conn.commit()
+    conn.close()
+
+
+def get_pending_reviews(content_type=None):
+    """获取待审核列表"""
+    conn = get_connection()
+    if content_type:
+        rows = conn.execute(
+            "SELECT * FROM content_reviews WHERE status = 'pending' AND content_type = ? ORDER BY created_at DESC",
+            (content_type,)).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM content_reviews WHERE status = 'pending' ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def approve_review(review_id, reviewer_id):
+    """审核通过"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE content_reviews SET status='approved', reviewed_by=?, reviewed_at=datetime('now','localtime') WHERE id=?",
+        (reviewer_id, review_id))
+    review = conn.execute("SELECT * FROM content_reviews WHERE id=?", (review_id,)).fetchone()
+    if review:
+        ct, cid = review['content_type'], review['content_id']
+        # 注：success_case 不需要回写目标表 —— 案例内容在 cases_data.py，
+        #     「是否可见」完全由这张 content_reviews 的 status 决定（见 get_success_cases）。
+        if ct == 'course':
+            conn.execute("UPDATE courses SET review_status='approved', is_published=1 WHERE id=?", (cid,))
+        elif ct == 'job':
+            conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (cid,))
+        elif ct == 'procurement':
+            conn.execute("UPDATE procurements SET review_status='approved' WHERE id=?", (cid,))
+        elif ct == 'model_3d':
+            conn.execute("UPDATE models_3d SET review_status='approved', is_published=1 WHERE id=?", (cid,))
+    conn.commit()
+    conn.close()
+
+
+def reject_review(review_id, reviewer_id, comment=''):
+    """审核拒绝。
+
+    ⚠️ 必须与 `approve_review()` **对称地回写目标表的 `review_status`** ——
+       此前只改 content_reviews，导致岗位被驳回后企业端一直显示「待审核」，
+       企业会以为还在排队等审（2026-10-07 修）。`success_case` 仍不需要回写，
+       它的可见性完全由本表的 status 决定（见 `get_success_cases`）。
+    """
+    conn = get_connection()
+    conn.execute(
+        "UPDATE content_reviews SET status='rejected', reviewed_by=?, review_comment=?, reviewed_at=datetime('now','localtime') WHERE id=?",
+        (reviewer_id, comment, review_id))
+    review = conn.execute("SELECT * FROM content_reviews WHERE id=?", (review_id,)).fetchone()
+    if review:
+        ct, cid = review['content_type'], review['content_id']
+        if ct == 'course':
+            conn.execute("UPDATE courses SET review_status='rejected' WHERE id=?", (cid,))
+        elif ct == 'job':
+            conn.execute("UPDATE job_listings SET review_status='rejected' WHERE id=?", (cid,))
+        elif ct == 'procurement':
+            conn.execute("UPDATE procurements SET review_status='rejected' WHERE id=?", (cid,))
+        elif ct == 'model_3d':
+            conn.execute("UPDATE models_3d SET review_status='rejected' WHERE id=?", (cid,))
+    conn.commit()
+    conn.close()
+
+
+def get_review_by_content(content_type, content_id):
+    """获取内容的审核记录"""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM content_reviews WHERE content_type=? AND content_id=? ORDER BY id DESC LIMIT 1",
+        (content_type, content_id)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+# ==================== 轮播图 ====================
+
+def get_carousels(active_only=True):
+    """获取轮播图列表"""
+    conn = get_connection()
+    if active_only:
+        rows = conn.execute(
+            "SELECT * FROM carousels WHERE is_active=1 ORDER BY sort_order").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM carousels ORDER BY sort_order").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_carousel(title, image_url, link_url='', sort_order=0):
+    """添加轮播图"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
+        (title, image_url, link_url, sort_order))
+    conn.commit()
+    car_id = cursor.lastrowid
+    conn.close()
+    return car_id
+
+
+def update_carousel(car_id, **kwargs):
+    """更新轮播图"""
+    conn = get_connection()
+    allowed = {'title', 'image_url', 'link_url', 'sort_order', 'is_active'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [car_id]
+        conn.execute(f"UPDATE carousels SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_carousel(car_id):
+    """删除轮播图"""
+    conn = get_connection()
+    conn.execute("DELETE FROM carousels WHERE id=?", (car_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 系统公告 ====================
+
+def get_system_announcements(active_only=True):
+    """获取系统公告"""
+    conn = get_connection()
+    if active_only:
+        rows = conn.execute(
+            "SELECT * FROM system_announcements WHERE is_active=1 ORDER BY is_pinned DESC, created_at DESC"
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM system_announcements ORDER BY is_pinned DESC, created_at DESC"
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def add_system_announcement(title, content, is_pinned=0, created_by=''):
+    """新增系统公告"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO system_announcements (title, content, is_pinned, created_by) VALUES (?, ?, ?, ?)",
+        (title, content, is_pinned, created_by))
+    conn.commit()
+    ann_id = cursor.lastrowid
+    conn.close()
+    return ann_id
+
+
+def delete_system_announcement(ann_id):
+    """删除系统公告（软删除）"""
+    conn = get_connection()
+    conn.execute("UPDATE system_announcements SET is_active=0 WHERE id=?", (ann_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 课程 ====================
+
+def create_course(title, description, category, teacher_id, cover_url=''):
+    """教师创建课程"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO courses (title, description, category, teacher_id, cover_url) VALUES (?, ?, ?, ?, ?)",
+        (title, description, category, teacher_id, cover_url))
+    conn.commit()
+    course_id = cursor.lastrowid
+    conn.close()
+    # 创建审核记录
+    create_content_review('course', course_id, teacher_id)
+    return course_id
+
+
+def get_courses(teacher_id=None, published_only=True):
+    """获取课程列表"""
+    conn = get_connection()
+    query = "SELECT * FROM courses WHERE 1=1"
+    params = []
+    if teacher_id:
+        query += " AND teacher_id = ?"
+        params.append(teacher_id)
+    if published_only:
+        query += " AND is_published = 1"
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_course(course_id):
+    """获取单个课程"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM courses WHERE id = ?", (course_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def update_course(course_id, **kwargs):
+    """更新课程"""
+    conn = get_connection()
+    allowed = {'title', 'description', 'category', 'cover_url'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [course_id]
+        conn.execute(f"UPDATE courses SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_course(course_id):
+    """删除课程及关联素材"""
+    conn = get_connection()
+    conn.execute("DELETE FROM course_materials WHERE course_id = ?", (course_id,))
+    conn.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+    conn.execute("DELETE FROM content_reviews WHERE content_type='course' AND content_id=?", (course_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 课程素材 ====================
+
+def add_course_material(course_id, material_type, file_name, file_path, file_size=0):
+    """添加课程素材"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO course_materials (course_id, material_type, file_name, file_path, file_size) VALUES (?, ?, ?, ?, ?)",
+        (course_id, material_type, file_name, file_path, file_size))
+    conn.commit()
+    mat_id = cursor.lastrowid
+    conn.close()
+    return mat_id
+
+
+def get_course_materials(course_id):
+    """获取课程素材列表"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM course_materials WHERE course_id = ? ORDER BY sort_order", (course_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_course_material(mat_id):
+    """删除课程素材"""
+    conn = get_connection()
+    row = conn.execute("SELECT file_path FROM course_materials WHERE id = ?", (mat_id,)).fetchone()
+    conn.execute("DELETE FROM course_materials WHERE id = ?", (mat_id,))
+    conn.commit()
+    conn.close()
+    return row['file_path'] if row else None
+
+
+# ==================== 3D 模型 ====================
+
+def create_model_3d(title, description, craft_type, file_path, file_name, file_size, teacher_id, thumbnail_url=''):
+    """上传3D模型"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO models_3d (title, description, craft_type, file_path, file_name, file_size, thumbnail_url, teacher_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (title, description, craft_type, file_path, file_name, file_size, thumbnail_url, teacher_id))
+    conn.commit()
+    model_id = cursor.lastrowid
+    conn.close()
+    create_content_review('model_3d', model_id, teacher_id)
+    return model_id
+
+
+def get_models_3d(teacher_id=None, published_only=True):
+    """获取3D模型列表"""
+    conn = get_connection()
+    query = "SELECT * FROM models_3d WHERE 1=1"
+    params = []
+    if teacher_id:
+        query += " AND teacher_id = ?"
+        params.append(teacher_id)
+    if published_only:
+        query += " AND is_published = 1"
+    query += " ORDER BY created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def delete_model_3d(model_id):
+    """删除3D模型"""
+    conn = get_connection()
+    row = conn.execute("SELECT file_path FROM models_3d WHERE id = ?", (model_id,)).fetchone()
+    conn.execute("DELETE FROM models_3d WHERE id = ?", (model_id,))
+    conn.execute("DELETE FROM content_reviews WHERE content_type='model_3d' AND content_id=?", (model_id,))
+    conn.commit()
+    conn.close()
+    return row['file_path'] if row else None
+
+
+# ==================== 评论 ====================
+
+def add_comment(target_type, target_id, user_id, content):
+    """添加评论"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO comments (target_type, target_id, user_id, content) VALUES (?, ?, ?, ?)",
+        (target_type, target_id, user_id, content))
+    conn.commit()
+    comment_id = cursor.lastrowid
+    # 更新讨论区评论计数
+    if target_type == 'discussion':
+        conn.execute("UPDATE discussions SET comment_count = comment_count + 1 WHERE id = ?", (target_id,))
+        conn.commit()
+    conn.close()
+    return comment_id
+
+
+def get_comments(target_type, target_id):
+    """获取评论列表"""
+    conn = get_connection()
+    rows = conn.execute(
+        """SELECT c.*, u.name as user_name, u.avatar_url
+           FROM comments c LEFT JOIN users u ON c.user_id = u.username
+           WHERE c.target_type = ? AND c.target_id = ? AND c.is_deleted = 0
+           ORDER BY c.created_at ASC""",
+        (target_type, target_id)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def soft_delete_comment(comment_id, deleted_by=''):
+    """软删除评论"""
+    conn = get_connection()
+    conn.execute("UPDATE comments SET is_deleted=1, deleted_by=? WHERE id=?", (deleted_by, comment_id))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 讨论区 ====================
+
+def create_discussion(title, content, category, user_id):
+    """创建讨论帖"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO discussions (title, content, category, user_id) VALUES (?, ?, ?, ?)",
+        (title, content, category, user_id))
+    conn.commit()
+    disc_id = cursor.lastrowid
+    conn.close()
+    return disc_id
+
+
+def get_discussions(category=None, page=1, page_size=20):
+    """获取讨论区列表（分页）"""
+    conn = get_connection()
+    query = "SELECT d.*, u.name as user_name FROM discussions d LEFT JOIN users u ON d.user_id = u.username WHERE d.is_deleted = 0"
+    params = []
+    if category:
+        query += " AND d.category = ?"
+        params.append(category)
+    query += " ORDER BY d.is_pinned DESC, d.created_at DESC LIMIT ? OFFSET ?"
+    params.extend([page_size, (page - 1) * page_size])
+    rows = conn.execute(query, params).fetchall()
+    total = conn.execute(
+        "SELECT COUNT(*) FROM discussions WHERE is_deleted = 0" +
+        (f" AND category = ?" if category else ""),
+        (category,) if category else ()).fetchone()[0]
+    conn.close()
+    return [dict(r) for r in rows], total
+
+
+def get_discussion(disc_id):
+    """获取讨论详情"""
+    conn = get_connection()
+    conn.execute("UPDATE discussions SET view_count = view_count + 1 WHERE id = ?", (disc_id,))
+    row = conn.execute(
+        "SELECT d.*, u.name as user_name FROM discussions d LEFT JOIN users u ON d.user_id = u.username WHERE d.id = ?",
+        (disc_id,)).fetchone()
+    conn.commit()
+    conn.close()
+    return dict(row) if row else None
+
+
+def soft_delete_discussion(disc_id):
+    """软删除讨论帖"""
+    conn = get_connection()
+    conn.execute("UPDATE discussions SET is_deleted = 1 WHERE id = ?", (disc_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 农产品求购 ====================
+
+def create_procurement(product_name, enterprise_id, specification='', quantity='',
+                       price_range='', delivery_location='', deadline='',
+                       contact_info='', description=''):
+    """企业发布求购"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO procurements (product_name, specification, quantity, price_range, "
+        "delivery_location, deadline, contact_info, description, enterprise_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (product_name, specification, quantity, price_range, delivery_location,
+         deadline, contact_info, description, enterprise_id))
+    conn.commit()
+    proc_id = cursor.lastrowid
+    conn.close()
+    create_content_review('procurement', proc_id, enterprise_id)
+    return proc_id
+
+
+def get_procurements(enterprise_id=None, status=None, published_only=True):
+    """获取求购列表"""
+    conn = get_connection()
+    query = "SELECT p.*, u.company_name, u.region as enterprise_region FROM procurements p LEFT JOIN users u ON p.enterprise_id = u.username WHERE 1=1"
+    params = []
+    if enterprise_id:
+        query += " AND p.enterprise_id = ?"
+        params.append(enterprise_id)
+    if status:
+        query += " AND p.status = ?"
+        params.append(status)
+    if published_only:
+        query += " AND p.review_status = 'approved'"
+    query += " ORDER BY p.created_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def update_procurement(proc_id, **kwargs):
+    """更新求购"""
+    conn = get_connection()
+    allowed = {'product_name', 'specification', 'quantity', 'price_range',
+               'delivery_location', 'deadline', 'contact_info', 'description', 'status'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if updates:
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [proc_id]
+        conn.execute(f"UPDATE procurements SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_procurement(proc_id):
+    """删除求购"""
+    conn = get_connection()
+    conn.execute("DELETE FROM procurements WHERE id = ?", (proc_id,))
+    conn.execute("DELETE FROM content_reviews WHERE content_type='procurement' AND content_id=?", (proc_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 新闻资讯（2026-10-07 整体下架） ====================
+# 用户拍板：政府端「新闻资讯」整块去掉。
+# 依据（实测）：`news_articles` 的**唯一消费者就是政府端那一个页面** ——
+#   · 写入只有 `/api/government/news`（POST，仅 government 角色）；
+#   · 公开的 `/api/resources/news` + `/<id>` 虽然存在，但 script.js / index.html **零调用**
+#     → 学员端 / 教师端 / 管理端 / 企业端**没有任何入口**能看到资讯，
+#       也就是说政务人员发出去的资讯只有他自己看得见（纯单向黑洞）。
+# 故连同 4 条政府端路由 + 2 条公开路由 + 下面 5 个函数一并移除。
+# ⚠️ `news_articles` 表**保留**（不做 DROP，历史数据仍在），只是不再有任何读写入口。
+#    若将来要把资讯真正推到学员端，从这里恢复读写即可。
+
+
+# ==================== 政府政策 ====================
+
+def create_policy(title, content, category, author_id,
+                  summary='', date='', source_text=''):
+    """发布政策（政府端）。
+
+    ⚠️ summary / date / source 必须一起写入（原实现只写 4 列）：
+       学员端政策卡片会渲染「摘要」与「发布日期」两行，任一为空就整行不渲染；
+       政府端刚发布的政策于是成了一张**没有摘要、没有日期、也没有资料来源**的残缺卡片，
+       夹在 5 条预置政策（各有 32–42 字摘要 + 日期 + 4 条来源）中间格外突兀，
+       点进详情还会看到「文号与数据均可溯源」这句**它并不具备**的背书。
+    · summary 留空 → 取正文首段（default_policy_summary）；
+    · date 留空 → 由调用方传当天（app.py），这里不再兜底，避免藏住"没填"这件事；
+    · source_text 是表单原文（一行一条），在这里转成 source 列要的 JSON。
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO government_policies "
+        "(title, content, category, author_id, summary, date, source) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (title, content, category, author_id,
+         summary or default_policy_summary(content), date,
+         policy_sources_to_json(source_text)))
+    conn.commit()
+    policy_id = cursor.lastrowid
+    conn.close()
+    return policy_id
+
+
+def get_government_policies(category=None):
+    """获取政府政策列表"""
+    conn = get_connection()
+    query = "SELECT * FROM government_policies WHERE is_published = 1"
+    params = []
+    if category:
+        query += " AND category = ?"
+        params.append(category)
+    # 排序：政策发布日期优先；未填日期的（政府端新发布的）退回按发布时间
+    query += " ORDER BY COALESCE(NULLIF(date, ''), substr(created_at, 1, 10)) DESC, id DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [_attach_policy_sources(dict(r)) for r in rows]
+
+
+def get_all_government_policies():
+    """获取所有政府政策（含未发布，政府端使用）"""
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM government_policies ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [_attach_policy_sources(dict(r)) for r in rows]
+
+
+def get_policy_by_id(policy_id):
+    """获取政策详情"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM government_policies WHERE id = ?", (policy_id,)).fetchone()
+    conn.close()
+    return _attach_policy_sources(dict(row)) if row else None
+
+
+def update_policy(policy_id, source_text=None, **kwargs):
+    """更新政策。
+
+    `source_text` 单独取值（表单原文，一行一条）：它不直接写库，
+    而是经 policy_sources_to_json 转成 source 列要的 JSON。
+    其它字段仍走白名单 —— 未知键一律忽略，不允许客户端改 author_id / created_at。
+    """
+    conn = get_connection()
+    allowed = {'title', 'content', 'category', 'is_published', 'summary', 'date'}
+    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
+    if source_text is not None:
+        updates['source'] = policy_sources_to_json(source_text)
+    if updates:
+        updates['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        set_clause = ', '.join(f"{k}=?" for k in updates)
+        params = list(updates.values()) + [policy_id]
+        conn.execute(f"UPDATE government_policies SET {set_clause} WHERE id=?", params)
+        conn.commit()
+    conn.close()
+    return True
+
+
+def delete_policy(policy_id):
+    """删除政策"""
+    conn = get_connection()
+    conn.execute("DELETE FROM government_policies WHERE id = ?", (policy_id,))
+    conn.commit()
+    conn.close()
+    return True
+
+
+# ==================== 政府端工作概览 ====================
+# ⚠️ 口径红线（2026-10-07 用户拍板后重做）：
+#   政府端概览只呈现**政务侧自己产生、且可核**的信息：政策发布情况 + 本地成功案例。
+#   原先的「总用户 / 培训学员 / 岗位数 / 内容生产 / 已获证书 / 讨论帖 / 地区分布 / 培训方向」
+#   全部移出，原因：
+#     · 岗位数属企业侧数据 → 企业端「工作台」(/api/enterprise/stats)
+#     · 培训口径原用 students.progress（**手填**字段；教师端口径是证书真实完成度，两者会打架）
+#     · 「地区分布」按 users.region，实际多为空串，「广东省农业农村厅」等机构名还会混进来
+#     · 证书/讨论帖在真实数据量下多为 0，硬拼成"大屏"只会显得空
+
+
+def get_government_overview():
+    """政府端工作概览：政策发布情况 + 本地成功案例。
+
+    ⚠️ 政策必须区分「本级发布」与「平台预置」：
+      预置政策是用 `gov_demo` 这个账号身份灌进去的（见 `_refresh_policies`），
+      只按 author_id 分不开 —— 若直接 COUNT，平台预置的 5 条会被算成本级发布的政绩。
+      这里复用与 `_refresh_policies` 相同的**预置标题白名单**（POLICIES_DATA）做区分。
+
+    案例口径与学员端一致：只统计 `content_reviews` 中 status='approved' 的
+    （未通过审核的案例，政府端同样不应看到）。
+    """
+    conn = get_connection()
+    preset_titles = {p[0] for p in POLICIES_DATA}
+    rows = conn.execute(
+        "SELECT title, category, is_published FROM government_policies"
+    ).fetchall()
+    conn.close()
+
+    own = {"total": 0, "published": 0, "unpublished": 0}
+    preset = {"total": 0, "published": 0, "unpublished": 0}
+    categories = {}
+    for r in rows:
+        bucket = preset if r["title"] in preset_titles else own
+        bucket["total"] += 1
+        if r["is_published"]:
+            bucket["published"] += 1
+        else:
+            bucket["unpublished"] += 1
+        cat = (r["category"] or "").strip() or "未分类"
+        categories[cat] = categories.get(cat, 0) + 1
+
+    review = get_case_review_stats()["case_review"]
+    approved = get_success_cases(only_approved=True)
+
+    region_count = {}
+    for c in approved:
+        reg = (c.get("region") or "").strip() or "未标注地区"
+        region_count[reg] = region_count.get(reg, 0) + 1
+    src_total = sum(len(c.get("sources") or []) for c in approved)
+
+    return {
+        "policies": {
+            "own": own,
+            "preset": preset,
+            "categories": [
+                {"category": k, "count": v}
+                for k, v in sorted(categories.items(), key=lambda kv: (-kv[1], kv[0]))
+            ],
+        },
+        "cases": {
+            "total": review["total"],
+            "approved": review["approved"],
+            "pending": review["pending"],
+            "rejected": review["rejected"],
+            "regions": [
+                {"region": k, "count": v}
+                for k, v in sorted(region_count.items(), key=lambda kv: (-kv[1], kv[0]))
+            ],
+            "source_total": src_total,
+            "avg_sources": round(src_total / len(approved), 1) if approved else 0,
+            "items": [
+                {
+                    "id": c["id"],
+                    "title": c.get("title") or "",
+                    "region": (c.get("region") or "").strip(),
+                    "sources": len(c.get("sources") or []),
+                }
+                for c in approved
+            ],
+        },
     }

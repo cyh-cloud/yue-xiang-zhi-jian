@@ -234,6 +234,16 @@
             border: 2px solid var(--bg-secondary);
             box-shadow: 0 0 0 2px var(--accent-blue);
         }
+        .timeline-item .t-period {
+            display: inline-block;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--accent-blue);
+            background: rgba(0, 180, 216, 0.12);
+            border-radius: 9999px;
+            padding: 2px 10px;
+            margin-bottom: 6px;
+        }
         .timeline-item .t-title {
             font-weight: 600;
             font-size: 0.95rem;
@@ -243,7 +253,40 @@
         .timeline-item .t-desc {
             font-size: 0.85rem;
             color: var(--text-muted);
+            line-height: 1.6;
+        }
+
+        /* ---- 小字说明（口径标注） ---- */
+        .section-note {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin: -6px 0 14px;
+            line-height: 1.6;
+        }
+
+        /* ---- 案例背景正文分段 ---- */
+        .prose p + p { margin-top: 12px; }
+
+        /* ---- 资料来源 ---- */
+        .case-sources ul li {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            padding: 12px 0;
+        }
+        .case-sources ul li::before { display: none; }
+        .case-sources a {
+            color: var(--accent-blue);
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            word-break: break-word;
             line-height: 1.5;
+        }
+        .case-sources a:hover { text-decoration: underline; }
+        .case-sources .src-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
         }
 
         /* ---- Quote ---- */
@@ -386,31 +429,40 @@
 
             const c = data.cases.find(item => item.id === caseId);
             if (!c) {
-                showError('案例未找到', `未找到ID为 ${caseId} 的案例。`);
+                // 接口只下发审核通过的案例 —— 未通过/已驳回的会走到这里，不能说成"链接错了"
+                const pending = (data.case_review && data.case_review.pending) || 0;
+                showError('案例未找到',
+                    `未找到 ID 为 ${caseId} 的案例：它可能尚未通过超级管理员审核（当前待审 ${pending} 条），或链接已失效。`);
                 return;
             }
 
-            renderCase(c);
+            renderCase(c, data);
         } catch (e) {
             console.error('加载案例失败:', e);
             showError('加载失败', `无法连接服务器（${e.message}），请确保服务已启动。`);
         }
 
-        function renderCase(c) {
-            const stats = c.stats || {};
-            const statEntries = Object.entries(stats);
-            const statIcons = ['fa-chart-line', 'fa-users', 'fa-hand-holding-usd', 'fa-leaf', 'fa-store', 'fa-video', 'fa-trophy', 'fa-star'];
-            const statLabels = {
-                'farmers': '带动农户',
-                'income_growth': '收入增长',
-                'fans': '粉丝数',
-                'income': '月收入',
-                'certification': '认证资质',
-                'channel': '销售渠道'
-            };
+        // 把纯文本按空行拆成多个 <p>，避免长段落挤成一坨
+        function toParagraphs(text) {
+            return String(text || '')
+                .split(/\n{2,}/)
+                .filter(s => s.trim())
+                .map(s => `<p>${s.trim()}</p>`)
+                .join('');
+        }
 
-            // Determine extra content based on case title
-            const extraContent = getExtraContent(c.title);
+        function renderCase(c, envelope) {
+            const stats = Array.isArray(c.stats) ? c.stats : [];
+            const milestones = Array.isArray(c.milestones) ? c.milestones : [];
+            const lessons = Array.isArray(c.lessons) ? c.lessons : [];
+            const sources = Array.isArray(c.sources) ? c.sources : [];
+            const hasQuote = !!(c.quote && c.quote_author);
+
+            // 口径说明由服务端下发（事实源在 cases_data.py），此处仅兜底
+            const sourceNote = (envelope && envelope.source_note)
+                || '本页内容依据公开报道整理，数据与事实均来自下列公开来源，仅供参考。';
+            const lessonsNote = (envelope && envelope.lessons_note)
+                || '以下为基于公开报道整理的借鉴点，非官方结论。';
 
             document.title = `${c.title} - 粤乡智匠`;
 
@@ -421,13 +473,13 @@
                     <p class="subtitle">${c.description}</p>
                 </div>
 
-                ${statEntries.length > 0 ? `
+                ${stats.length > 0 ? `
                 <div class="stats-grid">
-                    ${statEntries.map(([k, v], i) => `
+                    ${stats.map(s => `
                         <div class="stat-card">
-                            <div class="stat-icon"><i class="fas ${statIcons[i % statIcons.length]}"></i></div>
-                            <div class="stat-value">${v}</div>
-                            <div class="stat-label">${statLabels[k] || k}</div>
+                            <div class="stat-icon"><i class="fas ${s.icon || 'fa-chart-line'}"></i></div>
+                            <div class="stat-value">${s.value}</div>
+                            <div class="stat-label">${s.label}</div>
                         </div>
                     `).join('')}
                 </div>
@@ -435,32 +487,55 @@
 
                 <div class="content-card">
                     <h2><i class="fas fa-info-circle"></i> 案例背景</h2>
-                    <p>${extraContent.background}</p>
+                    <div class="prose">${toParagraphs(c.background)}</div>
                 </div>
 
+                ${milestones.length > 0 ? `
                 <div class="content-card">
-                    <h2><i class="fas fa-route"></i> 发展历程</h2>
+                    <h2><i class="fas fa-route"></i> 关键节点</h2>
                     <div class="timeline">
-                        ${extraContent.timeline.map(t => `
+                        ${milestones.map(m => `
                             <div class="timeline-item">
-                                <div class="t-title">${t.title}</div>
-                                <div class="t-desc">${t.desc}</div>
+                                ${m.period ? `<div class="t-period">${m.period}</div>` : ''}
+                                <div class="t-title">${m.title}</div>
+                                <div class="t-desc">${m.desc}</div>
                             </div>
                         `).join('')}
                     </div>
                 </div>
+                ` : ''}
 
+                ${hasQuote ? `
                 <div class="quote-block">
-                    <p>${extraContent.quote}</p>
-                    <div class="quote-author">—— ${extraContent.quoteAuthor}</div>
+                    <p>${c.quote}</p>
+                    <div class="quote-author">—— ${c.quote_author}</div>
                 </div>
+                ` : ''}
 
+                ${lessons.length > 0 ? `
                 <div class="content-card">
-                    <h2><i class="fas fa-lightbulb"></i> 经验启示</h2>
+                    <h2><i class="fas fa-lightbulb"></i> 借鉴与启示</h2>
+                    <p class="section-note">${lessonsNote}</p>
                     <ul>
-                        ${extraContent.lessons.map(l => `<li>${l}</li>`).join('')}
+                        ${lessons.map(l => `<li>${l}</li>`).join('')}
                     </ul>
                 </div>
+                ` : ''}
+
+                ${sources.length > 0 ? `
+                <div class="content-card case-sources">
+                    <h2><i class="fas fa-book-open"></i> 资料来源</h2>
+                    <p class="section-note">${sourceNote}</p>
+                    <ul>
+                        ${sources.map(s => `
+                            <li>
+                                <a href="${s.url}" target="_blank" rel="noopener noreferrer">${s.title}</a>
+                                <span class="src-meta">${s.media}${s.date ? ' · ' + s.date : ''}</span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+                ` : ''}
 
                 <div style="text-align:center; margin-top:12px;">
                     <a href="index.html" class="btn btn-primary"><i class="fas fa-arrow-left"></i> 返回首页探索更多</a>
@@ -477,89 +552,6 @@
                     <a href="index.html" class="btn btn-primary"><i class="fas fa-home"></i> 返回首页</a>
                 </div>
             `;
-        }
-
-        function getExtraContent(title) {
-            const contentMap = {
-                '梅州某村电商转型之路': {
-                    background: '梅州市某村曾是一个以传统种植业为主的客家村落，村民主要种植柚子、龙眼等水果。由于销路单一、信息闭塞，农产品长期面临"丰产不丰收"的困境。2021年，在当地政府和电商培训项目的支持下，村里几位年轻人率先尝试通过电商平台销售家乡特产，开启了这个村庄的数字化转型之路。',
-                    timeline: [
-                        { title: '2021年初 — 探索起步', desc: '3名返乡青年参加农村电商培训，开设首家淘宝店铺，主打梅州金柚。' },
-                        { title: '2021年中 — 直播破局', desc: '尝试抖音直播带货，第一场直播卖出500箱柚子，村民开始关注电商模式。' },
-                        { title: '2022年 — 规模扩大', desc: '成立村级电商合作社，带动30户农户参与，统一品牌、统一包装、统一发货。' },
-                        { title: '2023年 — 品牌升级', desc: '注册区域公共品牌，入驻拼多多、京东等平台，年销售额突破500万元。' },
-                        { title: '2024年 — 全面振兴', desc: '建成村级电商服务中心，开设短视频创作培训班，培养本地电商人才50余名。' }
-                    ],
-                    quote: '以前柚子烂在地里没人要，现在通过手机就能卖到全国各地。电商不仅改变了我们的收入，更改变了我们对未来的看法。',
-                    quoteAuthor: '村电商带头人 张伟明',
-                    lessons: [
-                        '政府引导 + 青年带头 是农村电商起步的关键组合',
-                        '直播带货是农产品上行的高效渠道，要敢于尝试新形式',
-                        '统一品牌和品控是规模化发展的基础',
-                        '培训本地人才比引进外部团队更可持续',
-                        '从单品突破到多品类经营，循序渐进降低风险'
-                    ]
-                },
-                '潮州手工艺人数字化传承': {
-                    background: '潮州木雕是国家级非物质文化遗产，但随着老一辈匠人逐渐退出，这门技艺面临后继无人的困境。90后手工艺人陈晓婷从小跟随祖父学习木雕，大学毕业后她决定用短视频记录和传播这门古老技艺，让非遗文化在数字时代焕发新生。',
-                    timeline: [
-                        { title: '2020年 — 记录起步', desc: '用手机拍摄祖父雕刻过程，发布到抖音，第一条视频获得10万播放量。' },
-                        { title: '2021年 — 内容深耕', desc: '系统学习短视频创作，形成"一刀一刻讲潮州"系列内容，粉丝突破10万。' },
-                        { title: '2022年 — 商业探索', desc: '开设线上店铺销售木雕文创产品，将传统工艺与现代设计结合，月收入过万。' },
-                        { title: '2023年 — 影响力扩大', desc: '粉丝突破50万，受邀参加非遗展览，带动周边20余名年轻人学习木雕。' },
-                        { title: '2024年 — 传承体系', desc: '建立"线上教学+线下工坊"模式，开设木雕体验课程，年接待学员超2000人。' }
-                    ],
-                    quote: '很多人说非遗是老古董，但我觉得它只是需要一个新的舞台。短视频让更多年轻人看到了潮州木雕的美，这就是最好的传承。',
-                    quoteAuthor: '潮州木雕传承人 陈晓婷',
-                    lessons: [
-                        '短视频是非遗文化传播的最佳载体之一',
-                        '传统技艺需要与现代审美结合才能吸引年轻受众',
-                        '个人IP打造是手艺人数字化转型的核心',
-                        '线上引流 + 线下体验 构成完整的商业化闭环',
-                        '让年轻人看到"钱景"才能真正解决传承问题'
-                    ]
-                },
-                '韶关有机农场品牌打造': {
-                    background: '韶关市仁化县的绿源农场曾是一个普通的小型种植场，农场主李志坚在2019年决定转型有机种植。经过三年的土壤改良和认证过程，农场获得了有机产品认证，并通过品牌化运营，从一个无名小农场成长为粤北地区知名的有机农产品品牌。',
-                    timeline: [
-                        { title: '2019年 — 转型决策', desc: '放弃化肥农药，开始三年土壤转换期，当年产量下降60%，承受巨大经济压力。' },
-                        { title: '2020年 — 坚持过渡', desc: '申请有机认证，同时学习品牌营销知识，开始在微信社群销售转换期产品。' },
-                        { title: '2021年 — 认证通过', desc: '正式获得有机产品认证，注册"绿源仁化"品牌，产品进入高端超市渠道。' },
-                        { title: '2022年 — 渠道拓展', desc: '开设天猫旗舰店，发展社区团购代理，线上线下销售额突破300万元。' },
-                        { title: '2023年 — 品牌升级', desc: '推出农场认养模式，发展休闲农业，年接待游客超5000人次，品牌溢价达300%。' }
-                    ],
-                    quote: '有机种植最难的不是技术，是前三年的坚持。当你熬过那段看不到回报的日子，市场会给你应有的认可。',
-                    quoteAuthor: '绿源农场创始人 李志坚',
-                    lessons: [
-                        '有机认证是品牌溢价的核心支撑，值得投入时间和成本',
-                        '社群营销是有机农产品冷启动的有效方式',
-                        '品牌故事比产品参数更能打动消费者',
-                        '农场认养模式创造了稳定的现金流和客户粘性',
-                        '线上线下结合才能最大化覆盖目标客群'
-                    ]
-                }
-            };
-
-            // Return matching content or a generic template
-            if (contentMap[title]) return contentMap[title];
-
-            return {
-                background: `${title}是一个具有代表性的乡村振兴案例。通过创新思维和不懈努力，当地探索出了一条适合自身发展的特色道路，为其他地区提供了宝贵的经验借鉴。`,
-                timeline: [
-                    { title: '起步阶段', desc: '发现本地资源优势，确定发展方向，组建核心团队。' },
-                    { title: '探索阶段', desc: '尝试多种经营模式，积累经验，逐步找到适合的发展路径。' },
-                    { title: '发展阶段', desc: '扩大经营规模，建立品牌影响力，带动更多农户参与。' },
-                    { title: '成熟阶段', desc: '形成可复制的模式，成为区域标杆，助力乡村振兴。' }
-                ],
-                quote: '乡村振兴需要的不仅是资金和技术，更需要敢于尝试的勇气和坚持不懈的精神。',
-                quoteAuthor: '项目负责人',
-                lessons: [
-                    '充分利用本地资源优势是成功的基础',
-                    '创新思维和数字化工具是加速发展的关键',
-                    '带动群众参与才能实现真正的乡村振兴',
-                    '品牌建设是长期竞争力的核心'
-                ]
-            };
         }
     })();
     </script>

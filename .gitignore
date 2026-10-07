@@ -1,0 +1,35 @@
+# ---- 环境变量与密钥（严禁提交）----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.venv/
+venv/
+
+# ---- 备份 / 临时文件 ----
+*.bak
+*.bak-*
+*.orig
+*.rej
+*~
+*.tmp
+*.log
+
+# ---- SQLite 运行时文件 ----
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ---- 系统 / 编辑器 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

@@ -15,16 +15,26 @@ const TABS = {
 
 const STORAGE_KEYS = {
     SESSION: 'yuexiang_session',
-    THEME: 'yuexiang_theme'
+    THEME: 'yuexiang_theme',
+    LARGE_TEXT: 'yuexiang_large_text',
+    NOTIF: 'yuexiang_notif_enabled'
 };
 
 // 全局状态
 const AppState = {
     currentTab: TABS.AGRICULTURE,
     currentDialect: 'cantonese',
-    currentProduct: 'lychee',
+    // 上次选择的农产品（由 localStorage 持久化，详见 script.js setupProductSelection）
+    currentProduct: (function () {
+        try {
+            return localStorage.getItem('yuexiang_farming_product') || 'lychee';
+        } catch (e) {
+            return 'lychee';
+        }
+    })(),
     currentCraft: 'embroidery',
-    calendarYear: new Date().getFullYear(),
+    // 注：此处原有 calendarYear，但全项目 0 处引用（日历按年周期模板复现、前端只传 month），
+    // 已随 A7 移除。calendarMonth 保留：它是日历翻页与取数的实际状态（0-indexed）。
     calendarMonth: new Date().getMonth(),
     user: null,
     sessionId: null,
@@ -49,7 +59,20 @@ async function apiCall(endpoint, method = 'GET', body = null) {
         options.body = JSON.stringify(body);
     }
     const resp = await fetch(`${API_BASE_URL}${endpoint}`, options);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    if (!resp.ok) {
+        // 小清理（2026-10-05）：失败时带上 HTTP 状态与服务端 code，
+        // 让调用方可以按 `err.status === 429` / `err.code === 'rate_limited'` 给出针对性提示，
+        // 而不是一律「请求失败，请稍后重试」（此前 voice 被限流只显示通用文案）。
+        let code = null;
+        try {
+            const body = await resp.json();
+            code = body && body.code ? body.code : null;
+        } catch (e) { /* 非 JSON 错误体（如 HTML 400）忽略 */ }
+        const err = new Error(`HTTP ${resp.status}`);
+        err.status = resp.status;
+        err.code = code;
+        throw err;
+    }
     return resp.json();
 }
 
@@ -108,9 +131,10 @@ function showOnboarding() {
                 <p>${steps[0].desc}</p>
             </div>
             <div class="onboarding-actions">
-                <button class="btn btn-text" id="onboarding-skip">跳过</button>
+                <button class="btn btn-outline btn-sm" id="onboarding-skip">跳过引导</button>
                 <button class="btn btn-primary" id="onboarding-next">下一步 <i class="fas fa-arrow-right"></i></button>
             </div>
+            <p style="margin-top:14px;font-size:0.75rem;color:var(--text-secondary);opacity:0.7;">提示：点击空白处或按 ESC 也可关闭</p>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -135,18 +159,31 @@ function showOnboarding() {
         }
     };
 
-    document.getElementById('onboarding-skip').addEventListener('click', () => {
+    const closeOnboarding = () => {
         overlay.remove();
         localStorage.setItem('yuexiang_onboarding_done', '1');
+        document.removeEventListener('keydown', onKeydown);
+    };
+
+    // 点击遮罩空白处关闭（点击卡片内容不关闭）
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) closeOnboarding();
     });
+
+    // ESC 键关闭
+    const onKeydown = (e) => {
+        if (e.key === 'Escape') closeOnboarding();
+    };
+    document.addEventListener('keydown', onKeydown);
+
+    document.getElementById('onboarding-skip').addEventListener('click', closeOnboarding);
 
     document.getElementById('onboarding-next').addEventListener('click', () => {
         if (currentStep < steps.length - 1) {
             currentStep++;
             updateContent();
         } else {
-            overlay.remove();
-            localStorage.setItem('yuexiang_onboarding_done', '1');
+            closeOnboarding();
         }
     });
 }
@@ -218,20 +255,9 @@ function typewriterEffect(container, text, speed = 15) {
 }
 
 // 24节气数据
-const SOLAR_TERMS = {
-    '2024-01-06': '小寒', '2024-01-20': '大寒', '2024-02-04': '立春', '2024-02-19': '雨水',
-    '2024-03-05': '惊蛰', '2024-03-20': '春分', '2024-04-04': '清明', '2024-04-19': '谷雨',
-    '2024-05-05': '立夏', '2024-05-20': '小满', '2024-06-05': '芒种', '2024-06-21': '夏至',
-    '2024-07-07': '小暑', '2024-07-22': '大暑', '2024-08-07': '立秋', '2024-08-22': '处暑',
-    '2024-09-07': '白露', '2024-09-22': '秋分', '2024-10-08': '寒露', '2024-10-23': '霜降',
-    '2024-11-07': '立冬', '2024-11-22': '小雪', '2024-12-07': '大雪', '2024-12-22': '冬至',
-    '2025-01-05': '小寒', '2025-01-20': '大寒', '2025-02-03': '立春', '2025-02-18': '雨水',
-    '2025-03-05': '惊蛰', '2025-03-20': '春分', '2025-04-05': '清明', '2025-04-20': '谷雨',
-    '2025-05-05': '立夏', '2025-05-21': '小满', '2025-06-05': '芒种', '2025-06-21': '夏至',
-    '2025-07-07': '小暑', '2025-07-22': '大暑', '2025-08-07': '立秋', '2025-08-23': '处暑',
-    '2025-09-07': '白露', '2025-09-23': '秋分', '2025-10-08': '寒露', '2025-10-23': '霜降',
-    '2025-11-07': '立冬', '2025-11-22': '小雪', '2025-12-07': '大雪', '2025-12-22': '冬至'
-};
+// 已移除：原硬编码 SOLAR_TERMS（仅覆盖 2024-01 ~ 2025-12，2026 年起永远查不到）。
+// 节气现由后端 Meeus 太阳黄经算法计算，随农时日历接口 /api/agriculture/calendar/<id> 的
+// solar_terms 字段下发（含 date / day / name），支持任意年份。
 
 function setupSelectionHandler(selector, activeClass, stateKey, callback) {
     document.querySelectorAll(selector).forEach(card => {

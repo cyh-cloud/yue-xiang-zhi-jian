@@ -1,0 +1,46 @@
+﻿id,作物,病名,类型,为害部位,拍什么,文件名,摄影者,拍摄日期,原图出处链接,许可协议,图注,备注
+lychee_downy_blight,荔枝,荔枝霜疫霉病,病害,果实（多从果蒂开始）、花穗、嫩叶,部位：果实（多从果蒂开始）、花穗、嫩叶；重点拍：嫩叶受害出现褐色不规则病斑，潮湿时病部有白色霉层,,,,,,,
+lychee_anthracnose,荔枝,荔枝炭疽病,病害,叶片、嫩梢、果实,部位：叶片、嫩梢、果实；重点拍：叶片出现圆形或不规则褐色斑点，边缘深褐色、中央灰白色,,,,,,,
+lychee_fruit_borer,荔枝,荔枝蒂蛀虫,虫害,果实（蛀果）、叶片（蛀食叶脉）,部位：果实（蛀果）、叶片（蛀食叶脉）；重点拍：幼虫自果蒂附近蛀入果实，果蒂内侧堆积黑色粉末状虫粪；尽量拍到虫体（成虫/幼虫）,lychee_fruit_borer.jpg,Chih Hao Chen,2026-06-19,https://www.inaturalist.org/observations/373148064,CC BY-NC,幼虫自果蒂蛀入果实内部（红圈为观察者标注）,iNaturalist 原图，缩放到 1024px 展示
+lychee_stink_bug,荔枝,荔枝蝽,虫害,嫩梢、花穗、幼果,部位：嫩梢、花穗、幼果；重点拍：成若虫刺吸嫩梢、花穗和幼果的汁液；尽量拍到虫体（成虫/幼虫）,lychee_stink_bug.jpg,neonicotinoid,2021-05-07,https://www.inaturalist.org/observations/405787350,CC BY-NC,若虫（成虫为黄褐色盾形、腹面覆白色蜡粉）,iNaturalist 原图，缩放到 1024px 展示
+lychee_leaf_roller,荔枝,荔枝卷叶虫,虫害,嫩叶、新梢,部位：嫩叶、新梢；重点拍：幼虫吐丝将嫩叶卷缀成苞，在其中取食叶肉；尽量拍到虫体（成虫/幼虫）,lychee_leaf_roller.jpg,bigbob222,2026-09-13,https://www.inaturalist.org/observations/400082349,CC BY-NC,成虫 · 荔枝异形小卷蛾 Cryptophlebia ombrodelta（荔枝卷叶虫类群中的一种）,未拍到卷叶为害状；iNaturalist 原图，缩放到 1024px 展示
+longan_witches_broom,龙眼,龙眼鬼帚病,病害,新梢、花穗,部位：新梢、花穗；重点拍：新梢丛生呈扫帚状，节间明显缩短,,,,,,,
+longan_downy_blight,龙眼,龙眼霜疫霉病,病害,果实、花穗、嫩叶,部位：果实、花穗、嫩叶；重点拍：果实受害出现褐色水渍状病斑，果面生褐斑并腐烂,,,,,,,
+longan_anthracnose,龙眼,龙眼炭疽病,病害,叶片、果实、枝条,部位：叶片、果实、枝条；重点拍：叶片出现褐色圆形或不规则病斑，中央灰白,,,,,,,
+longan_stink_bug,龙眼,龙眼蝽蟓,虫害,嫩梢、花穗、幼果,部位：嫩梢、花穗、幼果；重点拍：成若虫刺吸嫩梢、花穗和幼果汁液；尽量拍到虫体（成虫/幼虫）,longan_stink_bug.jpg,吳美珠,2026-09-29,https://www.inaturalist.org/observations/404407545,CC BY-NC,成虫（与荔枝蝽为同一物种 Tessaratoma papillosa）,iNaturalist 原图，缩放到 1024px 展示
+longan_scale_insect,龙眼,龙眼蚧壳虫,虫害,枝条、叶片、果实,部位：枝条、叶片、果实；重点拍：枝干和叶片上附着褐色或灰白色蚧壳；尽量拍到虫体（成虫/幼虫）,longan_scale_insect.jpg,Bonnie Semmling,2026-06-30,https://www.inaturalist.org/observations/377574861,CC BY,桑白盾蚧 Pseudaulacaspis pentagona（龙眼蚧壳虫类群中的一种）,iNaturalist 原图，缩放到 1024px 展示
+citrus_hlb,柑橘,柑橘黄龙病,病害,全株（叶片、新梢、果实、根系）,部位：全株（叶片、新梢、果实、根系）；重点拍：叶片斑驳黄化——黄绿相间且不对称，与缺素引起的均匀黄化不同,,,,,,,
+citrus_canker,柑橘,柑橘溃疡病,病害,叶片、果实、枝梢,部位：叶片、果实、枝梢；重点拍：叶片初现黄色油渍状小斑点,,,,,,,
+citrus_anthracnose,柑橘,柑橘炭疽病,病害,叶片、枝梢、果实,部位：叶片、枝梢、果实；重点拍：叶片出现叶尖或叶缘的褐色病斑，呈「V」形或不规则形,,,,,,,
+citrus_psyllid,柑橘,柑橘木虱,虫害,嫩梢、嫩芽,部位：嫩梢、嫩芽；重点拍：若虫聚集在嫩梢上吸食汁液；尽量拍到虫体（成虫/幼虫）,citrus_psyllid.jpg,镜影溪,2026-04-18,https://www.inaturalist.org/observations/404711342,CC BY-NC,成虫，群集于柑橘嫩梢,iNaturalist 原图，缩放到 1024px 展示
+citrus_red_mite,柑橘,柑橘红蜘蛛,虫害,叶片、果实表皮,部位：叶片、果实表皮；重点拍：成螨、若螨在叶片上刺吸汁液；尽量拍到虫体（成虫/幼虫）,,,,,,,
+citrus_leafminer,柑橘,柑橘潜叶蛾,虫害,嫩叶、嫩梢,部位：嫩叶、嫩梢；重点拍：幼虫潜入嫩叶表皮下取食叶肉，形成弯曲的银白色虫道；尽量拍到虫体（成虫/幼虫）,citrus_leafminer.jpg,Lingeshwaran V.J,2026-09-28,https://www.inaturalist.org/observations/404112056,CC BY-NC,成虫（柑橘潜叶蛾 Phyllocnistis citrella）,未拍到潜叶虫道；iNaturalist 原图，缩放到 1024px 展示
+banana_panama,香蕉,香蕉枯萎病,病害,根系、假茎（维管束）、叶片,部位：根系、假茎（维管束）、叶片；重点拍：叶片从外围老叶开始自下而上逐渐黄化,,,,,,,
+banana_leaf_spot,香蕉,香蕉叶斑病,病害,叶片,部位：叶片；重点拍：叶片出现椭圆形褐色条斑,,,,,,,
+banana_black_sigatoka,香蕉,香蕉黑星病,病害,叶片、青果,部位：叶片、青果；重点拍：叶片和青果表面散生黑色小点,,,,,,,
+banana_thrips,香蕉,香蕉蓟马,虫害,花蕾、幼果（果皮）,部位：花蕾、幼果（果皮）；重点拍：成若虫锉吸花器和幼果表皮汁液；尽量拍到虫体（成虫/幼虫）,banana_thrips.jpeg,熊盛志,2023-03-24,https://www.inaturalist.org/observations/152100512,CC0,成虫（香蕉蓟马 Thrips hawaiiensis）,iNaturalist 原图，缩放到 1024px 展示
+banana_aphid,香蕉,香蕉蚜虫,虫害,嫩叶、心叶、花蕾,部位：嫩叶、心叶、花蕾；重点拍：成若蚜群集在嫩叶和心叶刺吸汁液；尽量拍到虫体（成虫/幼虫）,banana_aphid.jpg,Ben Jobson,2026-07-14,https://www.inaturalist.org/observations/381446146,CC BY,有翅成虫（香蕉交脉蚜 Pentalonia nigronervosa）,iNaturalist 原图，缩放到 1024px 展示
+rice_blast,水稻,水稻稻瘟病,病害,叶片（叶瘟）、穗颈（穗颈瘟）、节部（节瘟）,部位：叶片（叶瘟）、穗颈（穗颈瘟）、节部（节瘟）；重点拍：叶片出现梭形（纺锤形）褐色病斑，中央灰白、边缘褐色,,,,,,,
+rice_sheath_blight,水稻,水稻纹枯病,病害,叶鞘、叶片,部位：叶鞘、叶片；重点拍：叶鞘近水面处出现暗绿色水渍状病斑,,,,,,,
+rice_planthopper,水稻,稻飞虱,虫害,稻株基部（茎秆、叶鞘）,部位：稻株基部（茎秆、叶鞘）；重点拍：成虫、若虫聚集在稻株基部刺吸汁液；尽量拍到虫体（成虫/幼虫）,rice_planthopper.jpg,王琰,2025-10-17,https://www.inaturalist.org/observations/321776016,CC BY-NC,成虫 · 褐飞虱 Nilaparvata lugens（稻飞虱类群中的一种）,照片背景非稻田；iNaturalist 原图，缩放到 1024px 展示
+rice_leaf_folder,水稻,稻纵卷叶螟,虫害,叶片,部位：叶片；重点拍：幼虫吐丝将叶片纵卷成筒状；尽量拍到虫体（成虫/幼虫）,rice_leaf_folder.jpg,Rajiv Thanawala,2026-04-21,https://www.inaturalist.org/observations/405655753,CC BY-NC,成虫（稻纵卷叶螟 Cnaphalocrocis medinalis）,未拍到卷叶为害状；iNaturalist 原图，缩放到 1024px 展示
+rice_stem_borer,水稻,水稻螟虫,虫害,茎秆,部位：茎秆；重点拍：幼虫蛀入稻茎取食，造成枯心苗；尽量拍到虫体（成虫/幼虫）,rice_stem_borer.jpg,Fernando de Juana,2025-08-12,https://www.inaturalist.org/observations/306965829,CC BY-NC,成虫 · 二化螟 Chilo suppressalis（水稻螟虫类群中的一种）,iNaturalist 原图，缩放到 1024px 展示
+rice_false_smut,水稻,稻曲病,病害,穗部谷粒,部位：穗部谷粒；重点拍：仅在穗部发病，谷粒被菌丝块包裹,,,,,,,
+tea_leafhopper,茶叶,茶小绿叶蝉,虫害,新梢、嫩叶、芽叶,部位：新梢、嫩叶、芽叶；重点拍：新梢嫩叶出现褐色斑点；尽量拍到虫体（成虫/幼虫）,tea_leafhopper.jpg,王學哲,2025-05-03,https://www.inaturalist.org/observations/280522632,CC BY-NC,成虫（茶小绿叶蝉 Matsumurasca onukii）,iNaturalist 原图，缩放到 1024px 展示
+tea_anthracnose,茶叶,茶炭疽病,病害,成叶、老叶,部位：成叶、老叶；重点拍：老叶出现半圆形或不规则形褐色病斑,,,,,,,
+tea_looper,茶叶,茶尺蠖,虫害,叶片,部位：叶片；重点拍：幼虫取食叶片，幼龄期咬食叶肉呈网状；尽量拍到虫体（成虫/幼虫）,tea_looper.jpg,starwu,2025-07-31,https://www.inaturalist.org/observations/304123624,CC BY-NC,成虫（茶尺蠖 Ectropis obliqua）,未拍到幼虫为害状；iNaturalist 原图，缩放到 1024px 展示
+tea_tussock_moth,茶叶,茶毛虫,虫害,叶片,部位：叶片；重点拍：幼虫群集取食叶片；尽量拍到虫体（成虫/幼虫）,tea_tussock_moth.jpg,machaonvert,2026-09-17,https://www.inaturalist.org/observations/400936298,CC BY-NC,幼虫群集取食叶片（茶毛虫 Arna pseudoconspersa）,iNaturalist 原图，缩放到 1024px 展示
+tea_blister_blight,茶叶,茶饼病,病害,嫩叶、新梢,部位：嫩叶、新梢；重点拍：嫩叶正面出现淡黄色水渍状斑点,,,,,,,
+tea_black_spiny_whitefly,茶叶,茶黑刺粉虱,虫害,叶片（背面）,部位：叶片（背面）；重点拍：若虫固定在叶背刺吸汁液；尽量拍到虫体（成虫/幼虫）,tea_black_spiny_whitefly.jpg,joneswurf,2026-10-03,https://www.inaturalist.org/observations/405455292,CC BY-NC,若虫/蛹壳群集于叶面，具白色蜡质边缘（茶黑刺粉虱 Aleurocanthus spiniferus）,iNaturalist 原图，缩放到 1024px 展示
+vegetable_downy_mildew,蔬菜,蔬菜霜霉病,病害,叶片,部位：叶片；重点拍：叶面出现多角形黄色病斑（受叶脉限制）,,,,,,,
+vegetable_diamondback_moth,蔬菜,小菜蛾,虫害,叶片,部位：叶片；重点拍：幼虫取食叶肉，留下透明表皮形成「开天窗」状孔洞；尽量拍到虫体（成虫/幼虫）,vegetable_diamondback_moth.jpg,Hobby📸mit❤️zur Natur,2026-10-03,https://www.inaturalist.org/observations/405610068,CC BY-NC,成虫（小菜蛾 Plutella xylostella）,未拍到「开天窗」为害状；iNaturalist 原图，缩放到 1024px 展示
+vegetable_aphid,蔬菜,蔬菜蚜虫,虫害,嫩梢、嫩叶、叶背,部位：嫩梢、嫩叶、叶背；重点拍：成若蚜群集在嫩梢嫩叶刺吸汁液；尽量拍到虫体（成虫/幼虫）,vegetable_aphid.jpg,Fishopedia,2026-05-16,https://www.inaturalist.org/observations/362179044,CC BY-NC,成蚜/若蚜（桃蚜 Myzus persicae，蔬菜蚜虫类群中的一种）,iNaturalist 原图，缩放到 1024px 展示
+vegetable_anthracnose,蔬菜,蔬菜炭疽病,病害,叶片、茎、果实,部位：叶片、茎、果实；重点拍：叶片出现近圆形褐色病斑，中央灰白、边缘深褐,,,,,,,
+vegetable_powdery_mildew,蔬菜,蔬菜白粉病,病害,叶片、茎、叶柄,部位：叶片、茎、叶柄；重点拍：叶面出现白色粉状霉斑，逐渐扩大连片,,,,,,,
+vegetable_soft_rot,蔬菜,蔬菜软腐病,病害,茎基部、叶柄、肉质根,部位：茎基部、叶柄、肉质根；重点拍：茎基部或叶柄出现水渍状病斑,,,,,,,
+aquatic_bacterial_septicemia,水产养殖,淡水鱼细菌性败血症,病害,全身（体表、鳃、肝、肾、腹腔）,部位：全身（体表、鳃、肝、肾、腹腔）；重点拍：病鱼离群缓慢游动，反应迟钝,,,,,,,
+aquatic_wssv,水产养殖,对虾白斑综合征,病害,全身（甲壳、鳃、肝胰腺）,部位：全身（甲壳、鳃、肝胰腺）；重点拍：虾体甲壳内侧（尤其头胸甲）出现白色斑点，直径一般小于3毫米或连成片,,,,,,,
+aquatic_grass_carp_hemorrhage,水产养殖,草鱼出血病,病害,全身（鳍、鳃盖、肌肉、肠道）,部位：全身（鳍、鳃盖、肌肉、肠道）；重点拍：主要危害草鱼及青鱼鱼种,,,,,,,
+aquatic_enteritis,水产养殖,淡水鱼细菌性肠炎病,病害,肠道,部位：肠道；重点拍：病鱼肛门红肿突出,,,,,,,
+aquatic_trichodiniasis,水产养殖,车轮虫病,病害,体表、鳃部,部位：体表、鳃部；重点拍：主要寄生在鱼体表和鳃部,,,,,,,
+aquatic_ehp,水产养殖,虾肝肠胞虫病,病害,肝胰腺、肠道,部位：肝胰腺、肠道；重点拍：对虾生长缓慢、个体参差不齐,,,,,,,

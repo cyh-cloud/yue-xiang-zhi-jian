@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教师工作台 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+    <style>
+        :root { --portal-accent: #2f6b4f; --portal-accent-hover: #1f5e43; }
+        .teacher-report-card { margin-bottom: 16px; }
+        .teacher-report-card textarea { width: 100%; border: 1px solid var(--portal-input-border); border-radius: 8px; padding: 10px; font-size: 0.9rem; resize: vertical; }
+        .suggestion-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+        .suggestion-chip { padding: 4px 10px; background: #eaf3ed; color: #123a2a; border: 1px solid #c6e0d1; border-radius: 12px; font-size: 0.8rem; cursor: pointer; border: none; }
+        .student-search { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+        .progress-bar-wrap { background: #e2e6e0; border-radius: 6px; height: 6px; width: 80px; }
+        .progress-bar-fill { background: var(--portal-accent); border-radius: 6px; height: 100%; }
+
+        /* ---- 实训批改（2026-10-07）：看作品 → 打分 ---- */
+        .trainings-notice { background: #fdf4e3; border: 1px solid #f0d9a8; color: #7a5a12;
+            border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; margin-bottom: 10px; }
+        tr.is-regrade td { background: #fffaf0; }
+        .grade-meta { font-size: 0.85rem; color: var(--portal-text-muted); line-height: 1.7; margin-bottom: 10px; }
+        .grade-work-label { font-size: 0.8rem; font-weight: 600; color: #123a2a; margin-bottom: 6px; }
+        .grade-work-body { max-height: 300px; overflow: auto; background: #f7f9f7; border: 1px solid #e2e6e0;
+            border-radius: 8px; padding: 12px; margin-bottom: 14px; }
+        .grade-script { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 0.88rem;
+            line-height: 1.7; font-family: inherit; color: #24312a; }
+        .grade-chat-row { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; font-size: 0.88rem; }
+        .grade-chat-who { flex: none; width: 38px; border-radius: 4px; text-align: center; font-size: 0.75rem;
+            padding: 2px 0; background: #e2e6e0; color: #4a5a50; }
+        .grade-chat-row.is-student .grade-chat-who { background: #c6e0d1; color: #123a2a; }
+        .grade-chat-text { flex: 1; line-height: 1.6; word-break: break-word; }
+        .grade-empty { color: var(--portal-text-muted); font-size: 0.85rem; margin: 0; }
+        .grade-error { color: #c0392b; font-size: 0.85rem; min-height: 18px; margin-bottom: 6px; }
+        .form-hint { font-size: 0.78rem; color: var(--portal-text-muted); margin-top: 6px; line-height: 1.5; }
+        .account-cell code { background: #eaf3ed; color: #123a2a; padding: 1px 6px; border-radius: 4px; font-size: 0.82rem; }
+        .account-cell .btn { margin-top: 4px; }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar">
+        <div class="logo"><i class="fas fa-seedling"></i>教师工作台</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>工作台</a>
+            <a href="#" data-page="announcements"><i class="fas fa-bullhorn"></i>通知公告</a>
+            <a href="#" data-page="analytics"><i class="fas fa-chart-bar"></i>学情分析</a>
+            <a href="#" data-page="trainings"><i class="fas fa-clipboard-check"></i>实训提交</a>
+            <a href="#" data-page="models"><i class="fas fa-cube"></i>3D模型</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">教</div><span id="sidebar-name">教师</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">工作台</h2>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <!-- 2026-10-07：移除「消息通知」铃铛。teacher.html 只加载 js/core.js + portal.js，
+                     没有 script.js，也没有 #msg-dropdown —— 这个按钮点了没有任何反应（CDP 实测
+                     点击后既无下拉也无事件），属于死控件。教师收通知走首页消息中心。 -->
+                <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+            </div>
+        </div>
+        <div class="portal-content">
+
+            <!-- ===== 1. 工作台 ===== -->
+            <div class="page active" id="page-dashboard">
+                <div class="stat-grid">
+                    <div class="stat-card"><div class="num" id="stat-total-students">-</div><div class="label">学员总数</div></div>
+                    <div class="stat-card"><div class="num" id="stat-certificates">-</div><div class="label">已获证书</div></div>
+                    <div class="stat-card"><div class="num" id="stat-completion">-</div><div class="label">学员获证率</div></div>
+                    <div class="stat-card"><div class="num" id="stat-avg-score">-</div><div class="label">平均完成度（证书）</div></div>
+                </div>
+                <!-- 学员列表 -->
+                <div class="card">
+                    <div class="section-header"><h3><i class="fas fa-user-graduate"></i> 学员管理 <span id="teacher-student-count" style="font-size:0.85rem;color:var(--portal-text-muted)">0人</span></h3>
+                        <div style="display:flex;gap:8px">
+                            <input type="text" id="teacher-search" placeholder="搜索学员..." style="width:180px">
+                            <button class="btn btn-primary btn-sm" id="teacher-add-student-btn"><i class="fas fa-plus"></i> 添加</button>
+                        </div>
+                    </div>
+                    <table><thead><tr><th>ID</th><th>姓名</th><th>方向</th><th>完成度（证书）</th><th>状态</th><th>平台账号</th><th>操作</th></tr></thead><tbody id="teacher-student-tbody"></tbody></table>
+                </div>
+                <!-- AI报告 -->
+                <div class="card teacher-report-card">
+                    <h3><i class="fas fa-wand-magic-sparkles"></i> AI 教学报告</h3>
+                    <textarea id="teacher-report-prompt" rows="3" placeholder="告诉 AI 你想分析什么..."></textarea>
+                    <div class="suggestion-chips">
+                        <button class="suggestion-chip" data-q="帮我做一份学员学习总结">学员总结</button>
+                        <button class="suggestion-chip" data-q="分析进度滞后的学员并给出干预建议">进度分析</button>
+                        <button class="suggestion-chip" data-q="对比各方向的教学效果">方向对比</button>
+                        <button class="suggestion-chip" data-q="哪些学员有掉队风险？">风险预警</button>
+                    </div>
+                    <button class="btn btn-primary btn-sm" id="teacher-report-generate-btn"><i class="fas fa-wand-magic-sparkles"></i> 生成报告</button>
+                    <div id="teacher-report-result" style="margin-top:12px"></div>
+                </div>
+            </div>
+
+            <!-- ===== 2. 通知公告 ===== -->
+            <div class="page" id="page-announcements">
+                <div class="section-header"><h3><i class="fas fa-bullhorn"></i> 通知公告</h3><button class="btn btn-primary btn-sm" id="teacher-publish-ann-btn"><i class="fas fa-plus"></i> 发布通知</button></div>
+                <div id="teacher-announcements-list"></div>
+            </div>
+
+            <!-- ===== 3. 学情分析 ===== -->
+            <div class="page" id="page-analytics">
+                <h3><i class="fas fa-chart-bar"></i> 学情分析</h3>
+                <div id="teacher-analytics-content" style="margin-top:16px"></div>
+            </div>
+
+            <!-- ===== 4. 实训提交（学员提交 → 教师复核闭环） ===== -->
+            <div class="page" id="page-trainings">
+                <div class="section-header"><h3><i class="fas fa-clipboard-check"></i> 学员实训提交</h3>
+                    <button class="btn btn-outline btn-sm" id="teacher-trainings-refresh"><i class="fas fa-sync-alt"></i> 刷新</button>
+                </div>
+                <p style="font-size:0.85rem;color:var(--portal-text-muted);margin-bottom:10px">学员在「电商运营」板块提交的直播带货 / 商品文案 / 客服对练实训，按提交时间倒序。点「查看作品」先看学员交的内容，再点「批改」打分并留评语，学员会在消息中心收到通知。<br>「系统规则分」是提交时由规则算出的参考分，「我的评分」才是你给出的成绩——两者分开显示，未批改时不会拿规则分冒充成绩。</p>
+                <div id="teacher-trainings-notice"></div>
+                <div id="teacher-trainings-list"></div>
+            </div>
+
+            <!-- ===== 5. 3D模型 ===== -->
+            <div class="page" id="page-models">
+                <div class="section-header"><h3>3D模型库</h3><button class="btn btn-primary btn-sm" onclick="showModelForm()"><i class="fas fa-plus"></i> 上传模型</button></div>
+                <div id="model-form" style="display:none" class="card">
+                    <div class="form-row"><input type="text" id="model-title" placeholder="模型标题"></div>
+                    <div class="form-row"><textarea id="model-desc" rows="2" placeholder="模型描述"></textarea></div>
+                    <div class="form-row"><select id="model-craft"><option value="embroidery">广绣</option><option value="woodcarving">潮汕木雕</option><option value="ceramics">石湾陶艺</option><option value="lacquer">阳江漆器</option></select></div>
+                    <div class="form-row"><input type="file" id="model-file" accept=".glb,.gltf,.obj,.fbx,.stl,.dae,.ply,.usdz"></div>
+                    <button class="btn btn-primary btn-sm" onclick="uploadModel()">上传</button>
+                    <button class="btn btn-outline btn-sm" onclick="document.getElementById('model-form').style.display='none'" style="margin-left:8px">取消</button>
+                </div>
+                <div id="model-list"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- 3D模型预览弹窗 -->
+<div class="modal-overlay is-hidden" id="model-preview-modal">
+    <div class="modal-content" style="max-width:720px">
+        <div class="modal-header"><h3 id="model-preview-title">模型预览</h3><button class="modal-close" onclick="closeModelPreview()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body" style="padding:0">
+            <model-viewer id="model-preview-viewer" style="width:100%;height:480px;background:#1a1f1a;"
+                camera-controls auto-rotate auto-rotate-delay="0" rotation-per-second="30deg"
+                shadow-intensity="1" exposure="1" environment-image="neutral">
+            </model-viewer>
+        </div>
+    </div>
+</div>
+
+<!-- 添加学员弹窗 -->
+<div class="modal-overlay is-hidden" id="teacher-add-student-modal">
+    <div class="modal-content" style="max-width:480px">
+        <div class="modal-header"><h3>添加学员</h3><button class="modal-close" onclick="closeAddStudentModal()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>姓名</label><input type="text" id="add-student-name" name="add-student-name" autocomplete="off" placeholder="学员姓名"></div>
+            <div class="form-group"><label>学习方向</label><select id="add-student-direction"><option value="荔枝种植">荔枝种植</option><option value="电商运营">电商运营</option><option value="广绣工艺">广绣工艺</option><option value="水产养殖">水产养殖</option></select></div>
+            <div class="form-group"><label>平台账号</label>
+                <select id="add-student-account-mode">
+                    <option value="link">关联已有学员账号</option>
+                    <option value="create">新建账号（我来设用户名和初始密码）</option>
+                    <option value="none">暂不关联（该学员无法登录、收不到通知）</option>
+                </select>
+            </div>
+            <div class="form-group" id="add-student-link-row">
+                <label>选择要关联的账号</label>
+                <select id="add-student-link-username"><option value="">加载中…</option></select>
+                <div class="form-hint" id="add-student-link-hint"></div>
+            </div>
+            <div class="form-group" id="add-student-create-row" style="display:none">
+                <label>用户名</label>
+                <input type="text" id="add-student-new-username" name="add-student-new-username" autocomplete="off" placeholder="登录用，如 zhangsan">
+                <label style="margin-top:8px;display:block">初始密码</label>
+                <input type="text" id="add-student-new-password" name="add-student-new-password" autocomplete="off" placeholder="至少 6 位，请线下告知学员">
+            </div>
+            <div id="add-student-error" class="grade-error"></div>
+            <button class="btn btn-primary" id="teacher-confirm-add-student">确认添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑学员弹窗（2026-10-07：由 5 连 prompt 改成表单，并支持改/解除账号关联） -->
+<div class="modal-overlay is-hidden" id="teacher-edit-student-modal">
+    <div class="modal-content" style="max-width:480px">
+        <div class="modal-header"><h3 id="edit-student-title">编辑学员</h3><button class="modal-close" onclick="closeEditStudentModal()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><label>姓名</label><input type="text" id="edit-student-name" name="edit-student-name" autocomplete="off"></div>
+            <div class="form-group"><label>学习方向</label><select id="edit-student-direction"><option value="荔枝种植">荔枝种植</option><option value="电商运营">电商运营</option><option value="广绣工艺">广绣工艺</option><option value="水产养殖">水产养殖</option></select></div>
+            <div class="form-group"><label>状态</label><select id="edit-student-status"><option value="active">在读</option><option value="suspended">停课</option></select></div>
+            <div class="form-group"><label>平台账号</label>
+                <select id="edit-student-link-username"><option value="">（不关联账号）</option></select>
+                <div class="form-hint" id="edit-student-link-hint"></div>
+            </div>
+            <div id="edit-student-error" class="grade-error"></div>
+            <button class="btn btn-primary" id="teacher-confirm-edit-student">保存修改</button>
+        </div>
+    </div>
+</div>
+
+<!-- 发布通知弹窗 -->
+<div class="modal-overlay is-hidden" id="teacher-publish-ann-modal">
+    <div class="modal-content" style="max-width:500px">
+        <div class="modal-header"><h3>发布通知</h3><button class="modal-close" onclick="document.getElementById('teacher-publish-ann-modal').classList.add('is-hidden')"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group"><input type="text" id="publish-ann-title" placeholder="通知标题"></div>
+            <div class="form-group"><textarea id="publish-ann-content" rows="4" placeholder="通知内容"></textarea></div>
+            <div class="form-group"><select id="publish-ann-category"><option value="通知">通知</option><option value="作业">作业</option><option value="考试">考试</option></select></div>
+            <button class="btn btn-primary" id="teacher-confirm-publish-ann">发布</button>
+        </div>
+    </div>
+</div>
+
+<!-- 实训批改弹窗（必须先看到学员作品再打分，避免盲批） -->
+<div class="modal-overlay is-hidden" id="teacher-grade-modal">
+    <div class="modal-content" style="max-width:720px">
+        <div class="modal-header"><h3 id="grade-modal-title">批改实训</h3><button class="modal-close" onclick="closeGradeModal()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div id="grade-meta" class="grade-meta"></div>
+            <div class="grade-work-label">学员提交的作品</div>
+            <div id="grade-work-body" class="grade-work-body"></div>
+            <div class="form-group">
+                <label>我的评分（0-100）</label>
+                <input type="number" id="grade-score-input" min="0" max="100" placeholder="请输入 0-100 的整数">
+            </div>
+            <div class="form-group">
+                <label>评语（可留空，学员会在消息中心看到）</label>
+                <textarea id="grade-feedback-input" rows="3" placeholder="例如：卖点提炼到位，建议补上产地与采摘时间的可信信息"></textarea>
+            </div>
+            <div id="grade-error" class="grade-error"></div>
+            <button class="btn btn-primary" id="teacher-confirm-grade">确认批改</button>
+        </div>
+    </div>
+</div>
+
+<script>window.APP_CONFIG = { apiBaseUrl: '' };</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+// ---- 会话初始化 ----
+PORTAL.init('teacher', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = (AppState.user.name || '教')[0];
+    loadDashboard();
+});
+
+PORTAL.onPageChange(function(page) {
+    if (page === 'dashboard') loadDashboard();
+    else if (page === 'announcements') loadAnnouncements();
+    else if (page === 'analytics') loadAnalytics();
+    else if (page === 'trainings') loadTrainings();
+    else if (page === 'models') loadModels();
+});
+
+// ==================== 工作台 ====================
+function loadDashboard() {
+    apiCall('/api/teacher/dashboard', 'GET').then(function(r) {
+        if (r.success && r.dashboard) {
+            var s = r.dashboard.stats;
+            document.getElementById('stat-total-students').textContent = s.total_students || 0;
+            document.getElementById('stat-certificates').textContent = s.certificates_earned || 0;
+            document.getElementById('stat-completion').textContent = (s.completion_rate || 0) + '%';
+            document.getElementById('stat-avg-score').textContent = (s.avg_score || 0) + '%';
+        }
+    });
+    loadStudents();
+}
+
+// ==================== 学员管理 ====================
+function loadStudents() {
+    var q = document.getElementById('teacher-search') ? document.getElementById('teacher-search').value : '';
+    apiCall('/api/teacher/students' + (q ? '?search=' + encodeURIComponent(q) : ''), 'GET').then(function(r) {
+        var tbody = document.getElementById('teacher-student-tbody');
+        var count = document.getElementById('teacher-student-count');
+        if (!r.students || !r.students.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--portal-text-muted)">暂无学员</td></tr>';
+            if (count) count.textContent = '0人';
+            return;
+        }
+        if (count) count.textContent = r.students.length + '人';
+        tbody.innerHTML = r.students.map(function(s) {
+            // 名册行 ≠ 平台账号：未关联账号的学员登不进来、收不到通知，
+            // 这里必须一眼看出来，否则老师会把学号发给一个根本不存在的账号。
+            var accountCell;
+            if (s.user_id) {
+                accountCell = '<span class="badge badge-green">已关联</span><br><code>' + _tEsc(s.user_id) + '</code>';
+            } else {
+                accountCell = '<span class="badge badge-yellow">未关联</span><br>' +
+                    '<button class="btn btn-outline btn-sm" onclick="editStudent(\'' + s.id + '\')">去关联</button>';
+            }
+            return '<tr><td>' + _tEsc(s.id) + '</td><td>' + _tEsc(s.name) + '</td><td>' + _tEsc(s.direction || '-') + '</td>' +
+                '<td>' + (s.has_cert_data
+                    ? '<div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:' + (s.completion || 0) + '%"></div></div> ' + (s.completion || 0) + '%（证书' + (s.cert_earned || 0) + '/' + (s.cert_total || 0) + '）'
+                    : '<span style="color:var(--portal-text-muted)">暂无证书记录' + (s.user_id ? '' : '（未关联账号）') + '</span>') + '</td>' +
+                '<td><span class="badge ' + (s.status === 'active' ? 'badge-green' : 'badge-red') + '">' + (s.status === 'active' ? '在读' : '停课') + '</span></td>' +
+                '<td class="account-cell">' + accountCell + '</td>' +
+                '<td><button class="btn btn-outline btn-sm" onclick="editStudent(\'' + s.id + '\')">编辑</button> <button class="btn btn-danger btn-sm" onclick="delStudent(\'' + s.id + '\')">删除</button></td></tr>';
+        }).join('');
+    }).catch(function() {
+        var tbody = document.getElementById('teacher-student-tbody');
+        if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--portal-text-muted)">学员列表加载失败，请刷新重试</td></tr>';
+    });
+}
+document.getElementById('teacher-search').addEventListener('input', function() { loadStudents(); });
+
+document.getElementById('teacher-add-student-btn').addEventListener('click', openAddStudentModal);
+
+// ---- 添加弹窗：账号处理方式切换 ----
+function _syncAddStudentAccountRows() {
+    var mode = document.getElementById('add-student-account-mode').value;
+    document.getElementById('add-student-link-row').style.display = (mode === 'link') ? '' : 'none';
+    document.getElementById('add-student-create-row').style.display = (mode === 'create') ? '' : 'none';
+}
+document.getElementById('add-student-account-mode').addEventListener('change', _syncAddStudentAccountRows);
+
+// 拉取「可关联的学员账号」——只列尚未被任何名册行占用的账号。
+// ⚠️ 当前已关联的账号放在第一项（默认选中）：这样「打开弹窗不改动就保存」不会误解除关联，
+//    要解绑必须显式选「（改为不关联账号）」。
+function loadLinkableAccounts(selectId, hintId, currentUsername) {
+    var sel = document.getElementById(selectId);
+    var hint = document.getElementById(hintId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">加载中…</option>';
+    apiCall('/api/teacher/linkable-accounts', 'GET').then(function(r) {
+        var list = (r && r.accounts) || [];
+        var opts = [];
+        if (currentUsername) {
+            opts.push('<option value="' + _tEsc(currentUsername) + '">' + _tEsc(currentUsername) + '（当前已关联）</option>');
+        } else {
+            opts.push('<option value="">（不关联账号）</option>');
+        }
+        list.forEach(function(a) {
+            opts.push('<option value="' + _tEsc(a.username) + '">' + _tEsc(a.name || a.username) + '（' + _tEsc(a.username) + '）</option>');
+        });
+        if (!list.length && !currentUsername) {
+            opts.push('<option value="">（没有空闲的学员账号）</option>');
+        }
+        if (currentUsername) {
+            opts.push('<option value="">（改为不关联账号）</option>');
+        }
+        sel.innerHTML = opts.join('');
+        if (hint) {
+            hint.textContent = list.length
+                ? '只显示尚未被名册占用的学员账号，共 ' + list.length + ' 个。'
+                : '目前没有空闲的学员账号。可关闭弹窗后改用「添加学员 → 新建账号」。';
+        }
+    }).catch(function() {
+        sel.innerHTML = '<option value="">账号列表加载失败</option>';
+        if (hint) hint.textContent = '账号列表加载失败，请关闭弹窗后重试（本次保存不会改动账号关联）。';
+    });
+}
+
+function openAddStudentModal() {
+    document.getElementById('add-student-name').value = '';
+    document.getElementById('add-student-direction').value = '荔枝种植';
+    document.getElementById('add-student-account-mode').value = 'link';
+    document.getElementById('add-student-new-username').value = '';
+    document.getElementById('add-student-new-password').value = '';
+    document.getElementById('add-student-error').textContent = '';
+    _syncAddStudentAccountRows();
+    loadLinkableAccounts('add-student-link-username', 'add-student-link-hint', '');
+    document.getElementById('teacher-add-student-modal').classList.remove('is-hidden');
+}
+function closeAddStudentModal() {
+    document.getElementById('teacher-add-student-modal').classList.add('is-hidden');
+}
+
+document.getElementById('teacher-confirm-add-student').addEventListener('click', function() {
+    var errEl = document.getElementById('add-student-error');
+    errEl.textContent = '';
+    var n = document.getElementById('add-student-name').value.trim();
+    var d = document.getElementById('add-student-direction').value;
+    var mode = document.getElementById('add-student-account-mode').value;
+    if (!n) { errEl.textContent = '请输入姓名'; return; }
+    var payload = { name: n, direction: d };
+    if (mode === 'link') {
+        var u = document.getElementById('add-student-link-username').value;
+        if (!u) { errEl.textContent = '请选择一个要关联的学员账号，或改选「暂不关联」'; return; }
+        payload.link_username = u;
+    } else if (mode === 'create') {
+        var nu = document.getElementById('add-student-new-username').value.trim();
+        var npw = document.getElementById('add-student-new-password').value.trim();
+        if (!nu) { errEl.textContent = '请输入用户名'; return; }
+        if (npw.length < 6) { errEl.textContent = '初始密码至少 6 位'; return; }
+        payload.new_username = nu;
+        payload.new_password = npw;
+    }
+    var btn = this;
+    btn.disabled = true;
+    apiCall('/api/teacher/students/add', 'POST', payload).then(function(r) {
+        btn.disabled = false;
+        if (r.success) {
+            closeAddStudentModal();
+            loadStudents();
+            loadDashboard();
+            alert(r.message);
+        } else {
+            errEl.textContent = r.message || '添加失败';
+        }
+    }).catch(function() {
+        btn.disabled = false;
+        errEl.textContent = '添加失败，请稍后重试';
+    });
+});
+
+// ---- 编辑学员（表单版，替代原来的 5 连 prompt）----
+var editingStudentId = null;
+var editingStudentUserId = '';
+function editStudent(id) {
+    apiCall('/api/teacher/students/' + id, 'GET').then(function(r) {
+        if (!r.success) { alert('未找到该学员，请刷新后重试'); return; }
+        var s = r.student;
+        editingStudentId = id;
+        editingStudentUserId = s.user_id || '';
+        document.getElementById('edit-student-title').textContent = '编辑学员 · ' + s.id;
+        document.getElementById('edit-student-name').value = s.name || '';
+        // ⚠️ 方向下拉是固定选项表：若要编辑的学员方向不在表里，直接赋 value 会落空，
+        //    保存时就把方向改成了空串。这里补一条同值 option 兜住（数据不被静默改动）。
+        var dirSel = document.getElementById('edit-student-direction');
+        var dirVal = s.direction || '荔枝种植';
+        if (![].some.call(dirSel.options, function(o) { return o.value === dirVal; })) {
+            var extra = document.createElement('option');
+            extra.value = dirVal; extra.textContent = dirVal;
+            dirSel.appendChild(extra);
+        }
+        dirSel.value = dirVal;
+        document.getElementById('edit-student-status').value = s.status || 'active';
+        document.getElementById('edit-student-error').textContent = '';
+        var hint = document.getElementById('edit-student-link-hint');
+        if (hint) hint.textContent = s.user_id
+            ? '当前已关联账号 ' + s.user_id + '。改成「（改为不关联账号）」并保存后，该学员将无法登录，但名册与历史学习数据都会保留。'
+            : '该学员尚未关联账号，无法登录、收不到站内通知。选一个账号即可关联。';
+        loadLinkableAccounts('edit-student-link-username', null, s.user_id || '');
+        document.getElementById('teacher-edit-student-modal').classList.remove('is-hidden');
+    }).catch(function() { alert('加载学员信息失败，请重试'); });
+}
+function closeEditStudentModal() {
+    document.getElementById('teacher-edit-student-modal').classList.add('is-hidden');
+    editingStudentId = null;
+    editingStudentUserId = '';
+}
+
+document.getElementById('teacher-confirm-edit-student').addEventListener('click', function() {
+    var errEl = document.getElementById('edit-student-error');
+    errEl.textContent = '';
+    if (!editingStudentId) { errEl.textContent = '请选择要编辑的学员'; return; }
+    var name = document.getElementById('edit-student-name').value.trim();
+    if (!name) { errEl.textContent = '请输入姓名'; return; }
+    var direction = document.getElementById('edit-student-direction').value;
+    var status = document.getElementById('edit-student-status').value;
+    var account = document.getElementById('edit-student-link-username').value;
+    var btn = this;
+    btn.disabled = true;
+    // 先存基本资料，再单独处理账号关联（两个接口各自校验，避免半成功状态说不清）
+    apiCall('/api/teacher/students/' + editingStudentId, 'PUT', { name: name, direction: direction, status: status })
+        .then(function(r) {
+            if (!r.success) throw new Error(r.message || '保存失败');
+            // 与当前关联一致 → 不做任何改动（用户没碰账号下拉）
+            if (account === editingStudentUserId) return { success: true, message: '资料已更新' };
+            return apiCall('/api/teacher/students/' + editingStudentId + '/link', 'POST', { username: account });
+        })
+        .then(function(r2) {
+            btn.disabled = false;
+            if (r2 && r2.success === false) { errEl.textContent = r2.message || '账号关联失败'; return; }
+            closeEditStudentModal();
+            loadStudents();
+            loadDashboard();
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            errEl.textContent = (e && e.message) ? e.message : '保存失败，请稍后重试';
+        });
+});
+function delStudent(id) { if (!confirm('确定删除该学员？仅删除名册记录，平台账号不会被删除。')) return; apiCall('/api/teacher/students/' + id, 'DELETE').then(function(r) { if (r.success) loadStudents(); loadDashboard(); }); }
+
+// AI 报告
+document.querySelectorAll('.suggestion-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+        document.getElementById('teacher-report-prompt').value = this.dataset.q;
+    });
+});
+document.getElementById('teacher-report-generate-btn').addEventListener('click', function() {
+    var prompt = document.getElementById('teacher-report-prompt').value.trim();
+    if (!prompt) { alert('请输入分析需求'); return; }
+    var result = document.getElementById('teacher-report-result');
+    result.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> AI 正在生成报告...</div>';
+    apiCall('/api/teacher/reports/generate', 'POST', { prompt: prompt }).then(function(r) {
+        if (r.success) {
+            result.innerHTML = '<div class="card" style="white-space:pre-wrap;font-size:0.9rem;line-height:1.6">' + (r.report.content || '') + '</div>';
+        } else {
+            result.innerHTML = '<p style="color:#ef4444">生成失败: ' + (r.message || '未知错误') + '</p>';
+        }
+    });
+});
+
+// ==================== 通知公告 ====================
+function loadAnnouncements() {
+    apiCall('/api/teacher/announcements', 'GET').then(function(r) {
+        var list = document.getElementById('teacher-announcements-list');
+        if (!r.announcements || !r.announcements.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-bullhorn"></i><p>暂无公告</p></div>'; return; }
+        list.innerHTML = r.announcements.map(function(a) {
+            return '<div class="card" style="padding:16px"><h4>' + (a.pinned ? '📌 ' : '') + a.title + ' <span style="font-size:0.8rem;color:var(--portal-text-muted)">[' + a.category + ']</span></h4><p style="font-size:0.9rem;margin-top:4px">' + a.content + '</p><small style="color:var(--portal-text-muted)">' + a.created_at + '</small> <button class="btn btn-danger btn-sm" style="margin-left:8px" onclick="delAnnouncement(' + a.id + ')">删除</button></div>';
+        }).join('');
+    });
+}
+document.getElementById('teacher-publish-ann-btn').addEventListener('click', function() {
+    document.getElementById('teacher-publish-ann-modal').classList.remove('is-hidden');
+});
+document.getElementById('teacher-confirm-publish-ann').addEventListener('click', function() {
+    var t = document.getElementById('publish-ann-title').value.trim();
+    var c = document.getElementById('publish-ann-content').value.trim();
+    var cat = document.getElementById('publish-ann-category').value;
+    if (!t || !c) { alert('标题和内容不能为空'); return; }
+    apiCall('/api/teacher/announcements', 'POST', { title: t, content: c, category: cat }).then(function(r) {
+        alert(r.message);
+        if (r.success) { document.getElementById('teacher-publish-ann-modal').classList.add('is-hidden'); loadAnnouncements(); }
+    });
+});
+function delAnnouncement(id) { if (!confirm('确定删除?')) return; apiCall('/api/teacher/announcements/' + id, 'DELETE').then(function(r) { if (r.success) loadAnnouncements(); }); }
+
+// ==================== 学情分析 ====================
+function loadAnalytics() {
+    apiCall('/api/teacher/analytics', 'GET').then(function(r) {
+        var el = document.getElementById('teacher-analytics-content');
+        if (!r.success) { el.innerHTML = '<div class="empty-state"><i class="fas fa-chart-bar"></i><p>暂无数据</p></div>'; return; }
+        var a = r.analytics;
+        var html = '';
+        // 口径说明必须跟着数据走：这里的「完成度」来自学员名下证书进度的平均值，
+        // 不是名册里那个手填的 progress 字段。
+        if (a.no_cert_count > 0) {
+            html += '<div class="trainings-notice" style="margin-bottom:12px">口径：' + _tEsc(a.basis_label || '证书真实完成度') +
+                '。另有 <strong>' + a.no_cert_count + '</strong> 名学员暂无任何证书记录，未计入分布（不等于 0% 完成）。</div>';
+        } else if (a.basis_label) {
+            html += '<div class="trainings-notice" style="margin-bottom:12px">口径：' + _tEsc(a.basis_label) + '</div>';
+        }
+        html += '<div class="stat-grid">';
+        if (a.progress_distribution) {
+            var maxCnt = Math.max.apply(null, a.progress_distribution.map(function(d) { return d.count; }).concat([1]));
+            html += '<div class="card"><h4>完成度分布</h4>' + a.progress_distribution.map(function(d) {
+                // ⚠️ 柱宽按「占最大值比例」算：原实现写死 count*10，3 个人就能顶满一格，
+                //    8 个人直接溢出，柱子长短和人数完全对不上。
+                var w = maxCnt ? (d.count / maxCnt * 100) : 0;
+                return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span style="width:60px;font-size:0.85rem">' + d.label + '</span><div class="progress-bar-wrap" style="flex:1"><div class="progress-bar-fill" style="width:' + w.toFixed(1) + '%"></div></div><span style="font-size:0.85rem">' + d.count + '人</span></div>';
+            }).join('') + '</div>';
+        }
+        if (a.direction_distribution) {
+            html += '<div class="card"><h4>方向分布</h4>' + a.direction_distribution.map(function(d) {
+                return '<div style="margin:4px 0;font-size:0.9rem"><strong>' + _tEsc(d.direction || '未分类') + '</strong>: ' + d.count + '人</div>';
+            }).join('') + '</div>';
+        }
+        if (a.direction_progress) {
+            html += '<div class="card"><h4>各方向平均完成度</h4>' + a.direction_progress.map(function(d) {
+                return '<div style="display:flex;align-items:center;gap:8px;margin:4px 0"><span style="width:80px;font-size:0.85rem">' + _tEsc(d.direction) + '</span><div class="progress-bar-wrap" style="flex:1"><div class="progress-bar-fill" style="width:' + (d.avg_progress || 0) + '%"></div></div><span style="font-size:0.85rem">' + (d.avg_progress || 0) + '% · ' + (d.student_count || 0) + '人</span></div>';
+            }).join('') + '</div>';
+        }
+        html += '</div>';
+        el.innerHTML = html;
+    }).catch(function() {
+        var el = document.getElementById('teacher-analytics-content');
+        if (el) el.innerHTML = '<div class="empty-state"><i class="fas fa-triangle-exclamation"></i><p>学情数据加载失败，请刷新重试</p></div>';
+    });
+}
+
+// ==================== 3D模型 ====================
+function showModelForm() { document.getElementById('model-form').style.display = 'block'; }
+
+function uploadModel() {
+    var t = document.getElementById('model-title').value.trim();
+    var d = document.getElementById('model-desc').value.trim();
+    var c = document.getElementById('model-craft').value;
+    var f = document.getElementById('model-file').files[0];
+    if (!f) { alert('请选择文件'); return; }
+    if (f.size > 50 * 1024 * 1024) { alert('文件过大，模型文件不能超过 50MB'); return; }
+    var fd = new FormData(); fd.append('file', f); fd.append('title', t); fd.append('description', d); fd.append('craft_type', c);
+    fetch((window.APP_CONFIG.apiBaseUrl || '') + '/api/teacher/models-3d',
+        { method: 'POST', headers: { 'X-Session-Id': AppState.sessionId }, body: fd })
+        .then(function(r) { return r.json(); }).then(function(r) {
+            alert(r.message); if (r.success) { document.getElementById('model-form').style.display = 'none'; loadModels(); }
+        });
+}
+
+var CRAFT_TYPE_NAMES = { embroidery: '广绣', woodcarving: '潮汕木雕', ceramics: '石湾陶艺', lacquer: '阳江漆器' };
+function loadModels() {
+    var el = document.getElementById('model-list');
+    el.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载中...</div>';
+    apiCall('/api/teacher/models-3d', 'GET').then(function(r) {
+        if (!r.models || !r.models.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-cube"></i><p>暂无模型</p></div>'; return; }
+        el.innerHTML = '<table><thead><tr><th>标题</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.models.map(function(m) {
+                var statusHtml;
+                if (m.review_status === 'approved') {
+                    statusHtml = m.is_published
+                        ? '<span class="badge badge-green">已发布给学员</span>'
+                        : '<span class="badge badge-green">已通过审核</span>';
+                } else if (m.review_status === 'rejected') {
+                    statusHtml = '<span class="badge badge-red">已驳回</span>';
+                } else {
+                    statusHtml = '<span class="badge badge-yellow">待审核</span>';
+                }
+                return '<tr><td>' + (m.title || '') + '</td><td>' + (CRAFT_TYPE_NAMES[m.craft_type] || m.craft_type || '-') + '</td>' +
+                    '<td>' + statusHtml + '</td>' +
+                    '<td><button class="btn btn-outline btn-sm" onclick="previewModel(\'' + encodeURIComponent(m.file_path || '') + '\', \'' + (m.title || '').replace(/'/g, '') + '\')">预览</button> <button class="btn btn-danger btn-sm" onclick="delModel(' + m.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() { el.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+function delModel(id) { if (!confirm('确定删除?')) return; apiCall('/api/teacher/models-3d/' + id, 'DELETE').then(function(r) { if (r.success) loadModels(); }); }
+
+// 预览模型：弹出 modal + model-viewer 渲染（支持 glb/gltf/obj）
+function previewModel(filePath, title) {
+    var modal = document.getElementById('model-preview-modal');
+    var viewer = document.getElementById('model-preview-viewer');
+    if (!modal || !viewer) return;
+    document.getElementById('model-preview-title').textContent = title || '模型预览';
+    viewer.src = decodeURIComponent(filePath || '');
+    viewer.alt = title || '';
+    modal.classList.remove('is-hidden');
+}
+function closeModelPreview() {
+    var modal = document.getElementById('model-preview-modal');
+    var viewer = document.getElementById('model-preview-viewer');
+    if (modal) modal.classList.add('is-hidden');
+    if (viewer) viewer.removeAttribute('src');
+}
+
+// ==================== 实训提交（学员提交 → 教师复核） ====================
+// 数据源：assignment_submissions（学生端 /api/ecommerce/{live,copy,cs}/submit 写入）。
+// 批改走既有 /api/teacher/assignments/grade，会给学员发站内通知（写真实 username）。
+// 2026-10-07：① 下发学员作品正文，批改前先能看见；② 系统规则分与教师评分分列；
+//             ③ 学员重新提交时保留教师已给的分数与评语，状态标「已重新提交·待复核」。
+var TRAINING_KIND_NAMES = { live: '直播带货', copy: '商品文案', cs: '客服对练' };
+var TRAINING_STATUS_CLASS = { graded: 'badge-green', submitted: 'badge-yellow', resubmitted: 'badge-yellow' };
+var trainingCache = {};   // id -> 行数据（查看作品 / 批改都要用）
+var gradingId = null;
+
+function _tEsc(s) {
+    // teacher.html 加载了 js/core.js，escapeHtml 是全局函数；兜底防止旧缓存里没有它
+    if (typeof escapeHtml === 'function') return escapeHtml(String(s == null ? '' : s));
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+}
+function _tNum(v) { return (v === null || v === undefined || v === '') ? '—' : v; }
+
+// 作品正文渲染：直播/文案形态是 script 文本；客服对练形态是 transcript 对话。
+function renderTrainingWork(t) {
+    if (t.kind === 'cs' && t.transcript && t.transcript.length) {
+        return '<div class="grade-chat">' + t.transcript.map(function (m) {
+            var isStudent = (m.role === 'user');
+            return '<div class="grade-chat-row ' + (isStudent ? 'is-student' : 'is-customer') + '">' +
+                '<span class="grade-chat-who">' + (isStudent ? '学员' : '客户') + '</span>' +
+                '<span class="grade-chat-text">' + _tEsc(m.content || '') + '</span></div>';
+        }).join('') + '</div>';
+    }
+    if (t.script) return '<pre class="grade-script">' + _tEsc(t.script) + '</pre>';
+    return '<p class="grade-empty">该条提交没有可展示的正文（可能是早期版本留下的记录）</p>';
+}
+
+function loadTrainings() {
+    var el = document.getElementById('teacher-trainings-list');
+    var noticeEl = document.getElementById('teacher-trainings-notice');
+    if (!el) return;
+    el.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载中...</div>';
+    apiCall('/api/teacher/trainings', 'GET').then(function(r) {
+        var rows = (r && r.trainings) || [];
+        trainingCache = {};
+        rows.forEach(function (t) { trainingCache[String(t.id)] = t; });
+        if (noticeEl) {
+            var n = (r && r.pending_regrade) || 0;
+            noticeEl.innerHTML = n > 0
+                ? '<div class="trainings-notice"><i class="fas fa-exclamation-circle"></i> 有 ' + n + ' 条实训被学员重新提交，你之前的评分与评语已保留，但需要重新复核。</div>'
+                : '';
+        }
+        if (!rows.length) { el.innerHTML = '<div class="empty-state"><i class="fas fa-clipboard-check"></i><p>暂无学员实训提交</p></div>'; return; }
+        el.innerHTML = '<table><thead><tr><th>学员</th><th>类型</th><th>产品</th><th>提交次数</th><th>系统规则分</th><th>我的评分</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead><tbody>' +
+            rows.map(function(t) {
+                var kindName = TRAINING_KIND_NAMES[t.kind] || t.kind || '-';
+                var workLabel = (t.kind === 'cs')
+                    ? ((t.transcript && t.transcript.length) ? '对话 ' + t.transcript.length + ' 条' : '无对话记录')
+                    : (t.script ? '正文 ' + (t.script_len || 0) + ' 字' : '无正文');
+                return '<tr class="' + (t.regrade_needed ? 'is-regrade' : '') + '">' +
+                    '<td>' + _tEsc(t.student_name || t.student_id) +
+                        (t.student_name ? '<br><small style="color:var(--portal-text-muted)">' + _tEsc(t.student_id) + '</small>' : '') + '</td>' +
+                    '<td>' + _tEsc(kindName) + '<br><small style="color:var(--portal-text-muted)">' + _tEsc(workLabel) + '</small></td>' +
+                    '<td>' + _tEsc(t.product || '-') + '</td>' +
+                    '<td>' + (t.attempts || 1) + '</td>' +
+                    '<td>' + _tNum(t.rule_score) + '</td>' +
+                    '<td><strong>' + _tNum(t.score) + '</strong></td>' +
+                    '<td><span class="badge ' + (TRAINING_STATUS_CLASS[t.status] || 'badge-yellow') + '">' +
+                        _tEsc(t.status_label || '待批改') + '</span></td>' +
+                    '<td>' + _tEsc(t.submitted_at || '') + '</td>' +
+                    '<td><button class="btn btn-outline btn-sm" onclick="openGradeModal(' + t.id + ')">' +
+                        (t.status === 'graded' ? '查看/重批' : '查看并批改') + '</button></td>' +
+                    '</tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() { el.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败，请点「刷新」重试</p></div>'; });
+}
+
+function openGradeModal(id) {
+    var t = trainingCache[String(id)];
+    if (!t) { alert('数据已过期，请点「刷新」后重试'); return; }
+    gradingId = id;
+    document.getElementById('grade-modal-title').textContent = '批改实训 · ' + (TRAINING_KIND_NAMES[t.kind] || t.kind || '') + ' · ' + (t.product || '');
+    document.getElementById('grade-meta').innerHTML =
+        '学员：<strong>' + _tEsc(t.student_name || t.student_id) + '</strong>' +
+        (t.student_name ? '（' + _tEsc(t.student_id) + '）' : '') +
+        ' · 第 ' + (t.attempts || 1) + ' 次提交 · ' + _tEsc(t.submitted_at || '') +
+        ' · 系统规则分：' + _tNum(t.rule_score) +
+        (t.graded_at ? ' · 上次批改：' + _tEsc(t.graded_at) : '');
+    document.getElementById('grade-work-body').innerHTML = renderTrainingWork(t);
+    document.getElementById('grade-score-input').value = (t.score === null || t.score === undefined) ? '' : t.score;
+    document.getElementById('grade-feedback-input').value = t.feedback || '';
+    document.getElementById('grade-error').textContent = '';
+    document.getElementById('teacher-grade-modal').classList.remove('is-hidden');
+}
+
+function closeGradeModal() {
+    var m = document.getElementById('teacher-grade-modal');
+    if (m) m.classList.add('is-hidden');
+    gradingId = null;
+}
+
+document.getElementById('teacher-confirm-grade').addEventListener('click', function() {
+    var errEl = document.getElementById('grade-error');
+    errEl.textContent = '';
+    if (gradingId === null) { errEl.textContent = '请选择要批改的记录'; return; }
+    var raw = document.getElementById('grade-score-input').value.trim();
+    var score = parseInt(raw, 10);
+    if (raw === '' || isNaN(score) || score < 0 || score > 100) { errEl.textContent = '分数需为 0-100 的整数'; return; }
+    var fb = document.getElementById('grade-feedback-input').value.trim();
+    var btn = this;
+    btn.disabled = true;
+    apiCall('/api/teacher/assignments/grade', 'POST', { submission_id: gradingId, score: score, feedback: fb })
+        .then(function(r) {
+            btn.disabled = false;
+            if (r.success) { closeGradeModal(); loadTrainings(); }
+            else { errEl.textContent = r.message || '批改失败'; }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            errEl.textContent = (e && e.message) ? ('批改失败：' + e.message) : '批改失败，请稍后重试';
+        });
+});
+document.getElementById('teacher-trainings-refresh') && document.getElementById('teacher-trainings-refresh').addEventListener('click', loadTrainings);
+</script>
+</body>
+</html>

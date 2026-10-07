@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>政务工作台 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --portal-accent: #4a6fa5; --portal-accent-hover: #3a5780;
+            --portal-sidebar-bg: #16241e; --portal-sidebar-divider: #33473d;
+            --portal-sidebar-link-hover-bg: #1b2c25;
+            --portal-body-bg: #f2f4f1;
+        }
+        /* 表单提示 / 操作反馈 / 列表卡片（与 teacher.html 的 .form-hint 同名同义，保持一致） */
+        .form-hint { font-size: 0.78rem; color: var(--portal-text-muted); margin-top: 6px; line-height: 1.5; }
+        .form-row > textarea { resize: vertical; }
+        .form-msg { display: none; margin-top: 12px; padding: 8px 12px; border-radius: var(--portal-radius-sm); font-size: 0.85rem; line-height: 1.5; }
+        .form-msg.show { display: block; }
+        .form-msg.ok { background: #dcefe3; color: #123a2a; }
+        .form-msg.err { background: #fee2e2; color: #991b1b; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .card h4 { font-size: 0.98rem; font-weight: 600; line-height: 1.4; }
+        .list-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .list-card-meta { font-size: 0.78rem; color: var(--portal-text-muted); margin-top: 8px; line-height: 1.6; }
+        .list-card-preview { font-size: 0.85rem; color: var(--portal-text-muted); margin-top: 8px; line-height: 1.6; }
+        .row-actions { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+        /* 工作概览（政策发布情况 / 本地成功案例） */
+        .dash-section-title { font-size: 0.95rem; font-weight: 600; color: var(--portal-text); margin: 0 0 10px 2px; }
+        /* styles.css 的 .stat-card 是 display:flex 横排（给首页带 .stat-icon 的卡片用的）；
+           工作概览的卡片没有图标，横排会把「本级发布政策」这类 label 挤成竖排 —— 改回纵向堆叠。 */
+        #dash-content .stat-card { display: block; }
+        #dash-content .stat-card .num { line-height: 1.25; }
+        .dash-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; background: #eef1f5; color: var(--portal-text-muted); vertical-align: 1px; }
+        .dash-sub { font-size: 0.78rem; color: var(--portal-text-muted); margin-top: 6px; line-height: 1.5; }
+        .dash-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+        .dash-chip { font-size: 0.78rem; padding: 4px 10px; border-radius: 999px; background: #f1f3f6; color: var(--portal-text-muted); line-height: 1.5; }
+        .dash-note { margin-top: 4px; padding: 10px 12px; border-radius: var(--portal-radius-sm); background: #f4f6f4; font-size: 0.78rem; color: var(--portal-text-muted); line-height: 1.7; }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar">
+        <div class="logo"><i class="fas fa-landmark"></i>政务工作台</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-chart-pie"></i>数据大屏</a>
+            <a href="#" data-page="policies"><i class="fas fa-file-alt"></i>政策管理</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">政</div><span id="sidebar-name">政府人员</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">数据大屏</h2>
+            </div>
+            <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
+        <div class="portal-content">
+            <div class="page active" id="page-dashboard"><div id="dash-content"><div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载数据...</div></div></div>
+            <div class="page" id="page-policies">
+                <div class="card">
+                    <h3 id="policy-form-title">发布新政策</h3>
+                    <div class="form-row">
+                        <input type="text" id="policy-title" name="policy-title" autocomplete="off" placeholder="政策标题（必填）">
+                    </div>
+                    <div class="form-row">
+                        <select id="policy-cat" name="policy-cat" aria-label="政策分类">
+                            <option value="补贴">补贴</option>
+                            <option value="电商">电商</option>
+                            <option value="非遗">非遗</option>
+                            <option value="培训">培训</option>
+                            <option value="认证">认证</option>
+                            <option value="综合">综合</option>
+                        </select>
+                        <input type="date" id="policy-date" name="policy-date" autocomplete="off" aria-label="发布日期">
+                    </div>
+                    <div class="form-row">
+                        <input type="text" id="policy-summary" name="policy-summary" autocomplete="off" placeholder="摘要（留空将自动截取正文首段）">
+                    </div>
+                    <div class="form-row">
+                        <textarea id="policy-source" name="policy-source" rows="2" placeholder="资料来源（可选，一行一条，写作：来源名称 | 链接）"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <textarea id="policy-content" name="policy-content" rows="6" placeholder="政策内容（必填）"></textarea>
+                    </div>
+                    <div class="row-actions">
+                        <button class="btn btn-primary" id="policy-submit" type="button" onclick="pubPolicy()">发布政策</button>
+                        <button class="btn btn-outline" id="policy-cancel" type="button" style="display:none" onclick="cancelEditPolicy()">取消编辑</button>
+                    </div>
+                    <p class="form-hint">发布后<strong>立即</strong>在学员端首页「本土资源 → 政策信息」可见；如需先不上线，发布后在下方列表点「下架」。未填资料来源的政策，学员端详情不会出现「文号与数据均可溯源」的口径说明。</p>
+                    <div id="policy-msg" class="form-msg" role="status" aria-live="polite"></div>
+                </div>
+                <div id="policy-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载政策…</div></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>window.APP_CONFIG={apiBaseUrl:''};</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+PORTAL.init('government', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = '政';
+    // 发布日期默认今天（政务人员仍可改成文件实际的发文日期）
+    clearPolicyForm();
+    loadDash();
+});
+PORTAL.onPageChange(function(p) {
+    if (p === 'dashboard') loadDash();
+    else if (p === 'policies') loadPolicies();
+});
+
+// ==================== 工作概览（原「数据大屏」） ====================
+// 口径与后端 `get_government_overview()` 同源：只呈现**政务侧自己产生、可核**的信息。
+//   · 政策拆成「本级发布」与「平台预置」两张卡 —— 预置政策是用 gov_demo 身份灌进去的，
+//     混在一起会把平台整理的内容算成本级发布的政绩。
+//   · 岗位数归企业端「工作台」；培训/证书/讨论/地区分布等口径不稳的指标已在后端整体移出。
+function dashCard(num, label, sub, tag) {
+    var tagHtml = tag ? '<span class="dash-tag">' + escapeHtml(tag) + '</span>' : '';
+    return '<div class="stat-card"><div class="num">' + escapeHtml(String(num)) + '</div>'
+        + '<div class="label">' + escapeHtml(label) + tagHtml + '</div>'
+        + (sub ? '<p class="dash-sub">' + escapeHtml(sub) + '</p>' : '')
+        + '</div>';
+}
+
+function loadDash() {
+    apiCall('/api/government/dashboard', 'GET').then(function(r) {
+        var box = document.getElementById('dash-content');
+        if (!r.success) {
+            // 原来这里直接 return —— 页面停在「加载数据...」转圈，看不出是权限/服务问题
+            box.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>'
+                + escapeHtml(r.message || '数据加载失败') + '</p></div>';
+            return;
+        }
+        var d = r.overview || {};
+        var p = d.policies || {};
+        var c = d.cases || {};
+        if (!p.own || !p.preset || !c.items) {
+            // 新前端 + 旧后端（服务未更新）时字段不存在。**不能**用 0 兜底充数（那是无依据的结论），
+            // 也不能让「undefined 条」漏到页面上 —— 如实报格式不匹配。
+            box.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i>'
+                + '<p>概览数据格式不匹配，暂时无法显示，请稍后重试或联系管理员</p></div>';
+            return;
+        }
+        var own = p.own, preset = p.preset;
+        var cats = p.categories || [];
+        var regions = c.regions || [];
+        var items = c.items || [];
+
+        var html = '<h3 class="dash-section-title">政策发布情况</h3><div class="stat-grid">'
+            + dashCard(own.total + ' 条', '本级发布政策',
+                       '已上线 ' + own.published + ' · 已下架 ' + own.unpublished)
+            + dashCard(preset.total + ' 条', '平台预置参考',
+                       '已上线 ' + preset.published + ' · 已下架 ' + preset.unpublished, '平台整理')
+            + dashCard(cats.length + ' 类', '政策分类',
+                       cats.length
+                           ? cats.map(function(x) { return x.category + ' ' + x.count; }).join(' · ')
+                           : '暂无政策')
+            + '</div>';
+
+        html += '<h3 class="dash-section-title">本地成功案例</h3><div class="stat-grid">'
+            + dashCard(c.approved + ' 条', '已收录案例',
+                       '共 ' + c.total + ' 条，其余审核中')
+            + dashCard(regions.length + ' 个', '覆盖地市',
+                       regions.length
+                           ? regions.map(function(x) { return x.region + ' ' + x.count; }).join(' · ')
+                           : '暂无已通过审核的案例')
+            + dashCard(c.avg_sources + ' 条', '平均来源数',
+                       '合计 ' + c.source_total + ' 条公开出处')
+            + '</div>';
+
+        if (items.length) {
+            html += '<div class="card"><h3>案例列表</h3><div class="dash-chips">'
+                + items.map(function(x) {
+                    return '<span class="dash-chip">'
+                        + escapeHtml((x.region ? x.region + ' · ' : '') + x.title)
+                        + '（' + x.sources + ' 条来源）</span>';
+                }).join('')
+                + '</div></div>';
+        } else {
+            html += '<div class="card"><h3>案例列表</h3>'
+                + '<div class="empty-state"><i class="fas fa-seedling"></i>'
+                + '<p>暂无已通过审核的本地案例</p></div></div>';
+        }
+
+        html += '<div class="dash-note">'
+            + '本页只呈现政务侧产生的信息：政策发布情况与本地成功案例；岗位数请在企业端「工作台」查看。<br>'
+            + '政策与案例均依据公开文件 / 公开报道整理，逐条标注出处；'
+            + '具体标准与办理时限以当年度当地主管部门正式文件为准。'
+            + '</div>';
+
+        box.innerHTML = html;
+    }).catch(function() {
+        document.getElementById('dash-content').innerHTML =
+            '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>数据加载失败</p></div>';
+    });
+}
+
+// ==================== 政策管理 ====================
+var _govPolicies = [];        // 当前列表（编辑时按 id 取原文）
+var _editingPolicyId = null;  // 非空 = 表单处于「编辑中」状态
+
+function policyMsg(text, type) {
+    var el = document.getElementById('policy-msg');
+    if (!el) return;
+    el.className = 'form-msg' + (text ? ' show ' + (type || 'ok') : '');
+    el.textContent = text || '';
+}
+
+function todayStr() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? '0' : '') + n; }
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+
+// 预览截断：只有**确实超长**才加省略号，并把正文里的换行压成空格。
+// 原实现一律拼 '...'：短内容后面也多一串省略号，正文换行还会把卡片撑成一大块。
+function policyPreview(text, limit) {
+    var s = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
+    if (!s) return '';
+    return s.length > limit ? s.slice(0, limit) + '…' : s;
+}
+
+function loadPolicies() {
+    var list = document.getElementById('policy-list');
+    apiCall('/api/government/policies', 'GET').then(function(r) {
+        _govPolicies = (r && r.policies) || [];
+        if (!_govPolicies.length) {
+            list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无政策</p>'
+                + '<p class="form-hint">在上方表单发布第一条政策；发布后学员端首页「本土资源 → 政策信息」会立即显示。</p></div>';
+            return;
+        }
+        list.innerHTML = _govPolicies.map(function(p) {
+            var live = Number(p.is_published) === 1;
+            var badge = live
+                ? '<span class="badge badge-green">已上线</span>'
+                : '<span class="badge badge-yellow">已下架</span>';
+            var meta = [];
+            if (p.date) meta.push('发布日期 ' + escapeHtml(p.date));
+            if (p.created_at) meta.push('录入于 ' + escapeHtml(String(p.created_at).slice(0, 10)));
+            if (p.author_id) meta.push('发布者 ' + escapeHtml(p.author_id));
+            var srcCount = (p.sources || []).length;
+            meta.push(srcCount ? '资料来源 ' + srcCount + ' 条' : '未填资料来源');
+            var preview = policyPreview(p.summary || p.content, 120);
+            return '<div class="card">'
+                + '<div class="list-card-head">'
+                +   '<h4>' + escapeHtml(p.title || '(无标题)') + ' ' + badge + '</h4>'
+                +   '<span class="badge badge-blue">' + escapeHtml(p.category || '综合') + '</span>'
+                + '</div>'
+                + '<div class="list-card-meta">' + meta.join(' · ') + '</div>'
+                + (preview ? '<p class="list-card-preview">' + escapeHtml(preview) + '</p>' : '')
+                + '<div class="row-actions">'
+                +   '<button class="btn btn-outline btn-sm" onclick="togglePolicy(' + p.id + ',' + (live ? 1 : 0) + ')">' + (live ? '下架' : '上架') + '</button>'
+                +   '<button class="btn btn-outline btn-sm" onclick="editPolicy(' + p.id + ')"><i class="fas fa-pen"></i> 编辑</button>'
+                +   '<button class="btn btn-danger btn-sm" onclick="delPolicy(' + p.id + ')">删除</button>'
+                + '</div></div>';
+        }).join('');
+    }).catch(function(e) {
+        // 原来没有 .catch：接口 403/500 时页面永远停在转圈，且控制台只有一条未处理的 Promise 拒绝
+        list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>政策列表加载失败：'
+            + escapeHtml((e && e.message) || '未知错误') + '</p>'
+            + '<button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="loadPolicies()">重试</button></div>';
+    });
+}
+
+function readPolicyForm() {
+    return {
+        title: document.getElementById('policy-title').value.trim(),
+        content: document.getElementById('policy-content').value.trim(),
+        category: document.getElementById('policy-cat').value,
+        summary: document.getElementById('policy-summary').value.trim(),
+        date: document.getElementById('policy-date').value,
+        source: document.getElementById('policy-source').value
+    };
+}
+
+function clearPolicyForm() {
+    ['policy-title', 'policy-content', 'policy-summary', 'policy-source'].forEach(function(id) {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('policy-date').value = todayStr();
+}
+
+function setEditing(id) {
+    _editingPolicyId = id;
+    document.getElementById('policy-form-title').textContent = id ? '编辑政策' : '发布新政策';
+    document.getElementById('policy-submit').textContent = id ? '保存修改' : '发布政策';
+    document.getElementById('policy-cancel').style.display = id ? '' : 'none';
+}
+
+function pubPolicy() {
+    var f = readPolicyForm();
+    if (!f.title || !f.content) { policyMsg('标题和内容不能为空', 'err'); return; }
+    policyMsg('');
+    var btn = document.getElementById('policy-submit');
+    btn.disabled = true;
+    var wasEdit = !!_editingPolicyId;
+    var req = wasEdit
+        ? apiCall('/api/government/policies/' + _editingPolicyId, 'PUT', f)
+        : apiCall('/api/government/policies', 'POST', f);
+    req.then(function(r) {
+        btn.disabled = false;
+        if (!r.success) { policyMsg(r.message || '操作失败', 'err'); return; }
+        clearPolicyForm();
+        setEditing(null);
+        // 「发布」在本平台 = 直接上线学员端，必须明说，否则政务人员不知道已经对外可见了
+        policyMsg(wasEdit
+            ? '修改已保存，学员端同步更新。'
+            : '已发布，学员端首页「本土资源 → 政策信息」已同步显示。', 'ok');
+        loadPolicies();
+    }).catch(function(e) {
+        btn.disabled = false;
+        policyMsg('保存失败：' + ((e && e.message) || '网络异常') + '（请确认仍处于登录状态）', 'err');
+    });
+}
+
+function editPolicy(id) {
+    var p = null;
+    for (var i = 0; i < _govPolicies.length; i++) { if (_govPolicies[i].id === id) { p = _govPolicies[i]; break; } }
+    if (!p) { policyMsg('未找到该政策，请刷新列表后重试', 'err'); return; }
+    document.getElementById('policy-title').value = p.title || '';
+    document.getElementById('policy-content').value = p.content || '';
+    document.getElementById('policy-summary').value = p.summary || '';
+    document.getElementById('policy-date').value = p.date || '';
+    document.getElementById('policy-source').value = (p.sources || []).map(function(s) {
+        var name = s.title || s.media || '';
+        return s.url ? (name ? name + ' | ' + s.url : s.url) : name;
+    }).filter(Boolean).join('\n');
+    // ⚠️ 直接 select.value = 值：值不在选项里会**静默清空**分类（同类坑见 teacher.html 学习方向）
+    var sel = document.getElementById('policy-cat');
+    var cat = p.category || '综合';
+    var found = false;
+    for (var j = 0; j < sel.options.length; j++) { if (sel.options[j].value === cat) { found = true; break; } }
+    if (!found) {
+        var opt = document.createElement('option');
+        opt.value = cat;
+        opt.textContent = cat;
+        sel.appendChild(opt);
+    }
+    sel.value = cat;
+    setEditing(id);
+    policyMsg('正在编辑《' + (p.title || '') + '》，改完点「保存修改」。', 'ok');
+    document.getElementById('policy-title').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function cancelEditPolicy() {
+    clearPolicyForm();
+    setEditing(null);
+    policyMsg('');
+}
+
+function togglePolicy(id, pub) {
+    // pub = 1 表示当前是「已上线」→ 本次动作是下架
+    apiCall('/api/government/policies/' + id, 'PUT', { is_published: pub ? 0 : 1 }).then(function(r) {
+        if (!r.success) { policyMsg(r.message || '操作失败', 'err'); return; }
+        policyMsg(pub ? '已下架，学员端不再显示该政策。' : '已上架，学员端已恢复显示。', 'ok');
+        loadPolicies();
+    }).catch(function(e) {
+        policyMsg('操作失败：' + ((e && e.message) || '网络异常'), 'err');
+    });
+}
+
+function delPolicy(id) {
+    var title = '该政策';
+    for (var i = 0; i < _govPolicies.length; i++) { if (_govPolicies[i].id === id) { title = _govPolicies[i].title || title; break; } }
+    if (!confirm('确定删除《' + title + '》？删除后无法恢复。')) return;
+    apiCall('/api/government/policies/' + id, 'DELETE').then(function(r) {
+        if (!r.success) { policyMsg(r.message || '删除失败', 'err'); return; }
+        policyMsg('已删除。', 'ok');
+        if (_editingPolicyId === id) { clearPolicyForm(); setEditing(null); }
+        loadPolicies();
+    }).catch(function(e) {
+        policyMsg('删除失败：' + ((e && e.message) || '网络异常'), 'err');
+    });
+}
+</script>
+</body>
+</html>

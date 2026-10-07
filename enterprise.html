@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业中心 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --portal-accent: #a9673a; --portal-accent-hover: #8e5330;
+            --portal-sidebar-bg: #ffffff; --portal-sidebar-text: #1b2c25;
+            --portal-sidebar-link: #6b7a72; --portal-sidebar-link-hover-bg: #f7ede7;
+            --portal-sidebar-divider: #e2e6e0;
+            --portal-card-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        /* 审核驳回理由：跟状态徽标同列，字号小一号以免撑高表格行 */
+        .job-reject-reason { margin-top: 4px; font-size: 0.75rem; color: #991b1b; line-height: 1.4; }
+        /* 工作台统计卡的补充说明行 */
+        .ent-sub { font-size: 0.78rem; color: var(--portal-text-muted); margin-top: 6px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar" style="border-right:1px solid var(--portal-sidebar-divider)">
+        <div class="logo"><i class="fas fa-building"></i>企业中心</div>
+        <nav>
+            <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>工作台</a>
+            <a href="#" data-page="jobs"><i class="fas fa-briefcase"></i>职位管理</a>
+            <a href="#" data-page="applications"><i class="fas fa-file-alt"></i>简历管理</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">企</div><span id="sidebar-name">企业用户</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">工作台</h2>
+            </div>
+            <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
+        <div class="portal-content">
+            <div class="page active" id="page-dashboard"><div class="stat-grid" id="dash-stats"></div></div>
+            <div class="page" id="page-jobs">
+                <div class="card"><h3>发布新职位</h3><div class="form-row"><input type="text" id="job-title" placeholder="职位标题"><input type="text" id="job-salary" placeholder="薪资"></div><div class="form-row"><input type="text" id="job-location" placeholder="工作地点"><input type="text" id="job-category" placeholder="职位类别"></div><textarea id="job-desc" rows="3" placeholder="职位描述" style="margin-bottom:12px"></textarea><button class="btn btn-primary" onclick="postJob()">发布职位</button></div>
+                <div id="job-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+            </div>
+            <div class="page" id="page-applications"><div id="app-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+        </div>
+    </div>
+</div>
+<script>window.APP_CONFIG={apiBaseUrl:''};</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+PORTAL.init('enterprise', 'sidebar-name', function() {
+    document.getElementById('sidebar-avatar').textContent = '企';
+    loadDashboard();
+});
+PORTAL.onPageChange(function(p) {
+    if (p === 'dashboard') loadDashboard();
+    else if (p === 'jobs') loadJobs();
+    else if (p === 'applications') loadApps();
+});
+
+function loadDashboard() {
+    apiCall('/api/enterprise/stats', 'GET').then(function(r) {
+        var box = document.getElementById('dash-stats');
+        if (!r.success) {
+            // 原来直接 return —— 权限/服务异常时工作台只剩空卡片，看不出发生了什么
+            box.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>'
+                + escHtml(r.message || '加载失败') + '</p></div>';
+            return;
+        }
+        var s = r.stats || {};
+        // 口径：只算**审核通过**的岗位（学员端只展示 approved，两端口径必须一致）
+        var approved = Number(s.total_jobs) || 0;
+        var apps = Number(s.total_applications) || 0;
+        if (s.pending_jobs == null) {
+            // 新前端 + 旧后端：字段不存在时只渲染原有的两张卡，**不凭空补「0 待审核」**（无依据的结论）
+            box.innerHTML =
+                '<div class="stat-card"><div class="num">' + approved + '</div><div class="label">在招职位</div>'
+                + '<p class="ent-sub">已通过审核，学员端可见</p></div>'
+                + '<div class="stat-card"><div class="num">' + apps + '</div><div class="label">收到简历</div></div>';
+            return;
+        }
+        var pending = Number(s.pending_jobs) || 0;
+        box.innerHTML =
+            '<div class="stat-card"><div class="num">' + approved + '</div><div class="label">在招职位</div>'
+            + '<p class="ent-sub">已通过审核，学员端可见</p></div>'
+            + '<div class="stat-card"><div class="num">' + pending + '</div><div class="label">待审核岗位</div>'
+            + '<p class="ent-sub">' + (pending ? '审核通过后才对学员可见' : '暂无待审核岗位') + '</p></div>'
+            + '<div class="stat-card"><div class="num">' + apps + '</div><div class="label">收到简历</div></div>';
+    }).catch(function() { document.getElementById('dash-stats').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
+}
+
+function escHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function loadJobs() {
+    apiCall('/api/enterprise/jobs', 'GET').then(function(r) {
+        var list = document.getElementById('job-list');
+        if (!r.jobs || !r.jobs.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-briefcase"></i><p>暂无职位</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>标题</th><th>薪资</th><th>地点</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.jobs.map(function(j) {
+                // 被驳回时必须把管理员写的理由带出来 —— 否则企业只看到「已驳回」，
+                // 不知道该改什么、也无法改动重投（驳回后编辑会自动回到待审核）。
+                var reason = (j.review_status === 'rejected' && j.review_comment)
+                    ? '<div class="job-reject-reason">驳回理由：' + escHtml(j.review_comment) + '</div>' : '';
+                return '<tr><td>' + j.title + '</td><td>' + j.salary + '</td><td>' + j.location + '</td>' +
+                    '<td><span class="badge ' + (j.review_status === 'approved' ? 'badge-green' : (j.review_status === 'rejected' ? 'badge-red' : 'badge-yellow')) + '">' +
+                    ({ approved: '已通过', pending: '待审核', rejected: '已驳回' }[j.review_status] || '待审核') + '</span>' + reason + '</td>' +
+                    '<td><button class="btn btn-danger btn-sm" onclick="delJob(' + j.id + ')">删除</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+function postJob() { var t = document.getElementById('job-title').value.trim(); if (!t) { alert('请输入职位标题'); return; } var s = document.getElementById('job-salary').value.trim(); var l = document.getElementById('job-location').value.trim(); var c = document.getElementById('job-category').value.trim(); var d = document.getElementById('job-desc').value.trim(); apiCall('/api/enterprise/jobs', 'POST', { title: t, salary: s, location: l, category: c, description: d }).then(function(r) { alert(r.message); if (r.success) { document.getElementById('job-title').value = ''; document.getElementById('job-desc').value = ''; loadJobs(); } }); }
+function delJob(id) { if (!confirm('确定删除?')) return; apiCall('/api/enterprise/jobs/' + id, 'DELETE').then(function(r) { if (r.success) loadJobs(); }); }
+
+/* 求购管理（供应链）已于 2026-10-06 整块下线：侧栏入口、发布表单、列表与统计卡一并移除。
+   原 loadProcs / postProc / delProc 三个函数引用 #proc-list / #proc-name 等节点，故同步删除。 */
+
+function loadApps() {
+    apiCall('/api/enterprise/applications', 'GET').then(function(r) {
+        var list = document.getElementById('app-list');
+        if (!r.applications || !r.applications.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无简历投递</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+            r.applications.map(function(a) {
+                var sb = a.status === 'approved' ? 'badge-green' : a.status === 'rejected' ? 'badge-red' : 'badge-yellow';
+                return '<tr><td>' + (a.applicant_name || a.user_id) + '</td><td>' + a.job_title + '</td><td>' + (a.applicant_phone || '-') + '</td>' +
+                    '<td><span class="badge ' + sb + '">' + a.status + '</span></td>' +
+                    '<td><button class="btn btn-success btn-sm" onclick="updateApp(' + a.id + ',\'interview\')">面试</button> ' +
+                    '<button class="btn btn-primary btn-sm" onclick="updateApp(' + a.id + ',\'approved\')">通过</button> ' +
+                    '<button class="btn btn-danger btn-sm" onclick="updateApp(' + a.id + ',\'rejected\')">拒绝</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    });
+}
+function updateApp(id, status) { apiCall('/api/enterprise/applications/' + id, 'PUT', { status: status }).then(function(r) { alert(r.message); if (r.success) loadApps(); }); }
+</script>
+</body>
+</html>
