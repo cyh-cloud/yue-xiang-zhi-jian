@@ -229,7 +229,6 @@
 [data-theme="dark"] .step-item.active { background: rgba(31,94,67,0.1); border-color: var(--accent-blue); }
 [data-theme="dark"] .viewer3d-placeholder { background: #1b2c25; }
 [data-theme="dark"] .nav-item { color: var(--text-secondary); }
-[data-theme="dark"] .breadcrumb-bar { background: var(--bg-primary); border-bottom-color: var(--border); }
 [data-theme="dark"] .notification-inner {
     background: rgba(30,30,32,0.9);
     border-color: rgba(255,255,255,0.08);
@@ -322,6 +321,16 @@ img { max-width: 100%; }
     color: var(--accent-blue);
     font-weight: 600;
     background: rgba(31,94,67,0.06);
+}
+/* 导航项与品牌区已是独立页面链接（<a>），补上链接需要的重置 */
+a.nav-item {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
+}
+a.nav-brand {
+    text-decoration: none;
+    color: inherit;
 }
 .nav-actions {
     display: flex;
@@ -1008,11 +1017,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
     text-align: center;
     border-radius: var(--radius-xs);
     cursor: default;
-}
-.calendar-day.has-task {
-    background: var(--gradient-main);
-    color: white;
-    font-weight: 600;
 }
 .calendar-day.today {
     outline: 2px solid var(--accent-blue);
@@ -6870,7 +6874,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
     align-items: center;
     justify-content: flex-start;
     min-height: 46px;
-    padding: 8px 4px 14px;
+    padding: 10px 4px;
     gap: 3px;
 }
 .calendar-day.is-blank {
@@ -6891,6 +6895,23 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
     outline: 2px solid var(--accent-green);
     outline-offset: -2px;
 }
+/* 有农事的日期：整格填实心深绿 + 白字。原先是在日期数字下方排一排 5px 小圆点，
+   在 46px 高的格子里几乎看不见。中间试过「浅绿底 + 深绿字」，亮度对比度虽够，
+   但色相太接近，人眼看是一片糊绿，故定稿为实心深绿底配白字（与 .product-card.active
+   同一套处理）。放在 is-clickable 之后，同特异性下后者不再覆盖 color。 */
+.calendar-day.has-task {
+    background: var(--gradient-main);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.calendar-day.has-task:hover {
+    background: linear-gradient(135deg, var(--brand-mid), var(--brand-soft));
+}
+.calendar-day.has-task .lunar-marker {
+    color: #ffffff;
+    opacity: 0.72;
+}
 .calendar-day.is-highlight {
     animation: dayHighlight 1.6s ease;
 }
@@ -6898,20 +6919,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
     0%, 100% { box-shadow: 0 0 0 0 rgba(31, 94, 67, 0); }
     25% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 55%, transparent); }
 }
-.day-dots {
-    display: flex;
-    gap: 3px;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
-}
-.day-dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
 /* 加载态 */
 .calendar-loading {
     grid-column: 1 / -1;
@@ -7224,24 +7231,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
 .hamburger-btn.open .hamburger-line:nth-child(2) { opacity: 0; }
 .hamburger-btn.open .hamburger-line:nth-child(3) { transform: rotate(-45deg) translate(5px, -5px); }
 
-/* ==================== Breadcrumb ==================== */
-.breadcrumb-bar {
-    position: fixed;
-    top: 64px;
-    left: 0;
-    right: 0;
-    background: var(--bg-primary);
-    border-bottom: 1px solid var(--border-light);
-    padding: 8px 0;
-    z-index: 999;
-    font-size: 0.8rem;
-    display: none;
-}
-.breadcrumb-bar.visible { display: block; }
-.breadcrumb-item { color: var(--text-muted); }
-.breadcrumb-item.active { color: var(--text-primary); font-weight: 500; }
-.breadcrumb-sep { font-size: 0.6rem; color: var(--text-muted); margin: 0 8px; }
-
 @media (max-width: 1024px) {
     .hamburger-btn { display: flex; }
     .nav-menu {
@@ -7259,7 +7248,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
     }
     .nav-menu.open { display: flex; }
     .nav-item { padding: 14px 16px; text-align: left; width: 100%; }
-    .breadcrumb-bar { top: 64px; }
 }
 
 /* ==================== iOS 100vh Fix ==================== */
@@ -7281,7 +7269,7 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
 /* ==================== Print ==================== */
 @media print {
     .navbar, .hero, .floating-help, .loading-overlay, .notification,
-    .modal-overlay, .nav-actions, .breadcrumb-bar,
+    .modal-overlay, .nav-actions,
     .skip-link, .theme-toggle, .hamburger-btn { display: none !important; }
     .tab-content { display: block !important; padding: 20px 0; page-break-inside: avoid; opacity: 1 !important; transform: none !important; }
     .main-content { background: var(--bg-secondary); }
@@ -7604,7 +7592,6 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
 .tab-content .btn-primary:hover { box-shadow: 0 6px 18px var(--pa-soft); }
 .tab-content .btn-text { color: var(--pa); }
 .tab-content .example-btn:hover { border-color: var(--pa); color: var(--pa); }
-.tab-content .breadcrumb-item.active { color: var(--pa); }
 
 /* 板块头部卡片：左侧色条呼应板块身份 */
 .tab-content .card-section > .card-section-title {

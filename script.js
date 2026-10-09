@@ -6,7 +6,27 @@ document.addEventListener('DOMContentLoaded', function() {
     fixIOSViewport();
     initializeApp();
     registerServiceWorker();
+    initPageExtras();
 });
+
+// ==================== 分页后的首屏数据加载 ====================
+// 板块各自独立成页后，原先「切到某板块时才拉」的数据改在页面加载时拉。
+// 农业技能的农时日历由 setupCalendar() 自己首屏加载，电商运营是纯事件驱动，
+// 两者都不需要在这里补。
+const PAGE_INIT = {
+    crafts:     [loadCraftModels],
+    resources:  [loadSuccessCases, loadPolicies],
+    employment: [loadEmploymentData],
+    teacher:    [loadTeacherDashboard]
+};
+
+function initPageExtras() {
+    const jobs = PAGE_INIT[document.body.dataset.page];
+    if (!jobs) return;
+    jobs.forEach(fn => {
+        try { fn(); } catch (e) { console.error(`${fn.name} 首屏加载失败:`, e); }
+    });
+}
 
 function initializeApp() {
     // 首屏不再无条件弹「点击了解项目功能」这种语义不明、无指向的 toast；
@@ -170,12 +190,8 @@ function restoreSession() {
 // ==================== 导航 ====================
 
 function setupNavigation() {
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', function() {
-            switchTab(this.getAttribute('data-tab'));
-        });
-    });
-    // 键盘左右箭头切换tab
+    // 五大板块已各自独立成页，导航项是普通 <a href="xxx.html">，跳转由浏览器负责，
+    // 这里不再转发 click。只保留左右方向键在导航项之间移动焦点（不代为跳转）。
     const navMenu = document.getElementById('nav-menu');
     if (navMenu) {
         navMenu.addEventListener('keydown', function(e) {
@@ -185,12 +201,10 @@ function setupNavigation() {
                 e.preventDefault();
                 const next = (current + 1) % tabs.length;
                 tabs[next].focus();
-                tabs[next].click();
             } else if (e.key === 'ArrowLeft') {
                 e.preventDefault();
                 const prev = (current - 1 + tabs.length) % tabs.length;
                 tabs[prev].focus();
-                tabs[prev].click();
             }
         });
     }
@@ -207,76 +221,41 @@ function setupNavigation() {
     });
 }
 
+// 板块 → 独立页面。2026-10-09 起五大板块各自成页，导航即整页跳转。
+// admin/government/enterprise 三个门户页也一并列出，供登录后的角色分流兜底。
+const TAB_PAGES = {
+    agriculture: 'agriculture.html',
+    ecommerce: 'ecommerce.html',
+    crafts: 'crafts.html',
+    resources: 'resources.html',
+    employment: 'employment.html',
+    teacher: 'teacher-panel.html',
+    admin: 'admin.html',
+    government: 'government.html',
+    enterprise: 'enterprise.html'
+};
+
+// 当前所在页对应的板块；index.html（Hero 首页）返回 'index'，不属于任何板块
+function currentPageTab() {
+    const file = (location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    if (file === '' || file === 'index.html') return 'index';
+    return Object.keys(TAB_PAGES).find(tab => TAB_PAGES[tab] === file) || 'index';
+}
+
+// 保留 switchTab 作为「按板块名跳页」的入口：Hero 的「开始学习」、用户下拉的
+// 「教学面板」、登录后的角色默认页都还在调它，调用点无需逐个改。
+// 板块已是独立页面，原先「切走电商要停直播间」的离场清理不再需要 —— 整页跳转
+// 会把定时器、语音识别一起卸载掉。
 function switchTab(tabName) {
     // ===== 权限守卫 =====
     if (AppState.user && !isTabAllowed(tabName, AppState.user.role)) {
         showNotification("无权访问该页面", "error");
         tabName = ROLE_DEFAULT[AppState.user.role] || "agriculture";
     }
-    // ===== 离场清理 =====
-    // 切走「电商运营」时必须停掉直播间（朗读计时 + 语音识别 + 各刷新定时器），
-    // 否则定时器在后台空转、麦克风被占用到刷新页面。
-    if (AppState.currentTab === 'ecommerce' && tabName !== 'ecommerce'
-        && typeof stopLiveSimulation === 'function') {
-        stopLiveSimulation();
-    }
-    // 更新导航栏active + ARIA
-    document.querySelectorAll('.nav-item').forEach(item => {
-        const isActive = item.getAttribute('data-tab') === tabName;
-        item.classList.toggle('active', isActive);
-        item.setAttribute('aria-selected', isActive);
-    });
-    // 淡出当前tab
-    const allTabs = document.querySelectorAll('.tab-content');
-    const currentActive = document.querySelector('.tab-content.active');
-    if (currentActive) {
-        currentActive.style.opacity = '0';
-        currentActive.style.transform = 'translateY(12px)';
-    }
-    setTimeout(() => {
-        allTabs.forEach(c => c.classList.remove('active'));
-        const target = document.getElementById(tabName + '-tab');
-        if (target) {
-            target.classList.add('active');
-            target.style.opacity = '0';
-            target.style.transform = 'translateY(12px)';
-            requestAnimationFrame(() => {
-                target.style.opacity = '1';
-                target.style.transform = 'translateY(0)';
-            });
-            AppState.currentTab = tabName;
-            // 滚动到主内容区，让用户看到切换后的板块
-            document.getElementById('main-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-        // 更新面包屑
-        const tabNames = {
-            agriculture: '农业技能', ecommerce: '电商运营', crafts: '手工传承',
-            resources: '本土资源', employment: '就业对接',
-            teacher: '教师管理', admin: '系统管理', government: '政府工作台',
-            enterprise: '企业中心', discussions: '讨论社区'
-        };
-        const breadcrumb = document.getElementById('breadcrumb-current');
-        const breadcrumbBar = document.getElementById('breadcrumb-bar');
-        if (breadcrumb && tabNames[tabName]) {
-            breadcrumb.textContent = tabNames[tabName];
-            breadcrumbBar?.classList.add('visible');
-        }
-        // 切到教师tab时加载数据
-        if (tabName === 'teacher') loadTeacherDashboard();
-        // 切到就业tab时刷新数据
-        if (tabName === 'employment') loadEmploymentData();
-        // 新面板数据加载
-        if (tabName === 'government') loadGovDashboard();
-        if (tabName === 'enterprise') loadEnterpriseJobs();
-        if (tabName === 'discussions') loadDiscussions();
-        // P4（2026-10-06）：切到手工传承时轻量重拉 3D 模型，让教师新发布的模型及时可见。
-        if (tabName === 'crafts') loadCraftModels();
-        // 切到本土资源时加载本地成功案例与政策（首次加载后缓存，除非显式 force）
-        if (tabName === 'resources') {
-            loadSuccessCases();
-            loadPolicies();
-        }
-    }, 200);
+    const page = TAB_PAGES[tabName];
+    if (!page) return;
+    if (currentPageTab() === tabName) return;   // 已在目标页，不做无谓的整页刷新
+    location.href = page;
 }
 
 // ==================== 焦点捕获 ====================
@@ -2514,17 +2493,14 @@ async function updateFarmingCalendar() {
         const dayTasks = tasksByDay[d] || [];
         const isToday = (d === today.getDate() && month === today.getMonth() && year === today.getFullYear());
         const cls = ['calendar-day'];
-        if (dayTasks.length) cls.push('is-clickable');
+        // 有农事的日期：整格背景加深。原先是日期数字下方的一排小圆点，实测太不显眼
+        if (dayTasks.length) cls.push('is-clickable', 'has-task');
         if (isToday) cls.push('today');
 
-        const dots = dayTasks.slice(0, 3).map(t =>
-            `<span class="day-dot" style="background:${FARMING_CATEGORY_COLORS[t.category] || '#4a6fa5'}"></span>`
-        ).join('');
         const term = termByDay[d] ? `<span class="lunar-marker">${escapeHtml(termByDay[d])}</span>` : '';
 
         html += `<div class="${cls.join(' ')}"${dayTasks.length ? ` data-day="${d}" role="button" tabindex="0" aria-label="${d}日，${dayTasks.length}项农事"` : ''}>`
               + `<span class="day-num">${d}</span>`
-              + (dots ? `<span class="day-dots">${dots}</span>` : '')
               + term
               + `</div>`;
     }
@@ -10273,7 +10249,7 @@ function applyRoleVisibility(role) {
         btn.classList.toggle('is-hidden', !allowed);
         if (!allowed) {
             btn.classList.remove('active');
-            btn.setAttribute('aria-selected', 'false');
+            btn.removeAttribute('aria-current');
         }
     });
 
@@ -10315,14 +10291,15 @@ function onLoginSuccess() {
     document.querySelectorAll('.gov-only').forEach(el => el.classList.toggle('is-hidden', role !== 'government'));
     document.querySelectorAll('.enterprise-only').forEach(el => el.classList.toggle('is-hidden', role !== 'enterprise'));
 
-    // 强制跳转到角色默认首页
-    const defaultTab = ROLE_DEFAULT[role] || 'agriculture';
-    switchTab(defaultTab);
-
-    // 触发首次数据加载
-    if (role === 'government') loadGovDashboard();
-    else if (role === 'enterprise') loadEnterpriseJobs();
-    else if (role === 'teacher') loadTeacherDashboard();
+    // 落到角色默认首页。板块独立成页后，只在「当前页该角色看不了」时才跳：
+    // 学员在 crafts.html 刷新不该被拽回 agriculture.html。
+    // 另外 restoreSession 也会走 onLoginSuccess，无条件跳转会变成每次刷新都弹跳一次。
+    // gov/enterprise 的工作台数据加载原先是死代码（主站没有那两个面板），随本次拆分移除；
+    // 教师面板的数据改由 initPageExtras() 在 teacher-panel.html 上加载。
+    const here = currentPageTab();
+    if (here !== 'index' && !isTabAllowed(here, role)) {
+        switchTab(ROLE_DEFAULT[role] || 'agriculture');
+    }
 }
 
 // ==================== 公开视图恢复 ====================
@@ -10334,7 +10311,7 @@ function resetToPublicView() {
         var allowed = ROLE_NAV["student"].indexOf(tab) >= 0;
         btn.classList.toggle("is-hidden", !allowed);
         btn.classList.remove("active");
-        btn.setAttribute("aria-selected", "false");
+        btn.removeAttribute("aria-current");
     });
     // 恢复 Hero / Features
     var hero = document.getElementById("hero");

@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台">
+    <title>电商运营 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+</head>
+<body data-page="ecommerce">
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a class="nav-brand" href="index.html">
+                <div class="brand-logo">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <span class="brand-name">粤乡智匠</span>
+            </a>
+            <button class="hamburger-btn" id="hamburger-btn" aria-label="打开导航菜单" aria-expanded="false">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+            <div class="nav-menu" id="nav-menu" aria-label="主导航">
+                <a class="nav-item" href="agriculture.html" data-tab="agriculture">农业技能</a>
+                <a class="nav-item active" href="ecommerce.html" data-tab="ecommerce" aria-current="page">电商运营</a>
+                <a class="nav-item" href="crafts.html" data-tab="crafts">手工传承</a>
+                <a class="nav-item" href="resources.html" data-tab="resources">本土资源</a>
+                <a class="nav-item" href="employment.html" data-tab="employment">就业对接</a>
+            </div>
+            <div class="nav-actions">
+                <div class="teacher-quick-menu is-hidden" id="teacher-quick-menu">
+                    <div class="msg-center-wrap">
+                        <button class="icon-btn" id="quick-message-btn" title="消息通知">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge is-hidden" id="message-badge">0</span>
+                        </button>
+                        <div class="msg-dropdown" id="msg-dropdown">
+                            <div class="msg-dropdown-header">
+                                <h4>消息中心</h4>
+                                <div class="msg-dropdown-actions">
+                                    <button id="msg-mark-all-read" title="全部已读"><i class="fas fa-check-double"></i></button>
+                                    <button id="msg-clear-read" title="清除已读"><i class="fas fa-trash-can"></i></button>
+                                </div>
+                            </div>
+                            <div class="msg-dropdown-tabs">
+                                <button class="msg-tab-btn active" data-tab="notifications"><i class="fas fa-bell"></i> 通知</button>
+                                <button class="msg-tab-btn" data-tab="messages"><i class="fas fa-envelope"></i> 我的对话</button>
+                            </div>
+                            <div class="msg-dropdown-body" id="msg-notifications-list">
+                                <div class="msg-empty">暂无通知</div>
+                            </div>
+                            <div class="msg-dropdown-body is-hidden" id="msg-messages-list">
+                                <div class="msg-empty">暂无私信</div>
+                            </div>
+                            <div class="msg-dropdown-footer">
+                                <button id="msg-compose-btn"><i class="fas fa-pen"></i> 写消息</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-info is-hidden" id="user-info">
+                    <div class="user-avatar-wrap" id="user-dropdown-trigger">
+                        <div class="avatar-circle"><i class="fas fa-user"></i></div>
+                        <div class="user-meta">
+                            <span class="user-name" id="user-name">未登录</span>
+                            <span class="user-role" id="user-role">guest</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="dropdown-menu is-hidden" id="user-dropdown-menu">
+                        <div class="dropdown-header">
+                            <span class="dropdown-name" id="dropdown-name">用户名</span>
+                            <span class="dropdown-email" id="dropdown-email">user@example.com</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <!-- P1-5：积分余额展示（数据来自 /api/employment/points/<uid>，loadUserData 回填） -->
+                        <div class="dropdown-points" title="申请职位等可获得积分">
+                            <span><i class="fas fa-coins"></i> 我的积分</span>
+                            <b id="points-balance">—</b>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="profile-settings"><i class="fas fa-user-cog"></i> 个人设置</button>
+                        <button class="dropdown-item teacher-only" id="teaching-dashboard"><i class="fas fa-tachometer-alt"></i> 教学面板</button>
+                        <div class="dropdown-divider teacher-only"></div>
+                        <button class="dropdown-item" id="help-center"><i class="fas fa-question-circle"></i> 帮助中心</button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item logout" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                    </div>
+                </div>
+                <div class="login-section" id="login-section">
+                    <button class="btn btn-primary btn-sm" id="login-btn">
+                        <i class="fas fa-sign-in-alt"></i> 登录
+                    </button>
+                </div>
+                <button class="icon-btn large-text-toggle" id="large-text-toggle" aria-label="切换大字模式" aria-pressed="false" title="大字模式">
+                    <i class="fas fa-text-height"></i>
+                </button>
+                <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="connection-dot" id="connection-status">
+                    <span class="dot"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content" id="main-content" tabindex="-1">
+        <!-- 角色工作台引导卡：仅当该角色在主站没有对应面板时显示。
+             super_admin / government / enterprise 三个角色的工作台分别是
+             admin.html / government.html / enterprise.html，主站不提供对应面板；
+             2026-10-09 之前他们登录主站看到的是整页空白。 -->
+        <div class="role-portal-card is-hidden" id="role-portal-card" role="region" aria-label="工作台入口">
+            <div class="role-portal-inner">
+                <i class="fas fa-compass" aria-hidden="true"></i>
+                <h2 class="role-portal-title" id="role-portal-title">你的工作台不在这里</h2>
+                <p class="role-portal-desc" id="role-portal-desc"></p>
+                <a class="btn btn-primary" id="role-portal-link" href="admin.html">进入工作台</a>
+            </div>
+        </div>
+        <div class="tab-content active" id="ecommerce-tab">
+            <div class="container">
+                <div class="section-label">E-Commerce</div>
+                <h2 class="section-title">电商运营实训</h2>
+                <p class="section-desc">模拟直播后台，AI生成带货话术，助力农产品上行</p>
+
+                <div class="module-grid">
+                    <div class="module-card" data-module="live-stream">
+                        <div class="module-icon"><i class="fas fa-video"></i></div>
+                        <h4>直播带货实训</h4>
+                        <p>模拟直播间，练习直播技巧</p>
+                        <button class="btn btn-primary btn-sm">开始实训</button>
+                    </div>
+                    <div class="module-card" data-module="product-copy">
+                        <div class="module-icon"><i class="fas fa-edit"></i></div>
+                        <h4>商品文案创作</h4>
+                        <p>AI辅助撰写商品描述</p>
+                        <button class="btn btn-primary btn-sm">开始创作</button>
+                    </div>
+                    <div class="module-card" data-module="customer-service">
+                        <div class="module-icon"><i class="fas fa-headset"></i></div>
+                        <h4>客户服务模拟</h4>
+                        <p>练习处理客户咨询</p>
+                        <button class="btn btn-primary btn-sm">开始练习</button>
+                    </div>
+                </div>
+
+                <!-- 直播模拟区 -->
+                <div class="live-panel is-hidden" id="live-simulation">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-broadcast-tower"></i> 直播模拟训练</h3>
+                        <div class="panel-header-actions">
+                            <span class="live-badge" id="live-badge"><i class="fas fa-circle"></i> 模拟直播中</span>
+                            <button class="icon-btn" id="close-simulation"><i class="fas fa-times"></i></button>
+                        </div>
+                    </div>
+                    <div class="live-layout">
+                        <div class="live-preview">
+                            <!-- EC4：这里改为「朗读实录」区。原先的「摄像头预览区 / 点击开启摄像头」
+                                 是一段**没有任何点击处理器**的静态文字（全项目 0 处 getUserMedia），
+                                 现替换为真实可用的麦克风朗读识别。 -->
+                            <div class="live-cam" id="live-stage">
+                                <div class="cam-overlay" id="cam-overlay">
+                                    <i class="fas fa-microphone" id="mic-icon"></i>
+                                    <p id="mic-status">点「开始朗读」，对着麦克风念你的话术</p>
+                                    <span id="mic-hint">需要麦克风权限；浏览器不支持语音识别时可只用文本练习</span>
+                                </div>
+                                <!-- 2026-10-05：商品标签由静态文字改为下拉切换 —— 此前只能跟随顶部作物卡，
+                                     直播间内无法换商品（要换必须退出直播间去农业页选完再回来）。8 个选项
+                                     与顶部「选择农产品」一致，切换后双向联动（全局作物、评论池、AI 话术、提交记录同步）。 -->
+                                <div class="cam-product-tag" id="cam-product-tag"><i class="fas fa-apple-alt"></i>
+                                    <select id="live-product" title="切换直播商品">
+                                        <option value="lychee">荔枝</option>
+                                        <option value="longan">龙眼</option>
+                                        <option value="citrus">柑橘</option>
+                                        <option value="banana">香蕉</option>
+                                        <option value="aquatic">水产养殖</option>
+                                        <option value="rice">水稻</option>
+                                        <option value="tea">茶叶</option>
+                                        <option value="vegetable">蔬菜</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="live-reader-bar">
+                                <button class="btn btn-primary btn-sm" id="start-reading"><i class="fas fa-microphone"></i> 开始朗读</button>
+                                <button class="btn btn-outline btn-sm is-hidden" id="stop-reading"><i class="fas fa-stop"></i> 结束朗读</button>
+                                <span class="live-reader-timer" id="reader-timer">00:00</span>
+                                <button class="btn btn-outline btn-sm" id="analyze-reading"><i class="fas fa-wave-square"></i> 分析朗读</button>
+                            </div>
+                            <div class="live-transcript" id="live-transcript">
+                                <span class="live-transcript-label">实时识别</span>
+                                <p id="live-transcript-text">（开始朗读后显示识别到的内容）</p>
+                            </div>
+                            <div class="live-stats">
+                                <span><i class="fas fa-eye"></i> <strong id="viewer-count">0</strong> 观众</span>
+                                <span><i class="fas fa-heart"></i> <strong id="like-count">0</strong> 点赞</span>
+                                <span><i class="fas fa-comment"></i> <strong id="comment-count">0</strong> 评论</span>
+                                <span><i class="fas fa-clock"></i> <strong id="live-duration">00:00</strong></span>
+                            </div>
+                            <div class="live-comments" id="live-comments">
+                                <div class="comment-item"><span class="comment-user">系统：</span>直播间已开启，等待观众进入...</div>
+                            </div>
+                        </div>
+                        <div class="live-right-panel">
+                            <div class="live-script-panel">
+                                <div class="script-toolbar">
+                                    <h4><i class="fas fa-scroll"></i> 直播带货话术</h4>
+                                    <div class="script-style-btns">
+                                        <button class="style-btn active" data-style="热情">热情型</button>
+                                        <button class="style-btn" data-style="专业">专业型</button>
+                                        <button class="style-btn" data-style="故事">故事型</button>
+                                        <button class="style-btn" data-style="高级">高级感</button>
+                                    </div>
+                                    <!-- 直播间进阶（2026-10-05）：难度分级，影响评论口吻与突发状况 -->
+                                    <select id="live-difficulty" class="live-difficulty" title="训练难度">
+                                        <option value="新手" selected>新手 · 观众友善</option>
+                                        <option value="进阶">进阶 · 会质疑比价</option>
+                                        <option value="挑战">挑战 · 有突发状况</option>
+                                    </select>
+                                </div>
+                                <div class="script-actions">
+                                    <button class="btn btn-success" id="generate-script"><i class="fas fa-magic"></i> 生成 AI 初稿</button>
+                                    <button class="btn btn-outline btn-sm" id="adopt-script"><i class="fas fa-arrow-down"></i> 采用到我的稿</button>
+                                    <button class="btn btn-outline btn-sm" id="copy-script"><i class="fas fa-copy"></i> 复制</button>
+                                </div>
+
+                                <!-- EC3：双稿对照。此前只有一个不可编辑的展示区，学员唯一的动作是
+                                     「选风格 + 点生成」，评分也评的是 AI 自己的稿。现在 AI 只出**初稿**，
+                                     学员必须自己改出「我的稿」；评分与提交一律以「我的稿」为准。 -->
+                                <div class="script-block">
+                                    <div class="script-block-title">
+                                        <i class="fas fa-robot"></i> AI 初稿<span class="script-block-sub">（只作起点）</span>
+                                        <span class="script-degraded is-hidden" id="script-degraded">
+                                            <i class="fas fa-exclamation-triangle"></i> 本条为系统内置示例，非 AI 生成
+                                        </span>
+                                    </div>
+                                    <div class="script-box" id="live-script">
+                                        <div class="script-placeholder">
+                                            <i class="fas fa-magic"></i>
+                                            <p>选择风格后点击"生成 AI 初稿"</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="script-block">
+                                    <div class="script-block-title">
+                                        <i class="fas fa-pen"></i> 我的稿
+                                        <span class="script-block-sub">（自己改写后提交）</span>
+                                        <span class="script-block-meta" id="my-script-count">0 字</span>
+                                    </div>
+                                    <textarea id="live-script-mine" class="script-input" rows="8" maxlength="3000"
+                                        placeholder="把 AI 初稿按你自己的想法改写：补上【待填写】里的真实信息，换成你自己的语气……"></textarea>
+                                    <div class="script-block-note">
+                                        话术里的 <span class="ph-token">【待填写：…】</span> 都要换成你产品的真实信息 ——
+                                        认证、检测数据、价格、物流与赔付承诺不能靠 AI 编。
+                                    </div>
+                                </div>
+
+                                <div class="script-actions script-actions-submit">
+                                    <button class="btn btn-primary btn-sm" id="submit-live"><i class="fas fa-paper-plane"></i> 提交实训</button>
+                                    <button class="btn btn-outline btn-sm" id="toggle-live-records"><i class="fas fa-list"></i> 我的实训记录</button>
+                                </div>
+                            </div>
+
+                            <div class="live-records is-hidden" id="live-records">
+                                <div class="records-header">
+                                    <h4><i class="fas fa-list"></i> 我的实训记录</h4>
+                                    <button class="icon-btn" id="close-live-records"><i class="fas fa-times"></i></button>
+                                </div>
+                                <div class="records-body" id="live-records-body">
+                                    <p class="records-empty">登录后可保存并查看实训记录</p>
+                                </div>
+                            </div>
+                            <div class="ai-feedback" id="ai-feedback">
+                                <div class="feedback-header">
+                                    <h4><i class="fas fa-chart-bar"></i> 话术稿评分<span class="feedback-sub">（评「我的稿」文本，计入提交分）</span></h4>
+                                    <button class="btn btn-outline btn-sm is-hidden" id="re-score-btn"><i class="fas fa-redo"></i> 重新评分</button>
+                                </div>
+                                <div class="feedback-placeholder" id="feedback-placeholder">
+                                    <i class="fas fa-spinner"></i>
+                                    <p>先在下方「我的稿」写出你自己的话术，再点右上角「重新评分」按钮评分</p>
+                                </div>
+                                <div class="feedback-body is-hidden" id="feedback-body">
+                                    <div class="feedback-overall" id="feedback-overall">
+                                        <div class="overall-score" id="overall-score">-</div>
+                                        <div class="overall-label" id="overall-label">综合评分</div>
+                                        <div class="overall-grade" id="overall-grade"></div>
+                                    </div>
+                                    <div class="feedback-metrics" id="feedback-metrics"></div>
+                                    <div class="feedback-suggestions is-hidden" id="feedback-suggestions">
+                                        <h5><i class="fas fa-lightbulb"></i> 改进建议</h5>
+                                        <div class="suggestions-list" id="suggestions-list"></div>
+                                    </div>
+                                    <div class="feedback-summary is-hidden" id="feedback-summary"></div>
+                                    <div class="feedback-source is-hidden" id="feedback-source"></div>
+                                </div>
+                            </div>
+
+                            <div class="live-reading-report" id="live-reading-report">
+                                <div class="feedback-header">
+                                    <h4><i class="fas fa-wave-square"></i> 朗读实录分析<span class="feedback-sub">（评念稿表现，不计入提交分）</span></h4>
+                                    <span class="reading-report-note">规则分析 · 可复现</span>
+                                </div>
+                                <div class="feedback-placeholder" id="reading-report-placeholder">
+                                    <p>念一遍你自己的稿子，这里会给出完成度、真实语速与必卖点命中情况</p>
+                                </div>
+                                <div class="reading-report-body is-hidden" id="reading-report-body">
+                                    <div class="overall-score reading-overall" id="reading-overall">-</div>
+                                    <div class="feedback-metrics" id="reading-metrics"></div>
+                                    <div class="reading-rubric" id="reading-rubric"></div>
+                                    <div class="reading-tips" id="reading-tips"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <i class="fas fa-seedling"></i>
+                    <span>粤乡智匠</span>
+                </div>
+                <p class="footer-text">AI驱动的农村人才赋能平台 &copy; 2024</p>
+                <div class="footer-tech">
+                    <span>Flask</span><span>SQLite</span><span>SiliconFlow AI</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 登录/注册模态框 -->
+    <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" id="auth-tab-login">登录</button>
+                    <button class="auth-tab" id="auth-tab-register">注册</button>
+                </div>
+                <button class="modal-close" id="close-login-modal" aria-label="关闭"><i class="fas fa-times"></i></button>
+            </div>
+            <!-- 登录表单 -->
+            <div class="modal-body" id="auth-login-form">
+                <div class="form-group">
+                    <label for="login-username">用户名</label>
+                    <input type="text" id="login-username" name="login_username" autocomplete="username" placeholder="输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">密码</label>
+                    <input type="password" id="login-password" name="login_password" autocomplete="current-password" placeholder="输入密码">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="login-submit"><i class="fas fa-sign-in-alt"></i> 登录</button>
+                    <button class="btn btn-outline" id="demo-login"><i class="fas fa-eye"></i> 演示登录</button>
+                </div>
+                <div class="demo-section">
+                    <h4>演示账户</h4>
+                    <div class="demo-list">
+                        <div class="demo-account" data-username="admin_demo" data-password="admin123" data-role="super_admin">
+                            <strong>超管</strong><span>admin_demo / admin123</span>
+                        </div>
+                        <div class="demo-account" data-username="gov_demo" data-password="123456" data-role="government">
+                            <strong>政府</strong><span>gov_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="enterprise_demo" data-password="123456" data-role="enterprise">
+                            <strong>企业</strong><span>enterprise_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="teacher_demo" data-password="123456" data-role="teacher">
+                            <strong>教师</strong><span>teacher_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="student_demo" data-password="123456" data-role="student">
+                            <strong>学员</strong><span>student_demo / 123456</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 注册表单 -->
+            <div class="modal-body is-hidden" id="auth-register-form">
+                <div class="form-group">
+                    <label for="reg-username">用户名 <span class="required">*</span></label>
+                    <input type="text" id="reg-username" name="reg_username" autocomplete="username" placeholder="输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">密码 <span class="required">*</span></label>
+                    <input type="password" id="reg-password" name="reg_password" autocomplete="new-password" placeholder="至少6位密码">
+                </div>
+                <div class="form-group">
+                    <label for="reg-name">姓名 <span class="required">*</span></label>
+                    <input type="text" id="reg-name" name="reg_name" autocomplete="name" placeholder="输入真实姓名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-role">注册身份 <span class="required">*</span></label>
+                    <select id="reg-role">
+                        <option value="student">学员（学习技能）</option>
+                        <option value="teacher">教师（传授技能）</option>
+                        <option value="enterprise">企业用户（发布岗位）</option>
+                    </select>
+                </div>
+                <div class="form-group reg-enterprise-only is-hidden" id="reg-company-group">
+                    <label for="reg-company">公司名称</label>
+                    <input type="text" id="reg-company" name="reg_company" autocomplete="organization" placeholder="输入公司/单位名称">
+                </div>
+                <div class="form-group">
+                    <label for="reg-phone">手机号</label>
+                    <input type="text" id="reg-phone" name="reg_phone" autocomplete="tel" placeholder="输入手机号">
+                </div>
+                <div class="form-group">
+                    <label for="reg-region">所在地区</label>
+                    <input type="text" id="reg-region" name="reg_region" autocomplete="address-level1" placeholder="如：广州、梅州、湛江">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="register-submit"><i class="fas fa-user-plus"></i> 注册</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div class="loading-overlay is-hidden" id="loading-overlay">
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <p id="loading-message">AI正在为您准备学习内容...</p>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div class="notification" id="notification" role="alert" aria-live="polite">
+        <div class="notification-inner">
+            <i class="fas fa-info-circle"></i>
+            <span class="notification-message"></span>
+            <button type="button" class="notification-action is-hidden" id="notification-action"></button>
+        </div>
+    </div>
+
+    <!-- 浮动帮助 -->
+    <div class="floating-help" onclick="toggleShortcutsHelp()" role="button" tabindex="0" aria-label="帮助">
+        <i class="fas fa-question-circle"></i>
+    </div>
+
+    <script>
+        window.APP_CONFIG = { apiBaseUrl: '' };
+        // 大字模式：在样式加载前恢复，避免页面闪烁
+        try {
+            if (localStorage.getItem('yuexiang_large_text') === '1') {
+                document.documentElement.setAttribute('data-large-text', '');
+            }
+        } catch (e) {}
+    </script>
+    <script src="js/core.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

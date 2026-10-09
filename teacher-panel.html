@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台">
-    <title>AI驱动的农村人才赋能平台 - 粤乡智匠</title>
+    <title>教师管理 - 粤乡智匠</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 </head>
-<body data-page="index">
-    <a href="#hero" class="skip-link">跳转到主要内容</a>
+<body data-page="teacher">
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <nav class="navbar" id="navbar">
         <div class="nav-container">
             <a class="nav-brand" href="index.html">
@@ -109,37 +109,6 @@
         </div>
     </nav>
 
-    <section class="hero" id="hero">
-        <canvas class="hero-particles" id="hero-particles"></canvas>
-        <div class="hero-grid-lines"></div>
-        <div class="hero-content">
-            <div class="hero-badge">AI + 乡村振兴</div>
-            <h1 class="hero-title">AI驱动的<br>农村人才赋能平台</h1>
-            <p class="hero-subtitle">融合人工智能与本土文化，为广东农村人才提供技能培训、电商运营、非遗传承一站式解决方案</p>
-            <div class="hero-actions">
-                <a class="btn btn-primary btn-lg" href="agriculture.html">
-                    开始学习 <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-        </div>
-        <div class="hero-stats">
-            <div class="stat-item">
-                <span class="stat-number" data-key="farmers">0</span>
-                <span class="stat-label">服务农户</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-                <span class="stat-number" data-key="courses">0</span>
-                <span class="stat-label">培训课程</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-                <span class="stat-number" data-key="jobs">0</span>
-                <span class="stat-label">就业对接</span>
-            </div>
-        </div>
-    </section>
-
     <main class="main-content" id="main-content" tabindex="-1">
         <!-- 角色工作台引导卡：仅当该角色在主站没有对应面板时显示。
              super_admin / government / enterprise 三个角色的工作台分别是
@@ -153,7 +122,123 @@
                 <a class="btn btn-primary" id="role-portal-link" href="admin.html">进入工作台</a>
             </div>
         </div>
+        <div class="tab-content active" id="teacher-tab">
+            <div class="container">
+                <div class="section-label">Teacher Panel</div>
+                <h2 class="section-title">教师管理面板</h2>
+                <p class="section-desc">学员管理、通知公告、学情分析</p>
+
+                <!-- 仪表板 -->
+                <div class="dashboard-stats" id="teacher-dashboard">
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-users"></i></div><div><h3 id="stat-total-students">-</h3><p>管理学员数</p></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-graduation-cap"></i></div><div><h3 id="stat-certificates">-</h3><p>已获证书</p></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-chart-line"></i></div><div><h3 id="stat-completion">-</h3><p>课程完成率</p></div></div>
+                    <div class="stat-card"><div class="stat-icon"><i class="fas fa-star"></i></div><div><h3 id="stat-avg-score">-</h3><p>平均完成度（证书）</p></div></div>
+                </div>
+
+                <!-- 子标签栏 -->
+                <div class="teacher-tabs" id="teacher-tabs">
+                    <button class="teacher-tab-btn active" data-tab="overview"><i class="fas fa-house"></i> 总览</button>
+                    <button class="teacher-tab-btn" data-tab="announcements"><i class="fas fa-bullhorn"></i> 通知公告</button>
+                    <button class="teacher-tab-btn" data-tab="analytics"><i class="fas fa-chart-bar"></i> 学情分析</button>
+                </div>
+
+                <!-- 总览面板 -->
+                <div class="teacher-tab-panel active" id="teacher-panel-overview">
+                    <div class="teacher-layout">
+                        <div class="teacher-main">
+                            <div class="card-section teacher-section">
+                                <div class="teacher-section-header">
+                                    <div class="teacher-section-title">
+                                        <i class="fas fa-user-graduate"></i>
+                                        <span>学员管理</span>
+                                        <span class="teacher-student-count" id="teacher-student-count">0人</span>
+                                    </div>
+                                    <div class="teacher-section-actions">
+                                        <div class="teacher-search-wrap">
+                                            <i class="fas fa-search"></i>
+                                            <input type="text" placeholder="搜索学员姓名、ID..." class="teacher-search-input" id="teacher-search" name="teacher_q" autocomplete="off">
+                                        </div>
+                                        <button class="btn btn-primary btn-sm" id="teacher-add-student-btn">
+                                            <i class="fas fa-plus"></i> 添加学员
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="table-wrap">
+                                    <table class="data-table teacher-table">
+                                        <thead>
+                                            <tr><th>学员ID</th><th>姓名</th><th>学习方向</th><th>完成度（证书）</th><th>证书</th><th>平台账号</th><th>操作</th></tr>
+                                        </thead>
+                                        <tbody id="teacher-student-tbody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="teacher-sidebar">
+                            <div class="card-section teacher-report-card">
+                                <div class="teacher-report-header">
+                                    <i class="fas fa-wand-magic-sparkles"></i>
+                                    <span>AI 教学报告</span>
+                                </div>
+                                <div class="teacher-report-form">
+                                    <textarea id="teacher-report-prompt" class="teacher-report-textarea" rows="3" placeholder="告诉 AI 你想分析什么，例如：哪些学员需要重点关注？"></textarea>
+                                    <div class="teacher-report-suggestions">
+                                        <span class="suggestion-label">试试问：</span>
+                                        <button class="suggestion-chip" data-q="帮我做一份学员学习总结，包含整体概况、各方向对比、优秀学员和需要关注的学员">学员总结</button>
+                                        <button class="suggestion-chip" data-q="分析每个学员的学习进度，找出进度滞后的学员并给出干预建议">进度分析</button>
+                                        <button class="suggestion-chip" data-q="对比各方向的教学效果，分析哪个方向教得好、哪个方向需要改进">方向对比</button>
+                                        <button class="suggestion-chip" data-q="哪些学员有掉队风险？给出分级预警和具体的帮扶方案">风险预警</button>
+                                        <button class="suggestion-chip" data-q="根据当前数据预测下个月的学习完成情况，并给出教学计划建议">趋势预测</button>
+                                    </div>
+                                    <button class="btn btn-primary btn-sm teacher-report-generate" id="teacher-report-generate-btn">
+                                        <i class="fas fa-wand-magic-sparkles"></i> 生成报告
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-section teacher-activity-card">
+                                <div class="teacher-activity-header"><i class="fas fa-clock-rotate-left"></i><span>最近动态</span></div>
+                                <div class="teacher-activity-list" id="teacher-activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 通知公告面板 -->
+                <div class="teacher-tab-panel" id="teacher-panel-announcements">
+                    <div class="teacher-panel-toolbar">
+                        <h3 class="teacher-panel-title"><i class="fas fa-bullhorn"></i> 通知公告</h3>
+                        <button class="btn btn-primary btn-sm" id="teacher-publish-ann-btn"><i class="fas fa-plus"></i> 发布通知</button>
+                    </div>
+                    <div id="teacher-announcements-list"></div>
+                </div>
+
+                <!-- 学情分析面板 -->
+                <div class="teacher-tab-panel" id="teacher-panel-analytics">
+                    <div class="teacher-panel-toolbar">
+                        <h3 class="teacher-panel-title"><i class="fas fa-chart-bar"></i> 学情分析</h3>
+                    </div>
+                    <div class="teacher-analytics-grid" id="teacher-analytics-content"></div>
+                </div>
+
+            </div>
+        </div>
     </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <i class="fas fa-seedling"></i>
+                    <span>粤乡智匠</span>
+                </div>
+                <p class="footer-text">AI驱动的农村人才赋能平台 &copy; 2024</p>
+                <div class="footer-tech">
+                    <span>Flask</span><span>SQLite</span><span>SiliconFlow AI</span>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     <!-- 登录/注册模态框 -->
     <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">

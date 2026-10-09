@@ -207,10 +207,22 @@
 // v66：会话内消息实时刷新 —— script.js（主站会话弹窗 openConversation / doSend）+ enterprise.html
 //      （企业端消息页 openConv / renderConv）新增 4s 轮询，对方发来新消息在聊天页自动出现，无需刷新页面；
 //      backend 配合：database.send_message 显式生成 uuid 并返回，/api/messages/send 下发 id 供前端去重。
-const CACHE_NAME = 'yuexiang-v66';
+// v67（2026-10-09）：index.html 按板块拆成独立页面 —— 农业技能 / 电商运营 / 手工传承 /
+//      本土资源 / 就业对接各自成页（index.html 只留 Hero + 角色引导卡），
+//      教师管理面板独立为 teacher-panel.html；导航按钮由 tab 改成真实链接，整页跳转。
+//      script.js 的 switchTab 改为「按板块名跳对应页面」，原先切板块时才拉的数据
+//      （3D 模型 / 案例 / 政策 / 职位 / 教师仪表板）改由 initPageExtras 在首屏加载。
+//      面包屑导航整块下线；农时日历有农事的日期改为整格背景加深（去掉日期下方小圆点）。
+const CACHE_NAME = 'yuexiang-v67';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
+    '/agriculture.html',
+    '/ecommerce.html',
+    '/crafts.html',
+    '/resources.html',
+    '/employment.html',
+    '/teacher-panel.html',
     '/case-detail.html',
     '/styles.css',
     '/script.js',

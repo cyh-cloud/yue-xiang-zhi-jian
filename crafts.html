@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台">
-    <title>AI驱动的农村人才赋能平台 - 粤乡智匠</title>
+    <title>手工传承 - 粤乡智匠</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 </head>
-<body data-page="index">
-    <a href="#hero" class="skip-link">跳转到主要内容</a>
+<body data-page="crafts">
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <nav class="navbar" id="navbar">
         <div class="nav-container">
             <a class="nav-brand" href="index.html">
@@ -27,7 +27,7 @@
             <div class="nav-menu" id="nav-menu" aria-label="主导航">
                 <a class="nav-item" href="agriculture.html" data-tab="agriculture">农业技能</a>
                 <a class="nav-item" href="ecommerce.html" data-tab="ecommerce">电商运营</a>
-                <a class="nav-item" href="crafts.html" data-tab="crafts">手工传承</a>
+                <a class="nav-item active" href="crafts.html" data-tab="crafts" aria-current="page">手工传承</a>
                 <a class="nav-item" href="resources.html" data-tab="resources">本土资源</a>
                 <a class="nav-item" href="employment.html" data-tab="employment">就业对接</a>
             </div>
@@ -109,37 +109,6 @@
         </div>
     </nav>
 
-    <section class="hero" id="hero">
-        <canvas class="hero-particles" id="hero-particles"></canvas>
-        <div class="hero-grid-lines"></div>
-        <div class="hero-content">
-            <div class="hero-badge">AI + 乡村振兴</div>
-            <h1 class="hero-title">AI驱动的<br>农村人才赋能平台</h1>
-            <p class="hero-subtitle">融合人工智能与本土文化，为广东农村人才提供技能培训、电商运营、非遗传承一站式解决方案</p>
-            <div class="hero-actions">
-                <a class="btn btn-primary btn-lg" href="agriculture.html">
-                    开始学习 <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-        </div>
-        <div class="hero-stats">
-            <div class="stat-item">
-                <span class="stat-number" data-key="farmers">0</span>
-                <span class="stat-label">服务农户</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-                <span class="stat-number" data-key="courses">0</span>
-                <span class="stat-label">培训课程</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-                <span class="stat-number" data-key="jobs">0</span>
-                <span class="stat-label">就业对接</span>
-            </div>
-        </div>
-    </section>
-
     <main class="main-content" id="main-content" tabindex="-1">
         <!-- 角色工作台引导卡：仅当该角色在主站没有对应面板时显示。
              super_admin / government / enterprise 三个角色的工作台分别是
@@ -153,7 +122,122 @@
                 <a class="btn btn-primary" id="role-portal-link" href="admin.html">进入工作台</a>
             </div>
         </div>
+        <div class="tab-content active" id="crafts-tab">
+            <div class="container">
+                <div class="section-label">Heritage Crafts</div>
+                <h2 class="section-title">非遗手工技能传承</h2>
+                <p class="section-desc">数字化保存传统手工艺技法，3D步骤拆解，AR虚拟操作指导</p>
+
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-palette"></i> 选择手工艺</h3>
+                    <div class="craft-grid">
+                        <div class="craft-card active" data-craft="embroidery">
+                            <div class="craft-visual"><img src="uploads/models_3d/guangxiu_xiubeng_preview.png" alt="广绣绣绷" loading="lazy"></div>
+                            <div class="craft-info">
+                                <h4>广绣</h4>
+                                <p>国家级非物质文化遗产</p>
+                                <span class="tag">入门级</span>
+                            </div>
+                        </div>
+                        <div class="craft-card" data-craft="woodcarving">
+                            <div class="craft-visual"><img src="uploads/models_3d/chaoshan_mudiao_preview.png" alt="潮汕木雕" loading="lazy"></div>
+                            <div class="craft-info">
+                                <h4>潮汕木雕</h4>
+                                <p>传统雕刻艺术</p>
+                                <span class="tag">进阶级</span>
+                            </div>
+                        </div>
+                        <div class="craft-card" data-craft="ceramics">
+                            <div class="craft-visual"><img src="uploads/models_3d/shiwan_taoyi_preview.png" alt="石湾陶艺" loading="lazy"></div>
+                            <div class="craft-info">
+                                <h4>石湾陶艺</h4>
+                                <p>佛山传统工艺</p>
+                                <span class="tag">中级</span>
+                            </div>
+                        </div>
+                        <div class="craft-card" data-craft="lacquer">
+                            <div class="craft-visual"><img src="uploads/models_3d/yangjiang_qiqi_preview.png" alt="阳江漆器" loading="lazy"></div>
+                            <div class="craft-info">
+                                <h4>阳江漆器</h4>
+                                <p>传统漆艺</p>
+                                <span class="tag">高级</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 文化背景 -->
+                <div class="craft-intro" id="craft-intro"></div>
+
+                <!-- 3D教学 -->
+                <div class="card-section">
+                    <div class="panel-header">
+                        <h3 class="card-section-title"><i class="fas fa-cube"></i> 3D互动教学</h3>
+                        <div class="control-group">
+                            <button class="btn btn-outline btn-sm" id="slow-play"><i class="fas fa-play"></i> 慢放</button>
+                            <button class="btn btn-outline btn-sm" id="pause-play"><i class="fas fa-pause"></i> 暂停</button>
+                            <button class="btn btn-outline btn-sm" id="multi-angle"><i class="fas fa-sync-alt"></i> 多角度</button>
+                            <button class="btn btn-outline btn-sm" id="ar-view"><i class="fas fa-cube"></i> AR 实景</button>
+                        </div>
+                    </div>
+                    <div class="learning-layout">
+                        <div class="viewer-3d" id="viewer-3d">
+                            <div class="viewer-placeholder" id="craft-3d-placeholder">
+                                <i class="fas fa-cube"></i>
+                                <p id="craft-3d-status">3D模型加载中...</p>
+                            </div>
+                            <model-viewer id="craft-3d-viewer" class="craft-3d-viewer is-hidden"
+                                camera-controls auto-rotate auto-rotate-delay="0" rotation-per-second="30deg"
+                                shadow-intensity="1" exposure="1"
+                                environment-image="neutral" disable-tap
+                                ar ar-modes="webxr scene-viewer quick-look">
+                            </model-viewer>
+                        </div>
+                        <div class="step-guide">
+                            <h4>制作步骤 <span class="step-guide-hint"><i class="fas fa-mouse-pointer"></i> 点击步骤切换观察角度</span></h4>
+                            <div class="craft-progress" id="craft-progress">
+                                <div class="craft-progress-bar"><div class="craft-progress-fill" id="craft-progress-fill"></div></div>
+                                <span class="craft-progress-text" id="craft-progress-text">已完成 0/6 步</span>
+                            </div>
+                            <div class="steps-list" id="craft-steps">
+                                <div class="step active"><span class="step-num">1</span><div><h5>准备材料</h5><p>绣布、绣针、丝线</p></div></div>
+                                <div class="step"><span class="step-num">2</span><div><h5>图案设计</h5><p>绘制或转印图案</p></div></div>
+                                <div class="step"><span class="step-num">3</span><div><h5>基础针法</h5><p>直针、扭针等</p></div></div>
+                                <div class="step"><span class="step-num">4</span><div><h5>色彩搭配</h5><p>丝线配色技巧</p></div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="craft-model-tabs" id="craft-model-tabs"></div>
+                </div>
+
+                <!-- 材料采购 -->
+                <!-- P1-9：这里原先是**广绣专用**的材料卡（绣针/丝线/绣布）硬编码在 HTML 里。
+                     切到别的手工艺（如潮汕木雕）时，若接口失败或该工艺没有 purchase_guide，
+                     页面会残留广绣的采购卡且没有任何错误提示 → 学员会误以为木雕也要买绣针。
+                     现改为中性占位，实际内容由 updateCraftSteps() 按当前手工艺渲染。 -->
+                <div class="card-section" id="materials-section">
+                    <h3 class="card-section-title"><i class="fas fa-shopping-basket"></i> 材料采购指南</h3>
+                    <div class="materials-placeholder">选择手工艺后，这里会显示对应的材料采购清单。</div>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <i class="fas fa-seedling"></i>
+                    <span>粤乡智匠</span>
+                </div>
+                <p class="footer-text">AI驱动的农村人才赋能平台 &copy; 2024</p>
+                <div class="footer-tech">
+                    <span>Flask</span><span>SQLite</span><span>SiliconFlow AI</span>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     <!-- 登录/注册模态框 -->
     <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台">
+    <title>就业对接 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+</head>
+<body data-page="employment">
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a class="nav-brand" href="index.html">
+                <div class="brand-logo">
+                    <i class="fas fa-seedling"></i>
+                </div>
+                <span class="brand-name">粤乡智匠</span>
+            </a>
+            <button class="hamburger-btn" id="hamburger-btn" aria-label="打开导航菜单" aria-expanded="false">
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+                <span class="hamburger-line"></span>
+            </button>
+            <div class="nav-menu" id="nav-menu" aria-label="主导航">
+                <a class="nav-item" href="agriculture.html" data-tab="agriculture">农业技能</a>
+                <a class="nav-item" href="ecommerce.html" data-tab="ecommerce">电商运营</a>
+                <a class="nav-item" href="crafts.html" data-tab="crafts">手工传承</a>
+                <a class="nav-item" href="resources.html" data-tab="resources">本土资源</a>
+                <a class="nav-item active" href="employment.html" data-tab="employment" aria-current="page">就业对接</a>
+            </div>
+            <div class="nav-actions">
+                <div class="teacher-quick-menu is-hidden" id="teacher-quick-menu">
+                    <div class="msg-center-wrap">
+                        <button class="icon-btn" id="quick-message-btn" title="消息通知">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge is-hidden" id="message-badge">0</span>
+                        </button>
+                        <div class="msg-dropdown" id="msg-dropdown">
+                            <div class="msg-dropdown-header">
+                                <h4>消息中心</h4>
+                                <div class="msg-dropdown-actions">
+                                    <button id="msg-mark-all-read" title="全部已读"><i class="fas fa-check-double"></i></button>
+                                    <button id="msg-clear-read" title="清除已读"><i class="fas fa-trash-can"></i></button>
+                                </div>
+                            </div>
+                            <div class="msg-dropdown-tabs">
+                                <button class="msg-tab-btn active" data-tab="notifications"><i class="fas fa-bell"></i> 通知</button>
+                                <button class="msg-tab-btn" data-tab="messages"><i class="fas fa-envelope"></i> 我的对话</button>
+                            </div>
+                            <div class="msg-dropdown-body" id="msg-notifications-list">
+                                <div class="msg-empty">暂无通知</div>
+                            </div>
+                            <div class="msg-dropdown-body is-hidden" id="msg-messages-list">
+                                <div class="msg-empty">暂无私信</div>
+                            </div>
+                            <div class="msg-dropdown-footer">
+                                <button id="msg-compose-btn"><i class="fas fa-pen"></i> 写消息</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="user-info is-hidden" id="user-info">
+                    <div class="user-avatar-wrap" id="user-dropdown-trigger">
+                        <div class="avatar-circle"><i class="fas fa-user"></i></div>
+                        <div class="user-meta">
+                            <span class="user-name" id="user-name">未登录</span>
+                            <span class="user-role" id="user-role">guest</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="dropdown-menu is-hidden" id="user-dropdown-menu">
+                        <div class="dropdown-header">
+                            <span class="dropdown-name" id="dropdown-name">用户名</span>
+                            <span class="dropdown-email" id="dropdown-email">user@example.com</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <!-- P1-5：积分余额展示（数据来自 /api/employment/points/<uid>，loadUserData 回填） -->
+                        <div class="dropdown-points" title="申请职位等可获得积分">
+                            <span><i class="fas fa-coins"></i> 我的积分</span>
+                            <b id="points-balance">—</b>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item" id="profile-settings"><i class="fas fa-user-cog"></i> 个人设置</button>
+                        <button class="dropdown-item teacher-only" id="teaching-dashboard"><i class="fas fa-tachometer-alt"></i> 教学面板</button>
+                        <div class="dropdown-divider teacher-only"></div>
+                        <button class="dropdown-item" id="help-center"><i class="fas fa-question-circle"></i> 帮助中心</button>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item logout" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                    </div>
+                </div>
+                <div class="login-section" id="login-section">
+                    <button class="btn btn-primary btn-sm" id="login-btn">
+                        <i class="fas fa-sign-in-alt"></i> 登录
+                    </button>
+                </div>
+                <button class="icon-btn large-text-toggle" id="large-text-toggle" aria-label="切换大字模式" aria-pressed="false" title="大字模式">
+                    <i class="fas fa-text-height"></i>
+                </button>
+                <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <div class="connection-dot" id="connection-status">
+                    <span class="dot"></span>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="main-content" id="main-content" tabindex="-1">
+        <!-- 角色工作台引导卡：仅当该角色在主站没有对应面板时显示。
+             super_admin / government / enterprise 三个角色的工作台分别是
+             admin.html / government.html / enterprise.html，主站不提供对应面板；
+             2026-10-09 之前他们登录主站看到的是整页空白。 -->
+        <div class="role-portal-card is-hidden" id="role-portal-card" role="region" aria-label="工作台入口">
+            <div class="role-portal-inner">
+                <i class="fas fa-compass" aria-hidden="true"></i>
+                <h2 class="role-portal-title" id="role-portal-title">你的工作台不在这里</h2>
+                <p class="role-portal-desc" id="role-portal-desc"></p>
+                <a class="btn btn-primary" id="role-portal-link" href="admin.html">进入工作台</a>
+            </div>
+        </div>
+        <div class="tab-content active" id="employment-tab">
+            <div class="container">
+                <div class="employment-container">
+                    <div class="section-label">Employment</div>
+                    <h2 class="section-title">就业对接</h2>
+                    <p class="section-desc">能力档案 → AI 简历辅助 → 相似职位推荐 → 投递与报名，一条链路跑通求职全程</p>
+
+                    <!-- 搜索筛选栏 -->
+                    <div class="emp-search-bar">
+                        <div class="emp-search-input-wrap">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="emp-keyword" name="emp_q" autocomplete="off" placeholder="搜索职位、公司、技能...">
+                        </div>
+                        <select id="emp-location-filter">
+                            <option value="">工作地点</option>
+                            <option value="广州">广州</option>
+                            <option value="深圳">深圳</option>
+                            <option value="茂名">茂名</option>
+                            <option value="梅州">梅州</option>
+                            <option value="佛山">佛山</option>
+                            <option value="湛江">湛江</option>
+                            <option value="汕头">汕头</option>
+                            <option value="惠州">惠州</option>
+                            <option value="潮州">潮州</option>
+                            <option value="阳江">阳江</option>
+                            <option value="河源">河源</option>
+                            <option value="韶关">韶关</option>
+                            <option value="清远">清远</option>
+                            <option value="江门">江门</option>
+                        </select>
+                        <select id="emp-salary-filter">
+                            <option value="">薪资范围</option>
+                            <option value="3000-5000">3K-5K</option>
+                            <option value="5000-8000">5K-8K</option>
+                            <option value="8000-12000">8K-12K</option>
+                            <option value="12000+">12K以上</option>
+                        </select>
+                        <!-- 分类下拉：两组对应两条通道，**不要混在一起**（学员分不清
+                             「基层服务」筛的是公告还是企业岗）。静态项只是老后端/无脚本时的回退，
+                             正常由 script.js 按接口下发的真实条数重建（0 条标「暂无」）。 -->
+                        <select id="emp-category-filter">
+                            <option value="">职位类型</option>
+                            <optgroup label="企业招聘岗位">
+                                <option value="农业技术">农业技术</option>
+                                <option value="电商运营">电商运营</option>
+                                <option value="手工工艺">手工工艺</option>
+                                <option value="乡村旅游">乡村旅游</option>
+                                <option value="物流仓储">物流仓储</option>
+                            </optgroup>
+                            <optgroup label="公开招聘公告">
+                                <option value="基层服务">基层服务</option>
+                                <option value="乡村治理">乡村治理</option>
+                            </optgroup>
+                        </select>
+                        <button class="btn btn-primary" id="emp-search-btn">
+                            <i class="fas fa-search"></i> 搜索
+                        </button>
+                    </div>
+
+                    <!-- 主布局：列表 + 侧边栏 -->
+                    <div class="emp-layout">
+
+                        <!-- 左侧：主内容 -->
+                        <div class="emp-main">
+                            <div class="emp-tabs">
+                                <button class="emp-tab active" data-emp-tab="jobs">全部职位</button>
+                                <button class="emp-tab" data-emp-tab="resume">我的简历</button>
+                                <button class="emp-tab" data-emp-tab="applications">我的求职</button>
+                                <button class="emp-tab" data-emp-tab="saved">收藏职位</button>
+                            </div>
+
+                            <!-- 全部职位 -->
+                            <div class="emp-panel active" id="emp-jobs-panel">
+                                <div class="emp-job-count">共 <span id="emp-job-total">0</span> 条信息<span class="emp-job-count-detail" id="emp-job-breakdown"></span></div>
+                                <!-- 筛选生效范围的说明（如「按薪资筛选时公告不参与」），文案由 script.js 按接口数据生成 -->
+                                <div class="emp-filter-note" id="emp-filter-note" style="display:none;"></div>
+                                <div class="emp-job-list" id="emp-job-list"></div>
+                                <!-- 企业岗位在审核中时的说明（企业发布 → 管理员审核通过后才展示），文案由 script.js 生成 -->
+                                <div class="emp-review-pending" id="emp-review-pending" style="display:none;"></div>
+                                <div class="emp-empty" id="emp-jobs-empty" style="display:none;">
+                                    <i class="fas fa-search"></i>
+                                    <p id="emp-jobs-empty-title">未找到匹配的职位</p>
+                                    <span class="emp-empty-sub" id="emp-jobs-empty-hint"></span>
+                                </div>
+                                <!-- 公开招聘信息的口径说明（由后端 jobs_data.py 下发，前端不硬编码） -->
+                                <div class="emp-recruit-footnote" id="emp-recruit-footnote" style="display:none;"></div>
+                            </div>
+
+                            <!-- 我的简历 -->
+                            <div class="emp-panel" id="emp-resume-panel">
+                                <div class="resume-layout">
+                                    <!-- 左：能力档案（平台真实学习数据，也是 AI 写作的唯一素材来源） -->
+                                    <aside class="resume-profile" id="resume-profile"></aside>
+
+                                    <!-- 右：简历表单 -->
+                                    <div class="resume-main">
+                                        <div class="resume-note" id="resume-note"></div>
+
+                                        <section class="resume-block">
+                                            <h4><i class="fas fa-user"></i> 基本信息</h4>
+                                            <div class="resume-grid">
+                                                <label>求职意向岗位
+                                                    <input type="text" id="resume-title" name="resume_title" autocomplete="off" placeholder="如：农产品电商运营专员">
+                                                </label>
+                                                <label>期望工作地区
+                                                    <input type="text" id="resume-region" name="resume_region" autocomplete="address-level1" placeholder="如：茂名">
+                                                </label>
+                                                <label>最高学历
+                                                    <input type="text" id="resume-education" name="resume_education" autocomplete="off" placeholder="如：大专">
+                                                </label>
+                                                <label>工作/实践年限
+                                                    <input type="text" id="resume-work-years" name="resume_work_years" autocomplete="off" placeholder="如：1年">
+                                                </label>
+                                                <label>联系电话
+                                                    <input type="tel" id="resume-phone" name="resume_phone" autocomplete="tel" placeholder="选填">
+                                                </label>
+                                                <label>电子邮箱
+                                                    <input type="email" id="resume-email" name="resume_email" autocomplete="email" placeholder="选填">
+                                                </label>
+                                            </div>
+                                        </section>
+
+                                        <section class="resume-block">
+                                            <div class="resume-block-head">
+                                                <h4><i class="fas fa-star"></i> 自我评价</h4>
+                                                <div class="resume-block-actions">
+                                                    <button class="btn btn-outline btn-sm resume-ai-btn" data-ai-section="self_eval">
+                                                        <i class="fas fa-wand-magic-sparkles"></i> AI 起草
+                                                    </button>
+                                                    <span class="resume-ai-flag" data-ai-flag="self_eval"></span>
+                                                </div>
+                                            </div>
+                                            <textarea id="resume-self-eval" name="resume_self_eval" rows="4" placeholder="也可以点「AI 起草」，让 AI 先根据你的平台学习数据写一版，再自行修改"></textarea>
+                                        </section>
+
+                                        <section class="resume-block">
+                                            <div class="resume-block-head">
+                                                <h4><i class="fas fa-tools"></i> 专业技能</h4>
+                                                <div class="resume-block-actions">
+                                                    <button class="btn btn-outline btn-sm resume-ai-btn" data-ai-section="skills">
+                                                        <i class="fas fa-wand-magic-sparkles"></i> AI 起草
+                                                    </button>
+                                                    <span class="resume-ai-flag" data-ai-flag="skills"></span>
+                                                </div>
+                                            </div>
+                                            <textarea id="resume-skills" name="resume_skills" rows="3" placeholder="如：荔枝栽培管理、电商店铺运营、客户沟通"></textarea>
+                                        </section>
+
+                                        <section class="resume-block">
+                                            <div class="resume-block-head">
+                                                <h4><i class="fas fa-briefcase"></i> 工作与实践经历</h4>
+                                                <button class="btn btn-outline btn-sm" id="resume-add-exp">
+                                                    <i class="fas fa-plus"></i> 添加经历
+                                                </button>
+                                            </div>
+                                            <p class="resume-hint">
+                                                这部分平台没有你的数据，需要你自己填写。可以点单条右侧的「AI 润色」改善表达，
+                                                <strong>但 AI 不会替你添加任何未填写的事实</strong>。
+                                            </p>
+                                            <div id="resume-exp-list"></div>
+                                        </section>
+
+                                        <div class="resume-actions">
+                                            <button class="btn btn-primary" id="resume-save">
+                                                <i class="fas fa-floppy-disk"></i> 保存简历
+                                            </button>
+                                            <button class="btn btn-outline" id="resume-print">
+                                                <i class="fas fa-print"></i> 打印 / 导出 PDF
+                                            </button>
+                                            <button class="btn btn-outline" id="resume-copy">
+                                                <i class="fas fa-copy"></i> 复制纯文本
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 我的求职：公开招聘意向 + 企业岗位投递（两条通道，分别渲染） -->
+                            <div class="emp-panel" id="emp-applications-panel">
+                                <div class="emp-list-section-title">
+                                    <i class="fas fa-bookmark"></i>公开招聘意向
+                                    <span class="emp-list-section-note">仅记录你的意向 · 报名请按公告原文自行完成</span>
+                                </div>
+                                <div class="emp-intent-list" id="emp-intent-list"></div>
+
+                                <div class="emp-list-section-title">
+                                    <i class="fas fa-paper-plane"></i>企业岗位投递
+                                    <span class="emp-list-section-note">站内投递 · 企业端可查看简历并给反馈</span>
+                                </div>
+                                <div class="emp-app-tabs">
+                                    <button class="emp-app-tab active" data-status="all">全部</button>
+                                    <button class="emp-app-tab" data-status="pending">待审核</button>
+                                    <button class="emp-app-tab" data-status="approved">已通过</button>
+                                    <button class="emp-app-tab" data-status="rejected">已拒绝</button>
+                                </div>
+                                <div class="emp-app-list" id="emp-app-list"></div>
+                            </div>
+
+                            <!-- 收藏职位 -->
+                            <div class="emp-panel" id="emp-saved-panel">
+                                <div class="emp-job-list" id="emp-saved-list"></div>
+                                <div class="emp-empty" id="emp-saved-empty" style="display:none;">
+                                    <i class="far fa-heart"></i>
+                                    <p>暂无收藏的职位</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <i class="fas fa-seedling"></i>
+                    <span>粤乡智匠</span>
+                </div>
+                <p class="footer-text">AI驱动的农村人才赋能平台 &copy; 2024</p>
+                <div class="footer-tech">
+                    <span>Flask</span><span>SQLite</span><span>SiliconFlow AI</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 登录/注册模态框 -->
+    <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="auth-tabs">
+                    <button class="auth-tab active" id="auth-tab-login">登录</button>
+                    <button class="auth-tab" id="auth-tab-register">注册</button>
+                </div>
+                <button class="modal-close" id="close-login-modal" aria-label="关闭"><i class="fas fa-times"></i></button>
+            </div>
+            <!-- 登录表单 -->
+            <div class="modal-body" id="auth-login-form">
+                <div class="form-group">
+                    <label for="login-username">用户名</label>
+                    <input type="text" id="login-username" name="login_username" autocomplete="username" placeholder="输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="login-password">密码</label>
+                    <input type="password" id="login-password" name="login_password" autocomplete="current-password" placeholder="输入密码">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="login-submit"><i class="fas fa-sign-in-alt"></i> 登录</button>
+                    <button class="btn btn-outline" id="demo-login"><i class="fas fa-eye"></i> 演示登录</button>
+                </div>
+                <div class="demo-section">
+                    <h4>演示账户</h4>
+                    <div class="demo-list">
+                        <div class="demo-account" data-username="admin_demo" data-password="admin123" data-role="super_admin">
+                            <strong>超管</strong><span>admin_demo / admin123</span>
+                        </div>
+                        <div class="demo-account" data-username="gov_demo" data-password="123456" data-role="government">
+                            <strong>政府</strong><span>gov_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="enterprise_demo" data-password="123456" data-role="enterprise">
+                            <strong>企业</strong><span>enterprise_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="teacher_demo" data-password="123456" data-role="teacher">
+                            <strong>教师</strong><span>teacher_demo / 123456</span>
+                        </div>
+                        <div class="demo-account" data-username="student_demo" data-password="123456" data-role="student">
+                            <strong>学员</strong><span>student_demo / 123456</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- 注册表单 -->
+            <div class="modal-body is-hidden" id="auth-register-form">
+                <div class="form-group">
+                    <label for="reg-username">用户名 <span class="required">*</span></label>
+                    <input type="text" id="reg-username" name="reg_username" autocomplete="username" placeholder="输入用户名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-password">密码 <span class="required">*</span></label>
+                    <input type="password" id="reg-password" name="reg_password" autocomplete="new-password" placeholder="至少6位密码">
+                </div>
+                <div class="form-group">
+                    <label for="reg-name">姓名 <span class="required">*</span></label>
+                    <input type="text" id="reg-name" name="reg_name" autocomplete="name" placeholder="输入真实姓名">
+                </div>
+                <div class="form-group">
+                    <label for="reg-role">注册身份 <span class="required">*</span></label>
+                    <select id="reg-role">
+                        <option value="student">学员（学习技能）</option>
+                        <option value="teacher">教师（传授技能）</option>
+                        <option value="enterprise">企业用户（发布岗位）</option>
+                    </select>
+                </div>
+                <div class="form-group reg-enterprise-only is-hidden" id="reg-company-group">
+                    <label for="reg-company">公司名称</label>
+                    <input type="text" id="reg-company" name="reg_company" autocomplete="organization" placeholder="输入公司/单位名称">
+                </div>
+                <div class="form-group">
+                    <label for="reg-phone">手机号</label>
+                    <input type="text" id="reg-phone" name="reg_phone" autocomplete="tel" placeholder="输入手机号">
+                </div>
+                <div class="form-group">
+                    <label for="reg-region">所在地区</label>
+                    <input type="text" id="reg-region" name="reg_region" autocomplete="address-level1" placeholder="如：广州、梅州、湛江">
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary" id="register-submit"><i class="fas fa-user-plus"></i> 注册</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div class="loading-overlay is-hidden" id="loading-overlay">
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <p id="loading-message">AI正在为您准备学习内容...</p>
+        </div>
+    </div>
+
+    <!-- 通知提示 -->
+    <div class="notification" id="notification" role="alert" aria-live="polite">
+        <div class="notification-inner">
+            <i class="fas fa-info-circle"></i>
+            <span class="notification-message"></span>
+            <button type="button" class="notification-action is-hidden" id="notification-action"></button>
+        </div>
+    </div>
+
+    <!-- 浮动帮助 -->
+    <div class="floating-help" onclick="toggleShortcutsHelp()" role="button" tabindex="0" aria-label="帮助">
+        <i class="fas fa-question-circle"></i>
+    </div>
+
+    <script>
+        window.APP_CONFIG = { apiBaseUrl: '' };
+        // 大字模式：在样式加载前恢复，避免页面闪烁
+        try {
+            if (localStorage.getItem('yuexiang_large_text') === '1') {
+                document.documentElement.setAttribute('data-large-text', '');
+            }
+        } catch (e) {}
+    </script>
+    <script src="js/core.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

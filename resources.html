@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台">
-    <title>AI驱动的农村人才赋能平台 - 粤乡智匠</title>
+    <title>本土资源 - 粤乡智匠</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script type="module" src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 </head>
-<body data-page="index">
-    <a href="#hero" class="skip-link">跳转到主要内容</a>
+<body data-page="resources">
+    <a href="#main-content" class="skip-link">跳转到主要内容</a>
     <nav class="navbar" id="navbar">
         <div class="nav-container">
             <a class="nav-brand" href="index.html">
@@ -28,7 +28,7 @@
                 <a class="nav-item" href="agriculture.html" data-tab="agriculture">农业技能</a>
                 <a class="nav-item" href="ecommerce.html" data-tab="ecommerce">电商运营</a>
                 <a class="nav-item" href="crafts.html" data-tab="crafts">手工传承</a>
-                <a class="nav-item" href="resources.html" data-tab="resources">本土资源</a>
+                <a class="nav-item active" href="resources.html" data-tab="resources" aria-current="page">本土资源</a>
                 <a class="nav-item" href="employment.html" data-tab="employment">就业对接</a>
             </div>
             <div class="nav-actions">
@@ -109,37 +109,6 @@
         </div>
     </nav>
 
-    <section class="hero" id="hero">
-        <canvas class="hero-particles" id="hero-particles"></canvas>
-        <div class="hero-grid-lines"></div>
-        <div class="hero-content">
-            <div class="hero-badge">AI + 乡村振兴</div>
-            <h1 class="hero-title">AI驱动的<br>农村人才赋能平台</h1>
-            <p class="hero-subtitle">融合人工智能与本土文化，为广东农村人才提供技能培训、电商运营、非遗传承一站式解决方案</p>
-            <div class="hero-actions">
-                <a class="btn btn-primary btn-lg" href="agriculture.html">
-                    开始学习 <i class="fas fa-arrow-right"></i>
-                </a>
-            </div>
-        </div>
-        <div class="hero-stats">
-            <div class="stat-item">
-                <span class="stat-number" data-key="farmers">0</span>
-                <span class="stat-label">服务农户</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-                <span class="stat-number" data-key="courses">0</span>
-                <span class="stat-label">培训课程</span>
-            </div>
-            <div class="stat-divider"></div>
-            <div class="stat-item">
-                <span class="stat-number" data-key="jobs">0</span>
-                <span class="stat-label">就业对接</span>
-            </div>
-        </div>
-    </section>
-
     <main class="main-content" id="main-content" tabindex="-1">
         <!-- 角色工作台引导卡：仅当该角色在主站没有对应面板时显示。
              super_admin / government / enterprise 三个角色的工作台分别是
@@ -153,7 +122,148 @@
                 <a class="btn btn-primary" id="role-portal-link" href="admin.html">进入工作台</a>
             </div>
         </div>
+        <div class="tab-content active" id="resources-tab">
+            <div class="container">
+                <div class="section-label">Local Resources</div>
+                <h2 class="section-title">本土化资源库</h2>
+                <p class="section-desc">方言交互支持、本地成功案例、政策信息推送</p>
+
+                <!-- 方言交互 -->
+                <div class="card-section dialect-section">
+                    <h3 class="card-section-title"><i class="fas fa-microphone"></i> 方言语音交互</h3>
+
+                    <div class="dialect-cards" id="dialect-cards">
+                        <div class="dialect-card active" data-dialect="cantonese">
+                            <div class="dialect-card-header">
+                                <span class="dialect-emoji">🗣️</span>
+                                <div>
+                                    <strong>粤语</strong>
+                                    <span>广州话</span>
+                                </div>
+                            </div>
+                            <div class="dialect-card-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> 广州、佛山、深圳、东莞、中山、珠海、江门</span>
+                                <span><i class="fas fa-users"></i> 约7000万使用者</span>
+                            </div>
+                        </div>
+                        <div class="dialect-card" data-dialect="hakka">
+                            <div class="dialect-card-header">
+                                <span class="dialect-emoji">🏔️</span>
+                                <div>
+                                    <strong>客家话</strong>
+                                    <span>梅州话</span>
+                                </div>
+                            </div>
+                            <div class="dialect-card-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> 梅州、惠州、河源、韶关、深圳(部分)</span>
+                                <span><i class="fas fa-users"></i> 约4500万使用者</span>
+                            </div>
+                        </div>
+                        <div class="dialect-card" data-dialect="teochew">
+                            <div class="dialect-card-header">
+                                <span class="dialect-emoji">🌊</span>
+                                <div>
+                                    <strong>潮汕话</strong>
+                                    <span>汕头话</span>
+                                </div>
+                            </div>
+                            <div class="dialect-card-meta">
+                                <span><i class="fas fa-map-marker-alt"></i> 汕头、潮州、揭阳、汕尾</span>
+                                <span><i class="fas fa-users"></i> 约1500万使用者</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dialect-detail" id="dialect-detail">
+                        <div class="dialect-greeting">
+                            <div class="greeting-main" id="greeting-main">你好！食咗饭未？</div>
+                            <div class="greeting-meaning" id="greeting-meaning">（你好！吃饭了吗？）</div>
+                        </div>
+
+                        <div class="dialect-features" id="dialect-features">
+                            <span class="feature-tag">九声六调</span>
+                            <span class="feature-tag">保留古汉语词汇</span>
+                            <span class="feature-tag">大量外来语借词</span>
+                        </div>
+
+                        <div class="phrases-panel">
+                            <h4><i class="fas fa-language"></i> 常用短语</h4>
+                            <div class="phrases-grid" id="phrases-grid"></div>
+                        </div>
+                    </div>
+
+                    <div class="voice-chat-area">
+                        <div class="voice-chat-header">
+                            <h4><i class="fas fa-comments"></i> AI方言助手</h4>
+                            <button class="btn btn-outline btn-sm" id="clear-voice-chat"><i class="fas fa-trash-alt"></i> 清空</button>
+                        </div>
+                        <div class="voice-chat-messages" id="voice-chat-messages">
+                            <div class="voice-welcome">
+                                <i class="fas fa-robot"></i>
+                                <p>你好！我是方言农业助手，可以用普通话或方言向我提问</p>
+                            </div>
+                        </div>
+                        <div class="voice-quick-questions" id="voice-quick-questions"></div>
+                        <div class="voice-input-bar">
+                            <button class="voice-btn-small" id="voice-record-btn" title="语音输入">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <input type="text" id="voice-text-input" name="voice_q" autocomplete="off" placeholder="输入你的问题..." />
+                            <button class="voice-send-btn" id="voice-send-btn" title="发送">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 成功案例 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-trophy"></i> 本地成功案例</h3>
+                    <!-- 卡片内容由 loadSuccessCases() 从 /api/resources/cases 动态渲染。
+                         事实源在后端 cases_data.py，此处不再写死任何案例，避免双份维护。 -->
+                    <div class="cases-grid" id="cases-grid">
+                        <div class="cases-placeholder">
+                            <i class="fas fa-spinner fa-spin"></i> 正在加载案例…
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 政策信息 -->
+                <div class="card-section">
+                    <h3 class="card-section-title"><i class="fas fa-file-alt"></i> 政策信息推送</h3>
+                    <div class="policy-filters">
+                        <!-- 仅保留「全部」；其余分类按钮由 renderPolicyFilters() 按 /api/resources/policies
+                             返回的真实分类动态生成 —— 不要在 HTML 里写死分类列表，
+                             否则政府端发布了列表之外的新分类时，学员端会出现「筛不到」的死角。 -->
+                        <button class="policy-filter active" data-filter="all">全部</button>
+                    </div>
+                    <div class="policy-grid" id="policy-grid">
+                        <!-- 政策卡片由 loadPolicies() 从 /api/resources/policies 动态渲染。
+                             事实源在后端 policies_data.py，此处不再写死标题/日期/摘要，避免双份维护。 -->
+                        <div class="policy-placeholder">
+                            <i class="fas fa-spinner fa-spin"></i> 正在加载政策…
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <i class="fas fa-seedling"></i>
+                    <span>粤乡智匠</span>
+                </div>
+                <p class="footer-text">AI驱动的农村人才赋能平台 &copy; 2024</p>
+                <div class="footer-tech">
+                    <span>Flask</span><span>SQLite</span><span>SiliconFlow AI</span>
+                </div>
+            </div>
+        </div>
+    </footer>
 
     <!-- 登录/注册模态框 -->
     <div class="modal-overlay is-hidden" id="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-modal-title">
