@@ -174,7 +174,40 @@
 //          直接 COUNT 会把平台内容算成本级政绩（复用 POLICIES_DATA 标题白名单区分）。
 //        · 岗位数移出政府端，归企业端「工作台」；该处「在招职位」改为只统计
 //          `review_status='approved'`（原来含未审核岗位），另加「待审核岗位」卡。
-const CACHE_NAME = 'yuexiang-v59';
+// v60（2026-10-08）：超级管理员端「轮播图」整块下架（用户拍板）——
+//      首页轮播早在 v54 就已整块移除（index.html 零引用），管理端的增删改因此没有任何产出；
+//      且图片只能填外链 URL（库内 3 条均为 placehold.co，实测加载失败、管理端列表全是裂图）。
+//      ①admin.html：删侧栏入口 + #page-carousels 整页 + loadCarousels/addCarousel/toggleCar/delCar；
+//      ②app.py：删 4 条 /api/admin/carousels* 与公开的 /api/carousels（前端本就零调用）；
+//      ③database.py：删 get/add/update/delete_carousel（carousels 表与种子保留，不 DROP）；
+//      ④script.js：删 loadAdminCarousels/adminToggleCarousel/adminDeleteCarousel/setupAdminCarouselAdd
+//        及 setupAdminSubTabs 分支与 setupNewFeatures 里的挂载；⑤styles.css 删 .home-carousel* 死样式。
+// v61（2026-10-08）：清理 script.js 中「超级管理员功能」整块死代码 ——
+//      admin.html 只加载 js/core.js + portal.js，根本不加载 script.js，
+//      这批函数依赖的 admin-* DOM id 在 index.html 也全部不存在（双重不可达）。
+//      删除 11 个函数（loadAdminUsers/adminUpdateUser/adminSuspendUser/adminUnsuspendUser/
+//      adminDeleteUser/loadAdminReviews/adminApproveReview/adminRejectReview/
+//      loadAdminAnnouncements/adminDeleteAnnouncement/setupAdminAnnouncementPublish）
+//      及其 4 处挂载（setupAdminSubTabs 分支 ×3、setupNewFeatures、switchTab 的
+//      admin 分支、角色首次加载链首、末尾管理员搜索 IIFE），共 -158 行。
+//      ⚠️ 保留 showPublishAnnouncementModal / loadAnnouncements —— 它们用的是
+//         teacher-publish-ann-btn / teacher-announcements-list，属教师端活功能。
+// v62（2026-10-09）：修复 super_admin / government / enterprise 登录主站整页空白 ——
+//      这三个角色的工作台是独立门户页（admin.html / government.html / enterprise.html），
+//      而 ROLE_DEFAULT 指向的 admin/government/enterprise tab 在 index.html 里并不存在，
+//      登录后所有面板都被隐藏 → 一片空白。现加一张「工作台引导卡」把他们送过去
+//      （index.html 新增 #role-portal-card、styles.css 新增 .role-portal-*、
+//       script.js 新增 ROLE_PORTAL / hasMainSitePanel() / applyRolePortalCard()）。
+// v63（2026-10-09）：打通「企业 ↔ 学员」沟通闭环相关改动 ——
+//      script.js：投递/消息两处状态映射补齐第四种状态 interview（原先会把英文原文显示给学员）；
+//      styles.css：新增 .emp-app-status.interview 徽标色。
+//      （企业端消息页、简历查看在 enterprise.html 内，不在预缓存清单，不影响本版本号。）
+// v65：script.js 未读红点实时刷新（打开消息中心 / 窗口重获焦点 / 15s 轮询三条通道），
+//      修复「对方发来新消息但铃铛红点不出现」。
+// v66：会话内消息实时刷新 —— script.js（主站会话弹窗 openConversation / doSend）+ enterprise.html
+//      （企业端消息页 openConv / renderConv）新增 4s 轮询，对方发来新消息在聊天页自动出现，无需刷新页面；
+//      backend 配合：database.send_message 显式生成 uuid 并返回，/api/messages/send 下发 id 供前端去重。
+const CACHE_NAME = 'yuexiang-v66';
 const STATIC_ASSETS = [
     '/',
     '/index.html',

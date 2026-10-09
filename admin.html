@@ -21,6 +21,28 @@
             --portal-topbar-bg: #1b2c25;
         }
         .portal-topbar { background: var(--portal-card-bg); }
+        /* 内容审核：状态筛选页签（2026-10-08） */
+        .review-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+        .rtab {
+            padding: 6px 14px; border-radius: 999px; cursor: pointer;
+            background: var(--portal-input-bg); color: var(--portal-text-muted);
+            border: 1px solid var(--portal-input-border); font-size: 0.9rem;
+        }
+        .rtab.active { background: var(--portal-accent); color: #fff; border-color: var(--portal-accent); }
+        .rtab-num { margin-left: 6px; opacity: 0.85; font-size: 0.85rem; }
+        /* 自提自审标记：如实标注，不做任何背书（2026-10-08） */
+        .badge-self { background: #6b5b2a; color: #ffe9a8; }
+        /* 仪表盘（2026-10-08 重做） */
+        /* ⚠️ styles.css 里的 .stat-card 是 flex 横排（含图标卡的布局），门户页这些
+           无图标卡必须改回 block，否则「数字 + 标签」被挤在同一行、标签逐字竖排。
+           政府端门户踩过同一个坑（#dash-content .stat-card{display:block}）。 */
+        #dash-stats .stat-card, #dash-inventory .stat-card { display: block; }
+        /* portal.css 的 .stat-grid 用的是 auto-fill（会保留空轨道 → 卡片挤在左侧不铺满）。
+           只在管理端覆盖成 auto-fit，不动 portal.css，免得影响其余三个门户页。 */
+        #dash-stats, #dash-inventory { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+        .stat-card[onclick] { cursor: pointer; }
+        .dash-sub { margin-top: 4px; font-size: 0.8rem; color: var(--portal-text-muted); }
+        .dash-note { margin-top: 18px; font-size: 0.8rem; line-height: 1.7; color: var(--portal-text-muted); }
     </style>
 </head>
 <body>
@@ -32,7 +54,6 @@
             <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>仪表盘</a>
             <a href="#" data-page="users"><i class="fas fa-users"></i>用户管理</a>
             <a href="#" data-page="reviews"><i class="fas fa-check-circle"></i>内容审核</a>
-            <a href="#" data-page="carousels"><i class="fas fa-images"></i>轮播图</a>
             <a href="#" data-page="announcements"><i class="fas fa-bullhorn"></i>系统公告</a>
             <a href="#" data-page="content"><i class="fas fa-shield"></i>内容监管</a>
         </nav>
@@ -48,15 +69,25 @@
         </div>
         <div class="portal-content">
             <div class="page active" id="page-dashboard">
-                <div class="stat-grid" id="dash-stats"></div>
-                <div class="card"><h3>待处理</h3><div id="dash-pending"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+                <h3 style="margin:0 0 10px">待处理</h3>
+                <div class="stat-grid" id="dash-stats"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+                <h3 style="margin:20px 0 10px">账号与内容存量</h3>
+                <div class="stat-grid" id="dash-inventory"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+                <p class="dash-note" id="dash-note"></p>
             </div>
             <div class="page" id="page-users">
                 <div class="form-row"><input type="text" id="user-search" placeholder="搜索用户名/姓名"><select id="user-role-filter"><option value="">全部角色</option><option value="student">学员</option><option value="teacher">教师</option><option value="enterprise">企业</option><option value="government">政府</option></select></div>
                 <div id="user-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
             </div>
             <div class="page" id="page-reviews">
-                <div class="form-row"><select id="review-filter"><option value="">全部类型</option><option value="course">课程</option><option value="job">职位</option><option value="model_3d">3D模型</option><option value="success_case">成功案例</option></select></div>
+                <div class="form-row">
+                    <div class="review-tabs" id="review-status-tabs">
+                        <button class="rtab active" data-status="pending">待审核<span class="rtab-num" id="rtab-n-pending"></span></button>
+                        <button class="rtab" data-status="approved">已通过<span class="rtab-num" id="rtab-n-approved"></span></button>
+                        <button class="rtab" data-status="rejected">已驳回<span class="rtab-num" id="rtab-n-rejected"></span></button>
+                    </div>
+                    <select id="review-filter"><option value="">全部类型</option><option value="course">课程</option><option value="job">职位</option><option value="model_3d">3D模型</option><option value="success_case">成功案例</option></select>
+                </div>
                 <div id="review-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
             </div>
 
@@ -73,10 +104,6 @@
                 </div>
             </div>
 
-            <div class="page" id="page-carousels">
-                <div class="section-header"><h3>轮播图列表</h3><button class="btn btn-primary" onclick="addCarousel()"><i class="fas fa-plus"></i> 添加</button></div>
-                <div id="carousel-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
-            </div>
             <div class="page" id="page-announcements">
                 <div class="card"><input type="text" id="ann-title" placeholder="公告标题"><textarea id="ann-content" rows="3" placeholder="公告内容" style="margin-top:8px"></textarea><button class="btn btn-primary" style="margin-top:8px" onclick="publishAnn()">发布公告</button></div>
                 <div id="ann-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
@@ -98,24 +125,98 @@ PORTAL.onPageChange(function(p) {
     if (p === 'dashboard') loadDashboard();
     else if (p === 'users') loadUsers();
     else if (p === 'reviews') loadReviews();
-    else if (p === 'carousels') loadCarousels();
     else if (p === 'announcements') loadAnnouncements();
     else if (p === 'content') loadContent();
 });
 
+// 只有「后端确实给了数字」才渲染该卡。后端查不到会给 null ——
+// 前端**绝不补 0**：补 0 会把「查不到」伪装成「确实是 0」，那是编数。
+function isNum(v) { return typeof v === 'number' && isFinite(v); }
+
+function sumIfNum(arr) {
+    var ok = true, s = 0;
+    arr.forEach(function(v) { if (isNum(v)) { s += v; } else { ok = false; } });
+    return ok ? s : null;
+}
+
+function statCard(num, label, sub, onclickPage) {
+    return '<div class="stat-card"' + (onclickPage ? ' onclick="goPage(\'' + onclickPage + '\')"' : '') + '>' +
+        '<div class="num">' + num + '</div>' +
+        '<div class="label">' + esc(label) + '</div>' +
+        (sub ? '<div class="dash-sub">' + esc(sub) + '</div>' : '') +
+        '</div>';
+}
+
+// 点仪表盘卡片跳到对应页面（复用侧栏链接，走既有 onPageChange 逻辑）
+function goPage(p) {
+    var a = document.querySelector('.portal-sidebar a[data-page="' + p + '"]');
+    if (a) a.click();
+}
+
 function loadDashboard() {
-    apiCall('/api/government/dashboard', 'GET').then(function(r) {
-        if (!r.success) return;
-        var d = r.overview;
+    adminCall('/api/admin/dashboard', 'GET').then(function(r) {
+        var ov = (r && r.overview) || {};
+        var us = ov.users || {}, rv = ov.reviews || {}, ct = ov.content || {};
+
+        // —— 第一层：待处理（都是行动项，点了直接跳对应页面）——
+        var todo = [];
+        if (isNum(rv.pending)) {
+            var sub = null;
+            if (rv.oldest_pending_days === 0) { sub = '最久已等待不到 1 天'; }
+            else if (isNum(rv.oldest_pending_days)) { sub = '最久已等待 ' + rv.oldest_pending_days + ' 天'; }
+            todo.push(statCard(rv.pending, '待审核内容', sub, 'reviews'));
+        }
+        if (isNum(us.suspended)) {
+            todo.push(statCard(us.suspended, '停用账号',
+                isNum(us.total) ? ('共 ' + us.total + ' 个账号') : null, 'users'));
+        }
         document.getElementById('dash-stats').innerHTML =
-            '<div class="stat-card"><div class="num">' + d.users.total + '</div><div class="label">总用户</div></div>' +
-            '<div class="stat-card"><div class="num">' + d.training.total_students + '</div><div class="label">学员</div></div>' +
-            '<div class="stat-card"><div class="num">' + d.employment.total_jobs + '</div><div class="label">岗位</div></div>' +
-            '<div class="stat-card"><div class="num">' + d.content.courses + '</div><div class="label">课程</div></div>';
+            todo.length ? todo.join('')
+                : '<div class="empty-state"><i class="fas fa-check-circle"></i><p>暂无待处理事项</p></div>';
+
+        // —— 第二层：账号与内容存量 ——
+        var inv = [];
+        if (isNum(us.student)) { inv.push(statCard(us.student, '学员')); }
+        var orgSum = sumIfNum([us.teacher, us.enterprise, us.government]);
+        if (orgSum !== null) { inv.push(statCard(orgSum, '教师 / 企业 / 政府')); }
+        var ctSum = sumIfNum([ct.jobs, ct.models, ct.cases, ct.policies]);
+        if (ctSum !== null) { inv.push(statCard(ctSum, '岗位 / 模型 / 案例 / 政策')); }
+        document.getElementById('dash-inventory').innerHTML =
+            inv.length ? inv.join('')
+                : '<div class="empty-state"><i class="fas fa-database"></i><p>暂无可统计内容</p></div>';
+
+        document.getElementById('dash-note').textContent =
+            '口径说明：仅统计库内真实可算的项；成功案例正文不落库，条数取自数据模块。' +
+            '在线人数、日活、增长趋势、平均审核时长等指标因缺少数据源，不予展示。';
+    }).catch(function() {
+        // ⚠️ 原先没有 .catch —— 接口一失败就是一条未捕获异常，统计区永远空白且无任何提示
+        document.getElementById('dash-stats').innerHTML =
+            '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>统计加载失败</p></div>';
+        document.getElementById('dash-inventory').innerHTML = '';
+        document.getElementById('dash-note').textContent = '';
     });
-    apiCall('/api/admin/reviews', 'GET').then(function(r) {
-        document.getElementById('dash-pending').textContent = r.reviews ? '待审核: ' + r.reviews.length + ' 项' : '暂无待审核';
+}
+
+// admin.html 专用的请求封装（2026-10-08）。
+// core.js 的 apiCall 在非 2xx 时只抛出 `HTTP xxx`，**把响应体的 message 丢了**；
+// 而删除/停用这类操作恰恰要把「为什么不行」原样告诉管理员（自删 / 末位超管 /
+// 关联数据清单），所以这里自己发一次 fetch 并把 body 挂在 err.data 上。
+async function adminCall(endpoint, method, body) {
+    var headers = { 'Content-Type': 'application/json' };
+    if (AppState.sessionId) { headers['X-Session-Id'] = AppState.sessionId; }
+    var resp = await fetch(endpoint, {
+        method: method || 'GET', headers: headers,
+        body: body ? JSON.stringify(body) : undefined
     });
+    var data = null;
+    try { data = await resp.json(); } catch (e) { data = null; }
+    if (!resp.ok) {
+        var err = new Error((data && data.message) || ('HTTP ' + resp.status));
+        err.status = resp.status;
+        err.data = data;
+        throw err;
+    }
+    return data || {};
 }
 
 function loadUsers() {
@@ -124,12 +225,33 @@ function loadUsers() {
     apiCall('/api/admin/users?search=' + encodeURIComponent(q) + '&role=' + role, 'GET').then(function(r) {
         var list = document.getElementById('user-list');
         if (!r.users || !r.users.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>暂无用户</p></div>'; return; }
-        list.innerHTML = '<table><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
+        list.innerHTML = '<table><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>关联数据</th><th>操作</th></tr></thead><tbody>' +
             r.users.map(function(u) {
-                return '<tr><td>' + u.username + '</td><td>' + u.name + '</td><td>' + u.role + '</td>' +
-                    '<td><span class="badge ' + (u.status === 'active' ? 'badge-green' : 'badge-red') + '">' + u.status + '</span></td>' +
-                    '<td><button class="btn btn-primary btn-sm" onclick="editUser(\'' + u.username + '\',\'' + u.role + '\',\'' + u.status + '\')">编辑</button> ' +
-                    '<button class="btn btn-danger btn-sm" onclick="delUser(\'' + u.username + '\')">删除</button></td></tr>';
+                // 「能不能删/能不能停用」由后端判定（can_delete / can_suspend），
+                // 前端只负责渲染，不自己下结论 —— 否则「藏了按钮、接口照样能删」等于没拦。
+                // ⚠️ 字段缺失（常驻服务没重启、新前端配旧后端）时一律不画按钮，也不输出结论性文案。
+                var acts = '<button class="btn btn-primary btn-sm" onclick="editUser(\'' + esc(u.username) + '\',\'' + esc(u.role) + '\',\'' + esc(u.status) + '\')">编辑</button> ';
+                if (u.can_suspend === true) {
+                    acts += (u.status === 'suspended')
+                        ? '<button class="btn btn-success btn-sm" onclick="setUserStatus(\'' + esc(u.username) + '\',\'active\')">启用</button> '
+                        : '<button class="btn btn-outline btn-sm" onclick="setUserStatus(\'' + esc(u.username) + '\',\'suspended\')">停用</button> ';
+                }
+                if (u.can_delete === true) {
+                    acts += '<button class="btn btn-danger btn-sm" onclick="delUser(\'' + esc(u.username) + '\')">删除</button>';
+                } else if (u.block_reason) {
+                    acts += '<span class="badge" title="' + esc(u.block_reason) + '">不可删除</span>';
+                }
+                var relCell = '';
+                if (typeof u.relation_count === 'number') {
+                    var detail = (u.relations || []).map(function(x) { return x.label + ' ' + x.count + ' 条'; }).join('、');
+                    relCell = (u.relation_count === 0)
+                        ? '<span style="color:var(--portal-text-muted)">无</span>'
+                        : '<span title="' + esc(detail) + '">' + u.relation_count + ' 条</span>';
+                }
+                return '<tr><td>' + esc(u.username) + '</td><td>' + esc(u.name) + '</td><td>' + esc(u.role) + '</td>' +
+                    '<td><span class="badge ' + (u.status === 'active' ? 'badge-green' : 'badge-red') + '">' + esc(u.status) + '</span></td>' +
+                    '<td>' + relCell + '</td>' +
+                    '<td>' + acts + '</td></tr>';
             }).join('') + '</tbody></table>';
     }).catch(function() { document.getElementById('user-list').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
 }
@@ -139,17 +261,67 @@ document.getElementById('user-role-filter').addEventListener('change', loadUsers
 function editUser(id, role, status) {
     var nr = prompt('角色 (student/teacher/enterprise/government/super_admin):', role); if (!nr) return;
     var ns = prompt('状态 (active/suspended):', status); if (!ns) return;
-    apiCall('/api/admin/users/' + id, 'PUT', { role: nr, status: ns }).then(function(r) { alert(r.message); if (r.success) loadUsers(); });
+    apiCall('/api/admin/users/' + encodeURIComponent(id), 'PUT', { role: nr, status: ns }).then(function(r) { alert(r.message); if (r.success) loadUsers(); });
 }
-function delUser(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/users/' + id, 'DELETE').then(function(r) { alert(r.message); if (r.success) loadUsers(); }); }
+
+// 停用 = 删除的替代方案：本人无法登录，但历史数据完整保留、随时可恢复。
+function setUserStatus(id, st) {
+    var msg = (st === 'suspended')
+        ? '确定停用「' + id + '」？\n停用后本人无法登录，所有数据完整保留，可随时启用恢复。'
+        : '确定启用「' + id + '」？';
+    if (!confirm(msg)) return;
+    adminCall('/api/admin/users/' + encodeURIComponent(id) + '/status', 'POST', { status: st })
+        .then(function(r) { alert(r.message); loadUsers(); })
+        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); loadUsers(); });
+}
+
+function delUser(id) {
+    if (!confirm('确定删除账号「' + id + '」？\n此操作不可恢复。')) return;
+    adminCall('/api/admin/users/' + encodeURIComponent(id), 'DELETE')
+        .then(function(r) { alert(r.message); loadUsers(); })
+        .catch(function(e) {
+            // 后端会说明拦在哪一关；409 还会带回关联数据清单
+            var d = e && e.data;
+            var extra = (d && d.relations && d.relations.length)
+                ? '\n\n关联数据：\n' + d.relations.map(function(x) { return '· ' + x.label + ' ' + x.count + ' 条'; }).join('\n')
+                : '';
+            alert(((d && d.message) || (e && e.message) || '删除失败') + extra);
+            loadUsers();
+        });
+}
 
 function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
+// 当前审核状态页签：pending / approved / rejected
+var reviewStatus = 'pending';
+
+function setReviewStatus(st) {
+    reviewStatus = st;
+    [].forEach.call(document.querySelectorAll('#review-status-tabs .rtab'), function(b) {
+        b.classList.toggle('active', b.getAttribute('data-status') === st);
+    });
+    loadReviews();
+}
+
+function renderReviewCounts(counts) {
+    // 后端没下发 counts（旧后端/接口降级）时不动，绝不自己补 0 —— 补 0 等于编数。
+    if (!counts) return;
+    ['pending', 'approved', 'rejected'].forEach(function(k) {
+        var el = document.getElementById('rtab-n-' + k);
+        if (el && typeof counts[k] === 'number') { el.textContent = '(' + counts[k] + ')'; }
+    });
+}
+
 function loadReviews() {
     var t = document.getElementById('review-filter').value;
-    apiCall('/api/admin/reviews?content_type=' + t, 'GET').then(function(r) {
+    apiCall('/api/admin/reviews?content_type=' + t + '&status=' + reviewStatus, 'GET').then(function(r) {
         var list = document.getElementById('review-list');
-        if (!r.reviews || !r.reviews.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i><p>暂无待审核</p></div>'; return; }
+        renderReviewCounts(r.counts);
+        if (!r.reviews || !r.reviews.length) {
+            var emptyText = { pending: '暂无待审核', approved: '暂无已通过记录', rejected: '暂无已驳回记录' }[reviewStatus] || '暂无记录';
+            list.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i><p>' + emptyText + '</p></div>';
+            return;
+        }
         list.innerHTML = r.reviews.map(function(rv) {
             var typeName = { course: '课程', job: '职位', model_3d: '3D模型', success_case: '成功案例' }[rv.content_type] || rv.content_type;
             var detailHtml = '';
@@ -188,14 +360,49 @@ function loadReviews() {
                 var nm = rv.detail.title || rv.detail.name || rv.detail.position || '';
                 detailHtml = '<div style="margin-top:8px;font-size:0.9rem;color:var(--portal-text)"><strong>内容：</strong>' + nm + '</div>';
             }
-            return '<div class="card"><div><strong>' + typeName + '</strong> <span class="badge badge-yellow">' + ({ pending: '待审核', approved: '已通过', rejected: '已驳回' }[rv.status] || rv.status) + '</span></div><div style="margin-top:4px;font-size:0.85rem;color:var(--portal-text-muted)">提交者: ' + rv.submitter_id + ' | ' + rv.created_at + '</div>' + detailHtml + '<div style="margin-top:8px;display:flex;gap:8px">' + previewBtn + '<button class="btn btn-success" onclick="approveReview(' + rv.id + ')">通过</button><button class="btn btn-danger" onclick="rejectReview(' + rv.id + ')">驳回</button></div></div>';
+            var statusBadge = { pending: 'badge-yellow', approved: 'badge-green', rejected: 'badge-red' }[rv.status] || 'badge-yellow';
+            var statusText = { pending: '待审核', approved: '已通过', rejected: '已驳回' }[rv.status] || rv.status;
+            // 「自提自审」如实标注：提交者与审核人是同一个账号时，这条记录
+            // 不含任何第三方把关。平台预置内容（如 success_case）就是这种情况，
+            // 数据本身是真实的，只是不能拿它当「已审核」的背书（2026-10-08）。
+            var selfTag = rv.is_self_reviewed
+                ? ' <span class="badge badge-self" title="提交者与审核人为同一账号，该记录不含第三方把关">自审</span>'
+                : '';
+            var metaLine = '<div style="margin-top:4px;font-size:0.85rem;color:var(--portal-text-muted)">提交者: ' + esc(rv.submitter_id) + ' | ' + esc(rv.created_at) +
+                (rv.reviewed_by ? ' | 审核人: ' + esc(rv.reviewed_by) + ' | ' + esc(rv.reviewed_at) : '') +
+                (rv.review_comment ? ' | 理由: ' + esc(rv.review_comment) : '') + '</div>';
+            var actionBtns = (rv.status === 'pending')
+                ? '<button class="btn btn-success" onclick="approveReview(' + rv.id + ')">通过</button><button class="btn btn-danger" onclick="rejectReview(' + rv.id + ')">驳回</button>'
+                : '<button class="btn btn-outline" onclick="revokeReview(' + rv.id + ')">撤销审核</button>';
+            return '<div class="card"><div><strong>' + esc(typeName) + '</strong> <span class="badge ' + statusBadge + '">' + esc(statusText) + '</span>' + selfTag + '</div>' + metaLine + detailHtml + '<div style="margin-top:8px;display:flex;gap:8px">' + previewBtn + actionBtns + '</div></div>';
         }).join('');
+    }).catch(function() {
+        document.getElementById('review-list').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>';
     });
 }
 document.getElementById('review-filter').addEventListener('change', loadReviews);
+[].forEach.call(document.querySelectorAll('#review-status-tabs .rtab'), function(b) {
+    b.addEventListener('click', function() { setReviewStatus(b.getAttribute('data-status')); });
+});
 
-function approveReview(id) { apiCall('/api/admin/reviews/' + id + '/approve', 'POST').then(function(r) { alert(r.message); if (r.success) loadReviews(); }); }
-function rejectReview(id) { var c = prompt('驳回理由(可选):', ''); apiCall('/api/admin/reviews/' + id + '/reject', 'POST', { comment: c || '' }).then(function(r) { alert(r.message); if (r.success) loadReviews(); }); }
+function approveReview(id) {
+    adminCall('/api/admin/reviews/' + id + '/approve', 'POST')
+        .then(function(r) { alert(r.message); loadReviews(); })
+        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); });
+}
+function rejectReview(id) {
+    var c = prompt('驳回理由(可选):', '');
+    adminCall('/api/admin/reviews/' + id + '/reject', 'POST', { comment: c || '' })
+        .then(function(r) { alert(r.message); loadReviews(); })
+        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); });
+}
+// 撤销审核：已通过 / 已驳回退回待审核，可重新处理
+function revokeReview(id) {
+    if (!confirm('确定撤销这条审核？\n撤销后该内容退回「待审核」，需重新处理。')) return;
+    adminCall('/api/admin/reviews/' + id + '/revoke', 'POST')
+        .then(function(r) { alert(r.message); loadReviews(); })
+        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); });
+}
 
 function previewReviewModel(filePath, title) {
     var modal = document.getElementById('review-model-modal');
@@ -212,23 +419,6 @@ function closeReviewModel() {
     if (modal) modal.classList.add('is-hidden');
     if (viewer) viewer.removeAttribute('src');
 }
-
-function loadCarousels() {
-    apiCall('/api/admin/carousels', 'GET').then(function(r) {
-        var list = document.getElementById('carousel-list');
-        if (!r.carousels || !r.carousels.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-images"></i><p>暂无轮播图</p></div>'; return; }
-        list.innerHTML = '<table><thead><tr><th>标题</th><th>图片</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
-            r.carousels.map(function(c) {
-                return '<tr><td>' + c.title + '</td><td><img src="' + c.image_url + '" style="max-width:100px;max-height:50px"></td><td>' + c.sort_order + '</td>' +
-                    '<td>' + (c.is_active ? '启用' : '禁用') + '</td>' +
-                    '<td><button class="btn btn-primary btn-sm" onclick="toggleCar(' + c.id + ',' + c.is_active + ')">' + (c.is_active ? '禁用' : '启用') + '</button> ' +
-                    '<button class="btn btn-danger btn-sm" onclick="delCar(' + c.id + ')">删除</button></td></tr>';
-            }).join('') + '</tbody></table>';
-    });
-}
-function addCarousel() { var t = prompt('标题:'); if (!t) return; var u = prompt('图片URL:'); if (!u) return; var l = prompt('链接URL:', ''); apiCall('/api/admin/carousels', 'POST', { title: t, image_url: u, link_url: l }).then(function(r) { alert(r.message); if (r.success) loadCarousels(); }); }
-function toggleCar(id, act) { apiCall('/api/admin/carousels/' + id, 'PUT', { is_active: act ? 0 : 1 }).then(function(r) { if (r.success) loadCarousels(); }); }
-function delCar(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/carousels/' + id, 'DELETE').then(function(r) { if (r.success) loadCarousels(); }); }
 
 function loadAnnouncements() {
     apiCall('/api/admin/system-announcements', 'GET').then(function(r) {

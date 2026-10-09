@@ -29,6 +29,7 @@ def get_connection():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=8000")  # 并发写入时最多等 8s，避免瞬时 "database is locked"
     return conn
 
 
@@ -1954,13 +1955,17 @@ def get_analytics_data():
 # ==================== 消息系统 ====================
 
 def send_message(sender_id, receiver_id, content):
+    # messages.id 是 INTEGER PRIMARY KEY AUTOINCREMENT，**不能**塞 uuid 字符串
+    # （SQLite 会报 datatype mismatch）。落库后取自增主键返回，供前端轮询去重。
     conn = get_connection()
-    conn.execute(
+    cur = conn.execute(
         "INSERT INTO messages (sender_id, receiver_id, content) VALUES (?, ?, ?)",
         (sender_id, receiver_id, content)
     )
+    mid = cur.lastrowid
     conn.commit()
     conn.close()
+    return mid
 
 
 def get_messages(user1_id, user2_id, limit=50):
@@ -2006,7 +2011,11 @@ def get_inbox(user_id):
             return r['name']
         return other_id
 
-    conn.close()
+    # ⚠️ 下面的循环必须发生在 conn.close() **之前**：_resolve_name 是闭包，
+    #   里面还要用同一个 conn 去查 students / users。原先 close 写在循环前，
+    #   导致「只要收件箱里有一条消息」就会抛
+    #   `ProgrammingError: Cannot operate on a closed database` → /api/messages/inbox 恒 500。
+    #   库里没有消息时 rows 为空、闭包不被调用，所以这个 bug 长期不暴露（2026-10-09）。
     result = []
     for r in rows:
         d = dict(r)
@@ -2015,6 +2024,7 @@ def get_inbox(user_id):
         d['other_name'] = _resolve_name(other_id)
         d['is_mine'] = d['sender_id'] == user_id
         result.append(d)
+    conn.close()
     return result
 
 
@@ -2866,15 +2876,172 @@ def update_user_by_admin(user_id, name=None, role=None, status=None, phone=None,
     return True
 
 
-def delete_user_by_admin(user_id):
-    """管理员删除用户"""
+# 「业务关联」= 删掉用户后会变成跨表孤儿、而删除逻辑本身**不会**清理的表。
+# ⚠️ user_sessions / points 由 delete_user_by_admin 自己清理，不计入。
+# ⚠️ students.user_id 是最要命的一条：它是名册收件人与证书归属的唯一依据。
+_USER_RELATION_SPECS = [
+    ("students", "user_id", "名册记录"),
+    ("certificates", "user_id", "证书"),
+    ("job_applications", "user_id", "岗位投递"),
+    ("resumes", "user_id", "简历"),
+    ("notifications", "user_id", "通知"),
+    ("discussions", "user_id", "讨论帖"),
+    ("comments", "user_id", "评论"),
+    ("messages", "sender_id", "发出的消息"),
+    ("messages", "receiver_id", "收到的消息"),
+    ("farming_subscriptions", "user_id", "农事订阅"),
+    ("farming_reminder_log", "user_id", "农事提醒记录"),
+    ("job_intents", "user_id", "求职意向"),
+    ("saved_jobs", "user_id", "收藏的岗位"),
+    ("assignment_submissions", "student_id", "作业提交"),
+    ("content_reviews", "submitter_id", "提交的内容审核"),
+    ("content_reviews", "reviewed_by", "处理过的审核"),
+    ("government_policies", "author_id", "发布的政策"),
+    ("job_listings", "enterprise_id", "发布的岗位"),
+    ("models_3d", "teacher_id", "上传的3D模型"),
+    ("courses", "teacher_id", "创建的课程"),
+    ("system_announcements", "created_by", "发布的公告"),
+]
+
+
+def count_user_relations(username):
+    """统计用户在各业务表里的引用条数，用于「能不能删」的判断。
+
+    返回 {'total': int, 'items': [{'table','column','label','count'}]}（只含 count>0 的项）。
+
+    只统计**真实存在的列**：不同库的表结构有差异，缺列的表静默跳过，
+    不让一次 schema 漂移把整个删除功能打挂。
+    """
     conn = get_connection()
-    conn.execute("DELETE FROM users WHERE username = ?", (user_id,))
-    conn.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
-    conn.execute("DELETE FROM points WHERE user_id = ?", (user_id,))
+    items = []
+    total = 0
+    for table, column, label in _USER_RELATION_SPECS:
+        try:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(%s)" % table)]
+        except Exception:
+            continue
+        if column not in cols:
+            continue
+        try:
+            n = conn.execute(
+                "SELECT COUNT(*) FROM %s WHERE %s = ?" % (table, column), (username,)).fetchone()[0]
+        except Exception:
+            continue
+        if n:
+            items.append({"table": table, "column": column, "label": label, "count": n})
+            total += n
+    conn.close()
+    items.sort(key=lambda x: -x["count"])
+    return {"total": total, "items": items}
+
+
+def count_super_admins():
+    """当前 super_admin 数量（守卫：系统必须至少保留一个）"""
+    conn = get_connection()
+    n = conn.execute("SELECT COUNT(*) FROM users WHERE role = 'super_admin'").fetchone()[0]
+    conn.close()
+    return n
+
+
+def get_admin_overview():
+    """超级管理员仪表盘统计（2026-10-08 新增）。
+
+    替代原先前端直接调 `/api/government/dashboard` 的做法 —— 那条路由只允许
+    government 角色，super_admin 恒 403，统计区因此长期空白。
+
+    ⚠️ 三条硬约束：
+      1. **只输出真实可算的口径**。在线人数 / 日活 / 近 N 天趋势 / 平均审核时长
+         一律不输出 —— 我们没有在线状态表、没有埋点、没有访问日志，
+         硬凑出来的数字就是编造。宁可少几张卡。
+      2. **成功案例正文不落库**（内容在 cases_data.py），本函数不查表，
+         cases 条数由路由层用 `cases_data.get_cases()` 补。
+      3. 查不到的项给 **None 而不是 0**，前端 None 时整张卡不渲染（不补 0）。
+    """
+    conn = get_connection()
+
+    def _cnt(table, where=None, col=None):
+        """计数；表/列不存在或查询失败一律返回 None（前端据此不渲染该卡）。"""
+        try:
+            if col is not None:
+                cols = [r[1] for r in conn.execute("PRAGMA table_info(%s)" % table)]
+                if col not in cols:
+                    return None
+            sql = "SELECT COUNT(*) AS n FROM %s" % table
+            if where:
+                sql += " WHERE " + where
+            return conn.execute(sql).fetchone()["n"]
+        except Exception:
+            return None
+
+    ov = {"users": {}, "reviews": {}, "content": {}}
+
+    ov["users"]["total"] = _cnt("users")
+    try:
+        for r in conn.execute("SELECT role, COUNT(*) AS n FROM users GROUP BY role"):
+            ov["users"][r["role"]] = r["n"]
+    except Exception:
+        pass
+    ov["users"]["suspended"] = _cnt("users", "status='suspended'")
+
+    for st in ("pending", "approved", "rejected"):
+        ov["reviews"][st] = _cnt("content_reviews", "status='%s'" % st)
+
+    ov["reviews"]["oldest_pending_at"] = None
+    ov["reviews"]["oldest_pending_days"] = None
+    try:
+        row = conn.execute(
+            "SELECT MIN(created_at) AS t FROM content_reviews WHERE status='pending'").fetchone()
+        t = row["t"] if row else None
+        if t:
+            ov["reviews"]["oldest_pending_at"] = t
+            try:
+                ov["reviews"]["oldest_pending_days"] = (
+                    datetime.now() - datetime.strptime(str(t)[:19], "%Y-%m-%d %H:%M:%S")).days
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    ov["content"]["jobs"] = _cnt("job_listings")
+    ov["content"]["jobs_published"] = _cnt("job_listings", "review_status='approved'", "review_status")
+    ov["content"]["models"] = _cnt("models_3d")
+    ov["content"]["policies"] = _cnt("government_policies")
+    ov["content"]["policies_published"] = _cnt("government_policies", "is_published=1", "is_published")
+    ov["content"]["courses"] = _cnt("courses")
+
+    conn.close()
+    return ov
+
+
+def set_user_status(username, status):
+    """启用/停用账号（删除的替代方案）。返回影响行数，0 = 用户不存在。"""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET status = ? WHERE username = ?", (status, username))
+    n = cur.rowcount
     conn.commit()
     conn.close()
-    return True
+    return n
+
+
+def delete_user_by_admin(user_id):
+    """管理员删除用户。**返回被删除的 users 行数**（0 = 压根没这个人）。
+
+    ⚠️ 调用方**必须**先过三道关（见 app.py 的 admin_delete_user）：
+       ① 不是自己；② 不是最后一个 super_admin；③ count_user_relations() == 0。
+       本函数只清理 users / user_sessions / points 三张表，其余表里的 user_id
+       引用会变成跨表孤儿。2026-10-08 之前它无条件 `return True`，
+       于是「删一个不存在的用户」也会向前端谎报「删除成功」。
+    """
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("DELETE FROM users WHERE username = ?", (user_id,))
+    n = cur.rowcount
+    cur.execute("DELETE FROM user_sessions WHERE user_id = ?", (user_id,))
+    cur.execute("DELETE FROM points WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+    return n
 
 
 def update_user_profile(user_id, name=None, email=None, phone=None, avatar_url=None,
@@ -2927,8 +3094,13 @@ def get_pending_reviews(content_type=None):
 def approve_review(review_id, reviewer_id):
     """审核通过"""
     conn = get_connection()
+    # ⚠️ 必须清掉 review_comment：一条记录可能「先驳回、再撤销、后通过」，
+    #    若不清，已通过的卡片上会残留上一轮的驳回理由（2026-10-08 复验时
+    #    在 success_case#1 上实测到「理由: 自审：临时驳回」，出现在「已通过」状态
+    #    下极易被误读为「通过了但有驳回意见」）。
     conn.execute(
-        "UPDATE content_reviews SET status='approved', reviewed_by=?, reviewed_at=datetime('now','localtime') WHERE id=?",
+        "UPDATE content_reviews SET status='approved', reviewed_by=?, review_comment='', "
+        "reviewed_at=datetime('now','localtime') WHERE id=?",
         (reviewer_id, review_id))
     review = conn.execute("SELECT * FROM content_reviews WHERE id=?", (review_id,)).fetchone()
     if review:
@@ -2974,6 +3146,77 @@ def reject_review(review_id, reviewer_id, comment=''):
     conn.close()
 
 
+def get_reviews_by_status(status=None, content_type=None):
+    """按状态取审核记录（status 为空 = 全部）。
+
+    2026-10-08 新增：管理端「内容审核」需要回看已通过 / 已驳回的历史，
+    而 `get_pending_reviews()` 的 SQL 写死 `status='pending'`，历史记录一条都
+    查不出来 —— 页面里那套「已通过/已驳回」徽标分支因此永远走不到。
+    """
+    conn = get_connection()
+    sql = "SELECT * FROM content_reviews WHERE 1=1"
+    params = []
+    if status:
+        sql += " AND status = ?"
+        params.append(status)
+    if content_type:
+        sql += " AND content_type = ?"
+        params.append(content_type)
+    sql += " ORDER BY created_at DESC"
+    rows = conn.execute(sql, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def count_reviews_by_status(content_type=None):
+    """各状态的审核记录条数（供页签显示数量）。三个 key 恒存在，缺失补 0。"""
+    conn = get_connection()
+    sql = "SELECT status, COUNT(*) AS n FROM content_reviews"
+    params = []
+    if content_type:
+        sql += " WHERE content_type = ?"
+        params.append(content_type)
+    sql += " GROUP BY status"
+    out = {r["status"]: r["n"] for r in conn.execute(sql, params).fetchall()}
+    conn.close()
+    for k in ("pending", "approved", "rejected"):
+        out.setdefault(k, 0)
+    return out
+
+
+def revoke_review(review_id):
+    """撤销审核：approved / rejected 退回 pending，并**对称回写**目标表。
+
+    回写规则与 approve_review / reject_review 保持一致（success_case 不回写，
+    它的可见性完全由 content_reviews.status 决定）。
+
+    返回 'ok' / 'not_found'（没有这条记录）/ 'not_reviewed'（本来就是 pending）。
+    """
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM content_reviews WHERE id = ?", (review_id,)).fetchone()
+    if not row:
+        conn.close()
+        return "not_found"
+    if row["status"] == "pending":
+        conn.close()
+        return "not_reviewed"
+    conn.execute(
+        "UPDATE content_reviews SET status='pending', reviewed_by='', review_comment='', "
+        "reviewed_at=NULL WHERE id=?", (review_id,))
+    ct, cid = row["content_type"], row["content_id"]
+    if ct == 'course':
+        conn.execute("UPDATE courses SET review_status='pending' WHERE id=?", (cid,))
+    elif ct == 'job':
+        conn.execute("UPDATE job_listings SET review_status='pending' WHERE id=?", (cid,))
+    elif ct == 'procurement':
+        conn.execute("UPDATE procurements SET review_status='pending' WHERE id=?", (cid,))
+    elif ct == 'model_3d':
+        conn.execute("UPDATE models_3d SET review_status='pending' WHERE id=?", (cid,))
+    conn.commit()
+    conn.close()
+    return "ok"
+
+
 def get_review_by_content(content_type, content_id):
     """获取内容的审核记录"""
     conn = get_connection()
@@ -2983,56 +3226,6 @@ def get_review_by_content(content_type, content_id):
     conn.close()
     return dict(row) if row else None
 
-
-# ==================== 轮播图 ====================
-
-def get_carousels(active_only=True):
-    """获取轮播图列表"""
-    conn = get_connection()
-    if active_only:
-        rows = conn.execute(
-            "SELECT * FROM carousels WHERE is_active=1 ORDER BY sort_order").fetchall()
-    else:
-        rows = conn.execute(
-            "SELECT * FROM carousels ORDER BY sort_order").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-
-def add_carousel(title, image_url, link_url='', sort_order=0):
-    """添加轮播图"""
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO carousels (title, image_url, link_url, sort_order) VALUES (?, ?, ?, ?)",
-        (title, image_url, link_url, sort_order))
-    conn.commit()
-    car_id = cursor.lastrowid
-    conn.close()
-    return car_id
-
-
-def update_carousel(car_id, **kwargs):
-    """更新轮播图"""
-    conn = get_connection()
-    allowed = {'title', 'image_url', 'link_url', 'sort_order', 'is_active'}
-    updates = {k: v for k, v in kwargs.items() if k in allowed and v is not None}
-    if updates:
-        set_clause = ', '.join(f"{k}=?" for k in updates)
-        params = list(updates.values()) + [car_id]
-        conn.execute(f"UPDATE carousels SET {set_clause} WHERE id=?", params)
-        conn.commit()
-    conn.close()
-    return True
-
-
-def delete_carousel(car_id):
-    """删除轮播图"""
-    conn = get_connection()
-    conn.execute("DELETE FROM carousels WHERE id=?", (car_id,))
-    conn.commit()
-    conn.close()
-    return True
 
 
 # ==================== 系统公告 ====================

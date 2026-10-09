@@ -266,7 +266,6 @@ function switchTab(tabName) {
         // 切到就业tab时刷新数据
         if (tabName === 'employment') loadEmploymentData();
         // 新面板数据加载
-        if (tabName === 'admin') loadAdminUsers();
         if (tabName === 'government') loadGovDashboard();
         if (tabName === 'enterprise') loadEnterpriseJobs();
         if (tabName === 'discussions') loadDiscussions();
@@ -7893,8 +7892,11 @@ async function loadUserApplications(statusFilter) {
 }
 
 function renderApplicationCard(app, hasResume) {
+    // ⚠️ 后端 enterprise_update_application 的白名单是 approved / rejected / **interview**，
+    //   这里四个状态必须齐全 —— 漏掉 interview 时学员端会直接把英文原文显示出来（2026-10-09）。
     const statusMap = {
         'pending': { text: '待审核', class: 'pending' },
+        'interview': { text: '已通知面试', class: 'interview' },
         'approved': { text: '已通过', class: 'approved' },
         'rejected': { text: '已拒绝', class: 'rejected' }
     };
@@ -7905,7 +7907,10 @@ function renderApplicationCard(app, hasResume) {
     const timelineSteps = [
         { label: `提交申请 ${app.applied_at || ''}`, done: true },
         { label: '企业查阅中', done: app.status !== 'pending', active: app.status === 'pending' },
-        { label: app.status === 'approved' ? '已通过审核' : app.status === 'rejected' ? '未通过审核' : '面试安排', done: app.status === 'approved' || app.status === 'rejected', active: false }
+        { label: app.status === 'approved' ? '已通过审核' : app.status === 'rejected' ? '未通过审核'
+                : app.status === 'interview' ? '已通知面试' : '面试安排',
+          done: app.status === 'approved' || app.status === 'rejected' || app.status === 'interview',
+          active: app.status === 'interview' }
     ];
     if (app.status === 'approved') timelineSteps[2].done = true;
 
@@ -8430,7 +8435,7 @@ async function generateTeacherReport() {
     }
 
     // 打开弹窗并显示加载状态
-    showDetailModal('<i class="fas fa-wand-magic-sparkles"></i> AI 教学报告', `
+    showDetailModal('AI 教学报告', `
         <div class="report-modal-body">
             <div class="report-loading">
                 <div class="spinner"></div>
@@ -8438,7 +8443,7 @@ async function generateTeacherReport() {
                 <span class="report-loading-hint">这可能需要几秒钟，请耐心等待</span>
             </div>
         </div>
-    `);
+    `, 'fa-wand-magic-sparkles');
 
     try {
         const data = await apiCall('/api/teacher/reports/generate', 'POST', { prompt });
@@ -9201,6 +9206,7 @@ function setupQuickMessage() {
         e.stopPropagation();
         const isOpen = dropdown.classList.toggle('show');
         if (isOpen) {
+            updateBadgeCount();
             loadNotifications();
             loadConversations();
         }
@@ -9258,6 +9264,86 @@ async function updateBadgeCount() {
     } catch(e) { console.warn('[消息中心] 未读红点加载失败', e); }
 }
 
+// ==================== 未读红点 · 实时刷新 ====================
+// 红点原仅「登录 / 刷新页面 / 自己发消息后」计算一次 → 对方（企业/教师）在
+// 另一个窗口发来新消息时，本端页面即使一直开着，铃铛红点也永远不更新，
+// 表现为「消息中心能看到新消息，但铃铛没有红色数字」（2026-10-09 修）。
+// 补三条刷新通道：① 打开消息中心时 ② 窗口重获焦点 / 切回前台时 ③ 定时轮询（仅已登录且页面可见）。
+let badgePollTimer = null;
+const BADGE_POLL_MS = 15000;
+function startBadgePolling() {
+    if (badgePollTimer) return;
+    badgePollTimer = setInterval(() => {
+        if (AppState.user && document.visibilityState === 'visible') updateBadgeCount();
+    }, BADGE_POLL_MS);
+}
+function stopBadgePolling() {
+    if (badgePollTimer) { clearInterval(badgePollTimer); badgePollTimer = null; }
+}
+// 窗口重获焦点 / 从后台切回前台 → 立即刷新一次（比等下一次轮询更即时）
+window.addEventListener('focus', () => { if (AppState.user) updateBadgeCount(); });
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && AppState.user) updateBadgeCount();
+});
+
+// ==================== 会话内消息 · 实时刷新 ====================
+// 原 bug：打开会话后页面停在聊天窗口，对方（学员/企业/教师）发来新消息不会自动出现，
+// 必须手动刷新才能看到（2026-10-09 修）。修法：会话打开期间每 4 秒拉一次会话，
+// 只把「本地还没有」的新消息追加进气泡区；会话弹窗关闭（#conversation-messages 被移除）即自动停。
+let convPollTimer = null;
+let convPollTarget = null;
+const CONV_POLL_MS = 4000;
+function startConvPolling(userId) {
+    convPollTarget = userId;
+    if (convPollTimer) return;
+    convPollTimer = setInterval(convTick, CONV_POLL_MS);
+    convTick();
+}
+function stopConvPolling() {
+    convPollTarget = null;
+    if (convPollTimer) { clearInterval(convPollTimer); convPollTimer = null; }
+}
+async function convTick() {
+    const box = document.getElementById('conversation-messages');
+    if (!box) { stopConvPolling(); return; }                       // 弹窗已关闭 → 停轮询
+    if (!AppState.user || document.visibilityState !== 'visible') return;
+    const myId = currentUserId();
+    if (!myId || !convPollTarget) return;
+    try {
+        const data = await apiCall(`/api/messages/conversation/${convPollTarget}?user_id=${myId}`);
+        if (!data.success || !data.messages) return;
+        appendConvMessages(box, data.messages, myId);
+    } catch (e) { /* 静默，下次轮询再试 */ }
+}
+// 会话消息唯一键：messages.id 既有整数（早期种子行）又有 UUID 字符串，
+// 直接比较会因 "7" !== 7 而误判为「新消息」造成重复气泡 —— 统一转字符串。
+// 极端情况下 id 为空则退化为「发送者|时间|内容」组合键，仍可去重。
+function convMidOf(m) {
+    if (!m) return '';
+    if (m.id !== null && m.id !== undefined) return 'i' + m.id;
+    return 'c' + (m.sender_id || '') + '|' + (m.created_at || '') + '|' + (m.content || '');
+}
+function appendConvMessages(box, messages, myId) {
+    const existing = new Set();
+    box.querySelectorAll('.msg-bubble').forEach(b => { if (b.dataset.mid) existing.add(String(b.dataset.mid)); });
+    let emptyEl = box.querySelector('.msg-empty');
+    const nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;  // 仅当用户停在底部时才自动滚到底
+    let appended = false;
+    messages.forEach(m => {
+        const mid = convMidOf(m);
+        if (mid && existing.has(mid)) return;                     // 去重：跳过已渲染的（含本地刚发出的）
+        if (emptyEl) { emptyEl.remove(); emptyEl = null; }
+        const bubble = document.createElement('div');
+        bubble.className = 'msg-bubble ' + (m.sender_id === myId ? 'mine' : 'theirs');
+        if (mid) bubble.dataset.mid = mid;
+        bubble.innerHTML = `<div class="msg-bubble-content">${escapeHtml(m.content || '')}</div>`
+            + `<div class="msg-bubble-time">${m.created_at ? escapeHtml(m.created_at.slice(11, 16)) : ''}</div>`;
+        box.appendChild(bubble);
+        appended = true;
+    });
+    if (appended && nearBottom) box.scrollTop = box.scrollHeight;
+}
+
 async function loadNotifications() {
     const container = document.getElementById('msg-notifications-list');
     if (!container) return;
@@ -9288,7 +9374,8 @@ async function loadNotifications() {
     // 2. 企业端就业对接（投递状态，可回复企业）
     try {
         const r = await apiCall(`/api/employment/my-jobs/${uid}`);
-        const statusMap = { pending: '待处理', approved: '已通过', rejected: '未通过' };
+        // interview 是后端白名单里的第四种状态，缺了就会把英文原文显示给学员（2026-10-09）
+        const statusMap = { pending: '待处理', interview: '已通知面试', approved: '已通过', rejected: '未通过' };
         (r.applications || []).forEach(a => items.push({
             type: 'job', tag: '企业通知',
             replyId: a.enterprise_id || '', replyName: a.company || '企业',
@@ -9420,28 +9507,38 @@ async function openConversation(userId, userName) {
         else convFailed = true;
     } catch(e) { convFailed = true; console.warn('[消息中心] 会话历史加载失败', e); }
 
-    showDetailModal(`<i class="fas fa-envelope"></i> 与 ${userName} 的对话`, `
+    showDetailModal(`与 ${userName} 的对话`, `
         <div class="conversation-modal">
             <div class="conversation-messages" id="conversation-messages">
-                ${convFailed ? '<div class="msg-empty">历史消息加载失败</div>' : (messages.length ? messages.map(m => `
-                    <div class="msg-bubble ${m.sender_id === myId ? 'mine' : 'theirs'}">
-                        <div class="msg-bubble-content">${m.content}</div>
-                        <div class="msg-bubble-time">${m.created_at ? m.created_at.slice(11, 16) : ''}</div>
+                ${convFailed
+                    ? '<div class="msg-empty"><i class="fas fa-triangle-exclamation"></i><p>历史消息加载失败</p></div>'
+                    : (messages.length
+                        ? messages.map(m => `
+                    <div class="msg-bubble ${m.sender_id === myId ? 'mine' : 'theirs'}" data-mid="${convMidOf(m)}">
+                        <div class="msg-bubble-content">${escapeHtml(m.content || '')}</div>
+                        <div class="msg-bubble-time">${m.created_at ? escapeHtml(m.created_at.slice(11, 16)) : ''}</div>
                     </div>
-                `).join('') : '<div class="msg-empty">暂无消息，发送第一条吧</div>')}
+                `).join('')
+                        : '<div class="msg-empty"><i class="fas fa-comments"></i><p>暂无消息，发送第一条吧</p></div>')}
             </div>
             <div class="conversation-input">
-                <input type="text" id="conversation-msg-input" placeholder="输入消息..." maxlength="500">
-                <button class="btn btn-primary btn-sm" id="conversation-send-btn">
-                    <i class="fas fa-paper-plane"></i>
+                <input type="text" id="conversation-msg-input" placeholder="输入消息..." maxlength="500" autocomplete="off" name="conversation-message">
+                <button class="btn btn-primary conversation-send" id="conversation-send-btn" aria-label="发送消息">
+                    <i class="fas fa-paper-plane" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
-    `);
+    `, 'fa-envelope');
+
+    // 会话弹窗专用布局（固定高度 / 内部滚动，避免与 .detail-modal 的双滚动条打架）
+    document.querySelector('.detail-modal .modal-content')?.classList.add('conv-modal');
 
     // 滚动到底部
     const msgContainer = document.getElementById('conversation-messages');
     if (msgContainer) msgContainer.scrollTop = msgContainer.scrollHeight;
+
+    // 会话内实时刷新：对方发来的新消息自动出现，无需刷新页面
+    startConvPolling(userId);
 
     // 发送按钮
     const sendBtn = document.getElementById('conversation-send-btn');
@@ -9451,13 +9548,14 @@ async function openConversation(userId, userName) {
         const content = input?.value.trim();
         if (!content) return;
         try {
-            await apiCall('/api/messages/send', 'POST', {
+            const res = await apiCall('/api/messages/send', 'POST', {
                 sender_id: myId, receiver_id: userId, content
             });
-            // 添加气泡
+            // 添加气泡（打 data-mid，轮询时据此去重，避免重复）
             const bubble = document.createElement('div');
             bubble.className = 'msg-bubble mine';
-            bubble.innerHTML = `<div class="msg-bubble-content">${content}</div><div class="msg-bubble-time">${new Date().toTimeString().slice(0,5)}</div>`;
+            if (res && res.id !== null && res.id !== undefined) bubble.dataset.mid = 'i' + res.id;
+            bubble.innerHTML = `<div class="msg-bubble-content">${escapeHtml(content)}</div><div class="msg-bubble-time">${escapeHtml(new Date().toTimeString().slice(0,5))}</div>`;
             // 移除空状态提示
             const empty = msgContainer.querySelector('.msg-empty');
             if (empty) empty.remove();
@@ -9514,14 +9612,14 @@ async function showComposeModal() {
     //   不再去调教师接口（那会拿到 403，页面显示成「收件人加载失败」）。
     const role = (AppState.user && AppState.user.role) || '';
     if (role !== 'teacher') {
-        showDetailModal('<i class="fas fa-pen"></i> 写消息', `
+        showDetailModal('写消息', `
             <div class="teacher-form">
                 <div class="teacher-form-hint" style="font-size:0.88rem">
                     平台暂不支持该角色主动发起新对话。对方（老师 / 企业）发来消息后，
                     可在消息中心对应条目上点「回复」继续沟通。
                 </div>
             </div>
-        `);
+        `, 'fa-pen');
         return;
     }
 
@@ -9536,7 +9634,7 @@ async function showComposeModal() {
     const reachable = students.filter(s => s.user_id);
     const unlinked = students.length - reachable.length;
 
-    showDetailModal('<i class="fas fa-pen"></i> 写消息', `
+    showDetailModal('写消息', `
         <div class="teacher-form">
             <div class="form-group">
                 <label>收件人</label>
@@ -9557,7 +9655,7 @@ async function showComposeModal() {
                 <i class="fas fa-paper-plane"></i> 发送
             </button>
         </div>
-    `);
+    `, 'fa-pen');
 
     document.getElementById('compose-send-btn')?.addEventListener('click', async () => {
         const receiverId = document.getElementById('compose-receiver')?.value;
@@ -9580,7 +9678,7 @@ async function showComposeModal() {
     });
 }
 
-function showDetailModal(title, html) {
+function showDetailModal(title, html, icon) {
     // 移除已有的
     document.querySelector('.modal-overlay.detail-modal')?.remove();
 
@@ -9590,10 +9688,14 @@ function showDetailModal(title, html) {
     modal.setAttribute('role', 'dialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-labelledby', 'detail-modal-title');
+    // ⚠️ title 一律 escapeHtml（可能含用户可控文本，如学员姓名 / 政策标题）；
+    //    图标必须走独立的 icon 参数（FontAwesome 类名，如 'fa-envelope'）——
+    //    写进 title 里会被转义成字面 `<i ...>` 文本（历史 bug，已在调用处一并修正）。
+    const iconHtml = icon ? `<i class="fas ${icon} modal-title-icon" aria-hidden="true"></i>` : '';
     modal.innerHTML = `
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="detail-modal-title">${escapeHtml(title)}</h3>
+                <h3 id="detail-modal-title">${iconHtml}${escapeHtml(title)}</h3>
                 <button class="modal-close detail-close" aria-label="关闭"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">${html}</div>
@@ -10105,6 +10207,27 @@ const ROLE_DEFAULT = {
     government: 'government', enterprise: 'enterprise'
 };
 
+// 这三个角色的工作台是独立门户页，主站没有对应面板（ROLE_DEFAULT 指向的
+// admin/government/enterprise tab 在 index.html 里并不存在）→ 登录主站会整页空白。
+// 2026-10-09：改为在主站给一张引导卡，把他们送到各自的门户页。
+const ROLE_PORTAL = {
+    super_admin: {
+        title: '系统管理后台',
+        desc: '账号管理、内容审核、系统公告与内容监管都在管理后台进行，主站不提供管理面板。',
+        btn: '进入管理后台', page: 'admin.html'
+    },
+    government: {
+        title: '政府工作端',
+        desc: '政策发布与本地案例管理在政府工作端进行，主站不提供政府面板。',
+        btn: '进入政府工作端', page: 'government.html'
+    },
+    enterprise: {
+        title: '企业服务端',
+        desc: '岗位发布、招聘管理与投递处理在企业服务端进行，主站不提供企业面板。',
+        btn: '进入企业服务端', page: 'enterprise.html'
+    }
+};
+
 function getAllowedTabs(role) {
     return ROLE_NAV[role] || ROLE_NAV['student'];
 }
@@ -10115,7 +10238,34 @@ function isTabAllowed(tabName, role) {
 
 // ==================== 角色UI切换 ====================
 
+// 该角色在主站是否有真实面板：看 ROLE_DEFAULT 指向的 #xxx-tab 元素存不存在。
+// 用「元素是否存在」判断而不是硬编码角色名，以后新增角色会自动适配。
+function hasMainSitePanel(role) {
+    const tab = ROLE_DEFAULT[role];
+    return !!(tab && document.getElementById(tab + '-tab'));
+}
+
+// 无主站面板的角色 → 显示引导卡，把他送到对应门户页（不再是一片空白）。
+function applyRolePortalCard(role) {
+    const card = document.getElementById('role-portal-card');
+    if (!card) return;
+    const entry = ROLE_PORTAL[role];
+    if (!entry || hasMainSitePanel(role)) {
+        card.classList.add('is-hidden');
+        return;
+    }
+    document.getElementById('role-portal-title').textContent = entry.title;
+    document.getElementById('role-portal-desc').textContent = entry.desc;
+    const link = document.getElementById('role-portal-link');
+    link.textContent = entry.btn;
+    link.setAttribute('href', entry.page);
+    card.classList.remove('is-hidden');
+}
+
 function applyRoleVisibility(role) {
+    // 0) 工作台引导卡：无主站面板的角色显示，其余隐藏
+    applyRolePortalCard(role);
+
     // 1) 导航栏：只显示该角色允许的 tab，隐藏其余
     document.querySelectorAll('#nav-menu .nav-item').forEach(btn => {
         const tab = btn.getAttribute('data-tab');
@@ -10156,6 +10306,8 @@ function onLoginSuccess() {
     // 之后再无人调用 → 刷新页面后红点永远停在初始的「0/隐藏」。
     // 这里在会话就绪后补一次（登录的 handleLogin 路径同样经过 onLoginSuccess）。
     updateBadgeCount();
+    // 并开启未读红点轮询（对方新消息 → 本端红点也能自动出现，见 updateBadgeCount 上方注释）
+    startBadgePolling();
 
     // 元素级角色可见性（散落在页面内的角色专属区块）
     document.querySelectorAll('.teacher-only').forEach(el => el.classList.toggle('is-hidden', role !== 'teacher'));
@@ -10168,8 +10320,7 @@ function onLoginSuccess() {
     switchTab(defaultTab);
 
     // 触发首次数据加载
-    if (role === 'super_admin') loadAdminUsers();
-    else if (role === 'government') loadGovDashboard();
+    if (role === 'government') loadGovDashboard();
     else if (role === 'enterprise') loadEnterpriseJobs();
     else if (role === 'teacher') loadTeacherDashboard();
 }
@@ -10193,11 +10344,17 @@ function resetToPublicView() {
     // 隐藏教师快速菜单
     var quickMenu = document.getElementById("teacher-quick-menu");
     if (quickMenu) quickMenu.classList.add("is-hidden");
+    // 退出登录：停止未读红点轮询 / 会话内实时刷新
+    stopBadgePolling();
+    stopConvPolling();
     // 更新UI到未登录状态
     var loginSection = document.getElementById("login-section");
     var userInfo = document.getElementById("user-info");
     if (loginSection) loginSection.classList.remove("is-hidden");
     if (userInfo) userInfo.classList.add("is-hidden");
+    // 隐藏工作台引导卡 —— 未登录态不该留着「进入管理后台」这类入口
+    var rolePortalCard = document.getElementById("role-portal-card");
+    if (rolePortalCard) rolePortalCard.classList.add("is-hidden");
     // 回到农业技能首页
     switchTab("agriculture");
 }
@@ -10207,198 +10364,6 @@ function saveSession() {
         sessionId: AppState.sessionId,
         user: AppState.user
     }));
-}
-
-// ==================== 超级管理员功能 ====================
-
-function loadAdminUsers() {
-    apiCall('/api/admin/users', 'GET').then(resp => {
-        const list = document.getElementById('admin-users-list');
-        if (!list) return;
-        if (!resp.users || resp.users.length === 0) {
-            list.innerHTML = '<p>暂无用户数据</p>';
-            return;
-        }
-        list.innerHTML = `<table class="data-table"><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>地区</th><th>注册时间</th><th>操作</th></tr></thead><tbody>
-            ${resp.users.map(u => `<tr>
-                <td>${u.username}</td><td>${u.name}</td><td>${u.role}</td>
-                <td><span class="status-badge status-${u.status}">${u.status}</span></td>
-                <td>${u.region || '-'}</td><td>${(u.created_at || '').slice(0,10)}</td>
-                <td class="table-actions">
-                    <button class="btn btn-xs" onclick="adminUpdateUser('${u.username}','${u.role}','${u.status}')">编辑</button>
-                    ${u.status !== 'suspended' ? `<button class="btn btn-xs btn-danger" onclick="adminSuspendUser('${u.username}')">停用</button>` : `<button class="btn btn-xs" onclick="adminUnsuspendUser('${u.username}')">启用</button>`}
-                    <button class="btn btn-xs btn-danger" onclick="adminDeleteUser('${u.username}')">删除</button>
-                </td></tr>`).join('')}
-            </tbody></table>`;
-    });
-}
-
-function adminUpdateUser(userId, currentRole, currentStatus) {
-    const newRole = prompt('新角色 (student/teacher/enterprise/government/super_admin)：', currentRole);
-    if (!newRole) return;
-    const newStatus = prompt('新状态 (active/suspended)：', currentStatus);
-    if (!newStatus) return;
-    apiCall(`/api/admin/users/${userId}`, 'PUT', { role: newRole, status: newStatus }).then(resp => {
-        showNotification(resp.message, resp.success ? 'success' : 'error');
-        if (resp.success) loadAdminUsers();
-    });
-}
-
-function adminSuspendUser(userId) {
-    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'suspended' }).then(resp => {
-        showNotification(resp.message, resp.success ? 'success' : 'error');
-        if (resp.success) loadAdminUsers();
-    });
-}
-
-function adminUnsuspendUser(userId) {
-    apiCall(`/api/admin/users/${userId}`, 'PUT', { status: 'active' }).then(resp => {
-        showNotification(resp.message, resp.success ? 'success' : 'error');
-        if (resp.success) loadAdminUsers();
-    });
-}
-
-function adminDeleteUser(userId) {
-    if (!confirm(`确定删除用户 ${userId} 吗？此操作不可撤销。`)) return;
-    apiCall(`/api/admin/users/${userId}`, 'DELETE').then(resp => {
-        showNotification(resp.message, resp.success ? 'success' : 'error');
-        if (resp.success) loadAdminUsers();
-    });
-}
-
-function loadAdminReviews() {
-    const type = document.getElementById('admin-review-filter')?.value || '';
-    apiCall(`/api/admin/reviews?content_type=${type}`, 'GET').then(resp => {
-        const list = document.getElementById('admin-reviews-list');
-        if (!list) return;
-        if (!resp.reviews || resp.reviews.length === 0) {
-            list.innerHTML = '<p>暂无待审核内容</p>';
-            return;
-        }
-        list.innerHTML = resp.reviews.map(r => `
-            <div class="review-card">
-                <div class="review-header">
-                    <span class="review-type">${r.content_type}</span>
-                    <span class="review-status">${r.status}</span>
-                    <span>${r.created_at?.slice(0,16) || ''}</span>
-                </div>
-                <div class="review-body">
-                    ${r.detail ? `<pre>${JSON.stringify(r.detail, null, 2).slice(0,300)}</pre>` : '无详情'}
-                </div>
-                <div class="review-actions">
-                    <button class="btn btn-sm btn-success" onclick="adminApproveReview(${r.id})">通过</button>
-                    <button class="btn btn-sm btn-danger" onclick="adminRejectReview(${r.id})">驳回</button>
-                </div>
-            </div>`).join('');
-    });
-}
-
-function adminApproveReview(id) {
-    apiCall(`/api/admin/reviews/${id}/approve`, 'POST').then(resp => {
-        showNotification(resp.message, resp.success ? 'success' : 'error');
-        if (resp.success) loadAdminReviews();
-    });
-}
-
-function adminRejectReview(id) {
-    const comment = prompt('驳回理由（可选）：', '');
-    apiCall(`/api/admin/reviews/${id}/reject`, 'POST', { comment: comment || '' }).then(resp => {
-        showNotification(resp.message, resp.success ? 'success' : 'error');
-        if (resp.success) loadAdminReviews();
-    });
-}
-
-function loadAdminCarousels() {
-    apiCall('/api/admin/carousels', 'GET').then(resp => {
-        const list = document.getElementById('admin-carousels-list');
-        if (!list) return;
-        if (!resp.carousels || resp.carousels.length === 0) {
-            list.innerHTML = '<p>暂无轮播图</p>';
-            return;
-        }
-        list.innerHTML = `<table class="data-table"><thead><tr><th>标题</th><th>图片</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
-            ${resp.carousels.map(c => `<tr>
-                <td>${c.title}</td><td><img src="${c.image_url}" style="max-width:120px;max-height:60px"></td>
-                <td>${c.sort_order}</td><td>${c.is_active ? '启用' : '禁用'}</td>
-                <td class="table-actions">
-                    <button class="btn btn-xs" onclick="adminToggleCarousel(${c.id},${c.is_active})">${c.is_active ? '禁用' : '启用'}</button>
-                    <button class="btn btn-xs btn-danger" onclick="adminDeleteCarousel(${c.id})">删除</button>
-                </td></tr>`).join('')}
-            </tbody></table>`;
-    });
-}
-
-function adminToggleCarousel(id, active) {
-    apiCall(`/api/admin/carousels/${id}`, 'PUT', { is_active: active ? 0 : 1 }).then(resp => {
-        if (resp.success) loadAdminCarousels();
-    });
-}
-
-function adminDeleteCarousel(id) {
-    if (!confirm('确定删除此轮播图？')) return;
-    apiCall(`/api/admin/carousels/${id}`, 'DELETE').then(resp => {
-        if (resp.success) loadAdminCarousels();
-    });
-}
-
-function setupAdminCarouselAdd() {
-    const btn = document.getElementById('admin-add-carousel-btn');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-        const title = prompt('轮播图标题：');
-        if (!title) return;
-        const image_url = prompt('图片URL：');
-        if (!image_url) return;
-        const link_url = prompt('链接URL（可选）：', '');
-        const sort_order = parseInt(prompt('排序（数字）：', '0')) || 0;
-        apiCall('/api/admin/carousels', 'POST', { title, image_url, link_url, sort_order }).then(resp => {
-            showNotification(resp.message, resp.success ? 'success' : 'error');
-            if (resp.success) loadAdminCarousels();
-        });
-    });
-}
-
-function loadAdminAnnouncements() {
-    apiCall('/api/admin/system-announcements', 'GET').then(resp => {
-        const list = document.getElementById('admin-announcements-list');
-        if (!list) return;
-        if (!resp.announcements || resp.announcements.length === 0) {
-            list.innerHTML = '<p>暂无公告</p>';
-            return;
-        }
-        list.innerHTML = resp.announcements.map(a => `
-            <div class="announcement-card">
-                <h4>${a.title} ${a.is_pinned ? '📌' : ''}</h4>
-                <p>${a.content.slice(0,200)}</p>
-                <small>${a.created_at?.slice(0,16) || ''}</small>
-                <button class="btn btn-xs btn-danger" onclick="adminDeleteAnnouncement(${a.id})">删除</button>
-            </div>`).join('');
-    });
-}
-
-function adminDeleteAnnouncement(id) {
-    if (!confirm('确定删除此公告？')) return;
-    apiCall(`/api/admin/system-announcements/${id}`, 'DELETE').then(resp => {
-        if (resp.success) loadAdminAnnouncements();
-    });
-}
-
-function setupAdminAnnouncementPublish() {
-    const btn = document.getElementById('admin-publish-ann');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-        const title = document.getElementById('admin-ann-title').value.trim();
-        const content = document.getElementById('admin-ann-content').value.trim();
-        if (!title || !content) { showNotification('标题和内容不能为空', 'error'); return; }
-        apiCall('/api/admin/system-announcements', 'POST', { title, content }).then(resp => {
-            showNotification(resp.message, resp.success ? 'success' : 'error');
-            if (resp.success) {
-                document.getElementById('admin-ann-title').value = '';
-                document.getElementById('admin-ann-content').value = '';
-                loadAdminAnnouncements();
-            }
-        });
-    });
 }
 
 // ==================== 政府人员功能 ====================
@@ -10647,11 +10612,7 @@ function setupAdminSubTabs() {
             const targetPanel = document.getElementById(`${subtab}-panel`);
             if (targetPanel) targetPanel.classList.remove('is-hidden');
             // 加载数据
-            if (subtab === 'admin-users') loadAdminUsers();
-            else if (subtab === 'admin-reviews') loadAdminReviews();
-            else if (subtab === 'admin-carousels') loadAdminCarousels();
-            else if (subtab === 'admin-announcements') loadAdminAnnouncements();
-            else if (subtab === 'gov-dashboard') loadGovDashboard();
+            if (subtab === 'gov-dashboard') loadGovDashboard();
             else if (subtab === 'gov-policies') loadGovPolicies();
             else if (subtab === 'ent-jobs') loadEnterpriseJobs();
             else if (subtab === 'ent-applications') loadEnterpriseApplications();
@@ -10666,8 +10627,6 @@ function setupNewFeatures() {
     setupAuthTabs();
     setupRegister();
     setupAdminSubTabs();
-    setupAdminCarouselAdd();
-    setupAdminAnnouncementPublish();
     setupGovPolicyPublish();
     setupEntAddJob();
     setupNewDiscussion();
@@ -10677,15 +10636,3 @@ function setupNewFeatures() {
 document.addEventListener('DOMContentLoaded', function() {
     try { setupNewFeatures(); } catch(e) { console.error('setupNewFeatures error:', e); }
 });
-
-// 管理员搜索功能
-(function() {
-    document.addEventListener('input', function(e) {
-        if (e.target.id === 'admin-user-search' || e.target.id === 'admin-role-filter') {
-            loadAdminUsers();
-        } else if (e.target.id === 'admin-review-filter') {
-            loadAdminReviews();
-        }
-    });
-})();
-

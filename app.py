@@ -5429,23 +5429,50 @@ def get_my_announcements():
 
 # ==================== 消息系统API ====================
 
+def _messages_self_guard(user_id):
+    """消息接口的身份护栏：只能以本人身份读自己的私信。
+
+    返回 (user, None) 放行，或 (None, (response, status)) 拒绝。
+    ⚠️ /api/messages/* 此前**完全不鉴权**：inbox / conversation / unread 按 query 里的
+    `user_id` 直查，任何人都能读别人的私信；send 的 `sender_id` 直接取自请求体，
+    不带会话也能冒名发送（2026-10-09 实测伪造 admin_demo 发送成功）。
+    """
+    user = _get_session_user()
+    if not user:
+        return None, (jsonify({"success": False, "message": "请先登录"}), 401)
+    if not user_id or user_id != user['username']:
+        return None, (jsonify({"success": False, "message": "权限不足"}), 403)
+    return user, None
+
+
 @app.route('/api/messages/send', methods=['POST'])
 def send_message():
-    data = request.get_json()
-    sender_id = data.get('sender_id', '')
-    receiver_id = data.get('receiver_id', '')
-    content = data.get('content', '').strip()
-    if not sender_id or not receiver_id or not content:
-        return jsonify({"success": False, "message": "参数不完整"})
-    database.send_message(sender_id, receiver_id, content)
-    return jsonify({"success": True, "message": "发送成功"})
+    user = _get_session_user()
+    if not user:
+        return jsonify({"success": False, "message": "请先登录"}), 401
+    data = request.get_json(silent=True) or {}
+    # ⚠️ sender_id 一律取会话用户，**不再信任请求体** —— 否则谁都能冒名发消息。
+    sender_id = user['username']
+    receiver_id = (data.get('receiver_id') or '').strip()
+    content = (data.get('content') or '').strip()
+    if not receiver_id or not content:
+        return jsonify({"success": False, "message": "参数不完整"}), 400
+    if receiver_id == sender_id:
+        return jsonify({"success": False, "message": "不能给自己发消息"}), 400
+    if not database.get_user_by_id(receiver_id):
+        return jsonify({"success": False, "message": "收件人不存在"}), 404
+    mid = database.send_message(sender_id, receiver_id, content)
+    return jsonify({"success": True, "message": "发送成功", "id": mid})
 
 
 @app.route('/api/messages/inbox', methods=['GET'])
 def get_inbox():
     user_id = request.args.get('user_id', '')
     if not user_id:
-        return jsonify({"success": False, "message": "缺少用户ID"})
+        return jsonify({"success": False, "message": "缺少用户ID"}), 400
+    _, err = _messages_self_guard(user_id)
+    if err:
+        return err
     inbox = database.get_inbox(user_id)
     return jsonify({"success": True, "inbox": inbox})
 
@@ -5454,7 +5481,10 @@ def get_inbox():
 def get_conversation(other_id):
     user_id = request.args.get('user_id', '')
     if not user_id:
-        return jsonify({"success": False, "message": "缺少用户ID"})
+        return jsonify({"success": False, "message": "缺少用户ID"}), 400
+    _, err = _messages_self_guard(user_id)
+    if err:
+        return err
     messages = database.get_messages(user_id, other_id)
     # 标记对方发来的消息为已读
     database.mark_messages_read(other_id, user_id)
@@ -5463,9 +5493,15 @@ def get_conversation(other_id):
 
 @app.route('/api/messages/read', methods=['POST'])
 def mark_messages_read():
-    data = request.get_json()
-    sender_id = data.get('sender_id', '')
-    receiver_id = data.get('receiver_id', '')
+    data = request.get_json(silent=True) or {}
+    receiver_id = (data.get('receiver_id') or '').strip()
+    sender_id = (data.get('sender_id') or '').strip()
+    if not receiver_id or not sender_id:
+        return jsonify({"success": False, "message": "参数不完整"}), 400
+    # 标为已读的是「别人发给我的」→ receiver 必须是本人
+    _, err = _messages_self_guard(receiver_id)
+    if err:
+        return err
     database.mark_messages_read(sender_id, receiver_id)
     return jsonify({"success": True})
 
@@ -5473,6 +5509,11 @@ def mark_messages_read():
 @app.route('/api/messages/unread', methods=['GET'])
 def get_unread_count():
     user_id = request.args.get('user_id', '')
+    if not user_id:
+        return jsonify({"success": False, "message": "缺少用户ID"}), 400
+    _, err = _messages_self_guard(user_id)
+    if err:
+        return err
     count = database.get_unread_count(user_id)
     return jsonify({"success": True, "count": count})
 
@@ -5834,6 +5875,29 @@ def register():
 
 # ==================== 超级管理员 API ====================
 
+@app.route('/api/admin/dashboard', methods=['GET'])
+def admin_dashboard():
+    """超级管理员仪表盘统计。
+
+    ⚠️ 前端此前调的是 `/api/government/dashboard`（只允许 government）→ super_admin
+       恒 403，统计区长期空白。这里给 admin 自己的口径。
+    ⚠️ 只输出真实可算的项：在线人数 / 日活 / 增长趋势 / 平均审核时长一律不下发 ——
+       没有在线状态表、没有埋点、没有访问日志，凑出来的数字就是编造。
+       成功案例正文不落库，条数从 cases_data 取（与审核详情同一来源）。
+    """
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    ov = database.get_admin_overview()
+    try:
+        import cases_data
+        ov['content']['cases'] = len(cases_data.get_cases())
+    except Exception:
+        # 案例模块取不到就置 None，前端该卡不渲染，绝不补 0
+        ov['content']['cases'] = None
+    return jsonify({"success": True, "overview": ov})
+
+
 @app.route('/api/admin/users', methods=['GET'])
 def admin_get_users():
     user = _get_session_user()
@@ -5842,6 +5906,32 @@ def admin_get_users():
     search = request.args.get('search', '')
     role_filter = request.args.get('role', '')
     users = database.get_all_users(search=search or None, role=role_filter or None)
+
+    # 逐条算出「能不能删」。
+    # ⚠️ 规则只放后端 —— 前端照 can_delete 渲染，不再自己判断，
+    #    否则「界面藏了按钮、接口照样能删」等于没拦。
+    me = user['username']
+    super_admin_count = database.count_super_admins()
+    for u in users:
+        # password_hash 绝不下发给前端（它是 SELECT * 带出来的）
+        u.pop('password_hash', None)
+        rel = database.count_user_relations(u['username'])
+        u['relation_count'] = rel['total']
+        u['relations'] = rel['items']
+        if u['username'] == me:
+            u['can_delete'] = False
+            u['block_reason'] = '当前登录账号，不能删除自己'
+        elif u.get('role') == 'super_admin' and super_admin_count <= 1:
+            u['can_delete'] = False
+            u['block_reason'] = '系统必须保留至少一个超级管理员'
+        elif rel['total'] > 0:
+            u['can_delete'] = False
+            u['block_reason'] = '有 %d 条关联业务数据，请改用「停用」' % rel['total']
+        else:
+            u['can_delete'] = True
+            u['block_reason'] = ''
+        # 自己也不能停用（停了就把自己锁在门外）
+        u['can_suspend'] = (u['username'] != me)
     return jsonify({"success": True, "users": users})
 
 
@@ -5850,19 +5940,92 @@ def admin_update_user(user_id):
     user = _get_session_user()
     if not user or user['role'] != 'super_admin':
         return jsonify({"success": False, "message": "权限不足"}), 403
-    data = request.get_json()
-    database.update_user_by_admin(user_id,
-        name=data.get('name'), role=data.get('role'), status=data.get('status'),
+    data = request.get_json(silent=True) or {}
+    target = database.get_user_by_id(user_id)
+    if not target:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+
+    # 末位 super_admin 不能被降级。
+    # ⚠️ 这条守卫放在 PUT 而不是 DELETE 才有意义：DELETE 要求操作者本人就是
+    #    super_admin，于是 count_super_admins() 恒 >= 1，「最后一个超管」只可能是
+    #    操作者自己，而自删已被前面拦掉 —— DELETE 里那条守卫实际不可触发。
+    #    真正能把全站最后一个超管搞没的路径是**改角色**：把 admin_demo 的 role
+    #    从 super_admin 改成别的，此后没有任何账号能进管理端，且无法自恢复。
+    new_role = data.get('role')
+    if (new_role is not None and new_role != 'super_admin'
+            and target.get('role') == 'super_admin'
+            and database.count_super_admins() <= 1):
+        return jsonify({
+            "success": False,
+            "message": "系统必须保留至少一个超级管理员，不能把最后一个超级管理员改成其他角色"}), 400
+
+    ok = database.update_user_by_admin(user_id,
+        name=data.get('name'), role=new_role, status=data.get('status'),
         phone=data.get('phone'), email=data.get('email'))
+    if not ok:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
     return jsonify({"success": True, "message": "更新成功"})
+
+
+@app.route('/api/admin/users/<user_id>/status', methods=['POST'])
+def admin_set_user_status(user_id):
+    """启用 / 停用账号 —— **删除的替代方案**（2026-10-08）。
+
+    删用户会留下跨表孤儿（students.user_id 是名册收件人与证书归属的唯一依据），
+    所以凡是有业务数据的账号一律走「停用」：登录接口本来就认 status='suspended'，
+    停用后本人进不来，但所有历史数据完整保留，随时可以恢复。
+    """
+    user = _get_session_user()
+    if not user or user['role'] != 'super_admin':
+        return jsonify({"success": False, "message": "权限不足"}), 403
+    if user_id == user['username']:
+        return jsonify({"success": False, "message": "不能停用当前登录的账号"}), 400
+    data = request.get_json(silent=True) or {}
+    status = data.get('status', '')
+    if status not in ('active', 'suspended'):
+        return jsonify({"success": False, "message": "状态只能是 active 或 suspended"}), 400
+    n = database.set_user_status(user_id, status)
+    if n <= 0:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+    return jsonify({"success": True,
+                    "message": "已停用，该账号无法登录" if status == 'suspended' else "已启用"})
 
 
 @app.route('/api/admin/users/<user_id>', methods=['DELETE'])
 def admin_delete_user(user_id):
+    """删除用户。四道关依次拦：自删 / 末位超管 / 关联数据 / 不存在。
+
+    ⚠️ 2026-10-08 之前本路由无条件返回 200「删除成功」——删一个不存在的人
+       也照样报成功，且能把自己删掉（删完全站再无 super_admin，会话立即失效、
+       不可自恢复）。现在逐条校验，并把 `delete_user_by_admin()` 的返回值
+       （真实影响行数）作为最终判据。
+    """
     user = _get_session_user()
     if not user or user['role'] != 'super_admin':
         return jsonify({"success": False, "message": "权限不足"}), 403
-    database.delete_user_by_admin(user_id)
+
+    if user_id == user['username']:
+        return jsonify({"success": False, "message": "不能删除当前登录的账号"}), 400
+
+    target = database.get_user_by_id(user_id)
+    if not target:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
+
+    if target.get('role') == 'super_admin' and database.count_super_admins() <= 1:
+        return jsonify({"success": False, "message": "系统必须保留至少一个超级管理员"}), 400
+
+    rel = database.count_user_relations(user_id)
+    if rel['total'] > 0:
+        return jsonify({
+            "success": False,
+            "message": "该账号有 %d 条关联业务数据，不能删除。请改用「停用」。" % rel['total'],
+            "relations": rel['items'],
+            "relation_total": rel['total'],
+        }), 409
+
+    n = database.delete_user_by_admin(user_id)
+    if n <= 0:
+        return jsonify({"success": False, "message": "用户不存在"}), 404
     return jsonify({"success": True, "message": "删除成功"})
 
 
@@ -5874,34 +6037,47 @@ def admin_get_reviews():
     if not user or user['role'] != 'super_admin':
         return jsonify({"success": False, "message": "权限不足"}), 403
     content_type = request.args.get('content_type', '')
-    reviews = database.get_pending_reviews(content_type=content_type or None)
+    ct = content_type or None
+    # status 支持 pending / approved / rejected / all；默认仍是 pending ——
+    # 仪表盘「待审核 N 项」依赖这个默认值，不能改。
+    status = request.args.get('status', '') or 'pending'
+    if status not in ('pending', 'approved', 'rejected', 'all'):
+        status = 'pending'
+    reviews = database.get_reviews_by_status(None if status == 'all' else status, ct)
 
     # 关联审核内容详情
     enriched = []
     for r in reviews:
         rd = dict(r)
         rd['detail'] = None
-        ct, cid = r['content_type'], r['content_id']
-        if ct == 'procurement':
+        ctype, cid = r['content_type'], r['content_id']
+        if ctype == 'procurement':
             # 求购已在 2026-10-06 随「供应链求购不做」整块下线。
             # 历史遗留的待审求购不再下发给管理端 —— 否则审核列表里会出现
             # 「看不到内容、界面也没有处理入口」的孤儿卡片。
             continue
-        if ct == 'course':
+        if ctype == 'course':
             rd['detail'] = database.get_course(cid)
-        elif ct == 'job':
+        elif ctype == 'job':
             rd['detail'] = database.get_job_by_id(cid)
-        elif ct == 'model_3d':
+        elif ctype == 'model_3d':
             conn = database.get_connection()
             row = conn.execute("SELECT * FROM models_3d WHERE id=?", (cid,)).fetchone()
             conn.close()
             rd['detail'] = dict(row) if row else None
-        elif ct == 'success_case':
+        elif ctype == 'success_case':
             # 案例正文不落库（内容在 cases_data.py），详情直接取数据模块
             import cases_data
             rd['detail'] = cases_data.get_case(cid)
+        # 「自提自审」如实标注：提交者与审核人是同一个人时，这条审核记录
+        # 不含任何第三方把关，界面必须标出来，不能被当成「已审核」背书。
+        # （平台预置内容的 5 条 success_case 就是这种情况，数据本身是真实的，
+        #   只是提交与审核都记在 admin_demo 名下 —— 2026-10-08）
+        rd['is_self_reviewed'] = bool(r.get('submitter_id') and r.get('reviewed_by')
+                                      and r['submitter_id'] == r['reviewed_by'])
         enriched.append(rd)
-    return jsonify({"success": True, "reviews": enriched})
+    counts = database.count_reviews_by_status(ct)
+    return jsonify({"success": True, "reviews": enriched, "counts": counts, "status": status})
 
 
 @app.route('/api/admin/reviews/<int:review_id>/approve', methods=['POST'])
@@ -5924,47 +6100,24 @@ def admin_reject_review(review_id):
     return jsonify({"success": True, "message": "已驳回"})
 
 
-# ---- 轮播图管理 ----
+@app.route('/api/admin/reviews/<int:review_id>/revoke', methods=['POST'])
+def admin_revoke_review(review_id):
+    """撤销审核：把已通过 / 已驳回的记录退回「待审核」，可重新处理。
 
-@app.route('/api/admin/carousels', methods=['GET'])
-def admin_get_carousels():
+    2026-10-08 新增（管理端「内容审核」要能回看并纠正历史）。
+    与 approve / reject 走同一套对称回写规则，目标表的 review_status 一并退回
+    pending，不会出现「审核表已撤销、岗位却还挂着 approved」的不一致。
+    """
     user = _get_session_user()
     if not user or user['role'] != 'super_admin':
         return jsonify({"success": False, "message": "权限不足"}), 403
-    carousels = database.get_carousels(active_only=False)
-    return jsonify({"success": True, "carousels": carousels})
+    result = database.revoke_review(review_id)
+    if result == 'not_found':
+        return jsonify({"success": False, "message": "审核记录不存在"}), 404
+    if result == 'not_reviewed':
+        return jsonify({"success": False, "message": "该记录本就处于待审核状态"}), 400
+    return jsonify({"success": True, "message": "已撤销，退回待审核"})
 
-
-@app.route('/api/admin/carousels', methods=['POST'])
-def admin_add_carousel():
-    user = _get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
-    data = request.get_json()
-    car_id = database.add_carousel(
-        data.get('title', ''), data.get('image_url', ''),
-        data.get('link_url', ''), data.get('sort_order', 0))
-    return jsonify({"success": True, "id": car_id, "message": "添加成功"})
-
-
-@app.route('/api/admin/carousels/<int:car_id>', methods=['PUT'])
-def admin_update_carousel(car_id):
-    user = _get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
-    data = request.get_json()
-    database.update_carousel(car_id, **{k: v for k, v in data.items()
-        if k in ('title', 'image_url', 'link_url', 'sort_order', 'is_active')})
-    return jsonify({"success": True, "message": "更新成功"})
-
-
-@app.route('/api/admin/carousels/<int:car_id>', methods=['DELETE'])
-def admin_delete_carousel(car_id):
-    user = _get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
-    database.delete_carousel(car_id)
-    return jsonify({"success": True, "message": "删除成功"})
 
 
 # ---- 系统公告管理 ----
@@ -6357,12 +6510,24 @@ def enterprise_get_applications():
     if not user or user['role'] != 'enterprise':
         return jsonify({"success": False, "message": "权限不足"}), 403
     conn = database.get_connection()
+    # ⚠️ 原先只 JOIN users，**没有 JOIN resumes** → 企业端只能看到申请人姓名/电话/邮箱，
+    #   学员在「我的简历」里填的意向岗位、学历、年限、技能、经历**企业完全看不到**，
+    #   「简历管理」名不副实（2026-10-09）。这里 LEFT JOIN 补上，学员没填简历时
+    #   resume_* 全为 NULL，前端如实显示「未填写」，不做任何补白。
     rows = conn.execute("""
-        SELECT ja.*, jl.title as job_title, u.name as applicant_name,
-               u.phone as applicant_phone, u.email as applicant_email, u.bio as applicant_bio
+        SELECT ja.id, ja.user_id, ja.job_id, ja.status, ja.applied_at,
+               jl.title as job_title,
+               u.name as applicant_name, u.phone as applicant_phone,
+               u.email as applicant_email, u.bio as applicant_bio,
+               r.title as resume_title, r.region as resume_region,
+               r.education as resume_education, r.work_years as resume_work_years,
+               r.phone as resume_phone, r.email as resume_email,
+               r.self_eval as resume_self_eval, r.skills as resume_skills,
+               r.experience as resume_experience, r.updated_at as resume_updated_at
         FROM job_applications ja
         JOIN job_listings jl ON ja.job_id = jl.id
         JOIN users u ON ja.user_id = u.username
+        LEFT JOIN resumes r ON r.user_id = ja.user_id
         WHERE jl.enterprise_id = ?
         ORDER BY ja.applied_at DESC
     """, (user['username'],)).fetchall()
@@ -6419,13 +6584,6 @@ def enterprise_get_stats():
 
 
 # ==================== 公开 API ====================
-
-# ---- 轮播图（公开） ----
-
-@app.route('/api/carousels', methods=['GET'])
-def public_get_carousels():
-    carousels = database.get_carousels(active_only=True)
-    return jsonify({"success": True, "carousels": carousels})
 
 
 # ---- 首页统计（公开，真实库计数） ----

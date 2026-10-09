@@ -154,6 +154,19 @@
 
     <!-- 主内容区域 -->
     <main class="main-content" id="main-content" tabindex="-1">
+        <!-- 角色工作台引导卡：仅当该角色在主站没有对应面板时显示。
+             super_admin / government / enterprise 三个角色的工作台分别是
+             admin.html / government.html / enterprise.html，主站不提供对应面板；
+             2026-10-09 之前他们登录主站看到的是整页空白。 -->
+        <div class="role-portal-card is-hidden" id="role-portal-card" role="region" aria-label="工作台入口">
+            <div class="role-portal-inner">
+                <i class="fas fa-compass" aria-hidden="true"></i>
+                <h2 class="role-portal-title" id="role-portal-title">你的工作台不在这里</h2>
+                <p class="role-portal-desc" id="role-portal-desc"></p>
+                <a class="btn btn-primary" id="role-portal-link" href="admin.html">进入工作台</a>
+            </div>
+        </div>
+
         <!-- 农业技能培训 -->
         <div class="tab-content active" id="agriculture-tab" role="tabpanel" tabindex="0">
             <div class="container">

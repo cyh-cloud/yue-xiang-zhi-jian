@@ -18,6 +18,22 @@
         .job-reject-reason { margin-top: 4px; font-size: 0.75rem; color: #991b1b; line-height: 1.4; }
         /* 工作台统计卡的补充说明行 */
         .ent-sub { font-size: 0.78rem; color: var(--portal-text-muted); margin-top: 6px; line-height: 1.5; }
+        /* 站内对话气泡 */
+        .ent-msg { margin-bottom: 12px; display: flex; }
+        .ent-msg.mine { justify-content: flex-end; }
+        .ent-msg-bubble { max-width: 72%; padding: 8px 12px; border-radius: 10px; background: var(--portal-bg-subtle, #f6f6f4); }
+        .ent-msg.mine .ent-msg-bubble { background: #e7f0ff; }
+        .ent-msg-text { font-size: 0.9rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+        .ent-msg-time { font-size: 0.72rem; color: var(--portal-text-muted); margin-top: 4px; }
+        #msg-conv-list { max-height: 340px; overflow-y: auto; margin-bottom: 12px; }
+        /* 简历展开行 */
+        .ent-resume-row > td { background: var(--portal-bg-subtle, #fafaf8); }
+        .ent-resume-block { margin-bottom: 10px; }
+        .ent-resume-block h5 { font-size: 0.8rem; color: var(--portal-text-muted); margin: 0 0 4px; font-weight: 500; }
+        .ent-resume-block p { margin: 0; font-size: 0.88rem; line-height: 1.6; white-space: pre-wrap; }
+        .ent-resume-grid { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 12px; }
+        .ent-resume-grid span { font-size: 0.85rem; }
+        .ent-resume-empty { font-size: 0.88rem; color: var(--portal-text-muted); }
     </style>
 </head>
 <body>
@@ -29,6 +45,7 @@
             <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>工作台</a>
             <a href="#" data-page="jobs"><i class="fas fa-briefcase"></i>职位管理</a>
             <a href="#" data-page="applications"><i class="fas fa-file-alt"></i>简历管理</a>
+            <a href="#" data-page="messages"><i class="fas fa-comments"></i>消息</a>
         </nav>
         <div class="user-badge"><div class="avatar" id="sidebar-avatar">企</div><span id="sidebar-name">企业用户</span></div>
     </aside>
@@ -47,6 +64,25 @@
                 <div id="job-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
             </div>
             <div class="page" id="page-applications"><div id="app-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+            <div class="page" id="page-messages">
+                <div class="card">
+                    <h3>投递学员</h3>
+                    <p class="ent-sub">只列出<b>向本企业岗位投递过</b>的学员 —— 这是企业端唯一真实存在的联系人来源，不做任何补白。</p>
+                    <div id="msg-contacts"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+                </div>
+                <div class="card">
+                    <h3>会话</h3>
+                    <div id="msg-inbox"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
+                </div>
+                <div class="card" id="msg-conv-card" style="display:none">
+                    <h3 id="msg-conv-title">对话</h3>
+                    <div id="msg-conv-list"></div>
+                    <div class="form-row">
+                        <input type="text" id="msg-conv-input" name="msg_conv_input" autocomplete="off" placeholder="输入消息..." maxlength="500">
+                        <button class="btn btn-primary" id="msg-conv-send"><i class="fas fa-paper-plane"></i> 发送</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -59,9 +95,11 @@ PORTAL.init('enterprise', 'sidebar-name', function() {
     loadDashboard();
 });
 PORTAL.onPageChange(function(p) {
+    if (p !== 'messages') stopConvPolling();   // 离开消息页 → 停会话轮询
     if (p === 'dashboard') loadDashboard();
     else if (p === 'jobs') loadJobs();
     else if (p === 'applications') loadApps();
+    else if (p === 'messages') loadMessages();
 });
 
 function loadDashboard() {
@@ -119,22 +157,280 @@ function delJob(id) { if (!confirm('确定删除?')) return; apiCall('/api/enter
 /* 求购管理（供应链）已于 2026-10-06 整块下线：侧栏入口、发布表单、列表与统计卡一并移除。
    原 loadProcs / postProc / delProc 三个函数引用 #proc-list / #proc-name 等节点，故同步删除。 */
 
+/* 状态口径必须和学员端一致（后端白名单 = approved/rejected/interview + 初始 pending）。
+   ⚠️ 原先直接把英文原文 pending/interview 显示在徽标里（2026-10-09）。 */
+var APP_STATUS = { pending: '待处理', interview: '已通知面试', approved: '已通过', rejected: '已拒绝' };
+var APP_BADGE = { pending: 'badge-yellow', interview: 'badge-blue', approved: 'badge-green', rejected: 'badge-red' };
+var APPS_CACHE = {};
+
 function loadApps() {
     apiCall('/api/enterprise/applications', 'GET').then(function(r) {
         var list = document.getElementById('app-list');
-        if (!r.applications || !r.applications.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无简历投递</p></div>'; return; }
-        list.innerHTML = '<table><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>操作</th></tr></thead><tbody>' +
-            r.applications.map(function(a) {
-                var sb = a.status === 'approved' ? 'badge-green' : a.status === 'rejected' ? 'badge-red' : 'badge-yellow';
-                return '<tr><td>' + (a.applicant_name || a.user_id) + '</td><td>' + a.job_title + '</td><td>' + (a.applicant_phone || '-') + '</td>' +
-                    '<td><span class="badge ' + sb + '">' + a.status + '</span></td>' +
+        if (!r.success) {
+            list.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>'
+                + escHtml(r.message || '加载失败') + '</p></div>';
+            return;
+        }
+        var apps = r.applications || [];
+        APPS_CACHE = {};
+        apps.forEach(function(a) { APPS_CACHE[a.id] = a; });
+        if (!apps.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无简历投递</p></div>'; return; }
+        list.innerHTML = '<table><thead><tr><th>申请人</th><th>职位</th><th>电话</th><th>状态</th><th>简历</th><th>操作</th></tr></thead><tbody>' +
+            apps.map(function(a) {
+                // 简历里填的电话优先（学员可能没填 users.phone）
+                var phone = a.resume_phone || a.applicant_phone || '';
+                return '<tr><td>' + escHtml(a.applicant_name || a.user_id) + '</td><td>' + escHtml(a.job_title || '') + '</td>' +
+                    '<td>' + (phone ? escHtml(phone) : '-') + '</td>' +
+                    '<td><span class="badge ' + (APP_BADGE[a.status] || 'badge-yellow') + '">' + escHtml(APP_STATUS[a.status] || a.status) + '</span></td>' +
+                    '<td><button class="btn btn-outline btn-sm" onclick="toggleResume(' + a.id + ')">查看</button></td>' +
                     '<td><button class="btn btn-success btn-sm" onclick="updateApp(' + a.id + ',\'interview\')">面试</button> ' +
                     '<button class="btn btn-primary btn-sm" onclick="updateApp(' + a.id + ',\'approved\')">通过</button> ' +
-                    '<button class="btn btn-danger btn-sm" onclick="updateApp(' + a.id + ',\'rejected\')">拒绝</button></td></tr>';
+                    '<button class="btn btn-danger btn-sm" onclick="updateApp(' + a.id + ',\'rejected\')">拒绝</button> ' +
+                    '<button class="btn btn-outline btn-sm" onclick="contactApplicant(' + a.id + ')">联系</button></td></tr>' +
+                    '<tr id="resume-row-' + a.id + '" class="ent-resume-row" style="display:none"><td colspan="6">' + resumeDetailHtml(a) + '</td></tr>';
             }).join('') + '</tbody></table>';
+    }).catch(function() {
+        document.getElementById('app-list').innerHTML =
+            '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>';
     });
 }
-function updateApp(id, status) { apiCall('/api/enterprise/applications/' + id, 'PUT', { status: status }).then(function(r) { alert(r.message); if (r.success) loadApps(); }); }
+
+function toggleResume(id) {
+    var row = document.getElementById('resume-row-' + id);
+    if (row) row.style.display = (row.style.display === 'none') ? '' : 'none';
+}
+
+function contactApplicant(id) {
+    var a = APPS_CACHE[id];
+    if (!a) return;
+    var link = document.querySelector('.portal-sidebar nav a[data-page="messages"]');
+    if (link) link.click();
+    openConv(a.user_id, a.applicant_name || a.user_id);
+}
+
+function nl2br(s) { return escHtml(s).replace(/\n/g, '<br>'); }
+
+function parseExperience(v) {
+    // experience 存的是 JSON 数组（[{company,position,period,desc}]）。
+    // ⚠️ 解析不出结构就按纯文本原样显示，**绝不猜结构、绝不补字段**。
+    if (!v) return '';
+    var raw = String(v).trim();
+    if (!raw || raw === '[]' || raw === '{}') return '';
+    try {
+        var arr = JSON.parse(raw);
+        if (Object.prototype.toString.call(arr) === '[object Array]') {
+            return arr.map(function(e) {
+                if (typeof e === 'string') return escHtml(e);
+                return escHtml([e.company, e.position, e.period].filter(Boolean).join(' / '))
+                    + (e.desc ? '<br>' + escHtml(e.desc) : '');
+            }).join('<br>');
+        }
+    } catch (e) {}
+    return nl2br(raw);
+}
+
+function resumeDetailHtml(a) {
+    var fields = [['意向岗位', a.resume_title], ['期望地区', a.resume_region], ['学历', a.resume_education],
+                  ['工作年限', a.resume_work_years], ['联系电话', a.resume_phone], ['邮箱', a.resume_email]];
+    var has = false, grid = '';
+    fields.forEach(function(f) {
+        if (f[1] && String(f[1]).trim()) { has = true; grid += '<span>' + f[0] + '：' + escHtml(f[1]) + '</span>'; }
+    });
+    var blocks = '';
+    if (a.resume_self_eval && String(a.resume_self_eval).trim()) {
+        has = true; blocks += '<div class="ent-resume-block"><h5>自我评价</h5><p>' + nl2br(a.resume_self_eval) + '</p></div>';
+    }
+    if (a.resume_skills && String(a.resume_skills).trim()) {
+        has = true; blocks += '<div class="ent-resume-block"><h5>技能</h5><p>' + nl2br(a.resume_skills) + '</p></div>';
+    }
+    var exp = parseExperience(a.resume_experience);
+    if (exp) { has = true; blocks += '<div class="ent-resume-block"><h5>经历</h5><p>' + exp + '</p></div>'; }
+    // ⚠️ 学员没填简历就是没填 —— 如实说明，平台不代为补写，也不把「无」渲染成「有」
+    if (!has) {
+        return '<div class="ent-resume-empty"><i class="fas fa-file-circle-exclamation"></i> '
+            + '该学员尚未填写简历内容 —— 平台不会替他生成，可点「联系」直接向学员询问。</div>';
+    }
+    return '<div class="ent-resume-grid">' + grid + '</div>' + blocks
+        + (a.resume_updated_at ? '<div class="ent-resume-block"><h5>更新时间</h5><p>' + escHtml(a.resume_updated_at) + '</p></div>' : '');
+}
+
+function updateApp(id, status) {
+    apiCall('/api/enterprise/applications/' + id, 'PUT', { status: status }).then(function(r) {
+        alert(r.message || '操作完成');
+        if (r.success) loadApps();
+    }).catch(function() { alert('操作失败'); });
+}
+
+/* ==================== 站内消息（企业 ↔ 学员闭环）====================
+   联系人来源只有一个真实数据源：**向本企业岗位投递过的学员**（/api/enterprise/applications）。
+   ⚠️ 不做「全网学员列表」这类凭空造出来的收件人。 */
+var MSG_TARGET = { id: '', name: '' };
+
+// 会话消息唯一键：messages.id 既有整数（早期种子行）又有 UUID，直接比较会因类型不同误判为新消息。
+// 统一转字符串；id 为空时退化为「发送者|时间|内容」组合键。
+function convMidOf(m) {
+    if (!m) return '';
+    if (m.id !== null && m.id !== undefined) return 'i' + m.id;
+    return 'c' + (m.sender_id || '') + '|' + (m.created_at || '') + '|' + (m.content || '');
+}
+
+function myId() { return (AppState.user && (AppState.user.username || AppState.user.id)) || ''; }
+
+function attrEsc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function loadMessages() { loadContacts(); loadInbox(); }
+
+function loadContacts() {
+    var box = document.getElementById('msg-contacts');
+    box.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i></div>';
+    apiCall('/api/enterprise/applications', 'GET').then(function(r) {
+        var apps = (r.success && r.applications) || [];
+        var seen = {}, items = [];
+        apps.forEach(function(a) { if (a.user_id && !seen[a.user_id]) { seen[a.user_id] = 1; items.push(a); } });
+        if (!items.length) {
+            box.innerHTML = '<div class="empty-state"><i class="fas fa-user-slash"></i>'
+                + '<p>还没有学员投递你的岗位</p><span class="ent-sub">有学员投递后，即可在此发起对话</span></div>';
+            return;
+        }
+        box.innerHTML = '<table><thead><tr><th>学员</th><th>投递岗位</th><th>操作</th></tr></thead><tbody>' +
+            items.map(function(a) {
+                return '<tr><td>' + escHtml(a.applicant_name || a.user_id) + '</td>'
+                    + '<td>' + escHtml(a.job_title || '') + '</td>'
+                    + '<td><button class="btn btn-outline btn-sm msg-contact-btn" data-uid="' + attrEsc(a.user_id)
+                    + '" data-uname="' + attrEsc(a.applicant_name || a.user_id) + '">发起对话</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>';
+    });
+}
+
+function loadInbox() {
+    var box = document.getElementById('msg-inbox');
+    box.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i></div>';
+    apiCall('/api/messages/inbox?user_id=' + encodeURIComponent(myId()), 'GET').then(function(r) {
+        var list = (r.success && r.inbox) || [];
+        if (!list.length) {
+            box.innerHTML = '<div class="empty-state"><i class="fas fa-envelope-open"></i><p>暂无会话</p></div>';
+            return;
+        }
+        box.innerHTML = '<table><thead><tr><th>对方</th><th>最新消息</th><th>时间</th><th>操作</th></tr></thead><tbody>' +
+            list.map(function(m) {
+                return '<tr><td>' + escHtml(m.other_name || m.other_id) + '</td>'
+                    + '<td>' + escHtml(m.content || '') + '</td>'
+                    + '<td>' + escHtml(m.created_at || '') + '</td>'
+                    + '<td><button class="btn btn-outline btn-sm msg-contact-btn" data-uid="' + attrEsc(m.other_id)
+                    + '" data-uname="' + attrEsc(m.other_name || m.other_id) + '">打开</button></td></tr>';
+            }).join('') + '</tbody></table>';
+    }).catch(function() {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>';
+    });
+}
+
+function openConv(uid, uname) {
+    if (!uid) return;
+    MSG_TARGET = { id: uid, name: uname || uid };
+    document.getElementById('msg-conv-card').style.display = '';
+    document.getElementById('msg-conv-title').textContent = '与 ' + (uname || uid) + ' 的对话';
+    renderConv();
+    startConvPolling();   // 会话内实时刷新：对方发来的新消息自动出现，无需刷新页面
+}
+
+function renderConv() {
+    var box = document.getElementById('msg-conv-list');
+    box.innerHTML = '<div class="loading-spinner"><i class="fas fa-spinner spin"></i></div>';
+    apiCall('/api/messages/conversation/' + encodeURIComponent(MSG_TARGET.id)
+            + '?user_id=' + encodeURIComponent(myId()), 'GET').then(function(r) {
+        var ms = (r.success && r.messages) || [];
+        if (!ms.length) {
+            box.innerHTML = '<div class="empty-state"><i class="fas fa-comments"></i><p>还没有消息，发送第一条吧</p></div>';
+            return;
+        }
+        box.innerHTML = ms.map(function(m) {
+            var mine = m.sender_id === myId();
+            return '<div class="ent-msg ' + (mine ? 'mine' : 'theirs') + '" data-mid="' + attrEsc(convMidOf(m)) + '"><div class="ent-msg-bubble">'
+                + '<div class="ent-msg-text">' + escHtml(m.content || '') + '</div>'
+                + '<div class="ent-msg-time">' + escHtml(m.created_at || '') + '</div></div></div>';
+        }).join('');
+        box.scrollTop = box.scrollHeight;
+    }).catch(function() {
+        box.innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>';
+    });
+}
+
+function sendConv() {
+    var input = document.getElementById('msg-conv-input');
+    var content = (input.value || '').trim();
+    if (!content) return;
+    if (!MSG_TARGET.id) return;
+    apiCall('/api/messages/send', 'POST', { receiver_id: MSG_TARGET.id, content: content })
+        .then(function(r) {
+            if (!r.success) { alert(r.message || '发送失败'); return; }
+            input.value = '';
+            renderConv();
+            loadInbox();
+        }).catch(function() { alert('发送失败'); });
+}
+
+// ---- 会话内实时刷新（2026-10-09）----
+// 打开会话期间每 4 秒拉一次会话，只追加「本地还没有」的新消息；
+// 离开消息页或关闭会话卡即停轮询。
+var convPollTimer = null;
+var CONV_POLL_MS = 4000;
+function startConvPolling() {
+    if (convPollTimer) return;
+    convPollTimer = setInterval(pollConv, CONV_POLL_MS);
+    pollConv();
+}
+function stopConvPolling() {
+    if (convPollTimer) { clearInterval(convPollTimer); convPollTimer = null; }
+}
+function pollConv() {
+    if (!MSG_TARGET || !MSG_TARGET.id) return;
+    var card = document.getElementById('msg-conv-card');
+    if (!card || card.style.display === 'none') { stopConvPolling(); return; }
+    if (document.visibilityState !== 'visible') return;
+    apiCall('/api/messages/conversation/' + encodeURIComponent(MSG_TARGET.id)
+            + '?user_id=' + encodeURIComponent(myId()), 'GET').then(function(r) {
+        var ms = (r.success && r.messages) || [];
+        appendNewConv(ms);
+    }).catch(function() {});
+}
+function appendNewConv(ms) {
+    var box = document.getElementById('msg-conv-list');
+    if (!box) return;
+    var existing = {};
+    box.querySelectorAll('.ent-msg').forEach(function(el){ if (el.dataset.mid) existing[String(el.dataset.mid)] = 1; });
+    var empty = box.querySelector('.empty-state');
+    var nearBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+    var appended = 0;
+    ms.forEach(function(m) {
+        var mid = convMidOf(m);
+        if (mid && existing[mid]) return;
+        if (empty) { empty.remove(); empty = null; }
+        var mine = m.sender_id === myId();
+        var div = document.createElement('div');
+        div.className = 'ent-msg ' + (mine ? 'mine' : 'theirs');
+        if (mid) div.dataset.mid = mid;
+        div.innerHTML = '<div class="ent-msg-bubble"><div class="ent-msg-text">' + escHtml(m.content || '')
+            + '</div><div class="ent-msg-time">' + escHtml(m.created_at || '') + '</div></div>';
+        box.appendChild(div);
+        appended++;
+    });
+    if (appended && nearBottom) box.scrollTop = box.scrollHeight;
+}
+
+// 事件委托：联系人/会话列表会被反复重建，绑在 document 上只需一次
+document.addEventListener('click', function(e) {
+    var btn = e.target && e.target.closest ? e.target.closest('.msg-contact-btn') : null;
+    if (btn) openConv(btn.getAttribute('data-uid'), btn.getAttribute('data-uname'));
+});
+document.getElementById('msg-conv-send').addEventListener('click', sendConv);
+document.getElementById('msg-conv-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); sendConv(); }
+});
 </script>
 </body>
 </html>
