@@ -168,6 +168,19 @@ def init_db():
             created_at TEXT DEFAULT (datetime('now','localtime'))
         );
 
+        -- 已读状态旁路表：给**自身没有已读字段**的通知来源补按用户的已读记录。
+        -- notifications / messages 两张表自带 is_read，不需要进这里；
+        -- system_announcements 是全局公告（不能往共享表上加按用户的列），
+        -- job_applications 的表语义是「投递记录」而非「消息」，也不该塞已读列。
+        -- 没有这张表，「全部已读 / 未读筛选 / 点击归档」就只能覆盖 4 个数据源里的 2 个。
+        CREATE TABLE IF NOT EXISTS notification_reads (
+            user_id TEXT NOT NULL,
+            source  TEXT NOT NULL,
+            ref_id  TEXT NOT NULL,
+            read_at TEXT DEFAULT (datetime('now','localtime')),
+            PRIMARY KEY (user_id, source, ref_id)
+         );
+
         CREATE TABLE IF NOT EXISTS job_applications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
@@ -2117,6 +2130,118 @@ def clear_read_notifications(user_id):
     )
     conn.commit()
     conn.close()
+
+# ---- 已读旁路表（system_announcements / job_applications 两个无 is_read 的来源）----
+
+def get_read_refs(user_id, source):
+    """取某用户在某来源上已读的 ref_id 列表。"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT ref_id FROM notification_reads WHERE user_id = ? AND source = ?",
+        (user_id, source)
+    ).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+def mark_ref_read(user_id, source, ref_id):
+    conn = get_connection()
+    conn.execute(
+        "INSERT OR IGNORE INTO notification_reads (user_id, source, ref_id) VALUES (?, ?, ?)",
+        (user_id, source, str(ref_id))
+    )
+    conn.commit()
+    conn.close()
+
+def mark_refs_read(user_id, source, ref_ids):
+    """批量标记已读（「全部已读」用）。ref_ids 为空时不做任何写入。"""
+    conn = get_connection()
+    for rid in ref_ids:
+        conn.execute(
+            "INSERT OR IGNORE INTO notification_reads (user_id, source, ref_id) VALUES (?, ?, ?)",
+            (user_id, source, str(rid))
+        )
+    conn.commit()
+    conn.close()
+
+def clear_read_refs(user_id, source):
+    conn = get_connection()
+    conn.execute(
+        "DELETE FROM notification_reads WHERE user_id = ? AND source = ?",
+        (user_id, source)
+    )
+    conn.commit()
+    conn.close()
+
+def mark_all_messages_read(user_id):
+    """把「别人发给我的」所有私信标为已读（全部已读用）。"""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND is_read = 0",
+        (user_id,)
+    )
+    conn.commit()
+    conn.close()
+
+def get_job_application_ids(user_id):
+    """该用户全部投递记录 id（「全部已读」要把它们逐个标已读）。"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id FROM job_applications WHERE user_id = ?", (user_id,)
+    ).fetchall()
+    conn.close()
+    return [str(r[0]) for r in rows]
+
+def get_active_system_announcement_ids():
+    """在投的系统公告 id（全局来源，不随用户变化）。"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT id FROM system_announcements WHERE is_active = 1"
+    ).fetchall()
+    conn.close()
+    return [str(r[0]) for r in rows]
+
+def get_total_unread_count(user_id):
+    """消息中心四个数据源的未读总数。
+
+    红点与「未读」页签都按这个口径，避免出现「红点有数、未读页签是空的」。
+    """
+    conn = get_connection()
+    notif = conn.execute(
+        "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0",
+        (user_id,)
+    ).fetchone()[0]
+    msgs = conn.execute(
+        # 私信按**会话**数而不是按消息条数：消息中心「互动」条目是一行一个会话，
+        # 按条数会让红点比可见条目多出一截（实测 15 对 9）。口径与 get_inbox 一致。
+        """SELECT COUNT(*) FROM messages m
+           WHERE m.receiver_id = ? AND m.is_read = 0
+             AND m.id IN (
+                 SELECT MAX(id) FROM messages
+                 WHERE sender_id = ? OR receiver_id = ?
+                 GROUP BY CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
+             )""",
+        (user_id, user_id, user_id, user_id)
+    ).fetchone()[0]
+    apps = conn.execute(
+        """SELECT COUNT(*) FROM job_applications a
+           WHERE a.user_id = ?
+             AND NOT EXISTS (SELECT 1 FROM notification_reads r
+                             WHERE r.user_id = a.user_id
+                               AND r.source = 'job_application'
+                               AND r.ref_id = CAST(a.id AS TEXT))""",
+        (user_id,)
+    ).fetchone()[0]
+    anns = conn.execute(
+        """SELECT COUNT(*) FROM system_announcements s
+           WHERE s.is_active = 1
+             AND NOT EXISTS (SELECT 1 FROM notification_reads r
+                             WHERE r.user_id = ?
+                               AND r.source = 'system_announcement'
+                               AND r.ref_id = CAST(s.id AS TEXT))""",
+        (user_id,)
+    ).fetchone()[0]
+    conn.close()
+    return notif + msgs + apps + anns
 
 
 # ==================== 就业 ====================

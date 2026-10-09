@@ -424,6 +424,26 @@ a.nav-brand {
     color: var(--accent-blue);
     background: rgba(31,94,67,0.08);
 }
+/* 红底白字未读按钮：显示未读总数，点击跳到「未读」页签 */
+.msg-unread-jump {
+    background: #e5484d !important;
+    color: #fff !important;
+    font-size: 0.72rem !important;
+    font-weight: 700;
+    line-height: 1;
+    min-width: 22px;
+    padding: 5px 8px !important;
+    border-radius: 11px;
+    font-variant-numeric: tabular-nums;
+}
+.msg-unread-jump:hover {
+    background: #c93a3f !important;
+    color: #fff !important;
+}
+[data-theme="dark"] .msg-unread-jump {
+    background: #e5484d !important;
+    color: #fff !important;
+}
 
 .msg-dropdown-tabs {
     display: flex;
@@ -459,6 +479,8 @@ a.nav-brand {
     overflow-y: auto;
     max-height: 340px;
     padding: 4px 0;
+    /* 滚到底后继续滚会带着主页面一起走（滚动链），关掉 */
+    overscroll-behavior: contain;
 }
 .msg-dropdown-body::-webkit-scrollbar { width: 4px; }
 .msg-dropdown-body::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
@@ -486,6 +508,30 @@ a.nav-brand {
     background: rgba(31,94,67,0.04);
     border-left-color: var(--accent-blue);
 }
+/* 整条可点后补键盘焦点样式（role=button + tabindex=0） */
+.msg-item.is-clickable:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: -2px;
+}
+/* 通知详情弹窗 */
+.notif-detail { font-size: 0.92rem; }
+.notif-detail .msg-tag { margin-left: 0; }
+.notif-detail-body {
+    margin-top: 14px;
+    line-height: 1.75;
+    color: var(--text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.notif-detail-empty { color: var(--text-muted); margin: 0; }
+.notif-detail-time {
+    margin-top: 18px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-light);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.notif-detail-time i { margin-right: 6px; }
 
 .msg-item-icon {
     width: 36px;

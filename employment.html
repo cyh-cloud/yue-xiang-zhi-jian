@@ -42,12 +42,16 @@
                             <div class="msg-dropdown-header">
                                 <h4>消息中心</h4>
                                 <div class="msg-dropdown-actions">
+                                    <button id="msg-unread-jump" class="msg-unread-jump is-hidden" title="查看未读通知">
+                                        <span id="msg-unread-jump-count">0</span>
+                                    </button>
                                     <button id="msg-mark-all-read" title="全部已读"><i class="fas fa-check-double"></i></button>
                                     <button id="msg-clear-read" title="清除已读"><i class="fas fa-trash-can"></i></button>
                                 </div>
                             </div>
                             <div class="msg-dropdown-tabs">
-                                <button class="msg-tab-btn active" data-tab="notifications"><i class="fas fa-bell"></i> 通知</button>
+                                <button class="msg-tab-btn active" data-tab="unread"><i class="fas fa-bell"></i> 未读</button>
+                                <button class="msg-tab-btn" data-tab="read"><i class="fas fa-envelope-open"></i> 已读</button>
                                 <button class="msg-tab-btn" data-tab="messages"><i class="fas fa-envelope"></i> 我的对话</button>
                             </div>
                             <div class="msg-dropdown-body" id="msg-notifications-list">

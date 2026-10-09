@@ -9190,6 +9190,9 @@ function setupQuickMessage() {
 
     // 点击外部关闭
     document.addEventListener('click', (e) => {
+        // 弹窗（通知详情 / 会话 / 登录等）打开期间，点弹窗内部不算「点击外部」——
+        // 用户看完一条往往还要回来看其它消息，popover 该保持展开。
+        if (e.target.closest && e.target.closest('.modal-overlay')) return;
         if (!dropdown.contains(e.target) && e.target !== btn) {
             dropdown.classList.remove('show');
         }
@@ -9204,9 +9207,23 @@ function setupQuickMessage() {
             dropdown.querySelectorAll('.msg-tab-btn').forEach(b => b.classList.remove('active'));
             tabBtn.classList.add('active');
             const tab = tabBtn.dataset.tab;
-            document.getElementById('msg-notifications-list').classList.toggle('is-hidden', tab !== 'notifications');
+            msgCenterTab = (tab === 'read') ? 'read' : (tab === 'unread' ? 'unread' : 'messages');
+            document.getElementById('msg-notifications-list').classList.toggle('is-hidden', tab === 'messages');
             document.getElementById('msg-messages-list').classList.toggle('is-hidden', tab !== 'messages');
+            // 未读 / 已读共用同一批数据，切换时重新过滤渲染即可
+            if (tab !== 'messages') loadNotifications();
         });
+    });
+
+    // 头部红底未读按钮 → 跳到未读页签
+    document.getElementById('msg-unread-jump')?.addEventListener('click', () => {
+        msgCenterTab = 'unread';
+        dropdown.querySelectorAll('.msg-tab-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.tab === 'unread');
+        });
+        document.getElementById('msg-notifications-list').classList.remove('is-hidden');
+        document.getElementById('msg-messages-list').classList.add('is-hidden');
+        loadNotifications();
     });
 
     // 全部已读
@@ -9230,11 +9247,10 @@ async function updateBadgeCount() {
     try {
         const userId = currentUserId();
         if (!userId) return;
-        const [notifRes, msgRes] = await Promise.all([
-            apiCall(`/api/notifications/unread?user_id=${userId}`),
-            apiCall(`/api/messages/unread?user_id=${userId}`)
-        ]);
-        const total = (notifRes.count || 0) + (msgRes.count || 0);
+        // 一个接口数全四个数据源。此前是两个接口相加，只覆盖 notifications + messages，
+        // 系统公告与投递状态永远不计入红点。
+        const res = await apiCall(`/api/notifications/unread?user_id=${userId}`);
+        const total = res.count || 0;
         badge.textContent = total;
         badge.classList.toggle('is-hidden', total === 0);
     } catch(e) { console.warn('[消息中心] 未读红点加载失败', e); }
@@ -9333,13 +9349,26 @@ async function loadNotifications() {
     }
     container.innerHTML = '<div class="msg-empty"><i class="fas fa-spinner fa-spin"></i><p>加载中...</p></div>';
 
+    // 已读旁路状态：系统公告与投递记录自身没有 is_read 字段，已读记录按用户存在
+    // notification_reads 表里（后端 /api/notifications/read-state 下发）。
+    // 没有这一步，「未读 / 已读」两个页签就只能覆盖 4 个数据源里的 2 个。
+    let readRefs = { system_announcement: [], job_application: [] };
+    try {
+        const rs = await apiCall(`/api/notifications/read-state?user_id=${uid}`);
+        if (rs && rs.success && rs.refs) readRefs = rs.refs;
+    } catch (e) { console.warn('[消息中心] 已读状态加载失败', e); }
+    const sysRead = new Set((readRefs.system_announcement || []).map(String));
+    const jobRead = new Set((readRefs.job_application || []).map(String));
+
     const items = [];
     let srcFailed = 0;
     // 1. 管理员系统公告（只读）
     try {
         const r = await apiCall('/api/system-announcements');
         (r.announcements || []).forEach(a => items.push({
+            key: 'sys:' + a.id, source: 'system_announcement', refId: String(a.id),
             type: 'announcement', tag: '系统公告', readOnly: true,
+            isRead: sysRead.has(String(a.id)),
             title: a.title || '系统公告',
             preview: a.content || '',
             time: a.created_at || '',
@@ -9353,8 +9382,10 @@ async function loadNotifications() {
         // interview 是后端白名单里的第四种状态，缺了就会把英文原文显示给学员（2026-10-09）
         const statusMap = { pending: '待处理', interview: '已通知面试', approved: '已通过', rejected: '未通过' };
         (r.applications || []).forEach(a => items.push({
+            key: 'job:' + a.id, source: 'job_application', refId: String(a.id),
             type: 'job', tag: '企业通知',
             replyId: a.enterprise_id || '', replyName: a.company || '企业',
+            isRead: jobRead.has(String(a.id)),
             title: `投递「${a.title || '岗位'}」`,
             preview: `状态：${statusMap[a.status] || a.status}　${a.company || ''}　${a.location || ''}`,
             time: a.applied_at || '',
@@ -9368,8 +9399,10 @@ async function loadNotifications() {
         (r.inbox || []).forEach(m => {
             if (m.is_mine) return;
             items.push({
+                key: 'msg:' + (m.other_id || ''), source: 'messages', refId: String(m.other_id || ''),
                 type: 'interaction', tag: '互动',
                 replyId: m.other_id || '', replyName: m.other_name || '对方',
+                isRead: !!m.is_read,
                 title: `来自 ${m.other_name || '对方'} 的消息`,
                 preview: m.content || '',
                 time: m.created_at || '',
@@ -9388,13 +9421,17 @@ async function loadNotifications() {
         const r = await apiCall(`/api/notifications?user_id=${uid}`);
         const notifTagMap = { announcement: '公告', grade: '实训批改' };
         (r.notifications || []).forEach(n => items.push({
+            key: 'notif:' + n.id, source: 'notifications', refId: String(n.id),
             type: n.type || 'system', tag: notifTagMap[n.type] || '通知', readOnly: true,
+            isRead: !!n.is_read,
             title: n.title || '通知',
             preview: n.content || '',
             time: n.created_at || '',
             ts: new Date((n.created_at || '').replace(' ', 'T')).getTime() || 0
         }));
     } catch (e) { srcFailed++; console.warn('[消息中心] 站内通知加载失败', e); }
+
+    renderUnreadCounters(items);
 
     if (!items.length) {
         if (srcFailed >= 4) {
@@ -9406,23 +9443,109 @@ async function loadNotifications() {
         container.innerHTML = '<div class="msg-empty"><i class="fas fa-bell-slash"></i><p>暂无通知</p></div>';
         return;
     }
-    items.sort((a, b) => b.ts - a.ts);
+
+    // 未读 / 已读两个页签是同一批数据的两种过滤，不是两次请求
+    const wantRead = (msgCenterTab === 'read');
+    const shown = items.filter(it => !!it.isRead === wantRead);
+    if (!shown.length) {
+        container.innerHTML = wantRead
+            ? '<div class="msg-empty"><i class="fas fa-envelope-open"></i><p>暂无已读通知</p></div>'
+            : '<div class="msg-empty"><i class="fas fa-check-circle"></i><p>全部已读，没有待处理通知</p></div>';
+        return;
+    }
+    shown.sort((a, b) => b.ts - a.ts);
     const iconMap = { announcement: 'fa-bullhorn', job: 'fa-briefcase', interaction: 'fa-comments',
                       grade: 'fa-check-circle', system: 'fa-bell' };
-    container.innerHTML = items.map(it => `
-        <div class="msg-item ${it.replyId ? 'has-reply' : ''}">
+    container.innerHTML = shown.map(it => `
+        <div class="msg-item ${it.replyId ? 'has-reply' : ''} ${it.isRead ? '' : 'unread'} is-clickable"
+             role="button" tabindex="0"
+             data-key="${escapeHtml(it.key)}" data-source="${escapeHtml(it.source)}"
+             data-ref="${escapeHtml(it.refId)}"
+             data-rid="${escapeHtml(it.replyId || '')}" data-rname="${escapeHtml(it.replyName || '')}"
+             data-title="${escapeHtml(it.title)}"
+             data-preview="${escapeHtml(it.preview)}"
+             data-time="${escapeHtml(it.time)}"
+             data-tag="${escapeHtml(it.tag)}">
             <div class="msg-item-icon type-${it.type}"><i class="fas ${iconMap[it.type] || 'fa-bell'}"></i></div>
             <div class="msg-item-text">
                 <div class="msg-item-title">${escapeHtml(it.title)} <span class="msg-tag msg-tag-${it.type}">${it.tag}</span></div>
                 <div class="msg-item-preview">${escapeHtml(it.preview)}</div>
                 <div class="msg-item-time">${formatTimeAgo(it.time)}</div>
-                ${it.replyId ? `<button class="msg-reply-btn" data-rid="${escapeHtml(it.replyId)}" data-rname="${escapeHtml(it.replyName || '')}">回复</button>` : ''}
+                ${it.replyId ? `<span class="msg-reply-btn" data-rid="${escapeHtml(it.replyId)}" data-rname="${escapeHtml(it.replyName || '')}">回复</span>` : ''}
             </div>
         </div>
     `).join('');
-    container.querySelectorAll('.msg-reply-btn').forEach(btn => {
-        btn.addEventListener('click', () => openConversation(btn.dataset.rid, btn.dataset.rname));
+
+    // 整条可点（此前只有「回复」小按钮可点，盒子其他区域点了没反应）：
+    // 有对话对象的（企业通知 / 互动）进会话窗口，没有的（系统公告 / 公告 / 实训批改）只做归档。
+    container.querySelectorAll('.msg-item').forEach(el => {
+        const open = () => handleNotificationItemClick(el);
+        el.addEventListener('click', open);
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
     });
+}
+
+// 当前停留在哪个页签：unread（未读）/ read（已读）/ messages（我的对话）
+let msgCenterTab = 'unread';
+
+// 未读/已读计数与两个入口（页签角标 + 头部红底按钮）的渲染
+function renderUnreadCounters(items) {
+    const unread = items.filter(it => !it.isRead).length;
+    const jump = document.getElementById('msg-unread-jump');
+    const jumpCount = document.getElementById('msg-unread-jump-count');
+    if (jumpCount) jumpCount.textContent = unread;
+    if (jump) jump.classList.toggle('is-hidden', unread === 0);
+}
+
+// 点击一条通知：未读的先归档（从未读列表消失、进已读），有对话对象的再跳会话窗口
+async function handleNotificationItemClick(el) {
+    const source = el.dataset.source;
+    const ref = el.dataset.ref;
+    const rid = el.dataset.rid;
+    const wasUnread = el.classList.contains('unread');
+
+    if (wasUnread && source && ref) {
+        try {
+            await apiCall('/api/notifications/read-one', 'POST',
+                          { user_id: currentUserId(), source, ref_id: ref });
+        } catch (e) { console.warn('[消息中心] 标记已读失败', e); }
+    }
+    if (rid) openConversation(rid, el.dataset.rname);
+
+    // 没有对话对象的（系统公告 / 公告 / 实训批改）→ 弹详情弹窗看全文。
+    // 列表里只有两行摘要，公告正文与批改评语都被截断了，点开才能看全。
+    if (!rid) showNotificationDetail(el);
+
+    if (wasUnread && msgCenterTab === 'unread') {
+        el.remove();
+        const list = document.getElementById('msg-notifications-list');
+        if (list && !list.querySelector('.msg-item')) {
+            list.innerHTML = '<div class="msg-empty"><i class="fas fa-check-circle"></i><p>全部已读，没有待处理通知</p></div>';
+        }
+    }
+    updateBadgeCount();
+}
+
+// 通知详情弹窗：标题 + 类型标签 + 正文 + 时间
+function showNotificationDetail(el) {
+    const title = el.dataset.title || '通知';
+    const tag = el.dataset.tag || '';
+    const preview = el.dataset.preview || '';
+    const time = el.dataset.time || '';
+    const iconMap = { announcement: 'fa-bullhorn', job: 'fa-briefcase', interaction: 'fa-comments',
+                      grade: 'fa-check-circle', system: 'fa-bell' };
+    const type = el.querySelector('.msg-item-icon')?.className.match(/type-([\w-]+)/);
+    const icon = (type && iconMap[type[1]]) || 'fa-bell';
+
+    showDetailModal(title, `
+        <div class="notif-detail">
+            ${tag ? `<span class="msg-tag msg-tag-${type ? type[1] : 'system'}">${escapeHtml(tag)}</span>` : ''}
+            <div class="notif-detail-body">${escapeHtml(preview) || '<p class="notif-detail-empty">暂无正文</p>'}</div>
+            ${time ? `<div class="notif-detail-time"><i class="far fa-clock"></i> ${escapeHtml(time)}</div>` : ''}
+        </div>
+    `, icon);
 }
 
 async function loadConversations() {
@@ -9468,9 +9591,6 @@ function formatTimeAgo(dateStr) {
 }
 
 async function openConversation(userId, userName) {
-    // 关闭下拉面板
-    document.getElementById('msg-dropdown')?.classList.remove('show');
-
     const myId = currentUserId();
     if (!myId) return;
 
