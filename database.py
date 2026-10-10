@@ -3271,12 +3271,18 @@ def reject_review(review_id, reviewer_id, comment=''):
     conn.close()
 
 
-def get_reviews_by_status(status=None, content_type=None):
+def get_reviews_by_status(status=None, content_type=None, sort='modified'):
     """按状态取审核记录（status 为空 = 全部）。
 
     2026-10-08 新增：管理端「内容审核」需要回看已通过 / 已驳回的历史，
     而 `get_pending_reviews()` 的 SQL 写死 `status='pending'`，历史记录一条都
     查不出来 —— 页面里那套「已通过/已驳回」徽标分支因此永远走不到。
+
+    sort（2026-10-10 新增，管理端排序下拉框）：
+      · 'modified'（默认）按「最后修改时间」倒序，取最近一次审核动作的
+        reviewed_at；没审过、或撤销后 reviewed_at 被清空的，退回 created_at；
+      · 'created' 按提交时间倒序。
+    两者都用 id 兜底拆同秒戳（种子数据常在同一秒创建多条，只按时间排会随机）。
     """
     conn = get_connection()
     sql = "SELECT * FROM content_reviews WHERE 1=1"
@@ -3287,7 +3293,10 @@ def get_reviews_by_status(status=None, content_type=None):
     if content_type:
         sql += " AND content_type = ?"
         params.append(content_type)
-    sql += " ORDER BY created_at DESC"
+    if sort == 'created':
+        sql += " ORDER BY created_at DESC, id DESC"
+    else:
+        sql += " ORDER BY COALESCE(reviewed_at, created_at) DESC, id DESC"
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]

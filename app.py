@@ -6121,7 +6121,12 @@ def admin_get_reviews():
     status = request.args.get('status', '') or 'pending'
     if status not in ('pending', 'approved', 'rejected', 'all'):
         status = 'pending'
-    reviews = database.get_reviews_by_status(None if status == 'all' else status, ct)
+    # 排序：modified（默认，按最后修改时间倒序）/ created（按提交时间倒序）。
+    # 与 status 一样做白名单校验，非法值回落默认，前端乱传参打不飞排序。
+    sort = request.args.get('sort', '') or 'modified'
+    if sort not in ('modified', 'created'):
+        sort = 'modified'
+    reviews = database.get_reviews_by_status(None if status == 'all' else status, ct, sort)
 
     # 关联审核内容详情
     enriched = []

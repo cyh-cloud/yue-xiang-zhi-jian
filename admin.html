@@ -43,6 +43,8 @@
         .stat-card[onclick] { cursor: pointer; }
         .dash-sub { margin-top: 4px; font-size: 0.8rem; color: var(--portal-text-muted); }
         .dash-note { margin-top: 18px; font-size: 0.8rem; line-height: 1.7; color: var(--portal-text-muted); }
+        /* 排序下拉：固定宽度不参与等分，否则状态页签被挤窄（2026-10-10） */
+        #review-sort { flex: 0 0 116px; width: 116px; }
         /* 操作反馈 toast：替代原生 alert（内嵌浏览器会拦对话框，拦了连后面的
            列表刷新都不会执行，按钮就像「坏了」）（2026-10-10） */
         .admin-toast {
@@ -103,6 +105,8 @@
                         <button class="rtab" data-status="rejected">已驳回<span class="rtab-num" id="rtab-n-rejected"></span></button>
                     </div>
                     <select id="review-filter"><option value="">全部类型</option><option value="course">课程</option><option value="job">职位</option><option value="model_3d">3D模型</option><option value="success_case">成功案例</option></select>
+                    <!-- 排序：默认按最后修改时间倒序，越新的越靠前（2026-10-10） -->
+                    <select id="review-sort"><option value="modified" selected>修改时间</option><option value="created">发布时间</option></select>
                 </div>
                 <div id="review-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
             </div>
@@ -365,7 +369,8 @@ function renderReviewCounts(counts) {
 
 function loadReviews() {
     var t = document.getElementById('review-filter').value;
-    apiCall('/api/admin/reviews?content_type=' + t + '&status=' + reviewStatus, 'GET').then(function(r) {
+    var s = document.getElementById('review-sort').value;
+    apiCall('/api/admin/reviews?content_type=' + t + '&status=' + reviewStatus + '&sort=' + s, 'GET').then(function(r) {
         var list = document.getElementById('review-list');
         renderReviewCounts(r.counts);
         if (!r.reviews || !r.reviews.length) {
@@ -419,8 +424,11 @@ function loadReviews() {
             var selfTag = rv.is_self_reviewed
                 ? ' <span class="badge badge-self" title="提交者与审核人为同一账号，该记录不含第三方把关">自审</span>'
                 : '';
-            var metaLine = '<div style="margin-top:4px;font-size:0.85rem;color:var(--portal-text-muted)">提交者: ' + esc(rv.submitter_id) + ' | ' + esc(rv.created_at) +
-                (rv.reviewed_by ? ' | 审核人: ' + esc(rv.reviewed_by) + ' | ' + esc(rv.reviewed_at) : '') +
+            // 时间戳带标签展示，且与排序口径一致：修改时间取最近一次审核动作的时间，
+            // 没审过（含撤销后 reviewed_at 被清空）退回发布时间（2026-10-10）。
+            var modifiedAt = rv.reviewed_at || rv.created_at;
+            var metaLine = '<div style="margin-top:4px;font-size:0.85rem;color:var(--portal-text-muted)">提交者: ' + esc(rv.submitter_id) + ' | 发布时间: ' + esc(rv.created_at) + ' | 修改时间: ' + esc(modifiedAt) +
+                (rv.reviewed_by ? ' | 审核人: ' + esc(rv.reviewed_by) : '') +
                 (rv.review_comment ? ' | 理由: ' + esc(rv.review_comment) : '') + '</div>';
             var actionBtns = (rv.status === 'pending')
                 ? '<button class="btn btn-success" onclick="approveReview(' + rv.id + ')">通过</button><button class="btn btn-danger" onclick="rejectReview(' + rv.id + ')">驳回</button>'
@@ -432,6 +440,7 @@ function loadReviews() {
     });
 }
 document.getElementById('review-filter').addEventListener('change', loadReviews);
+document.getElementById('review-sort').addEventListener('change', loadReviews);
 [].forEach.call(document.querySelectorAll('#review-status-tabs .rtab'), function(b) {
     b.addEventListener('click', function() { setReviewStatus(b.getAttribute('data-status')); });
 });
