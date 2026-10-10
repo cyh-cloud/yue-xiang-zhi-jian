@@ -1,0 +1,28 @@
+# .worktreeinclude：新建 git worktree 时，从主检出复制到新工作树的本地文件清单。
+# 语法与 .gitignore 相同。只有同时满足「匹配本表模式」「被 .gitignore 忽略」
+# 「未被 git 跟踪」三个条件的文件才会被复制；已跟踪的文件永远不会被复制。
+# 目的：新工作树开箱即用，不用像新 clone 一样重装依赖、重填配置。
+
+# 依赖：Python 虚拟环境（约 20MB / 1400 个文件，复制比重新 pip install 快）。
+# 注意：.venv 里的 pyvenv.cfg 记录本机基础 Python 的绝对路径，只在本机且
+# 基础 Python 不变时有效；换机器或升级 Python 后，删掉 .venv 重新创建即可。
+.venv/
+
+# 配置：AI 接口密钥等本地环境变量。.env 被 .gitignore 忽略、不进仓库，
+# 但没有它所有 AI 功能都不可用，每个工作树都需要一份。
+.env
+
+# 临时备份文件。当前仓库里还没有这类文件，模式先放着；
+# 以后主检出里出现 *.bak / *.orig 等本地备份时会自动跟随到新工作树。
+*.bak
+*.bak-*
+*.orig
+*.rej
+*~
+*.tmp
+
+# 刻意不收的（可再生或属于运行时垃圾，新工作树自行生成）：
+#   __pycache__/    Python 字节码缓存，首次运行自动重建
+#   .idea/          IDE 项目状态，含工作区绝对路径
+#   data/server.*   运行日志与 PID，服务启动时覆盖写
+#   e2e/node_modules、e2e/test-results   e2e 目录整体未入库，新工作树没有测试代码

@@ -47,7 +47,7 @@ app = Flask(__name__)
 # ---- CORS：只放行本机来源 ----
 # 本应用的所有页面（index.html / teacher.html / admin.html / 各门户页）都跟 API 同源，
 # 同源请求根本用不到 CORS 头；跨域只可能出现在本地调试时（例如页面在 127.0.0.1
-# 而 js/core.js 的默认 API 基址是 http://localhost:5000）。
+# 而 js/core.js 的默认 API 基址指向另一个源）。
 # 此前是 CORS(app) —— 等于对**任意来源**开放。一旦填上 AI_API_KEY，任何站点都能借
 # 用户浏览器直接调本站接口，把这里当成免费大模型代理刷额度（还可能顺带试出会话头）。
 # 需要跨域部署（独立域名前端）时，用环境变量 CORS_ORIGINS 显式追加，逗号分隔。
@@ -6861,16 +6861,23 @@ def serve_static(filename):
 # ==================== 启动 ====================
 
 if __name__ == '__main__':
+    # 端口与 run.py / _serve.py 同一解析逻辑：环境变量 PORT > .env 的 PORT > 默认 5000。
+    from run import resolve_port
+    port, port_source = resolve_port()
     database.init_db()
     print("🌾 启动粤乡智匠服务...")
     print("=" * 50)
     print("🌱 粤乡智匠 - AI驱动的农村人才赋能平台")
-    print(f"📊 服务地址: http://localhost:5000")
-    print(f"📚 健康检查: http://localhost:5000/api/health")
+    print(f"📊 服务地址: http://localhost:{port}")
+    print(f"📚 健康检查: http://localhost:{port}/api/health")
+    if port_source == 'config':
+        print(f"端口 {port} 来自 PORT 配置（环境变量或 .env）")
+    else:
+        print(f"端口 {port}（PORT 未配置或配置为空，使用默认端口）")
     if not _ai_configured():
         print("⚠️  未配置 AI_API_KEY：所有 AI 功能将返回明确的「未启用」提示")
     print("=" * 50)
     # 安全：调试模式会把 Werkzeug 交互式调试器暴露给能访问该端口的所有人。
     # 仅在显式设置 FLASK_DEBUG=1 时开启，默认关闭。
     _debug = os.getenv('FLASK_DEBUG', '').strip().lower() in ('1', 'true', 'yes', 'on')
-    app.run(host='0.0.0.0', port=5000, debug=_debug, use_reloader=False)
+    app.run(host='0.0.0.0', port=port, debug=_debug, use_reloader=False)

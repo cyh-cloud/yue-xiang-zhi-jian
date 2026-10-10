@@ -10,6 +10,7 @@ import sys
 import webbrowser
 import time
 import threading
+from dotenv import load_dotenv
 
 # 修复Windows控制台UTF-8编码
 if sys.platform == 'win32':
@@ -19,12 +20,37 @@ if sys.platform == 'win32':
     except Exception:
         os.environ['PYTHONIOENCODING'] = 'utf-8'
 
+# 默认服务端口。.env 里 PORT 留空 / 删行 / 填非法值时回落到这里。
+DEFAULT_PORT = 5000
+
+def resolve_port():
+    """解析服务端口，返回 (port, source)。source 为 'config' 或 'default'，仅用于启动信息展示。
+
+    优先级：真实环境变量 PORT > .env 的 PORT > 默认 5000。
+    留空或非法（非数字、超出 1-65535）时警告并回落默认端口，
+    这样多工作树各改各的 .env 就能并行起多个实例，不会互相撞端口。
+    """
+    load_dotenv()
+    raw = (os.getenv('PORT') or '').strip()
+    if not raw:
+        return DEFAULT_PORT, 'default'
+    try:
+        port = int(raw)
+    except ValueError:
+        print(f"警告：PORT={raw!r} 不是数字，改用默认端口 {DEFAULT_PORT}")
+        return DEFAULT_PORT, 'default'
+    if not 1 <= port <= 65535:
+        print(f"警告：PORT={port} 超出 1-65535，改用默认端口 {DEFAULT_PORT}")
+        return DEFAULT_PORT, 'default'
+    return port, 'config'
+
 def open_browser():
     """在浏览器中打开应用"""
     time.sleep(2)
-    webbrowser.open('http://localhost:5000')
+    webbrowser.open(f'http://localhost:{resolve_port()[0]}')
 
 def main():
+    port, port_source = resolve_port()
     print("🌾 启动粤乡智匠...")
     print("=" * 50)
     print("🌱 粤乡智匠 - 基于AI实训系统的农村本土人才赋能平台")
@@ -39,10 +65,15 @@ def main():
     print("   - 💼 就业对接：技能证书、人才匹配、创业支持")
     print()
     print("📊 服务信息:")
-    print(f"   - 本地地址: http://localhost:5000")
-    print(f"   - API文档: http://localhost:5000/api/health")
-    print(f"   - 农技问答: http://localhost:5000/api/agriculture/ask")
+    print(f"   - 本地地址: http://localhost:{port}")
+    print(f"   - API文档: http://localhost:{port}/api/health")
+    print(f"   - 农技问答: http://localhost:{port}/api/agriculture/ask")
     print("=" * 50)
+    if port_source == 'config':
+        print(f"端口 {port} 来自 PORT 配置（环境变量或 .env）")
+    else:
+        print(f"端口 {port}（PORT 未配置或配置为空，使用默认端口）")
+    print()
 
     # 检查 .env 文件
     env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -67,7 +98,7 @@ def main():
         from app import app
         app.run(
             host='0.0.0.0',
-            port=5000,
+            port=port,
             debug=False,
             use_reloader=False
         )

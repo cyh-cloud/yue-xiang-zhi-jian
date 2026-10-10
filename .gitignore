@@ -27,6 +27,9 @@ venv/
 *.db-wal
 *.db-shm
 
+# ---- 服务运行时产物 ----
+data/server.pid
+
 # ---- 系统 / 编辑器 ----
 .DS_Store
 Thumbs.db

@@ -42,7 +42,10 @@ const AppState = {
     isRecording: false
 };
 
-const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl ?? 'http://localhost:5000';
+// 默认取页面自身的源：页面由哪个端口serve，API 就打哪个端口。
+// 各页面在此之前注入 window.APP_CONFIG = { apiBaseUrl: '' } 走同源相对路径；
+// 只有漏注入的页面会用到这个回退值，写死端口会让它打到别的实例上。
+const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl ?? window.location.origin;
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ==================== API调用封装 ====================
