@@ -47,6 +47,7 @@
         <nav>
             <a href="#" class="active" data-page="dashboard"><i class="fas fa-chart-pie"></i>数据大屏</a>
             <a href="#" data-page="policies"><i class="fas fa-file-alt"></i>政策管理</a>
+            <a href="#" data-page="publish"><i class="fas fa-plus-circle"></i>发布政策</a>
         </nav>
         <div class="user-badge"><div class="avatar" id="sidebar-avatar">政</div><span id="sidebar-name">政府人员</span></div>
     </aside>
@@ -61,6 +62,10 @@
         <div class="portal-content">
             <div class="page active" id="page-dashboard"><div id="dash-content"><div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载数据...</div></div></div>
             <div class="page" id="page-policies">
+                <div id="policy-list-msg" class="form-msg" role="status" aria-live="polite"></div>
+                <div id="policy-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载政策…</div></div>
+            </div>
+            <div class="page" id="page-publish">
                 <div class="card">
                     <h3 id="policy-form-title">发布新政策</h3>
                     <div class="form-row">
@@ -90,10 +95,9 @@
                         <button class="btn btn-primary" id="policy-submit" type="button" onclick="pubPolicy()">发布政策</button>
                         <button class="btn btn-outline" id="policy-cancel" type="button" style="display:none" onclick="cancelEditPolicy()">取消编辑</button>
                     </div>
-                    <p class="form-hint">发布后<strong>立即</strong>在学员端首页「本土资源 → 政策信息」可见；如需先不上线，发布后在下方列表点「下架」。未填资料来源的政策，学员端详情不会出现「文号与数据均可溯源」的口径说明。</p>
+                    <p class="form-hint">发布后<strong>立即</strong>在学员端首页「本土资源 → 政策信息」可见；如需先不上线，发布后在「政策管理」列表点「下架」。未填资料来源的政策，学员端详情不会出现「文号与数据均可溯源」的口径说明。</p>
                     <div id="policy-msg" class="form-msg" role="status" aria-live="polite"></div>
                 </div>
-                <div id="policy-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i> 加载政策…</div></div>
             </div>
         </div>
     </div>
@@ -105,12 +109,19 @@
 PORTAL.init('government', 'sidebar-name', function() {
     document.getElementById('sidebar-avatar').textContent = '政';
     // 发布日期默认今天（政务人员仍可改成文件实际的发文日期）
+    setEditing(null);
     clearPolicyForm();
     loadDash();
 });
 PORTAL.onPageChange(function(p) {
     if (p === 'dashboard') loadDash();
     else if (p === 'policies') loadPolicies();
+    else if (p === 'publish' && !_editingPolicyId) {
+        // 从侧栏进「发布政策」视为开新篇；编辑中的草稿保留不清空
+        clearPolicyForm();
+        setEditing(null);
+        policyMsg('');
+    }
 });
 
 // ==================== 工作概览（原「数据大屏」） ====================
@@ -204,7 +215,9 @@ var _govPolicies = [];        // 当前列表（编辑时按 id 取原文）
 var _editingPolicyId = null;  // 非空 = 表单处于「编辑中」状态
 
 function policyMsg(text, type) {
-    var el = document.getElementById('policy-msg');
+    // 表单与列表已拆成两页：反馈只投递到当前可见页的消息框，用户此刻在哪页就看得到
+    var active = document.querySelector('.page.active');
+    var el = (active && active.querySelector('.form-msg')) || document.getElementById('policy-msg');
     if (!el) return;
     el.className = 'form-msg' + (text ? ' show ' + (type || 'ok') : '');
     el.textContent = text || '';
@@ -230,7 +243,7 @@ function loadPolicies() {
         _govPolicies = (r && r.policies) || [];
         if (!_govPolicies.length) {
             list.innerHTML = '<div class="empty-state"><i class="fas fa-file-alt"></i><p>暂无政策</p>'
-                + '<p class="form-hint">在上方表单发布第一条政策；发布后学员端首页「本土资源 → 政策信息」会立即显示。</p></div>';
+                + '<p class="form-hint">在左侧边栏「发布政策」发布第一条政策；发布后学员端首页「本土资源 → 政策信息」会立即显示。</p></div>';
             return;
         }
         list.innerHTML = _govPolicies.map(function(p) {
@@ -317,10 +330,18 @@ function pubPolicy() {
     });
 }
 
+// 代码内切页：点侧栏链接，复用 PORTAL 的导航与 onPageChange（admin.html 同款做法）
+function goPage(p) {
+    var a = document.querySelector('.portal-sidebar a[data-page="' + p + '"]');
+    if (a) a.click();
+}
+
 function editPolicy(id) {
     var p = null;
     for (var i = 0; i < _govPolicies.length; i++) { if (_govPolicies[i].id === id) { p = _govPolicies[i]; break; } }
     if (!p) { policyMsg('未找到该政策，请刷新列表后重试', 'err'); return; }
+    // 表单已拆到「发布政策」页：先切页（onPageChange 会按 _editingPolicyId 决定是否清空），再回填
+    goPage('publish');
     document.getElementById('policy-title').value = p.title || '';
     document.getElementById('policy-content').value = p.content || '';
     document.getElementById('policy-summary').value = p.summary || '';
