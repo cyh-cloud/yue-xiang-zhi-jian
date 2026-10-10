@@ -43,6 +43,22 @@
         .stat-card[onclick] { cursor: pointer; }
         .dash-sub { margin-top: 4px; font-size: 0.8rem; color: var(--portal-text-muted); }
         .dash-note { margin-top: 18px; font-size: 0.8rem; line-height: 1.7; color: var(--portal-text-muted); }
+        /* 操作反馈 toast：替代原生 alert（内嵌浏览器会拦对话框，拦了连后面的
+           列表刷新都不会执行，按钮就像「坏了」）（2026-10-10） */
+        .admin-toast {
+            position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%) translateY(16px);
+            background: var(--portal-accent); color: #fff; padding: 10px 18px;
+            border-radius: 8px; font-size: 0.9rem; opacity: 0; pointer-events: none;
+            transition: opacity .25s ease, transform .25s ease; z-index: 2000; max-width: 80vw;
+        }
+        .admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .admin-toast.error { background: #b3382f; }
+        /* 驳回理由输入框：沿用门户输入框配色 */
+        #reject-reason {
+            width: 100%; border: 1px solid var(--portal-input-border); border-radius: 8px;
+            padding: 10px; font-size: 0.9rem; resize: vertical;
+            background: var(--portal-input-bg); color: var(--portal-text);
+        }
     </style>
 </head>
 <body>
@@ -103,6 +119,41 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 驳回理由弹窗：替代原生 prompt。内嵌浏览器会拦对话框，prompt 被拦后
+                 按钮「点了没反应」，还会把后面的接口调用一起吞掉（2026-10-10） -->
+            <div class="modal-overlay is-hidden" id="reject-modal">
+                <div class="modal-content" style="max-width:440px">
+                    <div class="modal-header"><h3>驳回理由</h3><button class="modal-close" onclick="closeRejectModal()"><i class="fas fa-times"></i></button></div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="reject-reason">驳回理由</label>
+                            <textarea id="reject-reason" rows="4" placeholder="选填，将展示给提交者"></textarea>
+                        </div>
+                        <div style="display:flex;gap:8px;justify-content:flex-end">
+                            <button class="btn btn-outline" onclick="closeRejectModal()">取消</button>
+                            <button class="btn btn-danger" onclick="confirmReject()">确认驳回</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通用确认弹窗：替代原生 confirm（撤销审核等破坏性操作） -->
+            <div class="modal-overlay is-hidden" id="admin-confirm-modal">
+                <div class="modal-content" style="max-width:400px">
+                    <div class="modal-header"><h3>确认操作</h3><button class="modal-close" onclick="closeAdminConfirm()"><i class="fas fa-times"></i></button></div>
+                    <div class="modal-body">
+                        <p id="admin-confirm-msg" style="font-size:0.9rem;color:var(--portal-text);line-height:1.7;margin:0"></p>
+                        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+                            <button class="btn btn-outline" onclick="closeAdminConfirm()">取消</button>
+                            <button class="btn btn-danger" id="admin-confirm-ok">确认</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作反馈：替代原生 alert（同样会被内嵌浏览器拦） -->
+            <div class="admin-toast" id="admin-toast" role="status"></div>
 
             <div class="page" id="page-announcements">
                 <div class="card"><input type="text" id="ann-title" placeholder="公告标题"><textarea id="ann-content" rows="3" placeholder="公告内容" style="margin-top:8px"></textarea><button class="btn btn-primary" style="margin-top:8px" onclick="publishAnn()">发布公告</button></div>
@@ -385,23 +436,65 @@ document.getElementById('review-filter').addEventListener('change', loadReviews)
     b.addEventListener('click', function() { setReviewStatus(b.getAttribute('data-status')); });
 });
 
+// ---- 操作反馈与确认：全部走页面内组件，不用原生 alert/confirm/prompt ----
+// 内嵌浏览器会拦这些对话框：被拦后接口调用都不会发出，按钮就像坏了。
+function showAdminToast(msg, isError) {
+    var t = document.getElementById('admin-toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.toggle('error', !!isError);
+    t.classList.add('show');
+    clearTimeout(t._hideTimer);
+    t._hideTimer = setTimeout(function() { t.classList.remove('show'); }, 2600);
+}
+var adminConfirmAction = null;
+function adminConfirm(msg, onOk) {
+    document.getElementById('admin-confirm-msg').textContent = msg;
+    adminConfirmAction = onOk;
+    document.getElementById('admin-confirm-modal').classList.remove('is-hidden');
+}
+function closeAdminConfirm() {
+    document.getElementById('admin-confirm-modal').classList.add('is-hidden');
+    adminConfirmAction = null;
+}
+document.getElementById('admin-confirm-ok').addEventListener('click', function() {
+    var fn = adminConfirmAction;
+    closeAdminConfirm();
+    if (fn) fn();
+});
+
+// ---- 驳回理由弹窗 ----
+var rejectTargetId = null;
+function rejectReview(id) {
+    rejectTargetId = id;
+    document.getElementById('reject-reason').value = '';
+    document.getElementById('reject-modal').classList.remove('is-hidden');
+}
+function closeRejectModal() {
+    document.getElementById('reject-modal').classList.add('is-hidden');
+    rejectTargetId = null;
+}
+function confirmReject() {
+    if (rejectTargetId === null) return;
+    var id = rejectTargetId;
+    var c = document.getElementById('reject-reason').value.trim();
+    adminCall('/api/admin/reviews/' + id + '/reject', 'POST', { comment: c || '' })
+        .then(function(r) { closeRejectModal(); showAdminToast(r.message); loadReviews(); })
+        .catch(function(e) { showAdminToast((e && e.message) || '操作失败，请重试', true); });
+}
+
 function approveReview(id) {
     adminCall('/api/admin/reviews/' + id + '/approve', 'POST')
-        .then(function(r) { alert(r.message); loadReviews(); })
-        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); });
-}
-function rejectReview(id) {
-    var c = prompt('驳回理由(可选):', '');
-    adminCall('/api/admin/reviews/' + id + '/reject', 'POST', { comment: c || '' })
-        .then(function(r) { alert(r.message); loadReviews(); })
-        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); });
+        .then(function(r) { showAdminToast(r.message); loadReviews(); })
+        .catch(function(e) { showAdminToast((e && e.message) || '操作失败，请重试', true); });
 }
 // 撤销审核：已通过 / 已驳回退回待审核，可重新处理
 function revokeReview(id) {
-    if (!confirm('确定撤销这条审核？\n撤销后该内容退回「待审核」，需重新处理。')) return;
-    adminCall('/api/admin/reviews/' + id + '/revoke', 'POST')
-        .then(function(r) { alert(r.message); loadReviews(); })
-        .catch(function(e) { alert((e && e.message) || '操作失败，请重试'); });
+    adminConfirm('确定撤销这条审核？撤销后该内容退回「待审核」，需重新处理。', function() {
+        adminCall('/api/admin/reviews/' + id + '/revoke', 'POST')
+            .then(function(r) { showAdminToast(r.message); loadReviews(); })
+            .catch(function(e) { showAdminToast((e && e.message) || '操作失败，请重试', true); });
+    });
 }
 
 function previewReviewModel(filePath, title) {
