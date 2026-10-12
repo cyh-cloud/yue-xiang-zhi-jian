@@ -14,10 +14,15 @@ content_reviews 审核记录一致，管理端卡片详情（公司、薪资、c
 """
 import json
 import os
+import sys
 
 import requests
 
-from run import resolve_port
+_BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
+from run import resolve_port  # noqa: E402
 
 # 跟随 .env / 环境变量的 PORT，多工作树各自改端口时脚本不会打错实例
 BASE = 'http://127.0.0.1:' + str(resolve_port()[0])

@@ -6,6 +6,15 @@
 
 import unittest
 import json
+
+import os
+import sys
+
+# 后端代码整体迁入 backend/ 后，app 与 database 都在 backend/ 下。
+_BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
 from app import app
 
 class TestYueXiangApp(unittest.TestCase):
@@ -57,9 +66,9 @@ class TestYueXiangApp(unittest.TestCase):
         标题 / 媒体 / 链接。禁止出现无出处的编造案例。
 
         注意：接口只下发**超级管理员审核通过**的案例（见 database._seed_case_reviews），
-        所以「内容完整性」对 cases_data 全量校验，「可见性」对接口返回校验。
+        所以「内容完整性」对 domain_data.resources.cases_data 全量校验，「可见性」对接口返回校验。
         """
-        import cases_data
+        from domain_data.resources import cases_data
         all_cases = cases_data.get_cases()
         self.assertGreater(len(all_cases), 0)
 
@@ -237,7 +246,7 @@ class TestYueXiangApp(unittest.TestCase):
           ③ 分类必须落在 CATEGORY_LIST 内，否则前端会出现「筛了永远是 0 条」的死筛选项。
         """
         import datetime
-        import jobs_data
+        from domain_data.employment import jobs_data
         items = jobs_data.get_recruitment_list(today=datetime.date.today())
 
         actionable = [r for r in items if r['status'] in ('open', 'upcoming')]
@@ -264,12 +273,15 @@ class TestYueXiangApp(unittest.TestCase):
         本用例守住三条底线：
           ① 求职资料属个人数据，未登录 401、他人 403；
           ② user_id / ai_used **不能**由客户端 PUT 改写（否则可以伪称没用过 AI）；
-          ③ AI 未配置时必须 503 + code，**绝不返回 success=True 的兜底文案**（全项目红线）。
+        ③ AI 未配置时必须 503 + code，**绝不返回 success=True 的兜底文案**（全项目红线）。
+           模拟方式是改写开关的真正持有者 ai.client.ai_configured：后端按领域拆分
+           （T08）后，路由在导入时就把这个名字绑到了 ai.client 的函数对象上，
+           改写入口文件上的同名属性已不再生效。
         """
-        import app as app_module
+        import ai.client as ai_client
         import database
         sid = None
-        orig_ai_configured = app_module._ai_configured
+        orig_ai_configured = ai_client.ai_configured
         try:
             r = self.client.post('/api/auth/login', data=json.dumps({
                 'username': 'student_demo', 'password': '123456'
@@ -329,7 +341,7 @@ class TestYueXiangApp(unittest.TestCase):
                              'ai_used 只能由 AI 接口置位，客户端 PUT 不得改写')
 
             # ④ AI 未配置 → 503 + code，且不得出现 success=True
-            app_module._ai_configured = lambda: False
+            ai_client.ai_configured = lambda: False
             r = self.client.post('/api/employment/resume/ai',
                                  data=json.dumps({'user_id': 'student_demo',
                                                   'section': 'self_eval'}),
@@ -346,7 +358,7 @@ class TestYueXiangApp(unittest.TestCase):
                                  content_type='application/json', headers=headers)
             self.assertEqual(r.status_code, 400)
         finally:
-            app_module._ai_configured = orig_ai_configured
+            ai_client.ai_configured = orig_ai_configured
             conn = database.get_connection()
             conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
             if sid:
@@ -362,7 +374,7 @@ class TestYueXiangApp(unittest.TestCase):
         避免学员误以为登记意向 = 已报名。
         """
         import database
-        import jobs_data
+        from domain_data.employment import jobs_data
         sid = None
         try:
             r = self.client.post('/api/auth/login', data=json.dumps({

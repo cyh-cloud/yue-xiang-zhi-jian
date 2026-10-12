@@ -1961,7 +1961,7 @@ PEST_KNOWLEDGE = {
 
 # ==================== 实拍图清单合并 ====================
 #
-# 图片由实训团队拍摄后登记在项目根的 `pest_images.csv`（人填表），
+# 图片由实训团队拍摄后登记在仓库根的 `pest_images.csv`（人填表），
 # 由 `.workbuddy/_pest_img_ingest.py` 生成同目录的 `pest_image_manifest.py`，这里在导入时合并一次。
 #
 # 为什么不让人直接改上面 PEST_KNOWLEDGE 里的 image 字段：
@@ -1974,8 +1974,10 @@ PEST_KNOWLEDGE = {
 
 def _apply_image_manifest():
     """把实拍图清单合并进 PEST_KNOWLEDGE（幂等，只认 id 精确匹配）。"""
+    # T06：pest_image_manifest 与本模块一起搬进 domain_data.pest_diagnosis，
+    # 顶层 import 改成包内相对导入；缺失清单仍然不是错误（见上方说明）。
     try:
-        from pest_image_manifest import PEST_IMAGES
+        from .pest_image_manifest import PEST_IMAGES
     except ImportError:
         return
     for crop_data in PEST_KNOWLEDGE.values():

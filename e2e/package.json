@@ -1,0 +1,14 @@
+{
+  "name": "yuexiang-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "粤乡智匠 Playwright 端到端测试：以后端功能性 bug 排查为主",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  }
+}

@@ -10,6 +10,12 @@ import sys
 import webbrowser
 import time
 import threading
+
+_BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+
+import repo_paths
 from dotenv import load_dotenv
 
 # 修复Windows控制台UTF-8编码
@@ -76,15 +82,18 @@ def main():
     print()
 
     # 检查 .env 文件
-    env_path = os.path.join(os.path.dirname(__file__), '.env')
+    # 后端代码已整体迁入 backend/，而 .env 仍在仓库根，故用 repo_paths 的基准推导
+    env_path = os.path.join(repo_paths.REPO_ROOT, '.env')
     if not os.path.exists(env_path):
         print("⚠️  未找到 .env 文件，请复制 .env.example → .env 并填入配置")
         print("   某些功能（如AI服务）可能无法正常使用")
         print()
 
     # 创建必要目录
-    os.makedirs('data', exist_ok=True)
-    os.makedirs('uploads', exist_ok=True)
+    # 同理：data/ 与 uploads/ 都在仓库根，不能写成相对 cwd 的相对路径，
+    # 否则从别的目录启动就会把库和上传目录建到别处去。
+    os.makedirs(os.path.join(repo_paths.REPO_ROOT, 'data'), exist_ok=True)
+    os.makedirs(os.path.join(repo_paths.REPO_ROOT, 'uploads'), exist_ok=True)
 
     # 在新线程中打开浏览器
     browser_thread = threading.Thread(target=open_browser, daemon=True)
