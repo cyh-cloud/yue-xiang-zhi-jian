@@ -8,7 +8,7 @@ T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分�
 import time
 import uuid
 from db_connection import get_connection
-from db_credentials import hash_password, verify_password
+from db_credentials import verify_password
 
 
 def authenticate_user(username, password):

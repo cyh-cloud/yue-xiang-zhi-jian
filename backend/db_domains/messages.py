@@ -97,6 +97,12 @@ def get_inbox(user_id):
         (user_id, user_id, user_id)
     ).fetchall()
 
+    # T05 搬迁时漏掉了这一行：names 从未赋值，只要有任意一条私信，
+    # /api/messages/inbox 就 NameError 500（收件箱为空时循环不进，所以不暴露）。
+    names = _resolve_display_names(
+        [r['receiver_id'] if r['sender_id'] == user_id else r['sender_id']
+         for r in rows])
+
 
     # ⚠️ 下面的循环必须发生在 conn.close() **之前**：_resolve_name 是闭包，
     #   里面还要用同一个 conn 去查 students / users。原先 close 写在循环前，

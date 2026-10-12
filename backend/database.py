@@ -21,13 +21,6 @@ init_db() 是唯一的编排入口：建表 + 补列 + 播种。播种顺序是�
 """
 
 import json
-import os
-import re
-import sqlite3
-import sys
-import time
-import uuid
-from datetime import datetime
 
 # ---- 基础设施：连接工厂 / 建表定义 / 口令散列 ----
 # 下面每一行都带 noqa: F401：这些符号在本文件里不再被调用，只为把

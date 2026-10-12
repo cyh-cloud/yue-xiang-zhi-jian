@@ -45,7 +45,6 @@ from domains.ecommerce.prompts import (
     EC_CS_PERSONALITIES,
     EC_CS_SCENARIOS,
     EC_PRODUCTS,
-    EC_RATE_COMMENTS_LIMIT,
     EC_RATE_COPY_LIMIT,
     EC_RATE_CS_AUX_LIMIT,
     EC_RATE_CS_LIMIT,

@@ -8,7 +8,6 @@ T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分�
 import sqlite3
 from db_connection import get_connection
 
-import os
 import sys
 
 import repo_paths

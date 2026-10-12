@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 
 load_dotenv(repo_paths.ENV_FILE)
 
-from flask import request, jsonify
+from flask import jsonify
 from datetime import datetime
 import os
 import logging

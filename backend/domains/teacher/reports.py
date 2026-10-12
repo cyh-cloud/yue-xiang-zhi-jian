@@ -21,9 +21,7 @@
 """
 
 import logging
-from datetime import datetime
 
-import ai.client
 from ai.client import call_ai_service
 
 logger = logging.getLogger(__name__)

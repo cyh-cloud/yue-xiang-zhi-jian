@@ -17,7 +17,11 @@ domains/pest 同构：一个目录放两个蓝图对象会让 T01 检查器把�
 
 import json
 
+import logging
+
 from flask import Blueprint, jsonify, request
+
+import re
 
 from ai.client import AI_REASONING_TOKEN_RESERVE, chat_completion, chat_model
 from core.session import client_key, get_session_user, rate_limited
@@ -35,6 +39,8 @@ from shared.live_reading import LIVE_RUBRIC_RE, LIVE_SPEED_IDEAL, live_cjk, live
 from shared.training_status import training_status_label
 
 live_bp = Blueprint('live_training', __name__)
+
+logger = logging.getLogger(__name__)
 
 
 @live_bp.route('/api/ecommerce/live/report', methods=['POST'])

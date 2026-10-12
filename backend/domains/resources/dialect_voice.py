@@ -10,7 +10,6 @@
 降级路径同样要过免责声明口径。
 """
 
-import json
 
 from shared.agri_dosage import CHEM_DOSE_NOTICE, has_chem_dosage
 

@@ -13,7 +13,6 @@ _EC_PROMO_RULE 是商品宣传口径（EC1），与 A2「用药数值必须给�
 等于改全站电商文案的合规红线，必须连带回归 e2e 的 ai-contract。
 """
 
-import os
 
 from shared.ec_products import (  # noqa: F401  （再导出：本域与直播实训域共用同一份额度）
     EC_COPY_MAX_LEN,
