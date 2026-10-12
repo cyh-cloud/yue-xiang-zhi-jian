@@ -108,7 +108,8 @@ def sql_strings_in(path):
     判据是「作为 conn.execute(...) / cursor.execute(...) 的首个实参出现」，
     这样文档里提到表名不会被误判成跨域访问。
     """
-    tree = ast.parse(io.open(path, encoding='utf-8').read())
+    with io.open(path, encoding='utf-8') as handle:
+        tree = ast.parse(handle.read())
     return _collect_sql(tree)
 
 
@@ -178,6 +179,46 @@ class DomainBoundaryTest(unittest.TestCase):
             owners = domain_of_table(table)
             self.assertLessEqual(len(owners), 1,
                                  '表 %s 被多个领域同时拥有：%s' % (table, owners))
+
+
+class SharedDbHygieneTest(unittest.TestCase):
+    """共享种子库的卫生检查。
+
+    T05 与 T17 都踩过同一个坑：测试对 content_reviews 里已过审的案例反复 approve，
+    每次 create_content_review 都新增一行，于是同一个 (content_type, content_id,
+    status) 出现多条记录，把 get_case_review_stats 的 approved 计数撑爆，
+    进而污染其它测试文件里的案例可见性断言。症状是「单独跑全绿、合到一起就红」。
+
+    这条检查把那个状态变成可见的失败，而不是留给下一个跑测试的人猜。
+    """
+
+    def test_no_duplicate_review_rows_per_content_and_status(self):
+        import database
+        conn = database.get_connection()
+        try:
+            dupes = conn.execute(
+                'SELECT content_type, content_id, status, COUNT(*) AS n '
+                'FROM content_reviews '
+                'GROUP BY content_type, content_id, status '
+                'HAVING n > 1').fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(
+            [(d['content_type'], d['content_id'], d['status'], d['n'])
+             for d in dupes], [],
+            '同一内容的同一审核状态出现了多条记录，通常是测试 cleanup 不完整'
+            '（无条件把全部记录置 approved 会留下多余行）。')
+
+    def test_approved_case_count_matches_the_content_source(self):
+        """approved 计数必须等于内容源里的案例数，多出来就是被测试撑爆的。"""
+        import database
+        from domain_data.resources import cases_data
+        stats = database.get_case_review_stats()['case_review']
+        total_cases = len(cases_data.get_cases())
+        self.assertEqual(stats['total'], total_cases,
+                         '审核记录覆盖的内容数与内容源不一致')
+        self.assertLessEqual(stats['approved'], total_cases,
+                             'approved 超过了内容源条数，说明有重复的过审记录')
 
 
 if __name__ == '__main__':

@@ -36,6 +36,7 @@ from __future__ import annotations
 import argparse
 import ast
 import os
+import re
 import sys
 import tokenize
 from dataclasses import dataclass, field
@@ -448,6 +449,44 @@ def build_parser():
     return parser
 
 
+def check_blueprint_wiring(root=None):
+    """第四条检查：蓝图接线一致性。
+
+    domains/__init__.py 导出、core/app_factory 注册、静态蓝图排最后，三者必须对齐。
+    T11/T12 并行提交后合并时漏掉过 pest_bp 的导出与注册，症状是应用启动即
+    NameError、196 项单测 error。这类漏项在单个 worktree 里看不出来，只有合并后
+    才炸，所以值得单独查。
+    """
+    root = Path(root).resolve() if root else REPO_ROOT
+    domains_init = root / "domains" / "__init__.py"
+    factory = root / "core" / "app_factory.py"
+    if not domains_init.is_file() or not factory.is_file():
+        return []
+
+    init_text = domains_init.read_text(encoding="utf-8")
+    exported = set(re.findall(r"^from domains\.\w+ import (\w+)",
+                              init_text, re.MULTILINE))
+    match = re.search(r"__all__ = \[(.*?)\]", init_text, re.S)
+    listed = set(re.findall(r"'(\w+)'", match.group(1))) if match else set()
+
+    factory_text = factory.read_text(encoding="utf-8")
+    order = re.findall(r"app\.register_blueprint\((\w+)\)", factory_text)
+
+    problems = []
+    for name in sorted(exported - listed):
+        problems.append("domains/__init__.py 导出了 %s 但没列入 __all__" % name)
+    for name in sorted(listed - exported):
+        problems.append("domains/__init__.py 的 __all__ 列了 %s 但没有对应导入" % name)
+    for name in sorted(listed - set(order)):
+        problems.append("%s 已导出但 core/app_factory 没有注册它" % name)
+    for name in sorted(set(order) - listed):
+        problems.append("core/app_factory 注册了 %s 但它没被 domains/__init__ 导出" % name)
+    if order and order[-1] != "static_bp":
+        problems.append("静态蓝图必须最后注册（当前最后是 %s），否则 /<path:filename> "
+                        "可能吞掉具体路由" % order[-1])
+    return problems
+
+
 def configure_output_encoding():
     """让 stdout 能输出中文。Windows 默认按本地代码页编码，控制台会是乱码。"""
     for stream in (sys.stdout, sys.stderr):
@@ -474,7 +513,13 @@ def main(argv=None):
     report = check(root=root, max_lines=args.max_lines, shared_names=shared_names)
     configure_output_encoding()
     print(format_report(report))
-    return 0 if report.ok else 1
+    wiring = check_blueprint_wiring(root=root)
+    if wiring:
+        print()
+        print("蓝图接线有 %d 处问题：" % len(wiring))
+        for line in wiring:
+            print("  - " + line)
+    return 0 if (report.ok and not wiring) else 1
 
 
 if __name__ == "__main__":

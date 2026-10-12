@@ -16,6 +16,7 @@
 - 单测：`python -m unittest discover -s . -p "test_*.py" -t .`
 - 端到端：`cd e2e; npx playwright test`
 - 架构机械检查：`python tools/check_architecture.py`
+- Python 静态检查：`python tools/check_python.py`
 - 启动：`python backend/run.py`
 - 用一份可弃数据库跑 e2e：由 `e2e/serve.py` 自动处理，`YUEXIANG_DB` 指向临时库
 
