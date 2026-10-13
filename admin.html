@@ -124,25 +124,6 @@
         }
         .admin-portal:not(.is-collapsed) .admin-nav a::after { content: none; }
 
-        /* 侧栏底部：当前登录账号 */
-        .admin-sidebar-foot {
-            flex-shrink: 0; padding: 12px;
-            border-top: 1px solid var(--portal-sidebar-divider);
-        }
-        .admin-user-badge { position: relative; display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
-        .admin-user-badge .avatar {
-            width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
-            display: flex; align-items: center; justify-content: center;
-            background: var(--portal-accent); color: #fff; font-size: 0.85rem; font-weight: 700;
-        }
-        .admin-user-meta { min-width: 0; transition: opacity .15s ease-linear; }
-        .admin-user-name {
-            display: block; font-size: 0.85rem; font-weight: 600;
-            color: var(--portal-sidebar-text); white-space: nowrap;
-            overflow: hidden; text-overflow: ellipsis;
-        }
-        .admin-user-role { display: block; font-size: 0.7rem; color: var(--portal-sidebar-link); }
-
         /* ---- 主区 ---- */
         .admin-portal .portal-main {
             flex: 1; min-width: 0;
@@ -191,8 +172,7 @@
 
         /* ---- 桌面端折叠态：只剩图标 ---- */
         @media (min-width: 1025px) {
-            .admin-portal.is-collapsed .admin-group-label,
-            .admin-portal.is-collapsed .admin-user-meta {
+            .admin-portal.is-collapsed .admin-group-label {
                 position: absolute; opacity: 0; pointer-events: none;
             }
             .admin-portal.is-collapsed .admin-sidebar-toggle i { transform: rotate(180deg); }
@@ -202,7 +182,6 @@
                 opacity: 0; pointer-events: none;
             }
             .admin-portal.is-collapsed .admin-nav a:hover::after { opacity: 1; }
-            .admin-portal.is-collapsed .admin-user-badge { justify-content: center; padding-left: 0; padding-right: 0; }
         }
 
         /* ---- 深色主题：与前台共用 html[data-theme="dark"] ---- */
@@ -296,7 +275,49 @@
                 <a class="nav-item" href="employment.html">就业对接</a>
             </div>
             <div class="nav-actions">
+                <!-- 与前台 .nav-actions 保持同序同款：消息中心 → 大字模式 → 主题 → 账号。
+                     缺一个就少一个能力（前台登录用户全都有），顺序不同会显得后台是另一套东西。 -->
+                <div class="teacher-quick-menu" id="admin-quick-menu">
+                    <div class="msg-center-wrap">
+                        <button class="icon-btn" id="quick-message-btn" title="消息通知">
+                            <i class="fas fa-bell"></i>
+                            <span class="badge is-hidden" id="message-badge">0</span>
+                        </button>
+                        <div class="msg-dropdown" id="msg-dropdown">
+                            <div class="msg-dropdown-header">
+                                <h4>消息中心</h4>
+                                <div class="msg-dropdown-actions">
+                                    <button id="msg-unread-jump" class="msg-unread-jump is-hidden" title="查看未读通知">
+                                        <span id="msg-unread-jump-count">0</span>
+                                    </button>
+                                    <button id="msg-mark-all-read" title="全部已读"><i class="fas fa-check-double"></i></button>
+                                    <button id="msg-clear-read" title="清除已读"><i class="fas fa-trash-can"></i></button>
+                                </div>
+                            </div>
+                            <div class="msg-dropdown-tabs">
+                                <button class="msg-tab-btn active" data-tab="unread"><i class="fas fa-bell"></i> 未读</button>
+                                <button class="msg-tab-btn" data-tab="read"><i class="fas fa-envelope-open"></i> 已读</button>
+                                <button class="msg-tab-btn" data-tab="messages"><i class="fas fa-envelope"></i> 我的对话</button>
+                            </div>
+                            <div class="msg-dropdown-body" id="msg-notifications-list">
+                                <div class="msg-empty">暂无通知</div>
+                            </div>
+                            <div class="msg-dropdown-body is-hidden" id="msg-messages-list">
+                                <div class="msg-empty">暂无私信</div>
+                            </div>
+                            <div class="msg-dropdown-footer">
+                                <button id="msg-compose-btn"><i class="fas fa-pen"></i> 写消息</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <button class="icon-btn large-text-toggle" id="large-text-toggle" aria-label="切换大字模式" aria-pressed="false" title="大字模式">
+                    <i class="fas fa-text-height"></i>
+                </button>
                 <button class="icon-btn" id="admin-theme-toggle" aria-label="切换主题" title="切换主题"><i class="fas fa-moon"></i></button>
+                <div class="connection-dot" id="connection-status">
+                    <span class="dot"></span>
+                </div>
                 <div class="user-info" id="admin-user-info">
                     <div class="user-avatar-wrap" id="admin-user-trigger">
                         <div class="avatar-circle"><i class="fas fa-user-shield"></i></div>
@@ -340,15 +361,6 @@
                 <a href="#" data-page="announcements" data-tip="系统公告"><i class="fas fa-bullhorn"></i><span>系统公告</span></a>
                 <a href="#" data-page="content" data-tip="内容监管"><i class="fas fa-shield"></i><span>内容监管</span></a>
             </nav>
-            <div class="admin-sidebar-foot">
-                <div class="admin-user-badge">
-                    <div class="avatar" id="sidebar-avatar">管</div>
-                    <div class="admin-user-meta">
-                        <span class="admin-user-name" id="sidebar-name">系统管理员</span>
-                        <span class="admin-user-role">超级管理员</span>
-                    </div>
-                </div>
-            </div>
         </aside>
         <div class="portal-main">
             <div class="portal-topbar">
@@ -440,7 +452,37 @@
 <script>window.APP_CONFIG={apiBaseUrl:''};</script>
 <script src="js/core.js"></script>
 <script src="portal.js"></script>
+<script src="js/message-center.js"></script>
 <script>
+// ---- 大字模式（无障碍）：与前台共用 yuexiang_large_text，逻辑与 script.js 一致 ----
+function setupLargeTextToggle() {
+    var btn = document.getElementById('large-text-toggle');
+    if (!btn) return;
+    var saved = false;
+    try { saved = localStorage.getItem('yuexiang_large_text') === '1'; } catch (e) { /* 隐私模式忽略 */ }
+    applyLargeText(saved);
+    btn.addEventListener('click', function () {
+        var next = document.documentElement.dataset.largeText !== '1';
+        applyLargeText(next);
+        try { localStorage.setItem('yuexiang_large_text', next ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+    });
+}
+function applyLargeText(on) {
+    var root = document.documentElement;
+    if (on) { root.dataset.largeText = '1'; } else { delete root.dataset.largeText; }
+    var btn = document.getElementById('large-text-toggle');
+    if (btn) btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+setupLargeTextToggle();
+
+// ---- 连接状态小圆点：与前台 checkConnection 同一接口 ----
+(function () {
+    apiCall('/api/health').then(function () {
+        var dot = document.querySelector('#connection-status .dot');
+        if (dot) dot.classList.add('connected');
+    }).catch(function () { /* 离线就保持灰色 */ });
+})();
+
 // ---- 主题开关：与前台共用 yuexiang_theme，同一套门户变量随之切换 ----
 (function () {
     var btn = document.getElementById('admin-theme-toggle');
@@ -534,8 +576,42 @@
     document.addEventListener('click', function () { menu.classList.add('is-hidden'); });
     menu.addEventListener('click', function (e) { e.stopPropagation(); });
     var logoutBtn = document.getElementById('admin-logout-btn');
-    if (logoutBtn) logoutBtn.addEventListener('click', function () { PORTAL.logout(); });
+    if (logoutBtn) logoutBtn.addEventListener('click', function () {
+        // 先停消息中心轮询再登出，避免退出后还在打未读接口
+        if (window.MessageCenter) MessageCenter.stop();
+        PORTAL.logout();
+    });
 })();
+
+// ---- 消息中心依赖的三个通用件（主站由 script.js 提供，这里各补一份）----
+// 后台不引 script.js（那会把整个主站逻辑拖进来），只补齐消息中心用到的部分。
+// 后台已有的 toast 组件位置固定、自动消失，正好当轻量通知用
+function showAdminNotification(message, type) { showAdminToast(message, type === 'error'); }
+
+// 通用详情弹窗：通知详情 / 会话窗口都走它（复用前台 .modal-overlay 结构）
+function showDetailModal(title, html, icon) {
+    document.querySelectorAll('.modal-overlay.detail-modal').forEach(function (m) { m.remove(); });
+    var modal = document.createElement('div');
+    modal.className = 'modal-overlay detail-modal';
+    modal.style.display = 'flex';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    var iconHtml = icon ? '<i class="fas ' + icon + ' modal-title-icon" aria-hidden="true"></i>' : '';
+    modal.innerHTML = '<div class="modal-content">'
+        + '<div class="modal-header"><h3>' + iconHtml + escapeHtml(title) + '</h3>'
+        + '<button class="modal-close detail-close" aria-label="关闭"><i class="fas fa-times"></i></button></div>'
+        + '<div class="modal-body">' + html + '</div>'
+        + '</div>';
+    document.body.appendChild(modal);
+    modal.querySelector('.detail-close').addEventListener('click', function () { modal.remove(); });
+    modal.addEventListener('click', function (e) { if (e.target === modal) modal.remove(); });
+}
+
+// 后台页始终是登录态进来的，不会出现「去登录」入口；留空只为满足调用契约
+function bindLoginCta(root) {}
+
+// 消息中心内部按名字调用 showNotification，接到后台的 toast
+var showNotification = showAdminNotification;
 
 // ---- 顶栏滚动投影（与前台 .navbar.scrolled 同一效果） ----
 (function () {
@@ -552,10 +628,10 @@
     });
 })();
 
-PORTAL.init('super_admin', 'sidebar-name', function () {
+// 第二个参数原本指向侧栏底部的用户名节点，侧栏底部徽标已删，改为顶栏账号区
+PORTAL.init('super_admin', 'admin-user-name', function () {
     var user = AppState.user || {};
     var name = user.name || '系统管理员';
-    document.getElementById('sidebar-avatar').textContent = '管';
     var nameEl = document.getElementById('admin-user-name');
     if (nameEl) nameEl.textContent = name;
     var dropName = document.getElementById('admin-dropdown-name');
@@ -563,6 +639,8 @@ PORTAL.init('super_admin', 'sidebar-name', function () {
     var dropId = document.getElementById('admin-dropdown-id');
     if (dropId) dropId.textContent = user.id || '';
     loadDashboard();
+    // 会话就绪后再启动消息中心：红点要按当前登录账号查，init 时 AppState 还没填
+    if (window.MessageCenter) { MessageCenter.init(); MessageCenter.start(); }
 });
 
 PORTAL.onPageChange(function(p) {

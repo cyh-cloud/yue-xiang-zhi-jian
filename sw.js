@@ -230,7 +230,14 @@
 //      ② 无对话对象的通知（系统公告 / 公告 / 实训批改）点击后弹详情弹窗，展示完整标题、
 //         类型标签、正文与时间 —— 列表里只有两行截断摘要，公告正文与批改评语点开才能看全。
 //         有对话对象的（企业通知 / 互动）仍跳会话窗口。
-const CACHE_NAME = 'yuexiang-v69';
+// v70（2026-10-13）：后台管理页顶栏补齐前台同款能力 + 消息中心抽成共享模块 ——
+//      ① admin.html 顶栏右侧补上「消息中心 / 大字模式 / 主题 / 连接状态圆点」，顺序与前台
+//         .nav-actions 一致（此前只有主题 + 账号下拉，后台登录用户看不到通知、也不能放大字）；
+//      ② 侧栏底部「当前登录账号」徽标删除（顶栏头像区已显示姓名 + 角色，同一信息两处展示）；
+//      ③ 消息中心整块从 script.js 搬到 js/message-center.js，主站与 admin.html 共用，
+//         顺带把 isNotifEnabled / setNotifEnabled 一并搬过去（后台不引 script.js，缺这两个
+//         函数会让铃铛一点就抛 ReferenceError）。
+const CACHE_NAME = 'yuexiang-v70';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -244,6 +251,7 @@ const STATIC_ASSETS = [
     '/styles.css',
     '/script.js',
     '/js/core.js',
+    '/js/message-center.js',
     'https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css'
 ];
 
