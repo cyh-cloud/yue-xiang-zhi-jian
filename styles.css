@@ -2700,6 +2700,17 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
 [data-theme="dark"] .guide-cat-head { border-bottom-color: var(--border); }
 
 /* ==================== Simulation Panels ==================== */
+/* 诊断面板展开动画：从上方轻移入位，0.5s 内完成。
+   展开时不再 scrollIntoView 把页面强行拉到底部（会把用户正在看的区域顶出视口），
+   改成在原地滑出，用户想看自己往下滚。 */
+@keyframes panelSlideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.sim-panel.is-opening {
+    animation: panelSlideDown 0.5s var(--ease-out);
+}
+
 .sim-panel {
     background: var(--bg-secondary);
     border: 1px solid var(--border-light);

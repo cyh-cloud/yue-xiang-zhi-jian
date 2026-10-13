@@ -2498,6 +2498,29 @@ let farmingCalendarData = null;
 let farmingCalendarReqSeq = 0;
 // 当前用户已订阅的作物 id 列表（供「订阅提醒」摘要条同步显示，不依赖全站通知链路）
 let farmingSubscribedIds = [];
+// 农事数据加载态的延时定时器（见 scheduleFarmingLoading）
+let farmingLoadingTimer = null;
+// 加载态延后出现：翻月 / 切换作物的请求走本地接口，往返常在 50ms 上下，
+// 一上来就写「农事数据加载中」只会在数据到位前闪一下，看着像界面抖了一下。
+// 超过 1s 仍未返回才提示，既不误判「点了没反应」，也不做无意义的闪现。
+const FARMING_LOADING_DELAY_MS = 1000;
+
+function scheduleFarmingLoading(seq) {
+    clearTimeout(farmingLoadingTimer);
+    farmingLoadingTimer = setTimeout(() => {
+        farmingLoadingTimer = null;
+        if (seq !== farmingCalendarReqSeq) return;   // 已有更新的请求，不再回写旧月份
+        const grid = document.getElementById('calendar-grid');
+        const taskList = document.getElementById('farming-task-list');
+        if (grid) grid.innerHTML = '<div class="calendar-loading">农事数据加载中…</div>';
+        if (taskList) showSkeleton(taskList, 'row', 2);
+    }, FARMING_LOADING_DELAY_MS);
+}
+
+function cancelFarmingLoading() {
+    clearTimeout(farmingLoadingTimer);
+    farmingLoadingTimer = null;
+}
 
 function setupCalendar() {
     document.getElementById('prev-month')?.addEventListener('click', () => {
@@ -2535,17 +2558,16 @@ async function updateFarmingCalendar() {
 
     if (monthLabel) monthLabel.textContent = `${month + 1}月`;
 
-    // 加载态（避免请求期间白屏）
-    calendarGrid.innerHTML = '<div class="calendar-loading">农事数据加载中…</div>';
-    if (taskList) showSkeleton(taskList, 'row', 2);
-
     const seq = ++farmingCalendarReqSeq;
+    // 加载态延后出现（请求快时不要闪）
+    scheduleFarmingLoading(seq);
     let data;
     try {
         // 不传 year：由后端按服务器当前年计算节气（年周期模板，逐年复现）
         data = await apiCall(`/api/agriculture/calendar/${encodeURIComponent(product)}?month=${month + 1}`);
     } catch (e) {
         if (seq !== farmingCalendarReqSeq) return;
+        cancelFarmingLoading();
         farmingCalendarData = null;
         hideFarmingNotices();
         showErrorState(calendarGrid, '农事数据加载失败，请重试', () => updateFarmingCalendar());
@@ -2553,6 +2575,7 @@ async function updateFarmingCalendar() {
         return;
     }
     if (seq !== farmingCalendarReqSeq) return;          // 已有更新的请求，丢弃本次
+    cancelFarmingLoading();
     if (!data || !data.success) {
         farmingCalendarData = null;
         hideFarmingNotices();
@@ -2560,6 +2583,7 @@ async function updateFarmingCalendar() {
         if (taskList) taskList.innerHTML = '';
         return;
     }
+    cancelFarmingLoading();
     farmingCalendarData = data;
 
     // 数据依据入口：仅在有来源可列时挂出，点击展开该作物全年来源方向（不放说明性文案）
@@ -2974,12 +2998,20 @@ function setupPestDiagnosisEntry() {
         panel.classList.toggle('is-hidden', !willShow);
         if (willShow) {
             initPestDiagnosis();
-            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            // 展开：在原位滑出，不把页面拉走
+            panel.classList.remove('is-opening');
+            void panel.offsetWidth; // 强制重排以重启动画
+            panel.classList.add('is-opening');
             if (toggleBtn) toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> 收起诊断面板';
         } else if (toggleBtn) {
             toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> 展开诊断面板';
         }
     }
+
+    // 动画播完即撤下类名，避免残留状态影响下一次展开
+    panel?.addEventListener('animationend', (e) => {
+        if (e.animationName === 'panelSlideDown') panel.classList.remove('is-opening');
+    });
 
     entryCard?.addEventListener('click', () => togglePanel());
     toggleBtn?.addEventListener('click', (e) => {

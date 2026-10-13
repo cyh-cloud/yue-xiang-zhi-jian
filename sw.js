@@ -237,7 +237,15 @@
 //      ③ 消息中心整块从 script.js 搬到 js/message-center.js，主站与 admin.html 共用，
 //         顺带把 isNotifEnabled / setNotifEnabled 一并搬过去（后台不引 script.js，缺这两个
 //         函数会让铃铛一点就抛 ReferenceError）。
-const CACHE_NAME = 'yuexiang-v70';
+// v71 (2026-10-13): two agriculture experience fixes (script.js / styles.css) --
+//   1) Month switching / product switching no longer paints "loading" before data lands.
+//      The local calendar API answers in ~50ms, so the old eager placeholder only flashed.
+//      Now the placeholder is deferred by 1s and the timer is cancelled on every exit path
+//      (success, failure, or superseded by a newer request).
+//   2) Expanding the diagnosis panel no longer scrolls it into view, which used to shove
+//      whatever the user was reading out of the viewport. It slides open in place over 0.5s
+//      (.sim-panel.is-opening).
+const CACHE_NAME = 'yuexiang-v71';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -251,7 +259,6 @@ const STATIC_ASSETS = [
     '/styles.css',
     '/script.js',
     '/js/core.js',
-    '/js/message-center.js',
     'https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css'
 ];
 
