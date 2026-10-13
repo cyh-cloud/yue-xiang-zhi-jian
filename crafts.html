@@ -173,6 +173,43 @@
                 <!-- 文化背景 -->
                 <div class="craft-intro" id="craft-intro"></div>
 
+                <!-- 视频教学 -->
+                <!-- 学员走查（2026-10-12）：3D 互动上方补一块能直接看演示视频的区域。
+                     2026-10-13 改为「视频卡列表」：每种手工艺配 4 条视频（后端 CRAFTS_KNOWLEDGE[cid].videos），
+                     点卡才在本页内嵌播放器播放 —— 首屏只出封面，不预加载 4 个 iframe。
+                     卡片版式参考 BewlyCat 的 VideoCard：16:9 封面 + 底部渐变数据条 + 两行标题 + 作者行。
+                     视频文件不落到本站，省流量也不占 uploads。 -->
+                <div class="card-section" id="craft-video-section">
+                    <h3 class="card-section-title"><i class="fas fa-video"></i> 视频教学</h3>
+                    <!-- 播放器：点卡片后把 B 站 embed 塞进来，未点选时整块收起 -->
+                    <div class="craft-video-stage is-hidden" id="craft-video-stage">
+                        <div class="craft-video-stage-bar">
+                            <span class="craft-video-stage-title" id="craft-video-stage-title"></span>
+                            <button class="icon-btn" id="craft-video-close" aria-label="收起播放器" title="收起播放器">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="craft-video-frame">
+                            <div class="craft-video-placeholder" id="craft-video-placeholder">
+                                <i class="fas fa-circle-notch fa-spin"></i>
+                                <p id="craft-video-status">视频加载中...</p>
+                            </div>
+                            <iframe
+                                id="craft-video-player"
+                                class="craft-video-iframe is-hidden"
+                                title="手工艺教学演示视频"
+                                scrolling="no"
+                                frameborder="0"
+                                allowfullscreen="true"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                                referrerpolicy="no-referrer-when-downgrade"></iframe>
+                        </div>
+                    </div>
+                    <!-- 视频卡列表 -->
+                    <div class="craft-video-grid" id="craft-video-list"></div>
+                    <p class="craft-video-source" id="craft-video-source"></p>
+                </div>
+
                 <!-- 3D教学 -->
                 <div class="card-section">
                     <div class="panel-header">

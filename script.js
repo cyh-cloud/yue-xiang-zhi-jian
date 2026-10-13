@@ -920,6 +920,8 @@ async function updateCraftSteps() {
         if (data.success && data.data) {
             // 渲染文化背景卡（② 2026-10-06：展示 history/origin/name，让非遗不只技法）
             renderCraftIntro(data.data);
+            // 渲染视频教学（与手工艺联动，见 renderCraftVideo）
+            renderCraftVideo(data.data);
 
             // 渲染步骤
             if (data.data.steps && data.data.steps.length > 0) {
@@ -961,6 +963,8 @@ async function updateCraftSteps() {
         }
     } catch(e) {
         showErrorState(container, '加载手工艺步骤失败', () => updateCraftSteps());
+        // 视频区同样回到错误态：不沿用上一个手工艺的视频，也不留假的「加载中」
+        showCraftVideoError('视频加载失败，请稍后重试');
         // 材料指南同样回到错误态并提供重试，不留旧数据
         if (materialsSection) {
             showErrorState(materialsSection, '材料采购指南加载失败', () => updateCraftSteps());
@@ -993,6 +997,140 @@ function renderCraftIntro(craft) {
             </div>
         </div>
     `;
+}
+
+// ② 视频教学：每种手工艺一组视频卡（2026-10-13 学员走查「一个视频不够」）。
+// 数据来自后端 CRAFTS_KNOWLEDGE[cid].videos，卡片版式参考 BewlyCat 的 VideoCard：
+// 16:9 封面 + 封面底部渐变数据条（播放量/弹幕/点赞 + 右下角时长）+ 两行标题 + 作者行。
+// 点卡片才把 B 站 embed 塞进页面顶部的播放器 —— 首屏只出封面，不预加载 4 个 iframe
+// （每个 iframe 都是一个完整播放器实例，预载会让首屏明显变卡）。
+function renderCraftVideo(craft) {
+    const list = document.getElementById('craft-video-list');
+    const player = document.getElementById('craft-video-player');
+    const ph = document.getElementById('craft-video-placeholder');
+    const status = document.getElementById('craft-video-status');
+    const source = document.getElementById('craft-video-source');
+    const section = document.getElementById('craft-video-section');
+    const videos = (craft && craft.videos) || [];
+    // 没配视频的工艺：整块收起，不留空壳误导用户
+    if (!videos.length) {
+        if (section) section.style.display = 'none';
+        if (player) player.removeAttribute('src');
+        closeCraftVideoStage();
+        return;
+    }
+    if (section) section.style.display = '';
+    // 换手工艺时收起播放器并清掉 src，避免上一个工艺的视频继续在后台播放
+    closeCraftVideoStage();
+    if (list) {
+        list.innerHTML = videos.map(craftVideoCardHtml).join('');
+        list.querySelectorAll('.craft-video-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const idx = parseInt(card.dataset.videoIndex, 10);
+                playCraftVideo(videos[idx], idx);
+            });
+        });
+    }
+    if (source) {
+        source.innerHTML = '视频来源：哔哩哔哩，共 ' + videos.length + ' 条；网络不佳时可点封面右下角「在新窗口打开」。';
+    }
+}
+
+// 单张视频卡。cover 是 B 站封面外链，加载失败时退到本站深色占位。
+function craftVideoCardHtml(v, index) {
+    const bvid = escapeHtml(v.bvid || '');
+    const title = escapeHtml(v.title || '手工艺教学演示');
+    const author = escapeHtml(v.author || '哔哩哔哩');
+    const cover = escapeHtml(v.cover || '');
+    const link = 'https://www.bilibili.com/video/' + bvid + '/';
+    return ''
+        + '<article class="craft-video-card" data-video-index="' + index + '">'
+        + '  <div class="craft-video-card-cover">'
+        + (cover
+            ? '    <img src="' + cover + '" alt="' + title + '" loading="lazy" referrerpolicy="no-referrer" onerror="this.classList.add(\'is-failed\')">'
+            : '    <div class="craft-video-card-cover-fallback"><i class="fas fa-film"></i></div>')
+        + '    <div class="craft-video-card-stats">'
+        + '      <span class="craft-video-card-stat"><i class="fas fa-play-circle"></i>' + formatVideoCount(v.view) + '</span>'
+        + '      <span class="craft-video-card-stat"><i class="fas fa-comment-dots"></i>' + formatVideoCount(v.danmaku) + '</span>'
+        + '      <span class="craft-video-card-stat"><i class="fas fa-thumbs-up"></i>' + formatVideoCount(v.like) + '</span>'
+        + '      <span class="craft-video-card-duration">' + formatVideoDuration(v.duration) + '</span>'
+        + '    </div>'
+        + '    <span class="craft-video-card-play"><i class="fas fa-play"></i></span>'
+        + '  </div>'
+        + '  <h4 class="craft-video-card-title" title="' + title + '">' + title + '</h4>'
+        + '  <div class="craft-video-card-meta">'
+        + '    <span class="craft-video-card-author"><i class="fas fa-user"></i>' + author + '</span>'
+        + '    <a class="craft-video-card-external" href="' + link + '" target="_blank" rel="noopener noreferrer"'
+        + '       title="在新窗口打开" aria-label="在新窗口打开"><i class="fas fa-external-link-alt"></i></a>'
+        + '  </div>'
+        + '</article>';
+}
+
+// 播放指定视频：展开播放器并写入 embed 地址
+function playCraftVideo(video, index) {
+    const player = document.getElementById('craft-video-player');
+    const ph = document.getElementById('craft-video-placeholder');
+    const status = document.getElementById('craft-video-status');
+    const stage = document.getElementById('craft-video-stage');
+    const stageTitle = document.getElementById('craft-video-stage-title');
+    if (!video || !video.bvid || !player) return;
+    if (stageTitle) stageTitle.textContent = video.title || '手工艺教学演示';
+    if (stage) stage.classList.remove('is-hidden');
+    player.title = video.title || '手工艺教学演示';
+    player.setAttribute('src', 'https://player.bilibili.com/player.html?bvid=' + escapeHtml(video.bvid) + '&page=1&autoplay=0&high_quality=1');
+    player.classList.remove('is-hidden');
+    if (ph) ph.classList.add('is-hidden');
+    if (status) status.textContent = '视频加载中...';
+    // 高亮当前播放的卡片
+    document.querySelectorAll('.craft-video-card').forEach(c => {
+        c.classList.toggle('is-playing', parseInt(c.dataset.videoIndex, 10) === index);
+    });
+    // 滚到播放器，让用户立刻看到画面（首屏只露出卡片时尤其重要）
+    if (stage) stage.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 收起播放器：撤掉 src 让 iframe 真正卸载，视频不会在后台继续出声
+function closeCraftVideoStage() {
+    const player = document.getElementById('craft-video-player');
+    const stage = document.getElementById('craft-video-stage');
+    if (player) { player.removeAttribute('src'); player.classList.add('is-hidden'); }
+    if (stage) stage.classList.add('is-hidden');
+    document.querySelectorAll('.craft-video-card').forEach(c => c.classList.remove('is-playing'));
+}
+
+// 播放量等大数字按 B 站口径缩写：99.1 万
+function formatVideoCount(n) {
+    const num = parseInt(n, 10) || 0;
+    if (num >= 100000000) return (num / 100000000).toFixed(1).replace(/\.0$/, '') + '亿';
+    if (num >= 10000) return (num / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+    return String(num);
+}
+
+// 秒 → mm:ss / h:mm:ss
+function formatVideoDuration(sec) {
+    const s = parseInt(sec, 10) || 0;
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    const pad = x => String(x).padStart(2, '0');
+    return h > 0 ? h + ':' + pad(m) + ':' + pad(r) : pad(m) + ':' + pad(r);
+}
+
+// 视频区错误态：撤掉播放器，卡片区如实说明失败原因
+function showCraftVideoError(msg) {
+    const ph = document.getElementById('craft-video-placeholder');
+    const status = document.getElementById('craft-video-status');
+    const source = document.getElementById('craft-video-source');
+    const list = document.getElementById('craft-video-list');
+    closeCraftVideoStage();
+    if (list) list.innerHTML = '';
+    if (ph) {
+        ph.classList.remove('is-hidden');
+        const icon = ph.querySelector('i');
+        if (icon) icon.className = 'fas fa-exclamation-circle';
+    }
+    if (status) status.textContent = msg;
+    if (source) source.innerHTML = '';
 }
 
 // ③ 学习进度：每个手工艺独立记录「已完成的步骤数」（持久化到 localStorage）。
@@ -9050,6 +9188,8 @@ function setup3DControls() {
     document.getElementById('multi-angle')?.addEventListener('click', () => cycleAngle());
     // ④ AR 实景查看（移动端增值点）
     document.getElementById('ar-view')?.addEventListener('click', () => activateCraftAR());
+    // 视频播放器收起按钮：撤掉 src，让 B 站播放器真正卸载（不会在后台继续出声）
+    document.getElementById('craft-video-close')?.addEventListener('click', () => closeCraftVideoStage());
     // 初始化时载入默认手工艺（刺绣）的模型
     loadCraftModels();
 }

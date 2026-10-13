@@ -245,7 +245,16 @@
 //   2) Expanding the diagnosis panel no longer scrolls it into view, which used to shove
 //      whatever the user was reading out of the viewport. It slides open in place over 0.5s
 //      (.sim-panel.is-opening).
-const CACHE_NAME = 'yuexiang-v71';
+// v71（2026-10-12）：手工传承板块学员走查三处修正 ——
+//      ① 「3D互动教学」标题此前挂在 .panel-header 上，被 .panel-header h3 的 color:white
+//         盖成白字，压在页面浅色底上等于看不见（styles.css 补 .panel-header h3.card-section-title）；
+//      ② 3D 视口从半行宽改为整行宽 + 高度 360→520px，绣绷这类扁圆形器物才看得清（crafts.html / styles.css）；
+//      ③ 新增「视频教学」区块，嵌入 B 站官方播放器放演示视频（crafts.html / styles.css）。
+// v72（2026-10-13）：视频教学改为「视频卡列表」—— 每种手工艺配 4 条视频
+//      （后端 CRAFTS_KNOWLEDGE 加 videos[]，含封面/作者/时长/播放量/弹幕/点赞），
+//      版式参考 BewlyCat 的 VideoCard：16:9 封面 + 底部渐变数据条 + 两行标题 + 作者行。
+//      点卡片才把 B 站 embed 塞进页面顶部的播放器，首屏只出封面不预加载 4 个 iframe。
+const CACHE_NAME = 'yuexiang-v72';
 const STATIC_ASSETS = [
     '/',
     '/index.html',

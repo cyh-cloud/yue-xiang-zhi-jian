@@ -20,6 +20,12 @@ CRAFTS_KNOWLEDGE = {
         "name": "广绣",
         "origin": "广州",
         "history": "国家级非物质文化遗产，起源于唐代，与苏绣、湘绣、蜀绣并称中国四大名绣。广绣以构图饱满、色彩艳丽、针法多变著称，尤以金银线绣最为独特。",
+        "videos": [
+            {"bvid": "BV1REKq6jEmp", "title": "沉浸式复绣清代广绣｜从起针到成品全过程", "author": "广绣梁绣绣", "duration": 2157, "view": 994, "danmaku": 1, "like": 60, "pubdate": 1784445815, "cover": "http://i0.hdslb.com/bfs/archive/07919cc38aa7737d6620928df4136e8e0f417136.jpg"},
+            {"bvid": "BV1yD4y137Sv", "title": "《南粤工匠》纪录片第十一集-用针线记录时光的末代花佬许炽光", "author": "广东工会", "duration": 1331, "view": 8063, "danmaku": 3, "like": 193, "pubdate": 1676951297, "cover": "http://i2.hdslb.com/bfs/archive/af68850d5196c4792e6e2b10a8817775953b8c15.jpg"},
+            {"bvid": "BV1D34y1E7ui", "title": "广绣耳环绕边教学", "author": "广绣梁绣绣", "duration": 186, "view": 515, "danmaku": 0, "like": 12, "pubdate": 1653275562, "cover": "http://i0.hdslb.com/bfs/archive/af725d27daf591bc0fe16c335f48318dc188237d.jpg"},
+            {"bvid": "BV1ig411Z7oP", "title": "广绣制作过程（花瓶）", "author": "梁晓曼广绣", "duration": 222, "view": 845, "danmaku": 0, "like": 17, "pubdate": 1658566987, "cover": "http://i1.hdslb.com/bfs/archive/da1d1f68819a4101dcd9c94801c9e8ef66f964a7.jpg"},
+        ],
         "steps": [
             {
                 "title": "准备工具与材料",
@@ -89,6 +95,12 @@ CRAFTS_KNOWLEDGE = {
         "name": "潮汕木雕",
         "origin": "潮汕",
         "history": "国家级非物质文化遗产，始于唐代，盛于明清。以多层镂通雕刻技法闻名，作品玲珑剔透、层次分明，常用于建筑装饰、家具和祭祀器具。潮汕金漆木雕与东阳木雕、黄杨木雕、龙眼木雕并称中国四大木雕。",
+        "videos": [
+            {"bvid": "BV1G54y1h7Cz", "title": "【传统工艺】金漆木雕（潮州木雕）（1080p）", "author": "思维什锦店", "duration": 2365, "view": 4447, "danmaku": 2, "like": 81, "pubdate": 1616516053, "cover": "http://i1.hdslb.com/bfs/archive/7f12780df090bf09a5d5af7020f30f35cacd48c8.jpg"},
+            {"bvid": "BV1is21YjERi", "title": "超解压纪录片来了！看金光闪闪的潮州木雕，听有趣的故事。", "author": "广东卫视", "duration": 861, "view": 7570, "danmaku": 1, "like": 124, "pubdate": 1728619788, "cover": "http://i2.hdslb.com/bfs/archive/cd752250c9e61b5458a710827981cd5523281780.jpg"},
+            {"bvid": "BV1cR4y1z7g1", "title": "木雕界的天花板，潮州金漆木雕是如何制作的", "author": "澜日记", "duration": 170, "view": 1052, "danmaku": 0, "like": 18, "pubdate": 1675530848, "cover": "http://i1.hdslb.com/bfs/archive/68a2787cc31476252c9b26e864721084c515848d.jpg"},
+            {"bvid": "BV1Us411Y7RZ", "title": "【探秘非遗】潮州金漆木雕之美", "author": "发现城市之美", "duration": 341, "view": 6244, "danmaku": 8, "like": 83, "pubdate": 1481097934, "cover": "http://i2.hdslb.com/bfs/archive/79496478bd45c84f36b50534fb0468b4e768af52.jpg"},
+        ],
         "steps": [
             {
                 "title": "选材与备料",
@@ -158,6 +170,12 @@ CRAFTS_KNOWLEDGE = {
         "name": "石湾陶艺",
         "origin": "佛山石湾",
         "history": "国家级非物质文化遗产，始于新石器时代，盛于明清。石湾公仔以'胎骨朴拙、釉色斑斓、造型生动'著称，尤以人物陶塑最为出名，被誉为'石湾公仔甲天下'。",
+        "videos": [
+            {"bvid": "BV1QB4y1q7ER", "title": "岭南非遗--石湾陶艺的创作过程，泥土的选择！", "author": "岭南非遗文化", "duration": 250, "view": 1538, "danmaku": 0, "like": 16, "pubdate": 1656490736, "cover": "http://i1.hdslb.com/bfs/archive/bbe52917188bf18aa9771a7e1ed0b847b51afee8.jpg"},
+            {"bvid": "BV1hG411x7G1", "title": "岭南非遗--石湾陶艺的创作过程，釉料的配比！", "author": "岭南非遗文化", "duration": 162, "view": 1045, "danmaku": 0, "like": 19, "pubdate": 1656749151, "cover": "http://i0.hdslb.com/bfs/archive/c87dee231909185993e502f013971ff9b8d310c2.jpg"},
+            {"bvid": "BV1Ymo6YpEiA", "title": "陶塑大师刘泽棉：石湾陶艺的匠心坚守者", "author": "中国手艺网", "duration": 333, "view": 230, "danmaku": 0, "like": 4, "pubdate": 1742779408, "cover": "http://i1.hdslb.com/bfs/archive/f6b183c1bdfecdc1dc36d8512ce78aff5f3afadc.jpg"},
+            {"bvid": "BV1Hq4y1A7BK", "title": "【微纪录片】石湾公仔——泥土里的坚守", "author": "啊蛙啊蛙-", "duration": 301, "view": 2485, "danmaku": 0, "like": 35, "pubdate": 1642131911, "cover": "http://i1.hdslb.com/bfs/archive/381fc795cf9589e6ae90fab1d3a2b3b9c27dde6f.jpg"},
+        ],
         "steps": [
             {
                 "title": "揉泥排气",
@@ -227,6 +245,12 @@ CRAFTS_KNOWLEDGE = {
         "name": "阳江漆器",
         "origin": "阳江",
         "history": "广东省级非物质文化遗产，始于明末清初，以阳江漆器厂为代表。阳江漆器以皮胎漆器闻名，工艺精湛，色彩绚丽，曾是广东重要的出口工艺品。",
+        "videos": [
+            {"bvid": "BV18z4y1o7p4", "title": "【匠心工艺】真正的“国潮”长什么样？傅以周带你走进阳江髹饰技艺", "author": "广东印记", "duration": 181, "view": 3703, "danmaku": 23, "like": 97, "pubdate": 1603942336, "cover": "http://i1.hdslb.com/bfs/archive/b9df8cb4212131d9691a927b155dfc9527425d9a.jpg"},
+            {"bvid": "BV1rW4y1C7of", "title": "阳江漆器", "author": "大脚艺术", "duration": 97, "view": 446, "danmaku": 1, "like": 14, "pubdate": 1654212710, "cover": "http://i2.hdslb.com/bfs/archive/1134c2ebfac381dff1fded6e26393fa616c9b8e6.jpg"},
+            {"bvid": "BV1BG4y1U7qG", "title": "阳江探索之旅，漆器髹饰技艺，为阳江文化建设添光加彩", "author": "曾小旅", "duration": 405, "view": 2659, "danmaku": 0, "like": 7, "pubdate": 1675404369, "cover": "http://i0.hdslb.com/bfs/archive/31aedd10b7370de6790487ec79e938eb79f02f5e.jpg"},
+            {"bvid": "BV1QFYq6CEU8", "title": "解锁 阳江漆器博物馆", "author": "哗友仔", "duration": 58, "view": 18, "danmaku": 0, "like": 0, "pubdate": 1789303709, "cover": "http://i2.hdslb.com/bfs/archive/34871925e13784bdbf7f1a3a374ed0a6c3cd3fa9.jpg"},
+        ],
         "steps": [
             {
                 "title": "制作胎体",

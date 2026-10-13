@@ -1721,6 +1721,16 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
     align-items: center;
     gap: 10px;
 }
+.panel-header h3.card-section-title {
+    /* 手工传承的「3D互动教学」标题挂在 .panel-header 里，而 .panel-header h3 是
+       color: white —— 该卡片背景是页面底色（不是深色 live-panel），
+       白字压在浅色底上等于看不见（2026-10-12 学员走查）。
+       只有明确写 .card-section-title 的选择器在这里才拿得到深色文字色。
+       同时按学员要求改用黑体系字体：--font 首选的 'SF Pro Display' 在 Windows 上
+       缺失，会一路落到 Segoe UI/system-ui，中文标题偏细、远看发虚。 */
+    color: var(--text-primary);
+    font-family: 'Microsoft YaHei', 'SimHei', 'Heiti SC', 'PingFang SC', sans-serif;
+}
 .panel-header-actions { display: flex; align-items: center; gap: 12px; }
 .panel-header .icon-btn { color: rgba(255,255,255,0.6); }
 .panel-header .icon-btn:hover { color: white; background: rgba(255,255,255,0.1); }
@@ -2329,13 +2339,16 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
 /* ==================== 3D Learning ==================== */
 .learning-layout {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    /* 3D 视口占整行，步骤列表落到下一行（学员走查：模型区原先只有半行宽，
+       广绣绣绷这类扁圆形器物在窄格里只剩一条，根本没法观察）。
+       这里用显式两行而不是 grid-auto-flow: column，避免窄屏下被压成一条。 */
+    grid-template-columns: 1fr;
     gap: 24px;
 }
 .viewer-3d {
     background: var(--bg-dark);
     border-radius: var(--radius);
-    min-height: 360px;
+    min-height: 520px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2348,11 +2361,238 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
 /* 3D 模型查看器（model-viewer Web Component） */
 .craft-3d-viewer {
     width: 100%;
-    height: 360px;
-    min-height: 360px;
+    height: 520px;
+    min-height: 520px;
     --poster-color: transparent;
 }
 .craft-3d-viewer.is-hidden { display: none; }
+
+/* ---------- 视频教学（2026-10-12 学员走查新增；2026-10-13 改为视频卡列表） ---------- */
+
+/* 播放器舞台：点卡片后展开，未点选时整块收起 */
+.craft-video-stage.is-hidden { display: none; }
+.craft-video-stage {
+    margin-bottom: 20px;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+.craft-video-stage-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-light);
+}
+.craft-video-stage-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.craft-video-stage-bar .icon-btn { color: var(--text-muted); flex: none; }
+.craft-video-stage-bar .icon-btn:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+.craft-video-stage .craft-video-frame { border-radius: 0; }
+
+/* 视频卡网格：列数随容器宽度自适应（参考 BewlyCat 的 grid-adaptive） */
+.craft-video-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+}
+@media (min-width: 640px) { .craft-video-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .craft-video-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 1200px) { .craft-video-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* 单张视频卡 */
+.craft-video-card {
+    min-width: 0;
+    cursor: pointer;
+    border-radius: var(--radius);
+    transition: var(--transition);
+}
+.craft-video-card:hover { transform: translateY(-2px); }
+.craft-video-card:hover .craft-video-card-title { color: var(--accent-blue); }
+.craft-video-card:hover .craft-video-card-play { opacity: 1; transform: scale(1); }
+/* 封面：16:9，底部渐变数据条压在上面 */
+.craft-video-card-cover {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    background: var(--bg-dark);
+}
+.craft-video-card-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+/* 封面取不到时的占位（外链被拦 / 防盗链） */
+.craft-video-card-cover img.is-failed { visibility: hidden; }
+.craft-video-card-cover:has(img.is-failed)::after,
+.craft-video-card-cover:has(.craft-video-card-cover-fallback)::after {
+    content: '\f008';
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: rgba(255,255,255,0.28);
+    background: var(--bg-dark);
+}
+.craft-video-card-cover-fallback {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: rgba(255,255,255,0.28);
+}
+/* 数据条：播放量 / 弹幕 / 点赞 + 右下角时长，BewlyCat 同款底部渐变 */
+.craft-video-card-stats {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 10px 6px;
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1;
+    pointer-events: none;
+}
+.craft-video-card-stats::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 140%;
+    background: linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 50%, transparent 100%);
+}
+.craft-video-card-stats > * { position: relative; }
+.craft-video-card-stat { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.craft-video-card-stat i { font-size: 0.8rem; }
+.craft-video-card-duration { margin-left: auto; font-weight: 600; }
+/* 封面中央播放按钮：hover 才显现 */
+.craft-video-card-play {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.7);
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    font-size: 1.05rem;
+    opacity: 0;
+    transition: var(--transition);
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+}
+/* 标题：固定两行高度，长短不一时卡片依然齐平 */
+.craft-video-card-title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-primary);
+    margin: 10px 0 6px;
+    min-height: calc(1.35 * 2em);
+    max-height: calc(1.35 * 2em);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    transition: color var(--transition);
+}
+/* 作者行 */
+.craft-video-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.craft-video-card-author {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.craft-video-card-external {
+    margin-left: auto;
+    flex: none;
+    color: var(--text-muted);
+    padding: 4px;
+    border-radius: var(--radius-xs);
+}
+.craft-video-card-external:hover { color: var(--accent-blue); background: var(--bg-tertiary); }
+/* 正在播放的卡片：描边高亮 */
+.craft-video-card.is-playing .craft-video-card-cover {
+    box-shadow: 0 0 0 2px var(--accent-blue);
+}
+.craft-video-card.is-playing .craft-video-card-title { color: var(--accent-blue); }
+
+.craft-video-frame {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--bg-dark);
+}
+.craft-video-frame iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
+}
+.craft-video-frame iframe.craft-video-iframe.is-hidden { display: none; }
+/* 视频占位：与 3D 占位同形（图标 + 一行状态），风格统一 */
+.craft-video-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: rgba(255,255,255,0.45);
+    text-align: center;
+    padding: 20px;
+}
+.craft-video-placeholder i { font-size: 1.6rem; }
+.craft-video-placeholder .fa-exclamation-circle { color: rgba(255,200,120,0.6); }
+.craft-video-placeholder.is-hidden { display: none; }
+.craft-video-source {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.craft-video-source a { color: var(--accent-blue); }
+.craft-video-source a:hover { text-decoration: underline; }
+.craft-video-source i { margin-left: 4px; font-size: 0.7rem; }
 /* 多模型切换标签 */
 .craft-model-tabs {
     display: flex;
@@ -7347,6 +7587,9 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
     .craft-grid, .materials-grid, .cert-grid, .support-grid { grid-template-columns: repeat(2, 1fr); }
     .dashboard-stats { grid-template-columns: 1fr; }
     .footer-content { flex-direction: column; text-align: center; }
+    /* 3D 视口：手机上整行宽后 520px 太高，一屏只剩模型看不见步骤，按屏高收敛 */
+    .viewer-3d { min-height: 340px; }
+    .craft-3d-viewer { height: 340px; min-height: 340px; }
     .user-meta { display: none; }
     .chevron { display: none; }
     .modal-content { max-width: 95%; margin: 10px; }
