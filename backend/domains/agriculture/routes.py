@@ -199,8 +199,12 @@ def ask_agriculture():
         }), 503
 
     try:
-        answer = chat_completion(messages, temperature=0.4, max_tokens=800, timeout=30,
-                                  model=chat_model())
+        # max_tokens 必须带上推理余量：推理模型（step-3.7-flash）会先花额度思考，
+        # 实测一次问答就思考 1200-1600 字，800 的额度会被吃光，正文直接是空串。
+        # 与流式路径（stream_chat_completion 内部已加）保持同一预算口径。
+        answer = chat_completion(messages, temperature=0.4,
+                                  max_tokens=800 + AI_REASONING_TOKEN_RESERVE,
+                                  timeout=30, model=chat_model())
     except Exception as e:
         logger.error("AI问答失败: %s", e)
         return jsonify({
