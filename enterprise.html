@@ -34,6 +34,12 @@
         .ent-resume-grid { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 12px; }
         .ent-resume-grid span { font-size: 0.85rem; }
         .ent-resume-empty { font-size: 0.88rem; color: var(--portal-text-muted); }
+        /* 前台板块入口（侧栏下半区）：后台角色继承普通用户权限后的回主站通道 */
+        .portal-front-nav { border-top: 1px solid var(--portal-sidebar-divider); padding: 10px 0 4px; }
+        .portal-front-nav-label { padding: 4px 20px 6px; font-size: 0.68rem; font-weight: 600; letter-spacing: .06em; color: var(--portal-sidebar-link); opacity: .8; }
+        .portal-front-nav a { display: flex; align-items: center; gap: 10px; padding: 9px 20px; color: var(--portal-sidebar-link); font-size: 0.85rem; text-decoration: none; transition: color .15s, background .15s; }
+        .portal-front-nav a:hover { color: var(--portal-sidebar-text); background: var(--portal-sidebar-link-hover-bg); }
+        .portal-front-nav a i { width: 18px; text-align: center; flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -47,6 +53,16 @@
             <a href="#" data-page="applications"><i class="fas fa-file-alt"></i>简历管理</a>
             <a href="#" data-page="messages"><i class="fas fa-comments"></i>消息</a>
         </nav>
+        <!-- 前台板块入口：后台角色继承普通用户权限，也要能进农业技能 / 电商运营（含直播特训）等页面。
+             放在 <nav> 之外：portal.js 会把 .portal-sidebar nav a 的点击拦成页内切换。 -->
+        <div class="portal-front-nav">
+            <div class="portal-front-nav-label">前台导航</div>
+            <a href="agriculture.html"><i class="fas fa-seedling"></i>农业技能</a>
+            <a href="ecommerce.html"><i class="fas fa-cart-shopping"></i>电商运营</a>
+            <a href="crafts.html"><i class="fas fa-paint-brush"></i>手工传承</a>
+            <a href="resources.html"><i class="fas fa-book-open"></i>本土资源</a>
+            <a href="employment.html"><i class="fas fa-briefcase"></i>就业对接</a>
+        </div>
         <div class="user-badge"><div class="avatar" id="sidebar-avatar">企</div><span id="sidebar-name">企业用户</span></div>
     </aside>
     <div class="portal-main">

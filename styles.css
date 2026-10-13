@@ -946,7 +946,10 @@ button:focus-visible, .btn:focus-visible, a:focus-visible {
 }
 
 /* ==================== Main Content ==================== */
-.main-content { background: var(--bg-primary); }
+/* body 走纵向 flex、主区吃满剩余高度：正文不足一屏时页脚也能贴到视口底部，
+   否则页脚下面会露出一条空白底色（2026-10-13）。 */
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.main-content { background: var(--bg-primary); flex: 1 0 auto; }
 .tab-content {
     display: none;
     padding: 80px 0 120px;

@@ -379,7 +379,7 @@ function updateUserUI() {
     document.getElementById('login-section').classList.add('is-hidden');
     document.getElementById('user-info').classList.remove('is-hidden');
     document.getElementById('user-name').textContent = AppState.user.name;
-    document.getElementById('user-role').textContent = AppState.user.role === 'teacher' ? '教师' : '学员';
+    document.getElementById('user-role').textContent = roleText(AppState.user.role);
     document.getElementById('dropdown-name').textContent = AppState.user.name;
     document.getElementById('dropdown-email').textContent = AppState.user.id;
 
@@ -470,7 +470,7 @@ async function showSettingsModal() {
     const username = profileData?.username || user.id || '';
     const role = profileData?.role || user.role || '';
     const createdAt = profileData?.created_at || '';
-    const roleLabel = role === 'teacher' ? '教师' : '学员';
+    const roleLabel = roleText(role);
     const isDark = document.documentElement.dataset.theme === 'dark';
 
     showDetailModal('', `
@@ -10290,12 +10290,17 @@ function setupRegister() {
 
 // ==================== 角色权限配置 ====================
 
+// 普通用户（学员）能进的板块。后台角色（超管 / 政府 / 企业）继承这一组 ——
+// 他们既要在自己的门户里干活，也要能像普通用户一样用农业技能、电商运营（含直播特训）
+// 等主站功能；各自的门户 tab 追加在后面，入口由 applyRolePortalNavItem 注入导航。
+const STUDENT_TABS = ['agriculture', 'ecommerce', 'crafts', 'resources', 'employment'];
+
 const ROLE_NAV = {
-    student:     ['agriculture', 'ecommerce', 'crafts', 'resources', 'employment'],
-    teacher:     ['agriculture', 'ecommerce', 'crafts', 'resources', 'employment', 'teacher'],
-    super_admin: ['admin'],
-    government:  ['government'],
-    enterprise:  ['enterprise']
+    student:     STUDENT_TABS.slice(),
+    teacher:     STUDENT_TABS.concat('teacher'),
+    super_admin: STUDENT_TABS.concat('admin'),
+    government:  STUDENT_TABS.concat('government'),
+    enterprise:  STUDENT_TABS.concat('enterprise')
 };
 
 const ROLE_DEFAULT = {
@@ -10332,6 +10337,39 @@ function isTabAllowed(tabName, role) {
     return getAllowedTabs(role).includes(tabName);
 }
 
+// 角色中文名：用户卡片与个人设置共用，免得后台角色被一律显示成「学员」
+const ROLE_LABELS = {
+    student: '学员', teacher: '教师',
+    super_admin: '超级管理员', government: '政府', enterprise: '企业'
+};
+
+function roleText(role) {
+    return ROLE_LABELS[role] || '用户';
+}
+
+// 后台角色在主导航里的门户入口：与前台板块同级的一个 nav-item，点了直接进各自门户页。
+// 后台角色继承普通用户权限后，导航需要同时给出「进门户」和「逛主站」两条路。
+const ROLE_PORTAL_NAV = {
+    super_admin: { tab: 'admin', label: '系统管理后台' },
+    government:  { tab: 'government', label: '政府工作台' },
+    enterprise:  { tab: 'enterprise', label: '企业中心' }
+};
+
+function applyRolePortalNavItem(role) {
+    const menu = document.getElementById('nav-menu');
+    if (!menu) return;
+    // 先清掉上一次注入的，避免切换角色后残留旧入口
+    [].forEach.call(menu.querySelectorAll('.role-portal-entry'), el => el.remove());
+    const entry = ROLE_PORTAL_NAV[role];
+    if (!entry) return;
+    const a = document.createElement('a');
+    a.className = 'nav-item role-portal-entry';
+    a.href = TAB_PAGES[entry.tab];
+    a.setAttribute('data-tab', entry.tab);
+    a.textContent = entry.label;
+    menu.insertBefore(a, menu.firstChild);
+}
+
 // ==================== 角色UI切换 ====================
 
 // 该角色在主站是否有真实面板：看 ROLE_DEFAULT 指向的 #xxx-tab 元素存不存在。
@@ -10341,12 +10379,14 @@ function hasMainSitePanel(role) {
     return !!(tab && document.getElementById(tab + '-tab'));
 }
 
-// 无主站面板的角色 → 显示引导卡，把他送到对应门户页（不再是一片空白）。
+// 无主站面板的角色 → 在首页显示引导卡，把他送到对应门户页（不再是一片空白）。
+// 后台角色已继承普通用户权限，各板块页面能正常浏览，所以在板块页上不再顶这张卡
+// （否则农业技能/电商运营的正文会被引导卡挤下去）。
 function applyRolePortalCard(role) {
     const card = document.getElementById('role-portal-card');
     if (!card) return;
     const entry = ROLE_PORTAL[role];
-    if (!entry || hasMainSitePanel(role)) {
+    if (!entry || hasMainSitePanel(role) || currentPageTab() !== 'index') {
         card.classList.add('is-hidden');
         return;
     }
@@ -10362,6 +10402,9 @@ function applyRoleVisibility(role) {
     // 0) 工作台引导卡：无主站面板的角色显示，其余隐藏
     applyRolePortalCard(role);
 
+    // 0.5) 后台角色：在导航最前面插入自己的门户入口（政府工作台 / 系统管理后台…）
+    applyRolePortalNavItem(role);
+
     // 1) 导航栏：只显示该角色允许的 tab，隐藏其余
     document.querySelectorAll('#nav-menu .nav-item').forEach(btn => {
         const tab = btn.getAttribute('data-tab');
@@ -10373,10 +10416,10 @@ function applyRoleVisibility(role) {
         }
     });
 
-    // 2) 页面区域：隐藏不属于该角色的 Hero
+    // 2) 页面区域：Hero 只对「能进主站板块」的角色显示
+    //    （后台角色已继承普通用户权限，所以不再排除他们）
     const hero = document.getElementById('hero');
-    const isPublicRole = (role === 'student' || role === 'teacher');
-    if (hero) hero.classList.toggle('is-hidden', !isPublicRole);
+    if (hero) hero.classList.toggle('is-hidden', !isTabAllowed('agriculture', role));
 
     // 3) 消息中心：所有已登录角色可见（修正理由见 updateUserUI 内注释）
     const quickMenu = document.getElementById('teacher-quick-menu');
@@ -10425,6 +10468,8 @@ function onLoginSuccess() {
 // ==================== 公开视图恢复 ====================
 
 function resetToPublicView() {
+    // 去掉后台角色注入的门户入口，再按未登录态恢复公开导航项
+    [].forEach.call(document.querySelectorAll("#nav-menu .role-portal-entry"), function(el) { el.remove(); });
     // 显示所有公开导航项 (student tabs)
     document.querySelectorAll("#nav-menu .nav-item").forEach(function(btn) {
         var tab = btn.getAttribute("data-tab");

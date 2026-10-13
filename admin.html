@@ -8,19 +8,221 @@
     <link rel="stylesheet" href="portal.css">
     <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        /* ============================================================
+           后台管理页外壳（2026-10-12 重做）：顶部复用前台菜单栏，品牌徽标移到
+           侧栏顶部；左侧侧栏参考 new-api，桌面端可折叠成图标栏、主区随动。
+           ============================================================ */
         :root {
-            --portal-accent: #2e4a75; --portal-accent-hover: #24395c;
-            --portal-sidebar-bg: #1b2c25; --portal-sidebar-divider: #33473d;
-            --portal-sidebar-link-hover-bg: #33473d;
+            --admin-navbar-h: 72px;
+            --admin-sidebar-w-expanded: 244px;
+            --admin-sidebar-w-collapsed: 68px;
+            --admin-sidebar-w: var(--admin-sidebar-w-expanded);
+        }
+        .admin-portal { display: block; }
+        /* 折叠只改这一个变量：侧栏宽度从这里推，主区靠 flex 自动铺开 */
+        .admin-portal.is-collapsed { --admin-sidebar-w: var(--admin-sidebar-w-collapsed); }
+
+        /* ---- 顶部：复用前台菜单栏（左边栏开关 + 徽标，中间导航居中，右侧操作）---- */
+        .admin-navbar .nav-container {
+            position: relative; max-width: none;
+            padding: 0 14px 0 16px; justify-content: center; gap: 0;
+        }
+        .admin-nav-left {
+            position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .admin-navbar .nav-actions {
+            position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+        }
+        .admin-navbar .nav-menu { justify-content: center; }
+        /* 侧栏开关：宽屏收起/展开，窄屏开合抽屉（new-api 的 SidebarTrigger 同款位置） */
+        .admin-sidebar-toggle {
+            width: 32px; height: 32px; flex-shrink: 0;
+            border: none; border-radius: 8px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent; color: var(--text-secondary); font-size: 0.95rem;
+            transition: background .15s, color .15s;
+        }
+        .admin-sidebar-toggle:hover { background: rgba(0,0,0,.05); color: var(--text-primary); }
+        .admin-sidebar-toggle i { transition: transform .2s ease-linear; }
+        html[data-theme="dark"] .admin-sidebar-toggle:hover { background: rgba(255,255,255,.08); }
+
+        /* ⚠️ portal.css 的 `.portal * { margin:0; padding:0 }` 与 styles.css 里的组件
+           同为单类权重，而 portal.css 后加载 —— 门户页里凡是复用 styles.css 的组件
+           （顶栏、下拉、弹窗、表单）都会整块掉 padding。这里按组件补回来。 */
+        .admin-portal .nav-item { padding: 8px 14px; }
+        .admin-portal .user-avatar-wrap { padding: 4px 8px; }
+        .admin-portal .dropdown-header { padding: 14px 16px; }
+        .admin-portal .dropdown-item { padding: 10px 16px; }
+        .admin-portal .modal-header { padding: 20px 24px; }
+        .admin-portal .modal-body { padding: 24px; }
+        .admin-portal .form-group label { margin-bottom: 6px; }
+
+        /* ---- 外壳：菜单栏下方一行 = 侧栏 + 主区 ---- */
+        .admin-shell {
+            display: flex; align-items: stretch;
+            min-height: calc(100vh - var(--admin-navbar-h));
+            margin-top: var(--admin-navbar-h);
+        }
+
+        /* ---- 侧栏 ---- */
+        .admin-portal .admin-sidebar {
+            width: var(--admin-sidebar-w);
+            flex-shrink: 0;
+            display: flex; flex-direction: column;
+            position: sticky; top: var(--admin-navbar-h);
+            height: calc(100vh - var(--admin-navbar-h));
+            background: var(--portal-sidebar-bg);
+            color: var(--portal-sidebar-text);
+            z-index: 30;
+            transition: width .2s ease-linear;
+        }
+        .admin-portal .admin-sidebar a { text-decoration: none; }
+
+        /* 分组标签（new-api 的小字分组标题） */
+        .admin-group-label {
+            padding: 12px 14px 6px; font-size: 0.68rem; font-weight: 600;
+            letter-spacing: .06em; color: var(--portal-sidebar-link); opacity: .85;
+            white-space: nowrap; transition: opacity .15s ease-linear;
+        }
+
+        /* 导航项：图标 + 文字；激活项左侧一条强调色竖条。
+           ⚠️ 选择器都带 .admin-portal 前缀：portal.css 里的 `.portal-sidebar nav a`
+           是「类 + 元素」两级，只用 `.admin-nav a` 压不住它的 padding / border-left / 激活配色。 */
+        .admin-portal .admin-nav {
+            position: relative; display: flex; flex-direction: column; gap: 2px;
+            padding: 14px 12px 10px; overflow: visible;
+        }
+        .admin-portal .admin-nav a, .admin-portal .admin-drawer-front a {
+            position: relative; display: flex; align-items: center; gap: 12px;
+            padding: 10px 12px; border-radius: 10px; font-size: 0.9rem;
+            color: var(--portal-sidebar-link); white-space: nowrap; border-left: none;
+            transition: background .15s, color .15s;
+        }
+        .admin-portal .admin-nav a i, .admin-portal .admin-drawer-front a i {
+            width: 20px; flex-shrink: 0; text-align: center; font-size: 1rem;
+        }
+        .admin-portal .admin-nav a > span, .admin-portal .admin-drawer-front a > span { transition: opacity .15s ease-linear; }
+        .admin-portal .admin-nav a:hover, .admin-portal .admin-drawer-front a:hover {
+            background: var(--portal-sidebar-link-hover-bg); color: var(--portal-sidebar-text);
+        }
+        .admin-portal .admin-nav a.active {
+            background: var(--portal-sidebar-link-hover-bg); color: #fff; font-weight: 600;
+        }
+        .admin-portal .admin-nav a.active::before {
+            content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 20px; border-radius: 0 3px 3px 0; background: var(--portal-accent);
+        }
+        /* 折叠后的悬浮提示，补回被藏起来的文字 */
+        .admin-portal .admin-nav a::after {
+            content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%;
+            transform: translateY(-50%); z-index: 60;
+            padding: 5px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: 500;
+            background: #0b1a14; color: #fff; white-space: nowrap;
+            box-shadow: 0 6px 18px rgba(0,0,0,.28);
+            opacity: 0; pointer-events: none; transition: opacity .15s ease .04s;
+        }
+        .admin-portal:not(.is-collapsed) .admin-nav a::after { content: none; }
+
+        /* 侧栏底部：当前登录账号 */
+        .admin-sidebar-foot {
+            flex-shrink: 0; padding: 12px;
+            border-top: 1px solid var(--portal-sidebar-divider);
+        }
+        .admin-user-badge { position: relative; display: flex; align-items: center; gap: 10px; padding: 4px 6px; }
+        .admin-user-badge .avatar {
+            width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--portal-accent); color: #fff; font-size: 0.85rem; font-weight: 700;
+        }
+        .admin-user-meta { min-width: 0; transition: opacity .15s ease-linear; }
+        .admin-user-name {
+            display: block; font-size: 0.85rem; font-weight: 600;
+            color: var(--portal-sidebar-text); white-space: nowrap;
+            overflow: hidden; text-overflow: ellipsis;
+        }
+        .admin-user-role { display: block; font-size: 0.7rem; color: var(--portal-sidebar-link); }
+
+        /* ---- 主区 ---- */
+        .admin-portal .portal-main {
+            flex: 1; min-width: 0;
+            display: flex; flex-direction: column; overflow: visible;
+        }
+        .admin-portal .portal-topbar {
+            position: sticky; top: var(--admin-navbar-h); z-index: 20;
+            height: var(--portal-topbar-h); flex-shrink: 0;
+            display: flex; align-items: center; justify-content: flex-start; gap: 12px;
+            padding: 0 20px;
+            background: var(--portal-card-bg);
+            border-bottom: 1px solid var(--portal-card-border);
+        }
+        .admin-portal .portal-content {
+            flex: 1; padding: 24px;
+            background: var(--portal-content-bg); overflow: visible;
+        }
+        .admin-page-title { margin: 0 0 12px; font-size: 1rem; font-weight: 600; color: var(--portal-text); }
+        .admin-page-title-gap { margin-top: 22px; }
+
+        /* ---- 窄屏：侧栏收进抽屉（顶栏左上的开关改成开合抽屉）---- */
+        .admin-overlay { display: none; }
+        .admin-drawer-front { display: none; }
+        @media (max-width: 1024px) {
+            .admin-navbar .nav-menu { display: none; }
+            .admin-navbar .brand-name { font-size: 1rem; }
+            .admin-portal .admin-sidebar {
+                position: fixed; top: var(--admin-navbar-h); bottom: 0; left: 0; height: auto;
+                transform: translateX(-100%);
+                transition: transform .25s ease, width .2s ease-linear;
+                z-index: 950; box-shadow: 0 14px 48px rgba(0,0,0,.28);
+            }
+            .admin-portal .admin-sidebar.open { transform: translateX(0); }
+            /* 抽屉态不参与折叠：宽度始终是展开宽度 */
+            .admin-portal.is-collapsed { --admin-sidebar-w: var(--admin-sidebar-w-expanded); }
+            .admin-drawer-front {
+                display: block; margin-top: 4px;
+                border-top: 1px solid var(--portal-sidebar-divider);
+            }
+            .admin-portal .portal-content { padding: 16px; }
+            .admin-overlay.show {
+                display: block; position: fixed; inset: var(--admin-navbar-h) 0 0 0;
+                background: rgba(0,0,0,.45); z-index: 900;
+            }
+        }
+
+        /* ---- 桌面端折叠态：只剩图标 ---- */
+        @media (min-width: 1025px) {
+            .admin-portal.is-collapsed .admin-group-label,
+            .admin-portal.is-collapsed .admin-user-meta {
+                position: absolute; opacity: 0; pointer-events: none;
+            }
+            .admin-portal.is-collapsed .admin-sidebar-toggle i { transform: rotate(180deg); }
+            .admin-portal.is-collapsed .admin-nav a { justify-content: center; padding-left: 0; padding-right: 0; }
+            .admin-portal.is-collapsed .admin-nav a > span {
+                position: absolute; left: calc(100% + 10px);
+                opacity: 0; pointer-events: none;
+            }
+            .admin-portal.is-collapsed .admin-nav a:hover::after { opacity: 1; }
+            .admin-portal.is-collapsed .admin-user-badge { justify-content: center; padding-left: 0; padding-right: 0; }
+        }
+
+        /* ---- 深色主题：与前台共用 html[data-theme="dark"] ---- */
+        html[data-theme="dark"] {
+            --portal-sidebar-bg: #14261f; --portal-sidebar-divider: #2c3f36;
+            --portal-sidebar-link-hover-bg: #24382f;
+            --portal-accent: #8fc0a5; --portal-accent-hover: #6fb894;
             --portal-body-bg: #10201a; --portal-content-bg: #10201a;
             --portal-card-bg: #1b2c25; --portal-card-border: #33473d;
-            --portal-card-shadow: none; --portal-text: #e4ebe6;
-            --portal-text-muted: #93a49a;
+            --portal-card-shadow: none;
+            --portal-text: #e4ebe6; --portal-text-muted: #93a49a;
             --portal-input-bg: #10201a; --portal-input-border: #4a5b52;
-            --portal-table-border: #33473d; --portal-table-th-bg: #10201a;
-            --portal-topbar-bg: #1b2c25;
+            --portal-table-border: #33473d; --portal-table-th-bg: #14261f;
         }
-        .portal-topbar { background: var(--portal-card-bg); }
+        html[data-theme="dark"] .admin-navbar {
+            background: rgba(11,26,20,.9); border-bottom-color: rgba(255,255,255,.07);
+        }
+        html[data-theme="dark"] .admin-navbar.scrolled {
+            background: rgba(11,26,20,.97); box-shadow: 0 1px 3px rgba(0,0,0,.4);
+        }
         /* 内容审核：状态筛选页签（2026-10-08） */
         .review-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
         .rtab {
@@ -42,7 +244,11 @@
         #dash-stats, #dash-inventory { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
         .stat-card[onclick] { cursor: pointer; }
         .dash-sub { margin-top: 4px; font-size: 0.8rem; color: var(--portal-text-muted); }
-        .dash-note { margin-top: 18px; font-size: 0.8rem; line-height: 1.7; color: var(--portal-text-muted); }
+        .dash-note {
+            margin-top: 20px; padding: 12px 14px; border-radius: 10px;
+            background: var(--portal-table-th-bg); border: 1px solid var(--portal-card-border);
+            font-size: 0.78rem; line-height: 1.75; color: var(--portal-text-muted);
+        }
         /* 排序下拉：固定宽度不参与等分，否则状态页签被挤窄（2026-10-10） */
         #review-sort { flex: 0 0 116px; width: 116px; }
         /* 操作反馈 toast：替代原生 alert（内嵌浏览器会拦对话框，拦了连后面的
@@ -52,6 +258,7 @@
             background: var(--portal-accent); color: #fff; padding: 10px 18px;
             border-radius: 8px; font-size: 0.9rem; opacity: 0; pointer-events: none;
             transition: opacity .25s ease, transform .25s ease; z-index: 2000; max-width: 80vw;
+            box-shadow: 0 8px 24px rgba(0,0,0,.18);
         }
         .admin-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
         .admin-toast.error { background: #b3382f; }
@@ -61,35 +268,97 @@
             padding: 10px; font-size: 0.9rem; resize: vertical;
             background: var(--portal-input-bg); color: var(--portal-text);
         }
+        /* 表格套一张卡片：用户管理 / 讨论帖管理 */
+        .admin-table-card { padding: 0; overflow: hidden; }
+        .admin-table-card table th, .admin-table-card table td { padding: 12px 16px; }
+        .admin-table-card tbody tr:last-child td { border-bottom: none; }
+        .admin-table-card tbody tr:hover { background: var(--portal-table-th-bg); }
     </style>
 </head>
 <body>
-<div class="portal">
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-    <aside class="portal-sidebar" id="portal-sidebar">
-        <div class="logo"><i class="fas fa-shield-alt"></i>系统管理</div>
-        <nav>
-            <a href="#" class="active" data-page="dashboard"><i class="fas fa-tachometer-alt"></i>仪表盘</a>
-            <a href="#" data-page="users"><i class="fas fa-users"></i>用户管理</a>
-            <a href="#" data-page="reviews"><i class="fas fa-check-circle"></i>内容审核</a>
-            <a href="#" data-page="announcements"><i class="fas fa-bullhorn"></i>系统公告</a>
-            <a href="#" data-page="content"><i class="fas fa-shield"></i>内容监管</a>
-        </nav>
-        <div class="user-badge"><div class="avatar" id="sidebar-avatar">管</div><span id="sidebar-name">管理员</span></div>
-    </aside>
-    <div class="portal-main">
-        <div class="portal-topbar">
-            <div style="display:flex;align-items:center;gap:12px">
-                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+<div class="portal admin-portal" id="admin-portal">
+    <!-- 顶部：复用前台菜单栏（左侧开关 + 网站徽标，中间导航居中） -->
+    <nav class="navbar admin-navbar" id="navbar">
+        <div class="nav-container">
+            <div class="admin-nav-left">
+                <button class="admin-sidebar-toggle" id="admin-sidebar-toggle" aria-label="收起侧栏" aria-expanded="true" title="收起侧栏"><i class="fas fa-angles-left"></i></button>
+                <a class="nav-brand" href="index.html">
+                    <div class="brand-logo"><i class="fas fa-seedling"></i></div>
+                    <span class="brand-name">粤乡智匠</span>
+                </a>
+            </div>
+            <div class="nav-menu" id="nav-menu" aria-label="主导航">
+                <a class="nav-item active" href="admin.html" aria-current="page">系统管理后台</a>
+                <a class="nav-item" href="agriculture.html">农业技能</a>
+                <a class="nav-item" href="ecommerce.html">电商运营</a>
+                <a class="nav-item" href="crafts.html">手工传承</a>
+                <a class="nav-item" href="resources.html">本土资源</a>
+                <a class="nav-item" href="employment.html">就业对接</a>
+            </div>
+            <div class="nav-actions">
+                <button class="icon-btn" id="admin-theme-toggle" aria-label="切换主题" title="切换主题"><i class="fas fa-moon"></i></button>
+                <div class="user-info" id="admin-user-info">
+                    <div class="user-avatar-wrap" id="admin-user-trigger">
+                        <div class="avatar-circle"><i class="fas fa-user-shield"></i></div>
+                        <div class="user-meta">
+                            <span class="user-name" id="admin-user-name">系统管理员</span>
+                            <span class="user-role" id="admin-user-role">系统管理员</span>
+                        </div>
+                        <i class="fas fa-chevron-down chevron"></i>
+                    </div>
+                    <div class="dropdown-menu is-hidden" id="admin-user-menu">
+                        <div class="dropdown-header">
+                            <span class="dropdown-name" id="admin-dropdown-name">系统管理员</span>
+                            <span class="dropdown-email" id="admin-dropdown-id">admin_demo</span>
+                        </div>
+                        <div class="dropdown-divider"></div>
+                        <button class="dropdown-item logout" id="admin-logout-btn"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="admin-overlay" id="sidebar-overlay"></div>
+
+    <div class="admin-shell">
+        <aside class="portal-sidebar admin-sidebar" id="portal-sidebar">
+            <!-- 窄屏抽屉里补一份前台导航（宽屏由顶部菜单栏承担） -->
+            <div class="admin-drawer-front">
+                <div class="admin-group-label">前台导航</div>
+                <a href="agriculture.html"><i class="fas fa-seedling"></i><span>农业技能</span></a>
+                <a href="ecommerce.html"><i class="fas fa-cart-shopping"></i><span>电商运营</span></a>
+                <a href="crafts.html"><i class="fas fa-paint-brush"></i><span>手工传承</span></a>
+                <a href="resources.html"><i class="fas fa-book-open"></i><span>本土资源</span></a>
+                <a href="employment.html"><i class="fas fa-briefcase"></i><span>就业对接</span></a>
+            </div>
+            <nav class="admin-nav" aria-label="后台导航">
+                <div class="admin-group-label">系统管理</div>
+                <a href="#" class="active" data-page="dashboard" data-tip="仪表盘"><i class="fas fa-tachometer-alt"></i><span>仪表盘</span></a>
+                <a href="#" data-page="users" data-tip="用户管理"><i class="fas fa-users"></i><span>用户管理</span></a>
+                <a href="#" data-page="reviews" data-tip="内容审核"><i class="fas fa-check-circle"></i><span>内容审核</span></a>
+                <a href="#" data-page="announcements" data-tip="系统公告"><i class="fas fa-bullhorn"></i><span>系统公告</span></a>
+                <a href="#" data-page="content" data-tip="内容监管"><i class="fas fa-shield"></i><span>内容监管</span></a>
+            </nav>
+            <div class="admin-sidebar-foot">
+                <div class="admin-user-badge">
+                    <div class="avatar" id="sidebar-avatar">管</div>
+                    <div class="admin-user-meta">
+                        <span class="admin-user-name" id="sidebar-name">系统管理员</span>
+                        <span class="admin-user-role">超级管理员</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+        <div class="portal-main">
+            <div class="portal-topbar">
                 <h2 id="page-title">仪表盘</h2>
             </div>
-            <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
-        </div>
         <div class="portal-content">
             <div class="page active" id="page-dashboard">
-                <h3 style="margin:0 0 10px">待处理</h3>
+                <h3 class="admin-page-title">待处理</h3>
                 <div class="stat-grid" id="dash-stats"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
-                <h3 style="margin:20px 0 10px">账号与内容存量</h3>
+                <h3 class="admin-page-title admin-page-title-gap">账号与内容存量</h3>
                 <div class="stat-grid" id="dash-inventory"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
                 <p class="dash-note" id="dash-note"></p>
             </div>
@@ -163,7 +432,8 @@
                 <div class="card"><input type="text" id="ann-title" placeholder="公告标题"><textarea id="ann-content" rows="3" placeholder="公告内容" style="margin-top:8px"></textarea><button class="btn btn-primary" style="margin-top:8px" onclick="publishAnn()">发布公告</button></div>
                 <div id="ann-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div>
             </div>
-            <div class="page" id="page-content"><h3>讨论帖管理</h3><div id="disc-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+            <div class="page" id="page-content"><h3 class="admin-page-title">讨论帖管理</h3><div id="disc-list"><div class="loading-spinner"><i class="fas fa-spinner spin"></i></div></div></div>
+        </div>
         </div>
     </div>
 </div>
@@ -171,8 +441,127 @@
 <script src="js/core.js"></script>
 <script src="portal.js"></script>
 <script>
-PORTAL.init('super_admin', 'sidebar-name', function() {
+// ---- 主题开关：与前台共用 yuexiang_theme，同一套门户变量随之切换 ----
+(function () {
+    var btn = document.getElementById('admin-theme-toggle');
+    function syncIcon() {
+        var dark = document.documentElement.dataset.theme === 'dark';
+        var icon = btn && btn.querySelector('i');
+        if (icon) icon.className = dark ? 'fas fa-sun' : 'fas fa-moon';
+        if (btn) btn.title = dark ? '切换为浅色' : '切换为深色';
+    }
+    syncIcon();
+    if (btn) btn.addEventListener('click', function () {
+        var next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        try { localStorage.setItem('yuexiang_theme', next); } catch (e) { /* 隐私模式忽略 */ }
+        syncIcon();
+    });
+})();
+
+// ---- 侧栏开关（顶栏左上角）：宽屏折叠成图标栏（new-api 的 icon 模式，改一个 CSS
+//      变量、宽度 200ms 过渡），窄屏开合抽屉；两种形态共用一个按钮 ----
+(function () {
+    var shell = document.getElementById('admin-portal');
+    var sidebar = document.getElementById('portal-sidebar');
+    var overlay = document.getElementById('sidebar-overlay');
+    var btn = document.getElementById('admin-sidebar-toggle');
+    if (!shell || !sidebar || !btn) return;
+    var icon = btn.querySelector('i');
+    var KEY = 'yuexiang_admin_sidebar_collapsed';
+    var mq = window.matchMedia('(max-width: 1024px)');
+
+    function syncBtn() {
+        var label;
+        if (mq.matches) {
+            var open = sidebar.classList.contains('open');
+            if (icon) icon.className = 'fas ' + (open ? 'fa-times' : 'fa-bars');
+            label = open ? '关闭菜单' : '打开菜单';
+            btn.setAttribute('aria-expanded', String(open));
+        } else {
+            var collapsed = shell.classList.contains('is-collapsed');
+            if (icon) icon.className = 'fas fa-angles-left';
+            label = collapsed ? '展开侧栏' : '收起侧栏';
+            btn.setAttribute('aria-expanded', String(!collapsed));
+        }
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+    }
+
+    function applyCollapsed(collapsed) {
+        shell.classList.toggle('is-collapsed', !!collapsed);
+        syncBtn();
+    }
+
+    function setDrawer(open) {
+        sidebar.classList.toggle('open', open);
+        if (overlay) overlay.classList.toggle('show', open);
+        syncBtn();
+    }
+
+    var saved = false;
+    try { saved = localStorage.getItem(KEY) === '1'; } catch (e) { /* 隐私模式忽略 */ }
+    applyCollapsed(saved);
+
+    btn.addEventListener('click', function () {
+        if (mq.matches) {
+            setDrawer(!sidebar.classList.contains('open'));
+            return;
+        }
+        var next = !shell.classList.contains('is-collapsed');
+        applyCollapsed(next);
+        try { localStorage.setItem(KEY, next ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+    });
+    if (overlay) overlay.addEventListener('click', function () { setDrawer(false); });
+    // 跨断点后按钮含义会变：收起抽屉，并按新形态刷新图标与文案
+    mq.addEventListener('change', function () { setDrawer(false); syncBtn(); });
+    // Ctrl/Cmd + B，与 new-api 的快捷键一致
+    document.addEventListener('keydown', function (e) {
+        if (!(e.metaKey || e.ctrlKey) || (e.key !== 'b' && e.key !== 'B')) return;
+        if (e.target && e.target.matches && e.target.matches('input, textarea, select')) return;
+        e.preventDefault();
+        btn.click();
+    });
+    syncBtn();
+})();
+
+// ---- 顶栏账号下拉 + 退出登录 ----
+(function () {
+    var trigger = document.getElementById('admin-user-trigger');
+    var menu = document.getElementById('admin-user-menu');
+    if (!trigger || !menu) return;
+    trigger.addEventListener('click', function (e) { e.stopPropagation(); menu.classList.toggle('is-hidden'); });
+    document.addEventListener('click', function () { menu.classList.add('is-hidden'); });
+    menu.addEventListener('click', function (e) { e.stopPropagation(); });
+    var logoutBtn = document.getElementById('admin-logout-btn');
+    if (logoutBtn) logoutBtn.addEventListener('click', function () { PORTAL.logout(); });
+})();
+
+// ---- 顶栏滚动投影（与前台 .navbar.scrolled 同一效果） ----
+(function () {
+    var navbar = document.getElementById('navbar');
+    if (!navbar) return;
+    var ticking = false;
+    window.addEventListener('scroll', function () {
+        if (ticking) return;
+        ticking = true;
+        window.requestAnimationFrame(function () {
+            navbar.classList.toggle('scrolled', window.scrollY > 50);
+            ticking = false;
+        });
+    });
+})();
+
+PORTAL.init('super_admin', 'sidebar-name', function () {
+    var user = AppState.user || {};
+    var name = user.name || '系统管理员';
     document.getElementById('sidebar-avatar').textContent = '管';
+    var nameEl = document.getElementById('admin-user-name');
+    if (nameEl) nameEl.textContent = name;
+    var dropName = document.getElementById('admin-dropdown-name');
+    if (dropName) dropName.textContent = name;
+    var dropId = document.getElementById('admin-dropdown-id');
+    if (dropId) dropId.textContent = user.id || '';
     loadDashboard();
 });
 
@@ -280,7 +669,7 @@ function loadUsers() {
     apiCall('/api/admin/users?search=' + encodeURIComponent(q) + '&role=' + role, 'GET').then(function(r) {
         var list = document.getElementById('user-list');
         if (!r.users || !r.users.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-users"></i><p>暂无用户</p></div>'; return; }
-        list.innerHTML = '<table><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>关联数据</th><th>操作</th></tr></thead><tbody>' +
+        list.innerHTML = '<div class="card admin-table-card"><table><thead><tr><th>用户名</th><th>姓名</th><th>角色</th><th>状态</th><th>关联数据</th><th>操作</th></tr></thead><tbody>' +
             r.users.map(function(u) {
                 // 「能不能删/能不能停用」由后端判定（can_delete / can_suspend），
                 // 前端只负责渲染，不自己下结论 —— 否则「藏了按钮、接口照样能删」等于没拦。
@@ -307,7 +696,7 @@ function loadUsers() {
                     '<td><span class="badge ' + (u.status === 'active' ? 'badge-green' : 'badge-red') + '">' + esc(u.status) + '</span></td>' +
                     '<td>' + relCell + '</td>' +
                     '<td>' + acts + '</td></tr>';
-            }).join('') + '</tbody></table>';
+            }).join('') + '</tbody></table></div>';
     }).catch(function() { document.getElementById('user-list').innerHTML = '<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>加载失败</p></div>'; });
 }
 document.getElementById('user-search').addEventListener('input', loadUsers);
@@ -403,7 +792,10 @@ function loadReviews() {
                 // 职位必须能看清内容再审批。此前只有通用兜底分支（仅显示标题），
                 // 管理员等于"盲审"——看不到公司/薪资/地点/要求/描述（2026-10-06 修复）。
                 var jb = rv.detail;
-                var reqs = (jb.requirements || []).join('、');
+                // requirements 可能是数组，也可能是字符串（如「无」）——字符串没有 join，
+                // 直接调会让整张列表渲染失败（2026-10-12 修）。
+                var reqRaw = jb.requirements;
+                var reqs = Array.isArray(reqRaw) ? reqRaw.join('、') : (reqRaw || '');
                 detailHtml = '<div style="margin-top:8px;font-size:0.9rem;color:var(--portal-text)">' +
                     '<div><strong>职位：</strong>' + esc(jb.title) + '</div>' +
                     '<div><strong>公司：</strong>' + esc(jb.company) + '</div>' +
@@ -538,8 +930,8 @@ function loadContent() {
     apiCall('/api/discussions', 'GET').then(function(r) {
         var list = document.getElementById('disc-list');
         if (!r.discussions || !r.discussions.length) { list.innerHTML = '<div class="empty-state"><i class="fas fa-shield"></i><p>暂无帖子</p></div>'; return; }
-        list.innerHTML = '<table><thead><tr><th>标题</th><th>作者</th><th>时间</th><th>操作</th></tr></thead><tbody>' +
-            r.discussions.map(function(d) { return '<tr><td>' + d.title + '</td><td>' + (d.user_name || '') + '</td><td>' + (d.created_at || '').slice(0, 16) + '</td><td><button class="btn btn-danger btn-sm" onclick="delDisc(' + d.id + ')">删除</button></td></tr>'; }).join('') + '</tbody></table>';
+        list.innerHTML = '<div class="card admin-table-card"><table><thead><tr><th>标题</th><th>作者</th><th>时间</th><th>操作</th></tr></thead><tbody>' +
+            r.discussions.map(function(d) { return '<tr><td>' + d.title + '</td><td>' + (d.user_name || '') + '</td><td>' + (d.created_at || '').slice(0, 16) + '</td><td><button class="btn btn-danger btn-sm" onclick="delDisc(' + d.id + ')">删除</button></td></tr>'; }).join('') + '</tbody></table></div>';
     });
 }
 function delDisc(id) { if (!confirm('确定删除?')) return; apiCall('/api/admin/discussions/' + id, 'DELETE').then(function(r) { alert(r.message); if (r.success) loadContent(); }); }
