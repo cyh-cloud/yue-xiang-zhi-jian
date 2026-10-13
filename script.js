@@ -34,7 +34,7 @@ function initializeApp() {
     checkOnboarding();
     const setupFns = [
         setupNavigation, setupLoginModal,
-        setupProductSelection, setupCraftSelection, setupDialectSelection,
+        setupProductSelection, setupProductFilter, setupCraftSelection, setupDialectSelection,
         setupVoiceInput, setupAgricultureQA, setupCalendar,
         setupPestDiagnosisEntry, setupEventListeners, setupUserDropdown,
         setupCaseButtons, setupEmploymentTab, setupPolicySection,
@@ -790,6 +790,111 @@ function setupProductSelection() {
         // A4：速查的作物筛选同理跟随 —— 同一个页面里「当前作物」只应有一套含义。
         resetPestGuideCropToCurrent();
     });
+}
+
+// 农产品类别筛选与搜索。作物只有 8 个时平铺网格够用，一旦增补到十几个，
+// 用户在整页里滚动找就很吃力。筛选纯前端（卡片本来就在 DOM 里），
+// 不重新请求、不重建节点，因此原有的事件绑定与「当前作物」状态都不受影响。
+const PRODUCT_CATEGORIES = [
+    { id: 'all', label: '全部', icon: '🧺' },
+    { id: 'fruit', label: '水果', icon: '🍎' },
+    { id: 'aquatic', label: '水产', icon: '🐟' },
+    { id: 'crop', label: '作物', icon: '🌾' },
+];
+
+const ProductFilterState = { category: 'all', keyword: '' };
+
+function setupProductFilter() {
+    const cards = document.querySelectorAll('.product-card');
+    // 卡片是静态 HTML；没有卡片（例如以后改成接口渲染）时不要留下半套工具栏
+    if (!cards.length) return;
+
+    renderProductCategoryFilter();
+    syncProductFilter();
+
+    // 类别：事件委托，筛选栏重绘后不必重新绑定
+    const filter = document.getElementById('product-category-filter');
+    if (filter) {
+        filter.addEventListener('click', e => {
+            const btn = e.target.closest ? e.target.closest('.product-category-btn') : null;
+            if (!btn || !filter.contains(btn)) return;
+            const next = btn.getAttribute('data-category') || 'all';
+            if (next === ProductFilterState.category) return;
+            ProductFilterState.category = next;
+            renderProductCategoryFilter();
+            syncProductFilter();
+        });
+    }
+
+    // 搜索：本地过滤，不上行。加防抖，避免逐键重排整个网格。
+    const search = document.getElementById('product-search');
+    if (search) {
+        search.addEventListener('input', debounce(() => {
+            ProductFilterState.keyword = search.value || '';
+            syncProductFilter();
+        }, 120));
+    }
+
+    const clearBtn = document.getElementById('product-search-clear');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            if (search) {
+                search.value = '';
+                search.focus();
+            }
+            ProductFilterState.keyword = '';
+            syncProductFilter();
+        });
+    }
+}
+
+function renderProductCategoryFilter() {
+    const wrap = document.getElementById('product-category-filter');
+    if (!wrap) return;
+
+    // 计数从 DOM 现算，增删卡片不用回来改这里
+    const counts = { all: 0 };
+    document.querySelectorAll('.product-card').forEach(card => {
+        const key = card.dataset.category || '';
+        counts.all += 1;
+        if (key) counts[key] = (counts[key] || 0) + 1;
+    });
+
+    wrap.innerHTML = PRODUCT_CATEGORIES.map(cat => {
+        const active = (ProductFilterState.category || 'all') === cat.id;
+        return '<button type="button" class="product-category-btn' + (active ? ' active' : '') + '"' +
+            ' role="tab" aria-selected="' + (active ? 'true' : 'false') + '"' +
+            ' data-category="' + escapeHtml(cat.id) + '">' +
+            '<span aria-hidden="true">' + escapeHtml(cat.icon) + '</span> ' +
+            escapeHtml(cat.label) +
+            '<span class="product-category-count">' + (counts[cat.id] || 0) + '</span>' +
+            '</button>';
+    }).join('');
+}
+
+function syncProductFilter() {
+    const cards = document.querySelectorAll('.product-card');
+    if (!cards.length) return;
+
+    const category = ProductFilterState.category || 'all';
+    const kw = String(ProductFilterState.keyword || '').trim().toLowerCase();
+    let visible = 0;
+
+    cards.forEach(card => {
+        const inCategory = category === 'all' || card.dataset.category === category;
+        // 卡片文本含名称与描述，搜「岭南」「粮食」这类描述词也能命中
+        const text = (card.textContent || '').toLowerCase();
+        const hitKeyword = !kw || text.indexOf(kw) !== -1;
+        const show = inCategory && hitKeyword;
+        card.classList.toggle('is-filtered-out', !show);
+        if (show) visible += 1;
+    });
+
+    const empty = document.getElementById('product-filter-empty');
+    if (empty) empty.classList.toggle('is-hidden', visible > 0);
+
+    const clearBtn = document.getElementById('product-search-clear');
+    if (clearBtn) clearBtn.classList.toggle('is-hidden', !ProductFilterState.keyword);
 }
 
 // ==================== 手工艺选择 ====================

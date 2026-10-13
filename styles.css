@@ -1025,6 +1025,108 @@ body { min-height: 100vh; display: flex; flex-direction: column; }
 .product-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
 .product-card p { font-size: 0.75rem; opacity: 0.7; }
 
+/* ---- 农产品：类别筛选 / 搜索 / 限高滚动 ---- */
+.product-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+.product-category-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.product-category-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.product-category-btn:hover { border-color: var(--brand-soft); color: var(--brand); }
+.product-category-btn.active {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+}
+[data-theme="dark"] .product-category-btn.active { color: #14261f; }
+.product-category-btn .product-category-count { opacity: 0.7; font-size: 0.82rem; margin-left: 4px; }
+
+.product-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 220px;
+    flex: 0 1 280px;
+}
+.product-search > i {
+    position: absolute;
+    left: 16px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+.product-search input {
+    width: 100%;
+    /* 右侧留出清除按钮的位置，左侧避开放大镜图标 */
+    padding: 10px 38px 10px 38px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.product-search input:focus {
+    outline: none;
+    border-color: var(--brand-soft);
+    box-shadow: 0 0 0 3px var(--brand-tint);
+}
+/* 隐藏浏览器自带的清空叉：本组件右侧已有一个自己的清除按钮，不隐藏会出现两个叉 */
+.product-search input::-webkit-search-cancel-button,
+.product-search input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+.product-search-clear {
+    position: absolute;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: inherit;
+}
+.product-search-clear:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+/* 限高：作物继续增补时只加长滚动条，不让整页无限变长 */
+.product-grid-scroll {
+    max-height: 26rem;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+}
+.product-card.is-filtered-out { display: none; }
+.product-filter-empty {
+    margin: 0;
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+}
+
 /* ==================== Calendar ==================== */
 .calendar-layout {
     display: grid;

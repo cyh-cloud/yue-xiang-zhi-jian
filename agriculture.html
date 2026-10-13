@@ -135,50 +135,71 @@
                 <!-- 产品选择 -->
                 <div class="card-section">
                     <h3 class="card-section-title"><i class="fas fa-tags"></i> 选择农产品</h3>
-                    <div class="product-grid">
-                        <div class="product-card" data-product="lychee">
-                            <div class="product-icon"><i class="fas fa-apple-alt"></i></div>
-                            <h4>荔枝</h4>
-                            <p>广东特色水果</p>
+                    <!-- 类别筛选 + 搜索：作物一多，平铺网格靠滚动找不现实，
+                         先按大类收窄再按名字搜。分类口径写在每张卡的 data-category 上，
+                         增补作物时只改那张卡的属性，筛选栏的计数由脚本自动统计。 -->
+                    <div class="product-toolbar">
+                        <div class="product-category-filter" id="product-category-filter" role="tablist" aria-label="按类别筛选农产品"></div>
+                        <div class="product-search">
+                            <i class="fas fa-search" aria-hidden="true"></i>
+                            <!-- autocomplete="off" 必填：本框是本页第一个可见的文本输入框，
+                                 不加会被浏览器灌入保存过的登录名，把筛选态改写成「0 条」。 -->
+                            <input type="search" id="product-search" maxlength="20" name="product_q"
+                                   autocomplete="off" spellcheck="false"
+                                   placeholder="搜索农产品名称" aria-label="搜索农产品">
+                            <button type="button" class="product-search-clear is-hidden" id="product-search-clear" aria-label="清除搜索">
+                                <i class="fas fa-times"></i>
+                            </button>
                         </div>
-                        <div class="product-card" data-product="longan">
-                            <div class="product-icon"><i class="fas fa-circle"></i></div>
-                            <h4>龙眼</h4>
-                            <p>岭南佳果</p>
+                    </div>
+                    <!-- 限高滚动区：作物继续增补时只加长这里的滚动条，不把整页越拉越长 -->
+                    <div class="product-grid-scroll">
+                        <div class="product-grid" id="product-grid">
+                            <div class="product-card" data-product="lychee" data-category="fruit">
+                                <div class="product-icon"><i class="fas fa-apple-alt"></i></div>
+                                <h4>荔枝</h4>
+                                <p>广东特色水果</p>
+                            </div>
+                            <div class="product-card" data-product="longan" data-category="fruit">
+                                <div class="product-icon"><i class="fas fa-circle"></i></div>
+                                <h4>龙眼</h4>
+                                <p>岭南佳果</p>
+                            </div>
+                            <!-- A3：柑橘、香蕉原本只存在于「诊断面板 / 常见病虫害速查」，
+                                 导致速查里读得到柑橘黄龙病、香蕉枯萎病，却没有农时日历也问不了 AI。
+                                 此处补齐后，顶部作物卡 / 农时日历 / AI 问答 / 诊断 / 速查五处口径一致（均为 8 个）。 -->
+                            <div class="product-card" data-product="citrus" data-category="fruit">
+                                <div class="product-icon"><i class="fas fa-lemon"></i></div>
+                                <h4>柑橘</h4>
+                                <p>广东大宗水果</p>
+                            </div>
+                            <div class="product-card" data-product="banana" data-category="fruit">
+                                <div class="product-icon"><i class="fas fa-leaf"></i></div>
+                                <h4>香蕉</h4>
+                                <p>岭南特色蕉类</p>
+                            </div>
+                            <div class="product-card" data-product="aquatic" data-category="aquatic">
+                                <div class="product-icon"><i class="fas fa-fish"></i></div>
+                                <h4>水产养殖</h4>
+                                <p>鱼虾蟹贝</p>
+                            </div>
+                            <div class="product-card" data-product="rice" data-category="crop">
+                                <div class="product-icon"><i class="fas fa-seedling"></i></div>
+                                <h4>水稻</h4>
+                                <p>主要粮食作物</p>
+                            </div>
+                            <div class="product-card" data-product="tea" data-category="crop">
+                                <div class="product-icon"><i class="fas fa-mug-hot"></i></div>
+                                <h4>茶叶</h4>
+                                <p>广东名茶</p>
+                            </div>
+                            <div class="product-card" data-product="vegetable" data-category="crop">
+                                <div class="product-icon"><i class="fas fa-carrot"></i></div>
+                                <h4>蔬菜</h4>
+                                <p>时令蔬菜</p>
+                            </div>
                         </div>
-                        <!-- A3：柑橘、香蕉原本只存在于「诊断面板 / 常见病虫害速查」，
-                             导致速查里读得到柑橘黄龙病、香蕉枯萎病，却没有农时日历也问不了 AI。
-                             此处补齐后，顶部作物卡 / 农时日历 / AI 问答 / 诊断 / 速查五处口径一致（均为 8 个）。 -->
-                        <div class="product-card" data-product="citrus">
-                            <div class="product-icon"><i class="fas fa-lemon"></i></div>
-                            <h4>柑橘</h4>
-                            <p>广东大宗水果</p>
-                        </div>
-                        <div class="product-card" data-product="banana">
-                            <div class="product-icon"><i class="fas fa-leaf"></i></div>
-                            <h4>香蕉</h4>
-                            <p>岭南特色蕉类</p>
-                        </div>
-                        <div class="product-card" data-product="aquatic">
-                            <div class="product-icon"><i class="fas fa-fish"></i></div>
-                            <h4>水产养殖</h4>
-                            <p>鱼虾蟹贝</p>
-                        </div>
-                        <div class="product-card" data-product="rice">
-                            <div class="product-icon"><i class="fas fa-seedling"></i></div>
-                            <h4>水稻</h4>
-                            <p>主要粮食作物</p>
-                        </div>
-                        <div class="product-card" data-product="tea">
-                            <div class="product-icon"><i class="fas fa-mug-hot"></i></div>
-                            <h4>茶叶</h4>
-                            <p>广东名茶</p>
-                        </div>
-                        <div class="product-card" data-product="vegetable">
-                            <div class="product-icon"><i class="fas fa-carrot"></i></div>
-                            <h4>蔬菜</h4>
-                            <p>时令蔬菜</p>
-                        </div>
+                        <p class="product-filter-empty is-hidden" id="product-filter-empty" role="status">没有匹配的农产品，换个关键词或清空筛选试试。</p>
                     </div>
                 </div>
 
