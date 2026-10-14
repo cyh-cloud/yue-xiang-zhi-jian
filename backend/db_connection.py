@@ -12,8 +12,8 @@
   - busy_timeout=8000：并发写入时最多等 8 秒。
 
 路径仍以仓库根为基准（T02 的约定）：模块日后搬进子目录，库的位置不得跟着漂移。
-环境变量仍是唯一配置入口：VERCEL / VERCEL_ENV 决定目录，YUEXIANG_DB 让测试指向
-一份可弃的库副本，避免 e2e 写坏真实数据。
+环境变量仍是唯一配置入口：YUEXIANG_DB 让测试指向一份可弃的库副本，
+避免 e2e 写坏真实数据。项目已改为自托管单机部署，不再有 serverless 分支。
 """
 
 import os
@@ -21,12 +21,8 @@ import sqlite3
 
 import repo_paths
 
-# Vercel 环境使用 /tmp（可写但非持久），本地环境使用 data/ 目录
-if os.environ.get('VERCEL') or os.environ.get('VERCEL_ENV'):
-    DB_DIR = '/tmp'
-else:
-    # 以仓库根为基准，模块搬进子目录后数据库位置不变
-    DB_DIR = os.path.join(repo_paths.REPO_ROOT, 'data')
+# 以仓库根为基准，模块搬进子目录后数据库位置不变
+DB_DIR = os.path.join(repo_paths.REPO_ROOT, 'data')
 # YUEXIANG_DB 仅供测试覆盖：指向一份可弃的库副本，避免 E2E 写坏真实数据。
 # 不设该变量时行为完全不变（仍用 data/yuexiang.db）。
 DB_PATH = os.environ.get('YUEXIANG_DB') or os.path.join(DB_DIR, 'yuexiang.db')

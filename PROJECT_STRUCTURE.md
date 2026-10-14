@@ -1,68 +1,42 @@
 # 粤乡智匠 - 项目目录结构
 
-```
-粤乡智匠项目/
-├── index.html              # 主页面文件
-├── case-detail.html        # 案例详情页
-├── styles.css              # 样式文件
-├── script.js               # 前端交互脚本
-├── app.py                  # Flask后端应用
-├── run.py                  # 启动脚本
-├── test_app.py             # 测试文件
-├── requirements.txt        # Python依赖包
-└── PROJECT_STRUCTURE.md    # 项目结构说明（本文件）
-```
+本文件描述仓库的职责分区，不枚举具体文件：文件会改名搬家，按职责找才找得准。
 
-## 文件说明
+## 顶层分区
 
-### 前端文件
+| 目录 | 放什么 |
+| --- | --- |
+| `backend/` | 全部后端代码：应用工厂、领域路由蓝图、数据访问层、共享层 |
+| `docs/` | ADR（历史决策）、重构方案、运维说明 |
+| `e2e/` | Playwright 端到端测试与专用启动器 |
+| `tests/` | 领域级单测 |
+| `tools/` | 机械检查（架构边界、Python 静态检查） |
+| `js/` | 跨页复用的前端模块 |
+| `images/` `uploads/` | 静态图片素材、用户上传产物 |
+| `data/` | SQLite 库与运行日志（不进版本库，见 `.gitignore`） |
 
-1. **index.html**
-   - 主页面，包含所有功能模块的HTML结构
-   - 响应式设计，支持移动端访问
-   - 包含导航栏、各个功能标签页、模态框等
+仓库根还放着多页面前端的 HTML 页面、全局样式与脚本，以及 `requirements.txt`
+与 `.env`（配置模板是 `.env.example`）。
 
-2. **case-detail.html**
-   - 成功案例详情独立页面
-   - 通过URL参数 `?id=` 接收案例ID
-   - 从API获取数据并展示案例背景、发展历程、经验启示等
+## 后端分层
 
-3. **styles.css**
-   - CSS样式文件
-   - 采用绿色主题，体现乡村振兴理念
-   - 包含动画效果、响应式布局
+后端按领域拆分，一个领域一个蓝图目录，领域之间不互相 import。改后端前先读
+`docs/adr/0001-backend-domain-split.md`（边界与裁决）与
+`docs/adr/0002-content-into-database.md`（内容落库）。术语见 `GLOSSARY.md`。
 
-3. **script.js**
-   - 前端交互逻辑
-   - 处理导航切换、表单提交、API调用等
-   - 包含农时日历、方言交互等功能
+- **共享层**：`core`（应用工厂、会话与角色鉴权、限流、统一错误响应）、
+  `ai`（上游模型调用的唯一出口）、`shared`（零领域状态的纯函数与纯配置）。
+  共享层不感知任何具体领域。
+- **领域路由层**：`domains/<领域>/`，一个领域一个目录，承载该领域全部 HTTP 接口。
+- **数据访问层**：`db_domains/<领域>.py`，一个领域一个模块。
+- **基础设施**：连接工厂、建表定义、口令散列、播种逻辑，各自独立成模块。
+- **路径基准**：`repo_paths.py` 的 `REPO_ROOT` 指向仓库根（不是 `backend/`），
+  因为 `data/`、`uploads/`、`.env` 都在仓库根。
 
-### 后端文件
+## 部署
 
-4. **app.py**
-   - Flask后端应用主文件
-   - 包含所有API端点：
-     - 农业技能API
-     - 电商运营API
-     - 手工技能API
-     - 虚拟实训API
-     - 本土资源API
-     - 就业对接API
-     - 教师管理API
-     - 用户认证API
-
-5. **run.py**
-   - 应用启动脚本
-   - 自动打开浏览器
-   - 显示启动信息
-
-6. **test_app.py**
-   - 单元测试文件
-   - 测试各个API端点的功能
-
-7. **requirements.txt**
-   - Python依赖包列表
-   - 使用pip install -r requirements.txt安装
+自托管单机：`python backend/run.py` 起一个 Flask 进程，默认多线程，静态文件由
+同一个进程伺服。没有反向代理、没有多 worker、没有 serverless。
 
 ## 功能模块
 
@@ -112,11 +86,13 @@ pip install -r requirements.txt
 
 ### 2. 启动应用
 ```bash
-python run.py
+python backend/run.py
 ```
 
 ### 3. 访问应用
 打开浏览器访问: http://localhost:5000
+
+端口由 `PORT`（环境变量或 `.env`）覆盖，留空或非法时回落 5000。
 
 ## 演示账户
 
@@ -145,3 +121,9 @@ python run.py
 2. AI功能需要网络连接
 3. 建议使用现代浏览器访问
 4. 移动端体验可能有所差异
+
+## 数据库
+
+SQLite 单文件库放在 `data/` 下，`.gitignore` 忽略 `data/*.db`，库文件不进版本库。
+新环境用一份基线库文件还原即可启动；测试与 e2e 用 `YUEXIANG_DB` 指向可弃副本，
+不碰真实库。

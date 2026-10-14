@@ -4,7 +4,7 @@
 
 本文件把数据层的基础设施与领域业务函数重新导出，让 `import database` 加
 `database.xxx()` 的外部调用面在「后端按领域拆分」期间保持不变：app.py、
-api/index.py、run.py、_serve.py、e2e/serve.py、test_app.py 全部只认这个名字。
+run.py、_serve.py、e2e/serve.py、test_app.py 全部只认这个名字。
 
 职责已经搬走的四块（详见各模块自己的文档字符串）：
 

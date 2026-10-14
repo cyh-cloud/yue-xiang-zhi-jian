@@ -141,14 +141,6 @@ class RepoRootPathBaselineTest(unittest.TestCase):
         self.assertEqual(probe.DB_PATH,
                          os.path.join(repo_paths.REPO_ROOT, 'data', 'yuexiang.db'))
 
-    def test_serverless_database_dir_stays_in_tmp(self):
-        original = os.environ.get('VERCEL')
-        os.environ['VERCEL'] = '1'
-        self.addCleanup(self._restore_env, 'VERCEL', original)
-        probe = load_copy(self.probe_dir, 'database.py', 'database_probe_vercel')
-        self.assertEqual(probe.DB_DIR, '/tmp')
-        self.assertEqual(probe.DB_PATH, os.path.join('/tmp', 'yuexiang.db'))
-
     def test_yuexiang_db_override_still_wins(self):
         scratch = tempfile.mkdtemp(prefix='t02_db_')
         self.addCleanup(shutil.rmtree, scratch, ignore_errors=True)
