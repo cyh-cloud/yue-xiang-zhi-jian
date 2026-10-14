@@ -3,20 +3,22 @@
 
 从 app.py 迁出（后端按领域拆分 T17），URL、请求响应结构、状态码、错误码保持不变。
 
-角色把关沿用拆分前的函数内 inline 403 写法，不改成装饰器。
-
 三条口径：
 
 - 发布即 pending，且改内容后重新走审核（否则「先发合规的骗过审核、通过后再改成
   违规内容」会绕过整条审核链路）；
 - 删除只认归属：只能删自己发布的岗位；
 - 「在招职位」只算审核通过的，未通过的单列 pending_jobs。
+
+角色把关走能力表（core.permissions.require_capability），不再逐处写角色名比较。
+本域的岗位增删改与统计都挂在 job.manage 上。
 """
 
 import json
 
 from flask import Blueprint, jsonify, request
 
+from core.permissions import require_capability
 from core.session import get_session_user
 
 import database
@@ -25,10 +27,9 @@ enterprise_bp = Blueprint('enterprise', __name__)
 
 
 @enterprise_bp.route('/api/enterprise/jobs', methods=['GET'])
+@require_capability('job.manage')
 def enterprise_get_jobs():
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     conn = database.get_connection()
     rows = conn.execute(
         "SELECT * FROM job_listings WHERE enterprise_id = ? ORDER BY posted_at DESC",
@@ -48,10 +49,9 @@ def enterprise_get_jobs():
 
 
 @enterprise_bp.route('/api/enterprise/jobs', methods=['POST'])
+@require_capability('job.manage')
 def enterprise_create_job():
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     conn = database.get_connection()
     cursor = conn.cursor()
@@ -75,10 +75,9 @@ def enterprise_create_job():
 
 
 @enterprise_bp.route('/api/enterprise/jobs/<int:job_id>', methods=['PUT'])
+@require_capability('job.manage')
 def enterprise_update_job(job_id):
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     conn = database.get_connection()
     updates = []
@@ -105,10 +104,9 @@ def enterprise_update_job(job_id):
 
 
 @enterprise_bp.route('/api/enterprise/jobs/<int:job_id>', methods=['DELETE'])
+@require_capability('job.manage')
 def enterprise_delete_job(job_id):
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     conn = database.get_connection()
     # 只能删自己发布的岗位（此前不校验归属，任何企业账号都能按 id 删别人的岗位）
     row = conn.execute("SELECT enterprise_id FROM job_listings WHERE id = ?", (job_id,)).fetchone()
@@ -132,10 +130,9 @@ def enterprise_delete_job(job_id):
 # ---- 简历管理 ----
 
 @enterprise_bp.route('/api/enterprise/applications', methods=['GET'])
+@require_capability('job.manage')
 def enterprise_get_applications():
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     conn = database.get_connection()
     # ⚠️ 原先只 JOIN users，**没有 JOIN resumes** → 企业端只能看到申请人姓名/电话/邮箱，
     #   学员在「我的简历」里填的意向岗位、学历、年限、技能、经历**企业完全看不到**，
@@ -163,10 +160,9 @@ def enterprise_get_applications():
 
 
 @enterprise_bp.route('/api/enterprise/applications/<int:app_id>', methods=['PUT'])
+@require_capability('job.manage')
 def enterprise_update_application(app_id):
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     new_status = data.get('status', '')
     if new_status not in ('approved', 'rejected', 'interview'):
@@ -180,10 +176,9 @@ def enterprise_update_application(app_id):
 
 
 @enterprise_bp.route('/api/enterprise/stats', methods=['GET'])
+@require_capability('job.manage')
 def enterprise_get_stats():
     user = get_session_user()
-    if not user or user['role'] != 'enterprise':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     conn = database.get_connection()
     # ⚠️ 「在招职位」只算**审核通过**的：企业刚发布的岗位是 `pending`，学员端只展示
     #    `review_status='approved'`（见 get_job_listings_base）。若这里把未审核岗位也数进去，

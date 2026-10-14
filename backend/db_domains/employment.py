@@ -11,6 +11,11 @@ import json
 import sqlite3
 from db_connection import get_connection
 
+# 本模块的数据归属这个能力域。机械检查（tools/check_architecture.py）与
+# backend/core/permissions.py 的 CAPABILITIES 都以此为准：谁 import 本模块，
+# 谁就必须持 ${cap}.manage（读操作受 ${cap}.read 管）。
+CAPABILITY = 'job'
+
 # 企业端岗位分类的固定枚举。路由层用它拼「分类」下拉，故与业务函数同住就业域。
 ENTERPRISE_JOB_CATEGORIES = ['农业技术', '电商运营', '手工工艺', '乡村旅游', '物流仓储']
 

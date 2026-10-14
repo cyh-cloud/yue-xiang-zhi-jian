@@ -26,6 +26,13 @@ class TestYueXiangApp(unittest.TestCase):
         self.client = app.test_client()
         self.app.config['TESTING'] = True
 
+    def _login(self, username, password='123456'):
+        """登录并返回 session_id（教师端接口都要带 X-Session-Id 头）。"""
+        r = self.client.post('/api/auth/login', data=json.dumps(
+            {'username': username, 'password': password}),
+            content_type='application/json')
+        return json.loads(r.data)['session_id']
+
     def test_index_page(self):
         """测试主页"""
         response = self.client.get('/')
@@ -706,14 +713,21 @@ class TestYueXiangApp(unittest.TestCase):
 
     def test_get_teacher_dashboard(self):
         """测试教师仪表板"""
-        response = self.client.get('/api/teacher/dashboard')
+        # 教师端接口经 @require_role(*TEACHER_ROLES) 把关，未带会话头是 401。
+        # 这里以教师本人身份登录后带 X-Session-Id 请求，断言真实的 200 契约。
+        sid = self._login('teacher_demo', '123456')
+        response = self.client.get('/api/teacher/dashboard',
+                                   headers={'X-Session-Id': sid})
         data = json.loads(response.data)
         self.assertTrue(data['success'])
         self.assertIn('dashboard', data)
 
     def test_get_students(self):
         """测试获取学员列表"""
-        response = self.client.get('/api/teacher/students')
+        # 同上：名册接口要求教师或超级管理员，必须带会话头。
+        sid = self._login('teacher_demo', '123456')
+        response = self.client.get('/api/teacher/students',
+                                   headers={'X-Session-Id': sid})
         data = json.loads(response.data)
         self.assertTrue(data['success'])
         self.assertIn('students', data)

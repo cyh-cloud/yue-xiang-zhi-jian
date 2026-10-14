@@ -12,13 +12,15 @@
 3. 下架是真的下架：is_published=0 后学员端 /api/resources/policies 不再返回该条，
    本域的测试用这条链路锁住它。
 
-角色把关沿用拆分前的函数内 inline 403 写法，不改成装饰器。
+角色把关走能力表（core.permissions.require_capability）：本域只有 policy.manage
+一个能力，列表、发布、改、删、大屏全挂在它上面。
 """
 
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
+from core.permissions import require_capability
 from core.session import get_session_user
 
 import database
@@ -27,19 +29,17 @@ government_bp = Blueprint('government', __name__)
 
 
 @government_bp.route('/api/government/policies', methods=['GET'])
+@require_capability('policy.manage')
 def gov_get_policies():
     user = get_session_user()
-    if not user or user['role'] != 'government':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     policies = database.get_all_government_policies()
     return jsonify({"success": True, "policies": policies})
 
 
 @government_bp.route('/api/government/policies', methods=['POST'])
+@require_capability('policy.manage')
 def gov_create_policy():
     user = get_session_user()
-    if not user or user['role'] != 'government':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json() or {}
     title = (data.get('title') or '').strip()
     content = (data.get('content') or '').strip()
@@ -59,10 +59,9 @@ def gov_create_policy():
 
 
 @government_bp.route('/api/government/policies/<int:policy_id>', methods=['PUT'])
+@require_capability('policy.manage')
 def gov_update_policy(policy_id):
     user = get_session_user()
-    if not user or user['role'] != 'government':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json() or {}
     fields = {k: v for k, v in data.items()
               if k in ('title', 'content', 'category', 'is_published', 'summary', 'date')}
@@ -76,10 +75,8 @@ def gov_update_policy(policy_id):
 
 
 @government_bp.route('/api/government/policies/<int:policy_id>', methods=['DELETE'])
+@require_capability('policy.manage')
 def gov_delete_policy(policy_id):
-    user = get_session_user()
-    if not user or user['role'] != 'government':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     database.delete_policy(policy_id)
     return jsonify({"success": True, "message": "已删除"})
 
@@ -87,8 +84,6 @@ def gov_delete_policy(policy_id):
 # ---- 数据大屏 ----
 
 @government_bp.route('/api/government/dashboard', methods=['GET'])
+@require_capability('policy.manage')
 def gov_dashboard():
-    user = get_session_user()
-    if not user or user['role'] != 'government':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     return jsonify({"success": True, "overview": database.get_government_overview()})

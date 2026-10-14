@@ -11,6 +11,9 @@ T05 把原先挤在就业域 `get_learner_profile()` 里的五段 SQL 拆回各�
 
 from db_connection import get_connection
 
+# 本模块不拥有任何能力域：它是取数窄接口，数据全部来自下面的域。
+CAPABILITY = ''
+
 
 def get_profile_basic(user_id):
     """用户域的档案窄接口：学员的基础资料。"""

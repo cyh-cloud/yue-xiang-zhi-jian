@@ -9,6 +9,11 @@ import json
 import re
 from db_connection import get_connection
 
+# 本模块的数据归属这个能力域。机械检查（tools/check_architecture.py）与
+# backend/core/permissions.py 的 CAPABILITIES 都以此为准：谁 import 本模块，
+# 谁就必须持 ${cap}.manage（读操作受 ${cap}.read 管）。
+CAPABILITY = 'resource'
+
 # 成功案例的审核类型标识（走通用 content_reviews 链路，与 course/job/procurement/model_3d 同级）
 CASE_REVIEW_TYPE = 'success_case'
 

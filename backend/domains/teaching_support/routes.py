@@ -11,11 +11,12 @@
 
 跨域边界：
 
-- 会话取用户与角色装饰器只用共享层 core.session（require_role / get_session_user）。
-  ⚠️ 本域存在两种把关写法，且**都不能改**：公告、批改、实训列表、学情分析、
-  3D 模型走 `@require_role(...)` 装饰器（未登录 401 / 角色不符 403）；课程与材料
-  这几条是函数内 inline 的 `get_session_user()` + 角色判断（未登录与角色不符都是 403）。
-  这是拆分前就有的差异，统一它会改变对外可见的状态码。
+- 会话取用户与角色把关只用共享层：core.session（get_session_user）与
+  core.permissions（require_capability）。
+  ⚠️ 本域的未登录状态码仍按拆分前的两种形状分流，`require_capability` 的
+  anonymous 参数就是为这件事留的：公告/批改/实训/学情/3D 模型五条原本走
+  `@require_role`（未登录 401），传 anonymous=401；课程与材料几条原本是
+  inline 守卫（未登录与角色不符都是 403），用默认的 403。合起来会改变对外状态码。
 - 数据访问一律走 database 契约层（db_domains/teaching.py、db_domains/courses.py）；
 - 上传落盘目录与静态资源放行目录同源于仓库根（core.app_factory.BASE_DIR），
   否则会出现「存得下却取不回」。
@@ -28,7 +29,8 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from core.app_factory import BASE_DIR
-from core.session import TEACHER_ROLES, get_session_user, require_role
+from core.permissions import TEACHER, require_capability
+from core.session import get_session_user
 import database
 from shared.training_status import training_status_label
 
@@ -43,14 +45,14 @@ _MODEL_3D_MAX_BYTES = 50 * 1024 * 1024
 # ==================== 通知公告 ====================
 
 @teaching_support_bp.route('/api/teacher/announcements', methods=['GET'])
-@require_role(*TEACHER_ROLES)
+@require_capability('teaching.read', anonymous=401)
 def get_announcements():
     announcements = database.get_announcements()
     return jsonify({"success": True, "announcements": announcements})
 
 
 @teaching_support_bp.route('/api/teacher/announcements', methods=['POST'])
-@require_role(*TEACHER_ROLES)
+@require_capability('teaching.manage', anonymous=401)
 def create_announcement():
     data = request.get_json()
     title = data.get('title', '')
@@ -68,7 +70,7 @@ def create_announcement():
 
 
 @teaching_support_bp.route('/api/teacher/announcements/<int:ann_id>', methods=['DELETE'])
-@require_role(*TEACHER_ROLES)
+@require_capability('teaching.manage', anonymous=401)
 def delete_announcement(ann_id):
     if database.delete_announcement(ann_id):
         return jsonify({"success": True, "message": "删除成功"})
@@ -98,7 +100,7 @@ def get_my_announcements():
 #    `assignments.direction`（英文 slug 'ecommerce'）与 `students.direction`（中文
 #    '电商运营'），两者永不相等 → 通知一个也发不出去。该逻辑随本块一并删除。
 @teaching_support_bp.route('/api/teacher/assignments/grade', methods=['POST'])
-@require_role(*TEACHER_ROLES)
+@require_capability('teaching.manage', anonymous=401)
 def grade_submission():
     data = request.get_json()
     submission_id = data.get('submission_id')
@@ -118,7 +120,7 @@ def grade_submission():
 
 
 @teaching_support_bp.route('/api/teacher/trainings', methods=['GET'])
-@require_role(*TEACHER_ROLES)
+@require_capability('teaching.read', anonymous=401)
 def teacher_get_trainings():
     """教师端「实训提交」页：全部学员的电商实训提交（直播/文案/客服）。
 
@@ -174,7 +176,7 @@ def teacher_get_trainings():
 # ==================== 学情分析 ====================
 
 @teaching_support_bp.route('/api/teacher/analytics', methods=['GET'])
-@require_role(*TEACHER_ROLES)
+@require_capability('teaching.read', anonymous=401)
 def get_analytics():
     data = database.get_analytics_data()
     return jsonify({"success": True, "analytics": data})
@@ -183,19 +185,17 @@ def get_analytics():
 # ==================== 课程管理 ====================
 
 @teaching_support_bp.route('/api/teacher/courses', methods=['GET'])
+@require_capability('course.read')
 def teacher_get_courses():
     user = get_session_user()
-    if not user or user['role'] not in ('teacher', 'super_admin'):
-        return jsonify({"success": False, "message": "权限不足"}), 403
     courses = database.get_courses(teacher_id=user['username'], published_only=False)
     return jsonify({"success": True, "courses": courses})
 
 
 @teaching_support_bp.route('/api/teacher/courses', methods=['POST'])
+@require_capability('course.manage')
 def teacher_create_course():
     user = get_session_user()
-    if not user or user['role'] != 'teacher':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     course_id = database.create_course(
         data.get('title', ''), data.get('description', ''),
@@ -205,10 +205,9 @@ def teacher_create_course():
 
 
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>', methods=['PUT'])
+@require_capability('course.manage')
 def teacher_update_course(course_id):
     user = get_session_user()
-    if not user or user['role'] != 'teacher':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     database.update_course(course_id, **{k: v for k, v in data.items()
         if k in ('title', 'description', 'category', 'cover_url')})
@@ -216,10 +215,9 @@ def teacher_update_course(course_id):
 
 
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>', methods=['DELETE'])
+@require_capability('course.manage')
 def teacher_delete_course(course_id):
     user = get_session_user()
-    if not user or user['role'] != 'teacher':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     database.delete_course(course_id)
     return jsonify({"success": True, "message": "删除成功"})
 
@@ -233,10 +231,9 @@ def teacher_get_materials(course_id):
 
 
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>/materials', methods=['POST'])
+@require_capability('course.manage')
 def teacher_add_material(course_id):
     user = get_session_user()
-    if not user or user['role'] != 'teacher':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     if 'file' not in request.files:
         return jsonify({"success": False, "message": "请选择文件"}), 400
     f = request.files['file']
@@ -260,10 +257,9 @@ def teacher_add_material(course_id):
 
 
 @teaching_support_bp.route('/api/teacher/materials/<int:mat_id>', methods=['DELETE'])
+@require_capability('course.manage')
 def teacher_delete_material(mat_id):
     user = get_session_user()
-    if not user or user['role'] != 'teacher':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     filepath = database.delete_course_material(mat_id)
     if filepath:
         full = os.path.join(BASE_DIR, filepath)
@@ -275,16 +271,18 @@ def teacher_delete_material(mat_id):
 # ==================== 3D 模型管理 ====================
 
 @teaching_support_bp.route('/api/teacher/models-3d', methods=['GET'])
-@require_role(*TEACHER_ROLES)
+@require_capability('course.read', anonymous=401)
 def teacher_get_models_3d():
     user = get_session_user()
-    models = database.get_models_3d(teacher_id=user['username'] if user['role'] == 'teacher' else None,
+    # 教师只看自己上传的；其他持 course.read 的角色看全部
+    teacher_id = user['username'] if user['role'] == TEACHER else None
+    models = database.get_models_3d(teacher_id=teacher_id,
                                     published_only=False)
     return jsonify({"success": True, "models": models})
 
 
 @teaching_support_bp.route('/api/teacher/models-3d', methods=['POST'])
-@require_role('teacher')
+@require_capability('course.manage', anonymous=401)
 def teacher_create_model_3d():
     user = get_session_user()
     if 'file' not in request.files:
@@ -317,7 +315,7 @@ def teacher_create_model_3d():
 
 
 @teaching_support_bp.route('/api/teacher/models-3d/<int:model_id>', methods=['DELETE'])
-@require_role('teacher')
+@require_capability('course.manage', anonymous=401)
 def teacher_delete_model_3d(model_id):
     filepath = database.delete_model_3d(model_id)
     if filepath:
