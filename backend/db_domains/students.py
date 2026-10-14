@@ -5,7 +5,28 @@
 T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分前逐字节一致。
 """
 
+import sqlite3
+
 from db_connection import get_connection
+
+
+def _next_student_id(conn):
+    """算出下一个可用学号：当前最大号 +1，撞了已占用的号就继续往后顺延。
+
+    students.id 是 TEXT 主键，所以「最大号」必须按数值比：字符串序下 STU1000
+    小于 STU999，直接 ORDER BY id DESC LIMIT 1 会把号取小，也会取到已存在的号。
+    """
+    row = conn.execute(
+        "SELECT MAX(CAST(SUBSTR(id, 4) AS INTEGER)) FROM students "
+        "WHERE id GLOB 'STU[0-9]*'").fetchone()
+    num = (row[0] if row and row[0] is not None else 0) + 1
+    sid = f"STU{num:03d}"
+    # 取到的号可能已被占用（手工插入的号、历史脏数据、删行后跳号…）。逐个顺延
+    # 到第一个空号；取号与插入之间被别人插走的极端情况由上层重试兜底。
+    while conn.execute("SELECT 1 FROM students WHERE id = ?", (sid,)).fetchone():
+        num += 1
+        sid = f"STU{num:03d}"
+    return sid
 
 
 def get_students(search=None):
@@ -37,20 +58,26 @@ def add_student(name, class_name, direction, user_id=''):
     ⚠️ 名册行与平台账号是**两套数据**：不传 user_id 就只是一行名册记录，
        该学员无法登录、收不到通知、其证书也不会进入教师端统计。
        调用方（app.add_student）负责在需要时关联/创建账号。
+
+    ⚠️ 学号生成是「取最大号 → 查重顺延 → 插入」，撞了主键就重取。原先的写法是
+       `SELECT id ... ORDER BY id DESC LIMIT 1` 再 +1：字符串序下 STU1000 小于
+       STU999，号会取小；两个并发请求还会算出同一个号，后写入的撞 students.id
+       主键，IntegrityError 冒到前端就是 500。
     """
-    conn = get_connection()
-    # 生成ID
-    last = conn.execute("SELECT id FROM students ORDER BY id DESC LIMIT 1").fetchone()
-    if last:
-        num = int(last['id'].replace('STU', '')) + 1
-    else:
-        num = 1
-    sid = f"STU{num:03d}"
-    conn.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                 (sid, user_id or '', name, class_name, direction, 0, 'active'))
-    conn.commit()
-    conn.close()
-    return sid
+    for _ in range(5):
+        conn = get_connection()
+        try:
+            sid = _next_student_id(conn)
+            conn.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (sid, user_id or '', name, class_name, direction, 0, 'active'))
+            conn.commit()
+            return sid
+        except sqlite3.IntegrityError:
+            # 号在取号之后、插入之前被别人占走了，重取一次
+            conn.rollback()
+        finally:
+            conn.close()
+    raise RuntimeError('学号生成失败：并发写入过多，请重试')
 
 def get_roster_name_for(user_id):
     """学员域窄接口：单个账号在名册上的姓名，没有关联名册行返回 None。
