@@ -12,6 +12,11 @@ models_3d 四张表，等于审核域反向写四个领域。现在收敛为 `se
 """
 
 from db_connection import get_connection
+
+# 本模块的数据归属这个能力域。机械检查（tools/check_architecture.py）与
+# backend/core/permissions.py 的 CAPABILITIES 都以此为准：谁 import 本模块，
+# 谁就必须持 ${cap}.manage（读操作受 ${cap}.read 管）。
+CAPABILITY = 'review'
 from db_domains import courses, procurements
 from db_domains.employment import set_job_review_status
 

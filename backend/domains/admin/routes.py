@@ -5,8 +5,9 @@
 
 三条边界：
 
-1. 角色判定一律函数内 inline 403，不用 `@require_role` 装饰器 —— 本域的守卫写在
-   每个路由体内，改写判定形式就是改行为（未登录拿到的是 403 而不是 401）。
+1. 角色把关走能力表（core.permissions.require_capability），未登录与能力不符都回 403，
+   与拆分前逐字一致。四个能力：user.manage / review.moderate /
+   announcement.manage / community.manage。
 2. 审核状态变更只调 database.approve_review / reject_review / revoke_review，
    由 db_domains.reviews.set_review_status 按内容类型分派回写各领域表，
    路由层不直接写任何领域表。
@@ -15,6 +16,7 @@
 
 from flask import Blueprint, jsonify, request
 
+from core.permissions import require_capability
 from core.session import get_session_user
 
 import database
@@ -23,8 +25,10 @@ admin_bp = Blueprint('admin', __name__)
 
 
 @admin_bp.route('/api/admin/dashboard', methods=['GET'])
+@require_capability('review.moderate')
 def admin_dashboard():
     """超级管理员仪表盘统计。
+    user = get_session_user()
 
     ⚠️ 前端此前调的是 `/api/government/dashboard`（只允许 government）→ super_admin
        恒 403，统计区长期空白。这里给 admin 自己的口径。
@@ -33,8 +37,6 @@ def admin_dashboard():
         成功案例正文不落库，条数从 domain_data.resources.cases_data 取（与审核详情同一来源）。
     """
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     ov = database.get_admin_overview()
     try:
         from domain_data.resources import cases_data
@@ -46,10 +48,9 @@ def admin_dashboard():
 
 
 @admin_bp.route('/api/admin/users', methods=['GET'])
+@require_capability('user.manage')
 def admin_get_users():
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     search = request.args.get('search', '')
     role_filter = request.args.get('role', '')
     users = database.get_all_users(search=search or None, role=role_filter or None)
@@ -83,10 +84,9 @@ def admin_get_users():
 
 
 @admin_bp.route('/api/admin/users/<user_id>', methods=['PUT'])
+@require_capability('user.manage')
 def admin_update_user(user_id):
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json(silent=True) or {}
     target = database.get_user_by_id(user_id)
     if not target:
@@ -115,16 +115,16 @@ def admin_update_user(user_id):
 
 
 @admin_bp.route('/api/admin/users/<user_id>/status', methods=['POST'])
+@require_capability('user.manage')
 def admin_set_user_status(user_id):
     """启用 / 停用账号 —— **删除的替代方案**（2026-10-08）。
+    user = get_session_user()
 
     删用户会留下跨表孤儿（students.user_id 是名册收件人与证书归属的唯一依据），
     所以凡是有业务数据的账号一律走「停用」：登录接口本来就认 status='suspended'，
     停用后本人进不来，但所有历史数据完整保留，随时可以恢复。
     """
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     if user_id == user['username']:
         return jsonify({"success": False, "message": "不能停用当前登录的账号"}), 400
     data = request.get_json(silent=True) or {}
@@ -139,8 +139,10 @@ def admin_set_user_status(user_id):
 
 
 @admin_bp.route('/api/admin/users/<user_id>', methods=['DELETE'])
+@require_capability('user.manage')
 def admin_delete_user(user_id):
     """删除用户。四道关依次拦：自删 / 末位超管 / 关联数据 / 不存在。
+    user = get_session_user()
 
     ⚠️ 2026-10-08 之前本路由无条件返回 200「删除成功」——删一个不存在的人
        也照样报成功，且能把自己删掉（删完全站再无 super_admin，会话立即失效、
@@ -148,8 +150,6 @@ def admin_delete_user(user_id):
        （真实影响行数）作为最终判据。
     """
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
 
     if user_id == user['username']:
         return jsonify({"success": False, "message": "不能删除当前登录的账号"}), 400
@@ -179,10 +179,9 @@ def admin_delete_user(user_id):
 # ---- 内容审核 ----
 
 @admin_bp.route('/api/admin/reviews', methods=['GET'])
+@require_capability('review.moderate')
 def admin_get_reviews():
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     content_type = request.args.get('content_type', '')
     ct = content_type or None
     # status 支持 pending / approved / rejected / all；默认仍是 pending ——
@@ -233,19 +232,17 @@ def admin_get_reviews():
 
 
 @admin_bp.route('/api/admin/reviews/<int:review_id>/approve', methods=['POST'])
+@require_capability('review.moderate')
 def admin_approve_review(review_id):
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     database.approve_review(review_id, user['username'])
     return jsonify({"success": True, "message": "已审核通过"})
 
 
 @admin_bp.route('/api/admin/reviews/<int:review_id>/reject', methods=['POST'])
+@require_capability('review.moderate')
 def admin_reject_review(review_id):
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     comment = data.get('comment', '')
     database.reject_review(review_id, user['username'], comment)
@@ -253,16 +250,16 @@ def admin_reject_review(review_id):
 
 
 @admin_bp.route('/api/admin/reviews/<int:review_id>/revoke', methods=['POST'])
+@require_capability('review.moderate')
 def admin_revoke_review(review_id):
     """撤销审核：把已通过 / 已驳回的记录退回「待审核」，可重新处理。
+    user = get_session_user()
 
     2026-10-08 新增（管理端「内容审核」要能回看并纠正历史）。
     与 approve / reject 走同一套对称回写规则，目标表的 review_status 一并退回
     pending，不会出现「审核表已撤销、岗位却还挂着 approved」的不一致。
     """
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     result = database.revoke_review(review_id)
     if result == 'not_found':
         return jsonify({"success": False, "message": "审核记录不存在"}), 404
@@ -274,19 +271,17 @@ def admin_revoke_review(review_id):
 # ---- 系统公告管理 ----
 
 @admin_bp.route('/api/admin/system-announcements', methods=['GET'])
+@require_capability('announcement.manage')
 def admin_get_system_announcements():
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     anns = database.get_system_announcements(active_only=False)
     return jsonify({"success": True, "announcements": anns})
 
 
 @admin_bp.route('/api/admin/system-announcements', methods=['POST'])
+@require_capability('announcement.manage')
 def admin_add_system_announcement():
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     data = request.get_json()
     ann_id = database.add_system_announcement(
         data.get('title', ''), data.get('content', ''),
@@ -295,10 +290,9 @@ def admin_add_system_announcement():
 
 
 @admin_bp.route('/api/admin/system-announcements/<int:ann_id>', methods=['DELETE'])
+@require_capability('announcement.manage')
 def admin_delete_system_announcement(ann_id):
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     database.delete_system_announcement(ann_id)
     return jsonify({"success": True, "message": "已删除"})
 
@@ -306,18 +300,16 @@ def admin_delete_system_announcement(ann_id):
 # ---- 内容监管 ----
 
 @admin_bp.route('/api/admin/comments/<int:comment_id>', methods=['DELETE'])
+@require_capability('community.manage')
 def admin_delete_comment(comment_id):
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     database.soft_delete_comment(comment_id, user['username'])
     return jsonify({"success": True, "message": "已删除违规评论"})
 
 
 @admin_bp.route('/api/admin/discussions/<int:disc_id>', methods=['DELETE'])
+@require_capability('community.manage')
 def admin_delete_discussion(disc_id):
     user = get_session_user()
-    if not user or user['role'] != 'super_admin':
-        return jsonify({"success": False, "message": "权限不足"}), 403
     database.soft_delete_discussion(disc_id)
     return jsonify({"success": True, "message": "已删除违规帖子"})

@@ -7,6 +7,11 @@ T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分�
 
 from db_connection import get_connection
 
+# 本模块的数据归属这个能力域。机械检查（tools/check_architecture.py）与
+# backend/core/permissions.py 的 CAPABILITIES 都以此为准：谁 import 本模块，
+# 谁就必须持 ${cap}.manage（读操作受 ${cap}.read 管）。
+CAPABILITY = 'course'
+
 
 def count_courses_and_models():
     """课程域窄接口：(3D 模型数, 课程数)。"""
