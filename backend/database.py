@@ -297,15 +297,9 @@ def init_db():
     # 只动 is_demo=1 的行，真实企业岗位与其投递/收藏不受影响。
     seed_demo_jobs(cursor)
 
-    # 清理历史版本遗留的 success_cases 表（含 3 条编造案例）。
-    # 该表已废弃，内容改由 cases_data.py 提供，此处仅做一次性清库，保证编造数据不残留。
-    cursor.execute("DROP TABLE IF EXISTS success_cases")
-
-    # 清理已下架的「签到考勤」（2026-10-07 用户拍板：学员端从未实现签到，
-    # 教师端也没有入口，整套是死功能）。建表语句已从 db_schema.py 移除，
-    # 这里做一次性清库，避免旧库里那张永远 open、0 人签到的表继续残留。
-    cursor.execute("DROP TABLE IF EXISTS attendance_records")
-    cursor.execute("DROP TABLE IF EXISTS attendances")
+    # 废弃表清理已移入 db_schema.apply_schema()：内容落库（ADR 0002）把 success_cases
+    # 翻回正式表后，原先那条 DROP 会在每次 init_db() 时把它连同灌进去的内容一起删掉。
+    # 「哪些表不该存在」与「哪些表该存在」是同一份真相，故只在 db_schema 一处裁决。
 
     # 一次性迁移（2026-10-07）：assignment_submissions.score 的语义由
     # 「系统规则分」改为「教师批改分」（见 save_live_training 的说明）。
