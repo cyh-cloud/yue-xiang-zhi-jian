@@ -13,9 +13,9 @@ T15 从 app.py 的「就业对接API」区块整体迁出，URL、请求响应�
 
 跨域边界：
 
-- 公开招聘（招募）公告是策展内容，唯一事实源是 domain_data.employment.jobs_data，
-  本域直接 import；企业自行发布的岗位仍走 job_listings 表 + 内容审核，
-  两者在 /api/employment/jobs 里合并下发（前端按 source_type 区分展示）；
+- 公开招聘（招募）公告是平台策展内容，T09 起唯一事实源是 recruitments 表
+  （db_domains.recruitments，ADR 0002）；企业自行发布的岗位走 job_listings 表
+  + 内容审核，两者在 /api/employment/jobs 里合并下发（前端按 source_type 区分）；
 - 「是否已有简历」取共享层 shared.resume_state.user_has_resume：它有两个调用方
   （本域的投递提示与就业能力档案域的我的求职），而领域之间不得互相 import，
   放共享层才能既单一真相源又不违反边界；

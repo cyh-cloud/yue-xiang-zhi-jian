@@ -21,7 +21,7 @@ tools/check_architecture.py 正是用这条线来判定违规的（见 T01 与 T
 本域同样因 600 行上限拆成 routes / diagnosis / knowledge 三个模块，蓝图只有一个。
 
 本土资源域（domains.resources）导出蓝图 resources_bp：方言问答、成功案例、政策信息。
-案例与政策的内容事实源在 domain_data.resources，经 database 契约层读取；方言知识库与
+案例与政策的内容事实源在 db_domains.content（T09 起读库），经 resources 域组装；方言知识库与
 降级话术库是本域自己的资产（dialect_voice.py）；农技口径的判定函数与免责声明在
 共享层 shared.agri_dosage，与农业培训域、病虫害诊断域共用同一份。
 

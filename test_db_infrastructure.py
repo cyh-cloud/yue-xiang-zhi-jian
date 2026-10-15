@@ -68,6 +68,9 @@ DOMAIN_SYMBOLS = {
     'certificates.py': ('get_certificates',),
     'community.py': ('add_comment', 'create_discussion', 'get_comments', 'get_discussion',
                      'get_discussions', 'soft_delete_comment', 'soft_delete_discussion'),
+    # T09：招募公告与成功案例 / 政策口径改读库，两个新域模块。
+    'recruitments.py': ('get_recruitment', 'get_recruitment_notes', 'get_recruitments'),
+    'content.py': ('get_case', 'get_case_notes', 'get_cases', 'get_policy_notes'),
     'courses.py': ('add_course_material', 'create_course', 'create_model_3d', 'delete_course',
                    'delete_course_material', 'delete_model_3d', 'get_course',
                    'get_course_materials', 'get_courses', 'get_models_3d', 'update_course'),

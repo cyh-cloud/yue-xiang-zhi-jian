@@ -8,9 +8,10 @@
   · jobs         —— 企业端发布且**已通过审核**的岗位（可在站内申请 / 收藏）。
                     审核过滤在 `employment.get_job_listings_base()` 里，
                     学员端永远拿不到 `pending` 岗位（见该函数 docstring）；
-  · recruitments —— 公开招聘（招募）公告，策展内容、不落库、**不做站内申请**，
-                    卡片提供「查看公告」直达发布单位原文，事实源是
-                    domain_data.employment.jobs_data。
+  · recruitments —— 公开招聘（招募）公告，平台策展内容、**不做站内申请**，
+                    卡片提供「查看公告」直达发布单位原文。T09 起读库
+                    （db_domains.recruitments 的 recruitments / recruitment_sources
+                    两张表，ADR 0002），代码里不再持有公告副本。
 
 列表另下发 `category_options`（两类各自的真实条数）+ `recruit_hidden_by_salary`：
 前端据此把分类下拉标出条数、并在「按薪资筛选时公告被隐藏」这件事上说清楚，
@@ -19,10 +20,10 @@
 
 from flask import Blueprint, jsonify, request
 
-from domain_data.employment import jobs_data
 from shared.options import category_option_list
 from shared.resume_state import user_has_resume
 from db_domains import certificates, employment, points
+from db_domains import recruitments as recruitments_db
 
 employment_bp = Blueprint('employment', __name__)
 
@@ -33,8 +34,8 @@ def get_jobs():
 
     下发两部分，前端按 `source_type` 区分展示：
       · jobs         —— 企业端发布且**已通过审核**的岗位（可在站内申请 / 收藏）
-      · recruitments —— 公开招聘（招募）公告（策展内容，不落库、**不做站内申请**，
-                        卡片提供「查看公告」直达发布单位原文）
+      · recruitments —— 公开招聘（招募）公告（平台策展内容，**不做站内申请**，
+                        卡片提供「查看公告」直达发布单位原文，读库见模块 docstring）
 
     注意：jobs 侧的审核过滤在 `employment.get_job_listings_base()` 里，
     学员端永远拿不到 `pending` 岗位 —— 见该函数 docstring。
@@ -63,7 +64,7 @@ def get_jobs():
     # 公告没有「薪资」字段，所以薪资筛选对它不生效（前端也不展示该项）。
     kw = (keyword or '').strip()
     rec_pool, rec_counts = [], {}
-    for r in jobs_data.get_recruitment_list():
+    for r in recruitments_db.get_recruitments():
         if kw and (kw not in (r.get('title') or '')) and (kw not in (r.get('org') or '')) \
                 and (kw not in (r.get('description') or '')):
             continue
@@ -76,7 +77,7 @@ def get_jobs():
 
     recruitments = [r for r in rec_pool if not category or r.get('category') == category]
 
-    notes = jobs_data.get_recruitment_notes()
+    notes = recruitments_db.get_recruitment_notes()
     return jsonify({
         "success": True,
         "jobs": jobs,
@@ -86,7 +87,7 @@ def get_jobs():
         # 分类下拉：两组各自真实的条数（口径 = 已应用 关键词/地点/薪资，未应用分类）
         "category_options": {
             "enterprise": category_option_list(ent_counts, employment.ENTERPRISE_JOB_CATEGORIES),
-            "recruit": category_option_list(rec_counts, jobs_data.CATEGORY_LIST),
+            "recruit": category_option_list(rec_counts, recruitments_db.RECRUIT_CATEGORIES),
         },
         # 薪资筛选对公告不生效，被隐藏的公告条数 —— 前端据此给出明确说明
         "recruit_hidden_by_salary": len(rec_pool) if salary_range else 0,

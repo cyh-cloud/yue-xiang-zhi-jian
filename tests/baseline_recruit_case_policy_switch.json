@@ -1,0 +1,1927 @@
+{
+  "/api/employment/jobs": {
+    "recruit_payload": {
+      "sha256": "5944f5ec535fa8e6176cbb34c8f39371f999aa63d89c0f1e238dbfb848c0a7d3",
+      "value": {
+        "category_options": {
+          "enterprise": [
+            {
+              "count": 1,
+              "value": "农业技术"
+            },
+            {
+              "count": 1,
+              "value": "电商运营"
+            },
+            {
+              "count": 0,
+              "value": "手工工艺"
+            },
+            {
+              "count": 0,
+              "value": "乡村旅游"
+            },
+            {
+              "count": 0,
+              "value": "物流仓储"
+            }
+          ],
+          "recruit": [
+            {
+              "count": 2,
+              "value": "农业技术"
+            },
+            {
+              "count": 11,
+              "value": "基层服务"
+            },
+            {
+              "count": 1,
+              "value": "乡村治理"
+            }
+          ]
+        },
+        "recruit_disclaimer": "岗位条件、报名时间、考试安排等一律以发布单位公告原文为准，请点击「查看公告」核对后再报名。本平台不代办报名，也不对招募结果作任何承诺。",
+        "recruit_source_note": "以下为广东省各级党委政府、乡镇（街道）与涉农部门公开发布的基层岗位招募（招聘）公告汇编，以乡村公益性岗位、编外人员、网格员、特聘农技（动物防疫）等本地岗位为主，由本站整理呈现，供了解基层岗位与报名渠道参考。",
+        "recruitments": [
+          {
+            "category": "农业技术",
+            "contact": "0754-87369892（咨询时段：2026-10-10 至 10-16 工作日）",
+            "days_left": 1,
+            "deadline": "2026-10-16",
+            "description": "招聘单位为汕头市濠江区动物疫病预防控制中心（公益一类正股级事业单位），承担辖区动物疫病监测、检测、诊断、流行病学调查、疫情报告及预防控制等技术工作。本次招聘工作人员5名，旨在补齐基层畜牧兽医专业人才短板、健全动物防疫监管人才梯队。岗位具体条件见公告附件《岗位表》。考试采取“笔试+面试”方式，聘用后约定在本单位服务期限5年（含试用期）。",
+            "education": "",
+            "experience": "不限",
+            "headcount": "5名",
+            "job_type": "事业单位编制",
+            "key": "hj-nync-2026",
+            "org": "汕头市濠江区农业农村和水务局",
+            "publish_date": "2026-09-29",
+            "region": "汕头",
+            "salary": "纳入事业单位编制管理，工资福利待遇、岗位聘用按事业单位有关规定执行",
+            "signup_start": "2026-10-10",
+            "signup_way": "网络报名：https://d.zdzp.cn/?1249（报名确认：2026-10-19 至 10-20）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-29",
+                "media": "汕头市濠江区人民政府（政府信息公开）",
+                "title": "汕头市濠江区农业农村和水务局下属事业单位2026年度公开招聘工作人员公告",
+                "url": "https://www.haojiang.gov.cn/sthjrsj/gkmlpt/content/2/2572/mpost_2572909.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "汕头市濠江区农业农村和水务局下属事业单位2026年度公开招聘工作人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0762-4642835",
+            "days_left": 4,
+            "deadline": "2026-10-19",
+            "description": "根据《连平县人民政府办公室关于印发连平县机关事业单位编外人员管理办法的通知》（连府办〔2024〕6号），结合工作需要，面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。采取网上报名和资格初审，不接受现场报名；考试采取结构化面试方式，按 1:3 比例择优确定面试人员。",
+            "education": "大专及以上学历，不限专业",
+            "experience": "河源市户籍；年龄40周岁以下；有良好的沟通协调能力和文字基础，熟悉公文写作和办公软件操作；中共党员、有基层工作经历者优先",
+            "headcount": "1名",
+            "job_type": "编外人员（普通类）",
+            "key": "lp-xiuduan-2026",
+            "org": "连平县绣缎镇人民政府",
+            "publish_date": "",
+            "region": "河源",
+            "salary": "",
+            "signup_start": "2026-10-13",
+            "signup_way": "网上报名：材料打包为压缩文件（扫描件为 PDF，文件名为“编外人员报名+姓名”）发送至 lpxdzzb@163.com，不接受现场报名",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "连平县人民政府门户网站",
+                "title": "连平县绣缎镇人民政府2026年公开招聘编外人员公告",
+                "url": "https://www.lianping.gov.cn/hylpxdzf/gkmlpt/content/0/719/post_719203.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "连平县绣缎镇人民政府2026年公开招聘编外人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
+            "days_left": 16,
+            "deadline": "2026-10-31",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
+            "education": "",
+            "experience": "法定劳动年龄内（男18-60周岁、女18-50周岁）、有劳动能力和有就业意愿的就业困难人员；本县户籍的就业困难人员同等条件下优先聘用",
+            "headcount": "50人",
+            "job_type": "公益性岗位",
+            "key": "bl-gy-2026",
+            "org": "博罗县人力资源和社会保障局",
+            "publish_date": "2026-08-06",
+            "region": "惠州",
+            "salary": "不低于惠州市最低工资标准（1850元/月），为安置对象购买社保",
+            "signup_start": "2026-08-06",
+            "signup_way": "现场报名：按公告附件岗位表上每个岗位对应的报名地址报名（法定节假日不接受报名）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-06",
+                "media": "博罗县人民政府门户网站（政府信息公开）",
+                "title": "博罗县2026年公益性岗位公开招聘公告",
+                "url": "https://www.boluo.gov.cn/hzblrsj/gkmlpt/content/5/5827/post_5827288.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "博罗县2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": 26,
+            "deadline": "2026-11-10",
+            "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
+            "education": "",
+            "experience": "经人社部门认定的就业困难人员（含本省户籍有劳动能力和就业意愿的脱贫劳动力）",
+            "headcount": "161名",
+            "job_type": "乡村公益性岗位（安置期限一般不超过一年）",
+            "key": "xy-gy-2026",
+            "org": "信宜市人力资源和社会保障局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-09",
+            "signup_way": "现场报名：报名岗位所对应的行政村（居）委会，需携带身份证、《就业创业证》及报名登记表（额满即止）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "信宜市人民政府网（公告公示）",
+                "title": "信宜市2026年度乡村公益性岗位招聘公告",
+                "url": "http://www.xinyi.gov.cn/zwgk/gggs/content/post_1644040.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "信宜市2026年度乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-06-29",
+            "description": "2026年广东省继续选派高校毕业生到基层从事支教、支农、支医和帮扶乡村振兴等志愿服务（简称“三支一扶”），服务期为2年。全省计划招募3000名左右，其中韶关市180名、惠州市230名、湛江市240名（各市名额以当地公告为准）。招募经网上报名、笔试（《基本能力测验》）、确定招募对象、公示、体检等程序，拟招募对象名单在省人社厅官网、广东人事考试网公示。",
+            "education": "普通高校全日制大专以上毕业生",
+            "experience": "年龄不超过30周岁；已参加过“三支一扶”的不再列入",
+            "headcount": "全省约3000名",
+            "job_type": "基层志愿服务（服务期2年）",
+            "key": "szyf-2026",
+            "org": "广东省人力资源和社会保障厅",
+            "publish_date": "2026-06-23",
+            "region": "广东省",
+            "salary": "",
+            "signup_start": "2026-06-25",
+            "signup_way": "广东省高校毕业生“三支一扶”计划信息管理系统 https://ggfw.hrss.gd.gov.cn/szyf/index.do",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-06-23",
+                "media": "广东省人力资源和社会保障厅",
+                "title": "广东省2026年高校毕业生“三支一扶”计划招募公告",
+                "url": "https://hrss.gd.gov.cn/zwgk/gsgg/content/post_4915107.html"
+              },
+              {
+                "date": "2026-06-24",
+                "media": "广东省人民政府门户网站",
+                "title": "明天开始报名 广东今年“三支一扶”计划招募约3000人",
+                "url": "https://www.gd.gov.cn/gdywdt/bmdt/content/post_4915293.html"
+              },
+              {
+                "date": "2026-06-25",
+                "media": "韶关市人民政府门户网站",
+                "title": "广东省2026年“三支一扶”招募报名通道开启 今年我市计划招募180人",
+                "url": "https://www.sg.gov.cn/xw/xwzx/bdxw/content/post_2858112.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "广东省2026年高校毕业生“三支一扶”计划招募"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-08-27",
+            "description": "依据《广东省兜底安置类公益性岗位开发管理办法》（粤人社规〔2020〕13号），重点帮扶就业困难人员实现就业增收，面向社会公开招聘乡村公益性岗位工作人员若干名。年龄要求：男性57周岁以下、女性47周岁以下。采取面试方式，不需笔试。",
+            "education": "",
+            "experience": "江英镇户籍，具有劳动能力的脱贫人口、已认定的就业困难人员和监测对象",
+            "headcount": "若干名",
+            "job_type": "乡村公益性岗位",
+            "key": "ys-jiangying-gy-2026",
+            "org": "清远市阳山县江英镇人民政府",
+            "publish_date": "2026-08-25",
+            "region": "清远",
+            "salary": "月工资总额不低于清远市最低工资标准（本年度 2040 元/月）",
+            "signup_start": "2026-08-25",
+            "signup_way": "现场报名：阳山县江英镇党群服务中心（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-25",
+                "media": "阳山县政府门户网站（政府信息公开）",
+                "title": "2026年公益性岗位公开招聘的公告",
+                "url": "https://www.yangshan.gov.cn/qyysjy/gkmlpt/content/2/2180/post_2180831.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "阳山县江英镇2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "农业技术",
+            "contact": "0668-6387826",
+            "days_left": null,
+            "deadline": "2026-09-09",
+            "description": "根据《关于在我省生猪调出大县实施特聘动物防疫专员工作的通知》（粤农农办〔2020〕105号）文件精神，面向社会公开招聘特聘动物防疫专员4名，为非事业编制人员身份性质。报考年龄18至38周岁，学历为大专以上。采取现场报名 + 面试方式。",
+            "education": "大专及以上",
+            "experience": "不限",
+            "headcount": "4名",
+            "job_type": "特聘人员（非事业编制）",
+            "key": "gz-dwfyz-2026",
+            "org": "高州市农业农村局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-07",
+            "signup_way": "现场报名：高州市农业农村局二楼人事股（市教育路47号206室）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "高州市人民政府",
+                "title": "2026年高州市农业农村局特聘动物防疫专员招聘公告",
+                "url": "http://www.gaozhou.gov.cn/gznyncj/content/post_1642933.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市农业农村局特聘动物防疫专员招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0751-5680101",
+            "days_left": null,
+            "deadline": "2026-09-11",
+            "description": "依据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）等文件，面向本省人社部门认定的就业困难人员招聘乡村公益性岗位3名：乡村保洁员1名、乡村护林员2名，工作地点均为北乡镇人民政府。招用条件为就业困难人员，年龄16周岁以上（计算至2026年9月30日）。",
+            "education": "初中及以上（含中技）",
+            "experience": "就业困难人员（退伍军人、脱贫户家庭劳动力优先）",
+            "headcount": "3名（乡村保洁员1名、乡村护林员2名）",
+            "job_type": "乡村公益性岗位",
+            "key": "lc-beixiang-gy-2026",
+            "org": "乐昌市北乡镇人民政府",
+            "publish_date": "",
+            "region": "韶关",
+            "salary": "2040元/月（不含个人应缴社保）",
+            "signup_start": "2026-09-03",
+            "signup_way": "现场报名：乐昌市北乡镇党建和组织人事办公室（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "乐昌市政府公众信息网",
+                "title": "乐昌市北乡镇2026年乡村公益性岗位招聘公告",
+                "url": "https://www.lechang.gov.cn/renlizhiyuj/content/post_2876353.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-09-24",
+            "description": "为促进就业困难人员稳定就业，根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）、《茂名市人力资源和社会保障局关于进一步加强公益性岗位开发管理的通知》（茂人社〔2025〕13号），经市人社局同意，公开招聘乡村公益性岗位2个。报名后由用人单位面试，经村/居委代表会议民主评议、镇政府汇总报市人社局公示。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门认定）",
+            "headcount": "2个",
+            "job_type": "乡村公益性岗位",
+            "key": "hz-tongqing-gy-2026",
+            "org": "茂名市化州市同庆镇人民政府",
+            "publish_date": "2026-09-17",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-18",
+            "signup_way": "现场报名：化州市同庆镇山口村民委员会 / 石步村民委员会",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-17",
+                "media": "化州市人民政府网（政府信息公开）",
+                "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘公告",
+                "url": "http://www.huazhou.gov.cn/mmhztqz/gkmlpt/content/1/1646/post_1646691.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于高州市公益性岗位开发管理有关事项的通知》（高人社〔2026〕57号）文件精神，为进一步促进就业困难人员就业，经认定后发布本批招聘公告。报名人员携带所需材料直接到招聘单位报名，用人单位按公益性岗位安置排序确定人选，经市就业创业服务中心向社会公示无异议后录用。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门在广东省集中式一体化系统认定）",
+            "headcount": "",
+            "job_type": "公益性岗位（乡村岗聘用期限1年、城镇岗3年）",
+            "key": "gz-gy-2026-4",
+            "org": "高州市人力资源和社会保障局",
+            "publish_date": "2026-09-22",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-22",
+            "signup_way": "现场报名：直接到招聘单位报名，需携带本人身份证、《就业创业证》（含就业困难人员认定内容）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-22",
+                "media": "高州市人民政府",
+                "title": "2026年高州市公益性岗位招聘公告（第四批）",
+                "url": "http://www.gaozhou.gov.cn/gkmlzl/content/post_1649103.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市公益性岗位公开招聘（第四批）"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "因工作需要，经白沙镇委镇政府研究，决定面向社会招聘 2 名合同制工作人员。通过初审的人员采用结构化面试形式进行面试；体检通过后与白沙镇人民政府签订劳动合同，聘用期限 1 年、试用期 1 个月，合同期满后根据招聘单位需要和本人意愿续签。",
+            "education": "退役军人服务站专职人员：全日制大学专科及以上；安全生产监督协管员：大学本科及以上",
+            "experience": "退伍军人优先；需熟悉办公软件操作",
+            "headcount": "2名（退役军人服务站专职人员1名、安全生产监督协管员1名）",
+            "job_type": "合同制（聘用期限1年，试用期1个月）",
+            "key": "ts-baisha-2026",
+            "org": "台山市白沙镇人民政府",
+            "publish_date": "2026-09-28",
+            "region": "江门",
+            "salary": "退役军人服务站专职人员年薪约 5 万元；安全生产监督协管员年薪约 4 万元（均含社保个人缴纳部分、年终考核奖等）",
+            "signup_start": "",
+            "signup_way": "电子邮件报名：tssbszzfdjb@jiangmen.gov.cn（提交个人履历表及身份证、毕业证、退伍证等材料扫描件）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-28",
+                "media": "台山市人民政府（政府信息公开）",
+                "title": "白沙镇人民政府招聘合同制工作人员公告",
+                "url": "https://www.cnts.gov.cn/jmtssrsj/gkmlpt/content/3/3560/post_3560374.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "台山市白沙镇人民政府招聘合同制工作人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0762-4612997",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。要求大专及以上学历、不限专业，年龄40周岁以下（以公告当日为限），有良好的沟通协调能力和文字基础，熟悉公文写作和办公软件操作。考试采取结构化面试方式进行，满分100分。",
+            "education": "大专及以上",
+            "experience": "不限专业",
+            "headcount": "1名",
+            "job_type": "编外人员（普通类）",
+            "key": "lp-sanjiao-2026",
+            "org": "连平县三角镇人民政府",
+            "publish_date": "2026-09-29",
+            "region": "河源",
+            "salary": "按县财政有关编外人员（普通类）的规定执行；试用期2个月",
+            "signup_start": "2026-09-29",
+            "signup_way": "网上报名（不接受现场报名），材料打包为 PDF 压缩文件发送至 LPSJZZB@163.com",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-29",
+                "media": "连平县人民政府门户网站",
+                "title": "连平县三角镇人民政府2026年公开招聘编外人员公告",
+                "url": "http://www.lianping.gov.cn/zwgk/zfdt/tzgg/content/post_719197.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "连平县三角镇人民政府2026年公开招聘编外人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0662-3100276、0662-3103858（江城区劳动就业服务管理中心）",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "为助力我区乡村振兴工作，根据《广东省公益性岗位开发管理办法》（粤人社发〔2025〕15号）文件精神，经申报审核认定乡村公益性岗位55个。用人单位与聘用人员依法签订劳动合同或劳务协议，协议期限为1年，并为其购买意外伤害商业保险或工伤保险。",
+            "education": "",
+            "experience": "经本省人力资源社会保障部门认定的就业困难人员，且具备劳动能力",
+            "headcount": "55人",
+            "job_type": "乡村公益性岗位（协议期限1年）",
+            "key": "yjc-gy-2026",
+            "org": "阳江市江城区人力资源和社会保障局",
+            "publish_date": "2026-09-10",
+            "region": "阳江",
+            "salary": "按当地最低工资标准执行（当前为 2040 元/月），补贴资金从就业补助资金中列支",
+            "signup_start": "2026-09-10",
+            "signup_way": "现场报名：岗位工作地点所在村委会（工作日 8:30—12:00、14:30—17:30）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-10",
+                "media": "阳江市江城区人力资源和社会保障局（政府信息公开）",
+                "title": "2026年江城区乡村公益性岗位公告",
+                "url": "https://www.jiangcheng.gov.cn/yjjcrsj/gkmlpt/content/0/979/post_979222.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年江城区乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "乡村治理",
+            "contact": "0763-8666832",
+            "days_left": null,
+            "deadline": "2026-10-13",
+            "description": "因工作需要，按照“公开、公正、公平、竞争和德才兼备、择优聘用”的原则，面向社会公开招聘 1 名镇级专职网格管理员和 3 名村级专职网格员，面向具有高中以上学历的社会人员及高校应届毕业生，不限专业。专职网格员优先从本网格内符合条件的人员中选聘，本网格无人则遵循就近原则从周边网格选聘。招聘按报名、资格审查、面试、体检、组织考察和公示等程序进行。",
+            "education": "高中、中专及以上",
+            "experience": "年龄18至45周岁、不限专业；中共党员（含预备党员）、退伍军人、法律及相关专业毕业生、具有村务管理工作经验者优先",
+            "headcount": "4名（镇级专职网格管理员1名、大龙村委会专职网格员1名、东和村委会专职网格员2名）",
+            "job_type": "临聘（不列入单位编制序列，每年签订一次聘用合同）",
+            "key": "ln-sanjiang-2026",
+            "org": "连南瑶族自治县三江镇人民政府",
+            "publish_date": "2026-09-30",
+            "region": "清远",
+            "salary": "2540元/人/月（含基本工资2040元、绩效工资500元）；按企业职工标准购买社保五险",
+            "signup_start": "2026-10-08",
+            "signup_way": "现场报名：连南瑶族自治县三江镇人民政府平安法治和应急管理办公室（三江镇金三路2号），上午8:30—11:30、下午2:30—5:30；不收取报名费",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-30",
+                "media": "连南瑶族自治县人民政府门户网站（政府信息公开）",
+                "title": "三江镇公开招聘专职网格管理员、网格员的公告",
+                "url": "https://www.liannan.gov.cn/qylnsj/gkmlpt/content/2/2195/post_2195588.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "连南瑶族自治县三江镇公开招聘专职网格管理员、网格员"
+          }
+        ]
+      }
+    },
+    "status": 200
+  },
+  "/api/employment/jobs?category=基层服务": {
+    "recruit_payload": {
+      "sha256": "437e183d23d7ce9f053145e90e8ad1c1f4e14d69ddce092471787a9b24dfc054",
+      "value": {
+        "category_options": {
+          "enterprise": [
+            {
+              "count": 1,
+              "value": "农业技术"
+            },
+            {
+              "count": 1,
+              "value": "电商运营"
+            },
+            {
+              "count": 0,
+              "value": "手工工艺"
+            },
+            {
+              "count": 0,
+              "value": "乡村旅游"
+            },
+            {
+              "count": 0,
+              "value": "物流仓储"
+            }
+          ],
+          "recruit": [
+            {
+              "count": 2,
+              "value": "农业技术"
+            },
+            {
+              "count": 11,
+              "value": "基层服务"
+            },
+            {
+              "count": 1,
+              "value": "乡村治理"
+            }
+          ]
+        },
+        "recruit_disclaimer": "岗位条件、报名时间、考试安排等一律以发布单位公告原文为准，请点击「查看公告」核对后再报名。本平台不代办报名，也不对招募结果作任何承诺。",
+        "recruit_source_note": "以下为广东省各级党委政府、乡镇（街道）与涉农部门公开发布的基层岗位招募（招聘）公告汇编，以乡村公益性岗位、编外人员、网格员、特聘农技（动物防疫）等本地岗位为主，由本站整理呈现，供了解基层岗位与报名渠道参考。",
+        "recruitments": [
+          {
+            "category": "基层服务",
+            "contact": "0762-4642835",
+            "days_left": 4,
+            "deadline": "2026-10-19",
+            "description": "根据《连平县人民政府办公室关于印发连平县机关事业单位编外人员管理办法的通知》（连府办〔2024〕6号），结合工作需要，面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。采取网上报名和资格初审，不接受现场报名；考试采取结构化面试方式，按 1:3 比例择优确定面试人员。",
+            "education": "大专及以上学历，不限专业",
+            "experience": "河源市户籍；年龄40周岁以下；有良好的沟通协调能力和文字基础，熟悉公文写作和办公软件操作；中共党员、有基层工作经历者优先",
+            "headcount": "1名",
+            "job_type": "编外人员（普通类）",
+            "key": "lp-xiuduan-2026",
+            "org": "连平县绣缎镇人民政府",
+            "publish_date": "",
+            "region": "河源",
+            "salary": "",
+            "signup_start": "2026-10-13",
+            "signup_way": "网上报名：材料打包为压缩文件（扫描件为 PDF，文件名为“编外人员报名+姓名”）发送至 lpxdzzb@163.com，不接受现场报名",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "连平县人民政府门户网站",
+                "title": "连平县绣缎镇人民政府2026年公开招聘编外人员公告",
+                "url": "https://www.lianping.gov.cn/hylpxdzf/gkmlpt/content/0/719/post_719203.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "连平县绣缎镇人民政府2026年公开招聘编外人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
+            "days_left": 16,
+            "deadline": "2026-10-31",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
+            "education": "",
+            "experience": "法定劳动年龄内（男18-60周岁、女18-50周岁）、有劳动能力和有就业意愿的就业困难人员；本县户籍的就业困难人员同等条件下优先聘用",
+            "headcount": "50人",
+            "job_type": "公益性岗位",
+            "key": "bl-gy-2026",
+            "org": "博罗县人力资源和社会保障局",
+            "publish_date": "2026-08-06",
+            "region": "惠州",
+            "salary": "不低于惠州市最低工资标准（1850元/月），为安置对象购买社保",
+            "signup_start": "2026-08-06",
+            "signup_way": "现场报名：按公告附件岗位表上每个岗位对应的报名地址报名（法定节假日不接受报名）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-06",
+                "media": "博罗县人民政府门户网站（政府信息公开）",
+                "title": "博罗县2026年公益性岗位公开招聘公告",
+                "url": "https://www.boluo.gov.cn/hzblrsj/gkmlpt/content/5/5827/post_5827288.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "博罗县2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": 26,
+            "deadline": "2026-11-10",
+            "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
+            "education": "",
+            "experience": "经人社部门认定的就业困难人员（含本省户籍有劳动能力和就业意愿的脱贫劳动力）",
+            "headcount": "161名",
+            "job_type": "乡村公益性岗位（安置期限一般不超过一年）",
+            "key": "xy-gy-2026",
+            "org": "信宜市人力资源和社会保障局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-09",
+            "signup_way": "现场报名：报名岗位所对应的行政村（居）委会，需携带身份证、《就业创业证》及报名登记表（额满即止）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "信宜市人民政府网（公告公示）",
+                "title": "信宜市2026年度乡村公益性岗位招聘公告",
+                "url": "http://www.xinyi.gov.cn/zwgk/gggs/content/post_1644040.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "信宜市2026年度乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-06-29",
+            "description": "2026年广东省继续选派高校毕业生到基层从事支教、支农、支医和帮扶乡村振兴等志愿服务（简称“三支一扶”），服务期为2年。全省计划招募3000名左右，其中韶关市180名、惠州市230名、湛江市240名（各市名额以当地公告为准）。招募经网上报名、笔试（《基本能力测验》）、确定招募对象、公示、体检等程序，拟招募对象名单在省人社厅官网、广东人事考试网公示。",
+            "education": "普通高校全日制大专以上毕业生",
+            "experience": "年龄不超过30周岁；已参加过“三支一扶”的不再列入",
+            "headcount": "全省约3000名",
+            "job_type": "基层志愿服务（服务期2年）",
+            "key": "szyf-2026",
+            "org": "广东省人力资源和社会保障厅",
+            "publish_date": "2026-06-23",
+            "region": "广东省",
+            "salary": "",
+            "signup_start": "2026-06-25",
+            "signup_way": "广东省高校毕业生“三支一扶”计划信息管理系统 https://ggfw.hrss.gd.gov.cn/szyf/index.do",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-06-23",
+                "media": "广东省人力资源和社会保障厅",
+                "title": "广东省2026年高校毕业生“三支一扶”计划招募公告",
+                "url": "https://hrss.gd.gov.cn/zwgk/gsgg/content/post_4915107.html"
+              },
+              {
+                "date": "2026-06-24",
+                "media": "广东省人民政府门户网站",
+                "title": "明天开始报名 广东今年“三支一扶”计划招募约3000人",
+                "url": "https://www.gd.gov.cn/gdywdt/bmdt/content/post_4915293.html"
+              },
+              {
+                "date": "2026-06-25",
+                "media": "韶关市人民政府门户网站",
+                "title": "广东省2026年“三支一扶”招募报名通道开启 今年我市计划招募180人",
+                "url": "https://www.sg.gov.cn/xw/xwzx/bdxw/content/post_2858112.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "广东省2026年高校毕业生“三支一扶”计划招募"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-08-27",
+            "description": "依据《广东省兜底安置类公益性岗位开发管理办法》（粤人社规〔2020〕13号），重点帮扶就业困难人员实现就业增收，面向社会公开招聘乡村公益性岗位工作人员若干名。年龄要求：男性57周岁以下、女性47周岁以下。采取面试方式，不需笔试。",
+            "education": "",
+            "experience": "江英镇户籍，具有劳动能力的脱贫人口、已认定的就业困难人员和监测对象",
+            "headcount": "若干名",
+            "job_type": "乡村公益性岗位",
+            "key": "ys-jiangying-gy-2026",
+            "org": "清远市阳山县江英镇人民政府",
+            "publish_date": "2026-08-25",
+            "region": "清远",
+            "salary": "月工资总额不低于清远市最低工资标准（本年度 2040 元/月）",
+            "signup_start": "2026-08-25",
+            "signup_way": "现场报名：阳山县江英镇党群服务中心（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-25",
+                "media": "阳山县政府门户网站（政府信息公开）",
+                "title": "2026年公益性岗位公开招聘的公告",
+                "url": "https://www.yangshan.gov.cn/qyysjy/gkmlpt/content/2/2180/post_2180831.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "阳山县江英镇2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0751-5680101",
+            "days_left": null,
+            "deadline": "2026-09-11",
+            "description": "依据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）等文件，面向本省人社部门认定的就业困难人员招聘乡村公益性岗位3名：乡村保洁员1名、乡村护林员2名，工作地点均为北乡镇人民政府。招用条件为就业困难人员，年龄16周岁以上（计算至2026年9月30日）。",
+            "education": "初中及以上（含中技）",
+            "experience": "就业困难人员（退伍军人、脱贫户家庭劳动力优先）",
+            "headcount": "3名（乡村保洁员1名、乡村护林员2名）",
+            "job_type": "乡村公益性岗位",
+            "key": "lc-beixiang-gy-2026",
+            "org": "乐昌市北乡镇人民政府",
+            "publish_date": "",
+            "region": "韶关",
+            "salary": "2040元/月（不含个人应缴社保）",
+            "signup_start": "2026-09-03",
+            "signup_way": "现场报名：乐昌市北乡镇党建和组织人事办公室（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "乐昌市政府公众信息网",
+                "title": "乐昌市北乡镇2026年乡村公益性岗位招聘公告",
+                "url": "https://www.lechang.gov.cn/renlizhiyuj/content/post_2876353.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-09-24",
+            "description": "为促进就业困难人员稳定就业，根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）、《茂名市人力资源和社会保障局关于进一步加强公益性岗位开发管理的通知》（茂人社〔2025〕13号），经市人社局同意，公开招聘乡村公益性岗位2个。报名后由用人单位面试，经村/居委代表会议民主评议、镇政府汇总报市人社局公示。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门认定）",
+            "headcount": "2个",
+            "job_type": "乡村公益性岗位",
+            "key": "hz-tongqing-gy-2026",
+            "org": "茂名市化州市同庆镇人民政府",
+            "publish_date": "2026-09-17",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-18",
+            "signup_way": "现场报名：化州市同庆镇山口村民委员会 / 石步村民委员会",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-17",
+                "media": "化州市人民政府网（政府信息公开）",
+                "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘公告",
+                "url": "http://www.huazhou.gov.cn/mmhztqz/gkmlpt/content/1/1646/post_1646691.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于高州市公益性岗位开发管理有关事项的通知》（高人社〔2026〕57号）文件精神，为进一步促进就业困难人员就业，经认定后发布本批招聘公告。报名人员携带所需材料直接到招聘单位报名，用人单位按公益性岗位安置排序确定人选，经市就业创业服务中心向社会公示无异议后录用。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门在广东省集中式一体化系统认定）",
+            "headcount": "",
+            "job_type": "公益性岗位（乡村岗聘用期限1年、城镇岗3年）",
+            "key": "gz-gy-2026-4",
+            "org": "高州市人力资源和社会保障局",
+            "publish_date": "2026-09-22",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-22",
+            "signup_way": "现场报名：直接到招聘单位报名，需携带本人身份证、《就业创业证》（含就业困难人员认定内容）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-22",
+                "media": "高州市人民政府",
+                "title": "2026年高州市公益性岗位招聘公告（第四批）",
+                "url": "http://www.gaozhou.gov.cn/gkmlzl/content/post_1649103.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市公益性岗位公开招聘（第四批）"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "因工作需要，经白沙镇委镇政府研究，决定面向社会招聘 2 名合同制工作人员。通过初审的人员采用结构化面试形式进行面试；体检通过后与白沙镇人民政府签订劳动合同，聘用期限 1 年、试用期 1 个月，合同期满后根据招聘单位需要和本人意愿续签。",
+            "education": "退役军人服务站专职人员：全日制大学专科及以上；安全生产监督协管员：大学本科及以上",
+            "experience": "退伍军人优先；需熟悉办公软件操作",
+            "headcount": "2名（退役军人服务站专职人员1名、安全生产监督协管员1名）",
+            "job_type": "合同制（聘用期限1年，试用期1个月）",
+            "key": "ts-baisha-2026",
+            "org": "台山市白沙镇人民政府",
+            "publish_date": "2026-09-28",
+            "region": "江门",
+            "salary": "退役军人服务站专职人员年薪约 5 万元；安全生产监督协管员年薪约 4 万元（均含社保个人缴纳部分、年终考核奖等）",
+            "signup_start": "",
+            "signup_way": "电子邮件报名：tssbszzfdjb@jiangmen.gov.cn（提交个人履历表及身份证、毕业证、退伍证等材料扫描件）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-28",
+                "media": "台山市人民政府（政府信息公开）",
+                "title": "白沙镇人民政府招聘合同制工作人员公告",
+                "url": "https://www.cnts.gov.cn/jmtssrsj/gkmlpt/content/3/3560/post_3560374.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "台山市白沙镇人民政府招聘合同制工作人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0762-4612997",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。要求大专及以上学历、不限专业，年龄40周岁以下（以公告当日为限），有良好的沟通协调能力和文字基础，熟悉公文写作和办公软件操作。考试采取结构化面试方式进行，满分100分。",
+            "education": "大专及以上",
+            "experience": "不限专业",
+            "headcount": "1名",
+            "job_type": "编外人员（普通类）",
+            "key": "lp-sanjiao-2026",
+            "org": "连平县三角镇人民政府",
+            "publish_date": "2026-09-29",
+            "region": "河源",
+            "salary": "按县财政有关编外人员（普通类）的规定执行；试用期2个月",
+            "signup_start": "2026-09-29",
+            "signup_way": "网上报名（不接受现场报名），材料打包为 PDF 压缩文件发送至 LPSJZZB@163.com",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-29",
+                "media": "连平县人民政府门户网站",
+                "title": "连平县三角镇人民政府2026年公开招聘编外人员公告",
+                "url": "http://www.lianping.gov.cn/zwgk/zfdt/tzgg/content/post_719197.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "连平县三角镇人民政府2026年公开招聘编外人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0662-3100276、0662-3103858（江城区劳动就业服务管理中心）",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "为助力我区乡村振兴工作，根据《广东省公益性岗位开发管理办法》（粤人社发〔2025〕15号）文件精神，经申报审核认定乡村公益性岗位55个。用人单位与聘用人员依法签订劳动合同或劳务协议，协议期限为1年，并为其购买意外伤害商业保险或工伤保险。",
+            "education": "",
+            "experience": "经本省人力资源社会保障部门认定的就业困难人员，且具备劳动能力",
+            "headcount": "55人",
+            "job_type": "乡村公益性岗位（协议期限1年）",
+            "key": "yjc-gy-2026",
+            "org": "阳江市江城区人力资源和社会保障局",
+            "publish_date": "2026-09-10",
+            "region": "阳江",
+            "salary": "按当地最低工资标准执行（当前为 2040 元/月），补贴资金从就业补助资金中列支",
+            "signup_start": "2026-09-10",
+            "signup_way": "现场报名：岗位工作地点所在村委会（工作日 8:30—12:00、14:30—17:30）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-10",
+                "media": "阳江市江城区人力资源和社会保障局（政府信息公开）",
+                "title": "2026年江城区乡村公益性岗位公告",
+                "url": "https://www.jiangcheng.gov.cn/yjjcrsj/gkmlpt/content/0/979/post_979222.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年江城区乡村公益性岗位公开招聘"
+          }
+        ]
+      }
+    },
+    "status": 200
+  },
+  "/api/employment/jobs?keyword=zzz-no-such-keyword": {
+    "recruit_payload": {
+      "sha256": "acdbff490dd9ec7ac8984fcf86e34a3cf2114f7e8f9a9b32dc8ae79f798f2e41",
+      "value": {
+        "category_options": {
+          "enterprise": [
+            {
+              "count": 0,
+              "value": "农业技术"
+            },
+            {
+              "count": 0,
+              "value": "电商运营"
+            },
+            {
+              "count": 0,
+              "value": "手工工艺"
+            },
+            {
+              "count": 0,
+              "value": "乡村旅游"
+            },
+            {
+              "count": 0,
+              "value": "物流仓储"
+            }
+          ],
+          "recruit": [
+            {
+              "count": 0,
+              "value": "农业技术"
+            },
+            {
+              "count": 0,
+              "value": "基层服务"
+            },
+            {
+              "count": 0,
+              "value": "乡村治理"
+            }
+          ]
+        },
+        "recruit_disclaimer": "岗位条件、报名时间、考试安排等一律以发布单位公告原文为准，请点击「查看公告」核对后再报名。本平台不代办报名，也不对招募结果作任何承诺。",
+        "recruit_source_note": "以下为广东省各级党委政府、乡镇（街道）与涉农部门公开发布的基层岗位招募（招聘）公告汇编，以乡村公益性岗位、编外人员、网格员、特聘农技（动物防疫）等本地岗位为主，由本站整理呈现，供了解基层岗位与报名渠道参考。",
+        "recruitments": []
+      }
+    },
+    "status": 200
+  },
+  "/api/employment/jobs?keyword=公益性": {
+    "recruit_payload": {
+      "sha256": "e8bb8d1402c0a1bbfb80718bd7ffb5974ba9b3a9ed4f61b0786f450a65f0c166",
+      "value": {
+        "category_options": {
+          "enterprise": [
+            {
+              "count": 0,
+              "value": "农业技术"
+            },
+            {
+              "count": 0,
+              "value": "电商运营"
+            },
+            {
+              "count": 0,
+              "value": "手工工艺"
+            },
+            {
+              "count": 0,
+              "value": "乡村旅游"
+            },
+            {
+              "count": 0,
+              "value": "物流仓储"
+            }
+          ],
+          "recruit": [
+            {
+              "count": 0,
+              "value": "农业技术"
+            },
+            {
+              "count": 7,
+              "value": "基层服务"
+            },
+            {
+              "count": 0,
+              "value": "乡村治理"
+            }
+          ]
+        },
+        "recruit_disclaimer": "岗位条件、报名时间、考试安排等一律以发布单位公告原文为准，请点击「查看公告」核对后再报名。本平台不代办报名，也不对招募结果作任何承诺。",
+        "recruit_source_note": "以下为广东省各级党委政府、乡镇（街道）与涉农部门公开发布的基层岗位招募（招聘）公告汇编，以乡村公益性岗位、编外人员、网格员、特聘农技（动物防疫）等本地岗位为主，由本站整理呈现，供了解基层岗位与报名渠道参考。",
+        "recruitments": [
+          {
+            "category": "基层服务",
+            "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
+            "days_left": 16,
+            "deadline": "2026-10-31",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
+            "education": "",
+            "experience": "法定劳动年龄内（男18-60周岁、女18-50周岁）、有劳动能力和有就业意愿的就业困难人员；本县户籍的就业困难人员同等条件下优先聘用",
+            "headcount": "50人",
+            "job_type": "公益性岗位",
+            "key": "bl-gy-2026",
+            "org": "博罗县人力资源和社会保障局",
+            "publish_date": "2026-08-06",
+            "region": "惠州",
+            "salary": "不低于惠州市最低工资标准（1850元/月），为安置对象购买社保",
+            "signup_start": "2026-08-06",
+            "signup_way": "现场报名：按公告附件岗位表上每个岗位对应的报名地址报名（法定节假日不接受报名）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-06",
+                "media": "博罗县人民政府门户网站（政府信息公开）",
+                "title": "博罗县2026年公益性岗位公开招聘公告",
+                "url": "https://www.boluo.gov.cn/hzblrsj/gkmlpt/content/5/5827/post_5827288.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "博罗县2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": 26,
+            "deadline": "2026-11-10",
+            "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
+            "education": "",
+            "experience": "经人社部门认定的就业困难人员（含本省户籍有劳动能力和就业意愿的脱贫劳动力）",
+            "headcount": "161名",
+            "job_type": "乡村公益性岗位（安置期限一般不超过一年）",
+            "key": "xy-gy-2026",
+            "org": "信宜市人力资源和社会保障局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-09",
+            "signup_way": "现场报名：报名岗位所对应的行政村（居）委会，需携带身份证、《就业创业证》及报名登记表（额满即止）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "信宜市人民政府网（公告公示）",
+                "title": "信宜市2026年度乡村公益性岗位招聘公告",
+                "url": "http://www.xinyi.gov.cn/zwgk/gggs/content/post_1644040.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "信宜市2026年度乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-08-27",
+            "description": "依据《广东省兜底安置类公益性岗位开发管理办法》（粤人社规〔2020〕13号），重点帮扶就业困难人员实现就业增收，面向社会公开招聘乡村公益性岗位工作人员若干名。年龄要求：男性57周岁以下、女性47周岁以下。采取面试方式，不需笔试。",
+            "education": "",
+            "experience": "江英镇户籍，具有劳动能力的脱贫人口、已认定的就业困难人员和监测对象",
+            "headcount": "若干名",
+            "job_type": "乡村公益性岗位",
+            "key": "ys-jiangying-gy-2026",
+            "org": "清远市阳山县江英镇人民政府",
+            "publish_date": "2026-08-25",
+            "region": "清远",
+            "salary": "月工资总额不低于清远市最低工资标准（本年度 2040 元/月）",
+            "signup_start": "2026-08-25",
+            "signup_way": "现场报名：阳山县江英镇党群服务中心（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-25",
+                "media": "阳山县政府门户网站（政府信息公开）",
+                "title": "2026年公益性岗位公开招聘的公告",
+                "url": "https://www.yangshan.gov.cn/qyysjy/gkmlpt/content/2/2180/post_2180831.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "阳山县江英镇2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0751-5680101",
+            "days_left": null,
+            "deadline": "2026-09-11",
+            "description": "依据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）等文件，面向本省人社部门认定的就业困难人员招聘乡村公益性岗位3名：乡村保洁员1名、乡村护林员2名，工作地点均为北乡镇人民政府。招用条件为就业困难人员，年龄16周岁以上（计算至2026年9月30日）。",
+            "education": "初中及以上（含中技）",
+            "experience": "就业困难人员（退伍军人、脱贫户家庭劳动力优先）",
+            "headcount": "3名（乡村保洁员1名、乡村护林员2名）",
+            "job_type": "乡村公益性岗位",
+            "key": "lc-beixiang-gy-2026",
+            "org": "乐昌市北乡镇人民政府",
+            "publish_date": "",
+            "region": "韶关",
+            "salary": "2040元/月（不含个人应缴社保）",
+            "signup_start": "2026-09-03",
+            "signup_way": "现场报名：乐昌市北乡镇党建和组织人事办公室（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "乐昌市政府公众信息网",
+                "title": "乐昌市北乡镇2026年乡村公益性岗位招聘公告",
+                "url": "https://www.lechang.gov.cn/renlizhiyuj/content/post_2876353.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-09-24",
+            "description": "为促进就业困难人员稳定就业，根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）、《茂名市人力资源和社会保障局关于进一步加强公益性岗位开发管理的通知》（茂人社〔2025〕13号），经市人社局同意，公开招聘乡村公益性岗位2个。报名后由用人单位面试，经村/居委代表会议民主评议、镇政府汇总报市人社局公示。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门认定）",
+            "headcount": "2个",
+            "job_type": "乡村公益性岗位",
+            "key": "hz-tongqing-gy-2026",
+            "org": "茂名市化州市同庆镇人民政府",
+            "publish_date": "2026-09-17",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-18",
+            "signup_way": "现场报名：化州市同庆镇山口村民委员会 / 石步村民委员会",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-17",
+                "media": "化州市人民政府网（政府信息公开）",
+                "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘公告",
+                "url": "http://www.huazhou.gov.cn/mmhztqz/gkmlpt/content/1/1646/post_1646691.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于高州市公益性岗位开发管理有关事项的通知》（高人社〔2026〕57号）文件精神，为进一步促进就业困难人员就业，经认定后发布本批招聘公告。报名人员携带所需材料直接到招聘单位报名，用人单位按公益性岗位安置排序确定人选，经市就业创业服务中心向社会公示无异议后录用。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门在广东省集中式一体化系统认定）",
+            "headcount": "",
+            "job_type": "公益性岗位（乡村岗聘用期限1年、城镇岗3年）",
+            "key": "gz-gy-2026-4",
+            "org": "高州市人力资源和社会保障局",
+            "publish_date": "2026-09-22",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-22",
+            "signup_way": "现场报名：直接到招聘单位报名，需携带本人身份证、《就业创业证》（含就业困难人员认定内容）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-22",
+                "media": "高州市人民政府",
+                "title": "2026年高州市公益性岗位招聘公告（第四批）",
+                "url": "http://www.gaozhou.gov.cn/gkmlzl/content/post_1649103.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市公益性岗位公开招聘（第四批）"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0662-3100276、0662-3103858（江城区劳动就业服务管理中心）",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "为助力我区乡村振兴工作，根据《广东省公益性岗位开发管理办法》（粤人社发〔2025〕15号）文件精神，经申报审核认定乡村公益性岗位55个。用人单位与聘用人员依法签订劳动合同或劳务协议，协议期限为1年，并为其购买意外伤害商业保险或工伤保险。",
+            "education": "",
+            "experience": "经本省人力资源社会保障部门认定的就业困难人员，且具备劳动能力",
+            "headcount": "55人",
+            "job_type": "乡村公益性岗位（协议期限1年）",
+            "key": "yjc-gy-2026",
+            "org": "阳江市江城区人力资源和社会保障局",
+            "publish_date": "2026-09-10",
+            "region": "阳江",
+            "salary": "按当地最低工资标准执行（当前为 2040 元/月），补贴资金从就业补助资金中列支",
+            "signup_start": "2026-09-10",
+            "signup_way": "现场报名：岗位工作地点所在村委会（工作日 8:30—12:00、14:30—17:30）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-10",
+                "media": "阳江市江城区人力资源和社会保障局（政府信息公开）",
+                "title": "2026年江城区乡村公益性岗位公告",
+                "url": "https://www.jiangcheng.gov.cn/yjjcrsj/gkmlpt/content/0/979/post_979222.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年江城区乡村公益性岗位公开招聘"
+          }
+        ]
+      }
+    },
+    "status": 200
+  },
+  "/api/employment/jobs?location=茂名": {
+    "recruit_payload": {
+      "sha256": "7a9cd5e47d80262d5527635296c9687a9ccdb70e30c5339b64c9e640da7ce09a",
+      "value": {
+        "category_options": {
+          "enterprise": [
+            {
+              "count": 1,
+              "value": "农业技术"
+            },
+            {
+              "count": 0,
+              "value": "电商运营"
+            },
+            {
+              "count": 0,
+              "value": "手工工艺"
+            },
+            {
+              "count": 0,
+              "value": "乡村旅游"
+            },
+            {
+              "count": 0,
+              "value": "物流仓储"
+            }
+          ],
+          "recruit": [
+            {
+              "count": 1,
+              "value": "农业技术"
+            },
+            {
+              "count": 3,
+              "value": "基层服务"
+            },
+            {
+              "count": 0,
+              "value": "乡村治理"
+            }
+          ]
+        },
+        "recruit_disclaimer": "岗位条件、报名时间、考试安排等一律以发布单位公告原文为准，请点击「查看公告」核对后再报名。本平台不代办报名，也不对招募结果作任何承诺。",
+        "recruit_source_note": "以下为广东省各级党委政府、乡镇（街道）与涉农部门公开发布的基层岗位招募（招聘）公告汇编，以乡村公益性岗位、编外人员、网格员、特聘农技（动物防疫）等本地岗位为主，由本站整理呈现，供了解基层岗位与报名渠道参考。",
+        "recruitments": [
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": 26,
+            "deadline": "2026-11-10",
+            "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
+            "education": "",
+            "experience": "经人社部门认定的就业困难人员（含本省户籍有劳动能力和就业意愿的脱贫劳动力）",
+            "headcount": "161名",
+            "job_type": "乡村公益性岗位（安置期限一般不超过一年）",
+            "key": "xy-gy-2026",
+            "org": "信宜市人力资源和社会保障局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-09",
+            "signup_way": "现场报名：报名岗位所对应的行政村（居）委会，需携带身份证、《就业创业证》及报名登记表（额满即止）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "信宜市人民政府网（公告公示）",
+                "title": "信宜市2026年度乡村公益性岗位招聘公告",
+                "url": "http://www.xinyi.gov.cn/zwgk/gggs/content/post_1644040.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "信宜市2026年度乡村公益性岗位招聘"
+          },
+          {
+            "category": "农业技术",
+            "contact": "0668-6387826",
+            "days_left": null,
+            "deadline": "2026-09-09",
+            "description": "根据《关于在我省生猪调出大县实施特聘动物防疫专员工作的通知》（粤农农办〔2020〕105号）文件精神，面向社会公开招聘特聘动物防疫专员4名，为非事业编制人员身份性质。报考年龄18至38周岁，学历为大专以上。采取现场报名 + 面试方式。",
+            "education": "大专及以上",
+            "experience": "不限",
+            "headcount": "4名",
+            "job_type": "特聘人员（非事业编制）",
+            "key": "gz-dwfyz-2026",
+            "org": "高州市农业农村局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-07",
+            "signup_way": "现场报名：高州市农业农村局二楼人事股（市教育路47号206室）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "高州市人民政府",
+                "title": "2026年高州市农业农村局特聘动物防疫专员招聘公告",
+                "url": "http://www.gaozhou.gov.cn/gznyncj/content/post_1642933.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市农业农村局特聘动物防疫专员招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-09-24",
+            "description": "为促进就业困难人员稳定就业，根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）、《茂名市人力资源和社会保障局关于进一步加强公益性岗位开发管理的通知》（茂人社〔2025〕13号），经市人社局同意，公开招聘乡村公益性岗位2个。报名后由用人单位面试，经村/居委代表会议民主评议、镇政府汇总报市人社局公示。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门认定）",
+            "headcount": "2个",
+            "job_type": "乡村公益性岗位",
+            "key": "hz-tongqing-gy-2026",
+            "org": "茂名市化州市同庆镇人民政府",
+            "publish_date": "2026-09-17",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-18",
+            "signup_way": "现场报名：化州市同庆镇山口村民委员会 / 石步村民委员会",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-17",
+                "media": "化州市人民政府网（政府信息公开）",
+                "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘公告",
+                "url": "http://www.huazhou.gov.cn/mmhztqz/gkmlpt/content/1/1646/post_1646691.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于高州市公益性岗位开发管理有关事项的通知》（高人社〔2026〕57号）文件精神，为进一步促进就业困难人员就业，经认定后发布本批招聘公告。报名人员携带所需材料直接到招聘单位报名，用人单位按公益性岗位安置排序确定人选，经市就业创业服务中心向社会公示无异议后录用。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门在广东省集中式一体化系统认定）",
+            "headcount": "",
+            "job_type": "公益性岗位（乡村岗聘用期限1年、城镇岗3年）",
+            "key": "gz-gy-2026-4",
+            "org": "高州市人力资源和社会保障局",
+            "publish_date": "2026-09-22",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-22",
+            "signup_way": "现场报名：直接到招聘单位报名，需携带本人身份证、《就业创业证》（含就业困难人员认定内容）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-22",
+                "media": "高州市人民政府",
+                "title": "2026年高州市公益性岗位招聘公告（第四批）",
+                "url": "http://www.gaozhou.gov.cn/gkmlzl/content/post_1649103.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市公益性岗位公开招聘（第四批）"
+          }
+        ]
+      }
+    },
+    "status": 200
+  },
+  "/api/employment/jobs?salary=3K-5K": {
+    "recruit_payload": {
+      "sha256": "436bc564258cf69206b100a65c1026a28b58ea29a82935d04fd229da2b93cc1f",
+      "value": {
+        "category_options": {
+          "enterprise": [
+            {
+              "count": 1,
+              "value": "农业技术"
+            },
+            {
+              "count": 0,
+              "value": "电商运营"
+            },
+            {
+              "count": 0,
+              "value": "手工工艺"
+            },
+            {
+              "count": 0,
+              "value": "乡村旅游"
+            },
+            {
+              "count": 0,
+              "value": "物流仓储"
+            }
+          ],
+          "recruit": [
+            {
+              "count": 2,
+              "value": "农业技术"
+            },
+            {
+              "count": 11,
+              "value": "基层服务"
+            },
+            {
+              "count": 1,
+              "value": "乡村治理"
+            }
+          ]
+        },
+        "recruit_disclaimer": "岗位条件、报名时间、考试安排等一律以发布单位公告原文为准，请点击「查看公告」核对后再报名。本平台不代办报名，也不对招募结果作任何承诺。",
+        "recruit_source_note": "以下为广东省各级党委政府、乡镇（街道）与涉农部门公开发布的基层岗位招募（招聘）公告汇编，以乡村公益性岗位、编外人员、网格员、特聘农技（动物防疫）等本地岗位为主，由本站整理呈现，供了解基层岗位与报名渠道参考。",
+        "recruitments": [
+          {
+            "category": "农业技术",
+            "contact": "0754-87369892（咨询时段：2026-10-10 至 10-16 工作日）",
+            "days_left": 1,
+            "deadline": "2026-10-16",
+            "description": "招聘单位为汕头市濠江区动物疫病预防控制中心（公益一类正股级事业单位），承担辖区动物疫病监测、检测、诊断、流行病学调查、疫情报告及预防控制等技术工作。本次招聘工作人员5名，旨在补齐基层畜牧兽医专业人才短板、健全动物防疫监管人才梯队。岗位具体条件见公告附件《岗位表》。考试采取“笔试+面试”方式，聘用后约定在本单位服务期限5年（含试用期）。",
+            "education": "",
+            "experience": "不限",
+            "headcount": "5名",
+            "job_type": "事业单位编制",
+            "key": "hj-nync-2026",
+            "org": "汕头市濠江区农业农村和水务局",
+            "publish_date": "2026-09-29",
+            "region": "汕头",
+            "salary": "纳入事业单位编制管理，工资福利待遇、岗位聘用按事业单位有关规定执行",
+            "signup_start": "2026-10-10",
+            "signup_way": "网络报名：https://d.zdzp.cn/?1249（报名确认：2026-10-19 至 10-20）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-29",
+                "media": "汕头市濠江区人民政府（政府信息公开）",
+                "title": "汕头市濠江区农业农村和水务局下属事业单位2026年度公开招聘工作人员公告",
+                "url": "https://www.haojiang.gov.cn/sthjrsj/gkmlpt/content/2/2572/mpost_2572909.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "汕头市濠江区农业农村和水务局下属事业单位2026年度公开招聘工作人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0762-4642835",
+            "days_left": 4,
+            "deadline": "2026-10-19",
+            "description": "根据《连平县人民政府办公室关于印发连平县机关事业单位编外人员管理办法的通知》（连府办〔2024〕6号），结合工作需要，面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。采取网上报名和资格初审，不接受现场报名；考试采取结构化面试方式，按 1:3 比例择优确定面试人员。",
+            "education": "大专及以上学历，不限专业",
+            "experience": "河源市户籍；年龄40周岁以下；有良好的沟通协调能力和文字基础，熟悉公文写作和办公软件操作；中共党员、有基层工作经历者优先",
+            "headcount": "1名",
+            "job_type": "编外人员（普通类）",
+            "key": "lp-xiuduan-2026",
+            "org": "连平县绣缎镇人民政府",
+            "publish_date": "",
+            "region": "河源",
+            "salary": "",
+            "signup_start": "2026-10-13",
+            "signup_way": "网上报名：材料打包为压缩文件（扫描件为 PDF，文件名为“编外人员报名+姓名”）发送至 lpxdzzb@163.com，不接受现场报名",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "连平县人民政府门户网站",
+                "title": "连平县绣缎镇人民政府2026年公开招聘编外人员公告",
+                "url": "https://www.lianping.gov.cn/hylpxdzf/gkmlpt/content/0/719/post_719203.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "连平县绣缎镇人民政府2026年公开招聘编外人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
+            "days_left": 16,
+            "deadline": "2026-10-31",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
+            "education": "",
+            "experience": "法定劳动年龄内（男18-60周岁、女18-50周岁）、有劳动能力和有就业意愿的就业困难人员；本县户籍的就业困难人员同等条件下优先聘用",
+            "headcount": "50人",
+            "job_type": "公益性岗位",
+            "key": "bl-gy-2026",
+            "org": "博罗县人力资源和社会保障局",
+            "publish_date": "2026-08-06",
+            "region": "惠州",
+            "salary": "不低于惠州市最低工资标准（1850元/月），为安置对象购买社保",
+            "signup_start": "2026-08-06",
+            "signup_way": "现场报名：按公告附件岗位表上每个岗位对应的报名地址报名（法定节假日不接受报名）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-06",
+                "media": "博罗县人民政府门户网站（政府信息公开）",
+                "title": "博罗县2026年公益性岗位公开招聘公告",
+                "url": "https://www.boluo.gov.cn/hzblrsj/gkmlpt/content/5/5827/post_5827288.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "博罗县2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": 26,
+            "deadline": "2026-11-10",
+            "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
+            "education": "",
+            "experience": "经人社部门认定的就业困难人员（含本省户籍有劳动能力和就业意愿的脱贫劳动力）",
+            "headcount": "161名",
+            "job_type": "乡村公益性岗位（安置期限一般不超过一年）",
+            "key": "xy-gy-2026",
+            "org": "信宜市人力资源和社会保障局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-09",
+            "signup_way": "现场报名：报名岗位所对应的行政村（居）委会，需携带身份证、《就业创业证》及报名登记表（额满即止）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "信宜市人民政府网（公告公示）",
+                "title": "信宜市2026年度乡村公益性岗位招聘公告",
+                "url": "http://www.xinyi.gov.cn/zwgk/gggs/content/post_1644040.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "open",
+            "status_label": "报名中",
+            "title": "信宜市2026年度乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-06-29",
+            "description": "2026年广东省继续选派高校毕业生到基层从事支教、支农、支医和帮扶乡村振兴等志愿服务（简称“三支一扶”），服务期为2年。全省计划招募3000名左右，其中韶关市180名、惠州市230名、湛江市240名（各市名额以当地公告为准）。招募经网上报名、笔试（《基本能力测验》）、确定招募对象、公示、体检等程序，拟招募对象名单在省人社厅官网、广东人事考试网公示。",
+            "education": "普通高校全日制大专以上毕业生",
+            "experience": "年龄不超过30周岁；已参加过“三支一扶”的不再列入",
+            "headcount": "全省约3000名",
+            "job_type": "基层志愿服务（服务期2年）",
+            "key": "szyf-2026",
+            "org": "广东省人力资源和社会保障厅",
+            "publish_date": "2026-06-23",
+            "region": "广东省",
+            "salary": "",
+            "signup_start": "2026-06-25",
+            "signup_way": "广东省高校毕业生“三支一扶”计划信息管理系统 https://ggfw.hrss.gd.gov.cn/szyf/index.do",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-06-23",
+                "media": "广东省人力资源和社会保障厅",
+                "title": "广东省2026年高校毕业生“三支一扶”计划招募公告",
+                "url": "https://hrss.gd.gov.cn/zwgk/gsgg/content/post_4915107.html"
+              },
+              {
+                "date": "2026-06-24",
+                "media": "广东省人民政府门户网站",
+                "title": "明天开始报名 广东今年“三支一扶”计划招募约3000人",
+                "url": "https://www.gd.gov.cn/gdywdt/bmdt/content/post_4915293.html"
+              },
+              {
+                "date": "2026-06-25",
+                "media": "韶关市人民政府门户网站",
+                "title": "广东省2026年“三支一扶”招募报名通道开启 今年我市计划招募180人",
+                "url": "https://www.sg.gov.cn/xw/xwzx/bdxw/content/post_2858112.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "广东省2026年高校毕业生“三支一扶”计划招募"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-08-27",
+            "description": "依据《广东省兜底安置类公益性岗位开发管理办法》（粤人社规〔2020〕13号），重点帮扶就业困难人员实现就业增收，面向社会公开招聘乡村公益性岗位工作人员若干名。年龄要求：男性57周岁以下、女性47周岁以下。采取面试方式，不需笔试。",
+            "education": "",
+            "experience": "江英镇户籍，具有劳动能力的脱贫人口、已认定的就业困难人员和监测对象",
+            "headcount": "若干名",
+            "job_type": "乡村公益性岗位",
+            "key": "ys-jiangying-gy-2026",
+            "org": "清远市阳山县江英镇人民政府",
+            "publish_date": "2026-08-25",
+            "region": "清远",
+            "salary": "月工资总额不低于清远市最低工资标准（本年度 2040 元/月）",
+            "signup_start": "2026-08-25",
+            "signup_way": "现场报名：阳山县江英镇党群服务中心（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-08-25",
+                "media": "阳山县政府门户网站（政府信息公开）",
+                "title": "2026年公益性岗位公开招聘的公告",
+                "url": "https://www.yangshan.gov.cn/qyysjy/gkmlpt/content/2/2180/post_2180831.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "阳山县江英镇2026年公益性岗位公开招聘"
+          },
+          {
+            "category": "农业技术",
+            "contact": "0668-6387826",
+            "days_left": null,
+            "deadline": "2026-09-09",
+            "description": "根据《关于在我省生猪调出大县实施特聘动物防疫专员工作的通知》（粤农农办〔2020〕105号）文件精神，面向社会公开招聘特聘动物防疫专员4名，为非事业编制人员身份性质。报考年龄18至38周岁，学历为大专以上。采取现场报名 + 面试方式。",
+            "education": "大专及以上",
+            "experience": "不限",
+            "headcount": "4名",
+            "job_type": "特聘人员（非事业编制）",
+            "key": "gz-dwfyz-2026",
+            "org": "高州市农业农村局",
+            "publish_date": "",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-07",
+            "signup_way": "现场报名：高州市农业农村局二楼人事股（市教育路47号206室）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "高州市人民政府",
+                "title": "2026年高州市农业农村局特聘动物防疫专员招聘公告",
+                "url": "http://www.gaozhou.gov.cn/gznyncj/content/post_1642933.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市农业农村局特聘动物防疫专员招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0751-5680101",
+            "days_left": null,
+            "deadline": "2026-09-11",
+            "description": "依据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）等文件，面向本省人社部门认定的就业困难人员招聘乡村公益性岗位3名：乡村保洁员1名、乡村护林员2名，工作地点均为北乡镇人民政府。招用条件为就业困难人员，年龄16周岁以上（计算至2026年9月30日）。",
+            "education": "初中及以上（含中技）",
+            "experience": "就业困难人员（退伍军人、脱贫户家庭劳动力优先）",
+            "headcount": "3名（乡村保洁员1名、乡村护林员2名）",
+            "job_type": "乡村公益性岗位",
+            "key": "lc-beixiang-gy-2026",
+            "org": "乐昌市北乡镇人民政府",
+            "publish_date": "",
+            "region": "韶关",
+            "salary": "2040元/月（不含个人应缴社保）",
+            "signup_start": "2026-09-03",
+            "signup_way": "现场报名：乐昌市北乡镇党建和组织人事办公室（免报名费）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "",
+                "media": "乐昌市政府公众信息网",
+                "title": "乐昌市北乡镇2026年乡村公益性岗位招聘公告",
+                "url": "https://www.lechang.gov.cn/renlizhiyuj/content/post_2876353.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-09-24",
+            "description": "为促进就业困难人员稳定就业，根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）、《茂名市人力资源和社会保障局关于进一步加强公益性岗位开发管理的通知》（茂人社〔2025〕13号），经市人社局同意，公开招聘乡村公益性岗位2个。报名后由用人单位面试，经村/居委代表会议民主评议、镇政府汇总报市人社局公示。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门认定）",
+            "headcount": "2个",
+            "job_type": "乡村公益性岗位",
+            "key": "hz-tongqing-gy-2026",
+            "org": "茂名市化州市同庆镇人民政府",
+            "publish_date": "2026-09-17",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-18",
+            "signup_way": "现场报名：化州市同庆镇山口村民委员会 / 石步村民委员会",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-17",
+                "media": "化州市人民政府网（政府信息公开）",
+                "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘公告",
+                "url": "http://www.huazhou.gov.cn/mmhztqz/gkmlpt/content/1/1646/post_1646691.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于高州市公益性岗位开发管理有关事项的通知》（高人社〔2026〕57号）文件精神，为进一步促进就业困难人员就业，经认定后发布本批招聘公告。报名人员携带所需材料直接到招聘单位报名，用人单位按公益性岗位安置排序确定人选，经市就业创业服务中心向社会公示无异议后录用。",
+            "education": "",
+            "experience": "就业困难人员（需经人社部门在广东省集中式一体化系统认定）",
+            "headcount": "",
+            "job_type": "公益性岗位（乡村岗聘用期限1年、城镇岗3年）",
+            "key": "gz-gy-2026-4",
+            "org": "高州市人力资源和社会保障局",
+            "publish_date": "2026-09-22",
+            "region": "茂名",
+            "salary": "",
+            "signup_start": "2026-09-22",
+            "signup_way": "现场报名：直接到招聘单位报名，需携带本人身份证、《就业创业证》（含就业困难人员认定内容）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-22",
+                "media": "高州市人民政府",
+                "title": "2026年高州市公益性岗位招聘公告（第四批）",
+                "url": "http://www.gaozhou.gov.cn/gkmlzl/content/post_1649103.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年高州市公益性岗位公开招聘（第四批）"
+          },
+          {
+            "category": "基层服务",
+            "contact": "",
+            "days_left": null,
+            "deadline": "2026-10-09",
+            "description": "因工作需要，经白沙镇委镇政府研究，决定面向社会招聘 2 名合同制工作人员。通过初审的人员采用结构化面试形式进行面试；体检通过后与白沙镇人民政府签订劳动合同，聘用期限 1 年、试用期 1 个月，合同期满后根据招聘单位需要和本人意愿续签。",
+            "education": "退役军人服务站专职人员：全日制大学专科及以上；安全生产监督协管员：大学本科及以上",
+            "experience": "退伍军人优先；需熟悉办公软件操作",
+            "headcount": "2名（退役军人服务站专职人员1名、安全生产监督协管员1名）",
+            "job_type": "合同制（聘用期限1年，试用期1个月）",
+            "key": "ts-baisha-2026",
+            "org": "台山市白沙镇人民政府",
+            "publish_date": "2026-09-28",
+            "region": "江门",
+            "salary": "退役军人服务站专职人员年薪约 5 万元；安全生产监督协管员年薪约 4 万元（均含社保个人缴纳部分、年终考核奖等）",
+            "signup_start": "",
+            "signup_way": "电子邮件报名：tssbszzfdjb@jiangmen.gov.cn（提交个人履历表及身份证、毕业证、退伍证等材料扫描件）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-28",
+                "media": "台山市人民政府（政府信息公开）",
+                "title": "白沙镇人民政府招聘合同制工作人员公告",
+                "url": "https://www.cnts.gov.cn/jmtssrsj/gkmlpt/content/3/3560/post_3560374.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "台山市白沙镇人民政府招聘合同制工作人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0762-4612997",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。要求大专及以上学历、不限专业，年龄40周岁以下（以公告当日为限），有良好的沟通协调能力和文字基础，熟悉公文写作和办公软件操作。考试采取结构化面试方式进行，满分100分。",
+            "education": "大专及以上",
+            "experience": "不限专业",
+            "headcount": "1名",
+            "job_type": "编外人员（普通类）",
+            "key": "lp-sanjiao-2026",
+            "org": "连平县三角镇人民政府",
+            "publish_date": "2026-09-29",
+            "region": "河源",
+            "salary": "按县财政有关编外人员（普通类）的规定执行；试用期2个月",
+            "signup_start": "2026-09-29",
+            "signup_way": "网上报名（不接受现场报名），材料打包为 PDF 压缩文件发送至 LPSJZZB@163.com",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-29",
+                "media": "连平县人民政府门户网站",
+                "title": "连平县三角镇人民政府2026年公开招聘编外人员公告",
+                "url": "http://www.lianping.gov.cn/zwgk/zfdt/tzgg/content/post_719197.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "连平县三角镇人民政府2026年公开招聘编外人员"
+          },
+          {
+            "category": "基层服务",
+            "contact": "0662-3100276、0662-3103858（江城区劳动就业服务管理中心）",
+            "days_left": null,
+            "deadline": "2026-10-10",
+            "description": "为助力我区乡村振兴工作，根据《广东省公益性岗位开发管理办法》（粤人社发〔2025〕15号）文件精神，经申报审核认定乡村公益性岗位55个。用人单位与聘用人员依法签订劳动合同或劳务协议，协议期限为1年，并为其购买意外伤害商业保险或工伤保险。",
+            "education": "",
+            "experience": "经本省人力资源社会保障部门认定的就业困难人员，且具备劳动能力",
+            "headcount": "55人",
+            "job_type": "乡村公益性岗位（协议期限1年）",
+            "key": "yjc-gy-2026",
+            "org": "阳江市江城区人力资源和社会保障局",
+            "publish_date": "2026-09-10",
+            "region": "阳江",
+            "salary": "按当地最低工资标准执行（当前为 2040 元/月），补贴资金从就业补助资金中列支",
+            "signup_start": "2026-09-10",
+            "signup_way": "现场报名：岗位工作地点所在村委会（工作日 8:30—12:00、14:30—17:30）",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-10",
+                "media": "阳江市江城区人力资源和社会保障局（政府信息公开）",
+                "title": "2026年江城区乡村公益性岗位公告",
+                "url": "https://www.jiangcheng.gov.cn/yjjcrsj/gkmlpt/content/0/979/post_979222.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "2026年江城区乡村公益性岗位公开招聘"
+          },
+          {
+            "category": "乡村治理",
+            "contact": "0763-8666832",
+            "days_left": null,
+            "deadline": "2026-10-13",
+            "description": "因工作需要，按照“公开、公正、公平、竞争和德才兼备、择优聘用”的原则，面向社会公开招聘 1 名镇级专职网格管理员和 3 名村级专职网格员，面向具有高中以上学历的社会人员及高校应届毕业生，不限专业。专职网格员优先从本网格内符合条件的人员中选聘，本网格无人则遵循就近原则从周边网格选聘。招聘按报名、资格审查、面试、体检、组织考察和公示等程序进行。",
+            "education": "高中、中专及以上",
+            "experience": "年龄18至45周岁、不限专业；中共党员（含预备党员）、退伍军人、法律及相关专业毕业生、具有村务管理工作经验者优先",
+            "headcount": "4名（镇级专职网格管理员1名、大龙村委会专职网格员1名、东和村委会专职网格员2名）",
+            "job_type": "临聘（不列入单位编制序列，每年签订一次聘用合同）",
+            "key": "ln-sanjiang-2026",
+            "org": "连南瑶族自治县三江镇人民政府",
+            "publish_date": "2026-09-30",
+            "region": "清远",
+            "salary": "2540元/人/月（含基本工资2040元、绩效工资500元）；按企业职工标准购买社保五险",
+            "signup_start": "2026-10-08",
+            "signup_way": "现场报名：连南瑶族自治县三江镇人民政府平安法治和应急管理办公室（三江镇金三路2号），上午8:30—11:30、下午2:30—5:30；不收取报名费",
+            "source_type": "public_recruit",
+            "sources": [
+              {
+                "date": "2026-09-30",
+                "media": "连南瑶族自治县人民政府门户网站（政府信息公开）",
+                "title": "三江镇公开招聘专职网格管理员、网格员的公告",
+                "url": "https://www.liannan.gov.cn/qylnsj/gkmlpt/content/2/2195/post_2195588.html"
+              }
+            ],
+            "starts_in": null,
+            "status": "closed",
+            "status_label": "已过报名期",
+            "title": "连南瑶族自治县三江镇公开招聘专职网格管理员、网格员"
+          }
+        ]
+      }
+    },
+    "status": 200
+  },
+  "/api/resources/cases": {
+    "bytes": 34782,
+    "sha256": "7737c2f5abb65fceb97444c0e789eed0f91db7575a3a116c78fa8696cb71ee00",
+    "status": 200
+  },
+  "/api/resources/cases/1": {
+    "bytes": 5438,
+    "sha256": "655b52ba22e2ba5ddd270897c17dbdd05469ce5d9a6a9bf2d9f0c52f5d58263b",
+    "status": 200
+  },
+  "/api/resources/cases/2": {
+    "bytes": 7317,
+    "sha256": "5d695de78466e5e9711074c3e6a53022d2a7debb7277fb6433aa2b09431c1aa5",
+    "status": 200
+  },
+  "/api/resources/cases/3": {
+    "bytes": 7519,
+    "sha256": "16538ff2712bb1fcac059039d7e239467907b12208c91fde9ead0076a8a5224e",
+    "status": 200
+  },
+  "/api/resources/cases/4": {
+    "bytes": 7620,
+    "sha256": "c6a2cf054fab1fb1f1a52f35d53dd4df68afb17994a33193eef151db0f7f1c73",
+    "status": 200
+  },
+  "/api/resources/cases/5": {
+    "bytes": 6552,
+    "sha256": "d21ee83edae2692a5b8c4b5e688e95b0f8164c7540696156f30b3da95d61d2a1",
+    "status": 200
+  },
+  "/api/resources/cases/999999": {
+    "bytes": 103,
+    "sha256": "70c4db564ba7cdc8e20f86b06ed2fd5d16139530482cb9c2ec4edad3a32dc9c7",
+    "status": 404
+  },
+  "/api/resources/policies": {
+    "bytes": 37934,
+    "sha256": "a7a55178379e0ff8f9db4cfc0711b032e9a0d367a99c49b495c4c0d17e56bf00",
+    "status": 200
+  }
+}

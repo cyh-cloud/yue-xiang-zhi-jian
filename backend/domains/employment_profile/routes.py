@@ -8,7 +8,7 @@
 
 两条投递通道的区别（务必保持）：
   · 企业岗位（job_listings）—— 站内投递，走 job_applications，企业端「简历管理」可见并给反馈；
-  · 公开招聘公告（domain_data.employment.jobs_data）—— **平台不是官方报名系统**，
+  · 公开招聘公告（db_domains.recruitments，T09 起读库）—— **平台不是官方报名系统**，
     只做「求职意向登记」（job_intents），报名由学员按公告原文自行完成，
     接口文案与前端都必须显式声明这一点。
 
@@ -32,6 +32,7 @@ from domains.employment_profile.prompts import (
 from domains.employment_profile.service import profile_for_ai
 from domains.employment_profile.service import user_has_resume
 from db_domains import employment
+from db_domains import recruitments as recruitments_db
 
 employment_profile_bp = Blueprint('employment_profile', __name__)
 
@@ -170,7 +171,6 @@ def add_job_intent():
     ⚠️ 平台**不是**官方报名系统：这里只记录意向，**不代表报名成功**。
     前端的成功提示与公告详情页都必须写明「请按公告原文自行报名」。
     """
-    from domain_data.employment import jobs_data
     data = request.get_json(silent=True) or {}
     user_id = data.get('user_id')
     recruit_key = (data.get('recruit_key') or '').strip()
@@ -181,7 +181,7 @@ def add_job_intent():
     user, err = _self_only(user_id)
     if err:
         return err
-    if not jobs_data.get_recruitment(recruit_key):
+    if recruitments_db.get_recruitment(recruit_key) is None:
         return jsonify({"success": False, "code": "not_found",
                         "message": "公告不存在或已下架"}), 404
 
@@ -217,7 +217,6 @@ def get_my_jobs(user_id):
     两条通道在数据结构上完全不同（前者挂在数字 job_id 上、后者挂在公告字符串 key 上），
     这里统一成前端可直接渲染的两组，并**如实标注通道类型**。
     """
-    from domain_data.employment import jobs_data
     user, err = _self_only(user_id)
     if err:
         return err
@@ -227,10 +226,10 @@ def get_my_jobs(user_id):
         a['channel'] = 'enterprise'
 
     # 意向记录只有 recruit_key，这里补上公告的标题/单位/地区/报名截止，
-    # 并对**已从 jobs_data 中移除**的公告做剪枝（否则会渲染出一条点不开的空卡）。
+    # 并对**已从招募表里移除**的公告做剪枝（否则会渲染出一条点不开的空卡）。
     intents = []
     for it in employment.get_job_intents(user_id):
-        rec = jobs_data.get_recruitment(it['recruit_key'])
+        rec = recruitments_db.get_recruitment(it['recruit_key'])
         if not rec:
             continue
         intents.append({
@@ -251,7 +250,7 @@ def get_my_jobs(user_id):
         "success": True,
         "applications": applications,
         "intents": intents,
-        "intent_notice": jobs_data.get_recruitment_notes().get('disclaimer', ''),
+        "intent_notice": recruitments_db.get_recruitment_notes()['disclaimer'],
         # ⚠️ 平台**不强制**先写简历才能投递（投递只记一条申请 + 给积分），
         # 但企业端看到的是「无简历的空申请」。这里如实下发简历状态，
         # 前端据此给出持久提示 —— 而不是让文案和实际行为互相打架（2026-10-07）。

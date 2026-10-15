@@ -90,8 +90,8 @@ _ALLOWED_STATIC_DIRS = static_allowlist_dirs
 # 已整体迁至 domains.resources（蓝图 resources_bp，由 core.app_factory 注册）。
 # 方言知识库 DIALECTS_DATA 与方言降级话术库（原 generate_dynamic_voice_answer）在
 # domains.resources.dialect_voice，随域一起搬走；方言语音问答的限流额度 VOICE_RATE_LIMIT
-# 也随它走。案例与政策的内容事实源在 domain_data.resources（cases_data /
-# policies_data），经 db_domains.resources 读取，这里不持有第二份。
+# 也随它走。案例与政策的内容事实源在 db_domains.content（T09 起读库，ADR 0002），
+# 经 db_domains.resources 组装可见性，这里不持有第二份。
 # 用药口径的判定函数与免责声明文案仍在共享层 shared.agri_dosage（农业培训域、病虫害
 # 诊断域也判定它），本域按 chem_notice 单独字段下发，拼法见域内 _chem_dose_notice_for。
 
@@ -176,7 +176,7 @@ _ALLOWED_STATIC_DIRS = static_allowlist_dirs
 #
 # 政策发布/更新的三条口径（normalize_policy_category / policy_sources_to_json /
 # default_policy_summary）都在 db_domains/resources.py，调用方按域 import 访问；
-# 政策内容的事实源是 domain_data/resources/policies_data，本文件不持有副本。
+# 政策内容的事实源是 government_policies 表（政府端可发布与下架），本文件不持有副本。
 
 
 # ==================== 健康检查 ====================
