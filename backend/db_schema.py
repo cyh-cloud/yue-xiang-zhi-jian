@@ -189,6 +189,17 @@ SCHEMA_SQL = """
             extra TEXT NOT NULL DEFAULT '{}'
         );
 
+        -- 迁移记录表。migrations/0001_content_to_db.py 靠它判断「这库跑没跑过」，
+        -- 否则重复执行会把运营改过的内容按代码再刷一遍。记录与建表同住：表定义
+        -- 全仓库只有这一份，脚本不另建表。version 是脚本文件名里的序号，
+        -- extra 存本次执行的清理与写入摘要（脏数据清理记录就在那里，不静默丢弃）。
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version    TEXT PRIMARY KEY,
+            name       TEXT NOT NULL,
+            applied_at TEXT DEFAULT (datetime('now','localtime')),
+            extra TEXT NOT NULL DEFAULT '{}'
+        );
+
         CREATE TABLE IF NOT EXISTS job_listings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,

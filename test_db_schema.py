@@ -66,11 +66,13 @@ EXPECTED_TABLES = {
     'dialects', 'dialect_phrases', 'dialect_quick_questions', 'crafts',
     'craft_steps', 'craft_purchase_categories', 'craft_purchase_items',
     'craft_budgets',
+    # 迁移记录表（T05）：migrations/0001_content_to_db.py 靠它防重入
+    'schema_migrations',
 }
 # 36 张既有表 + 21 张新表。spec 4.4 写作「36 -> 56」，那是按
 # 「pest_entries 已存在、只补列」算的；实测现库里并没有 pest_entries
 # （病虫害内容此前只在 domain_data 里，从未落库），所以实际新建 21 张。
-EXPECTED_TABLE_COUNT = 57
+EXPECTED_TABLE_COUNT = 58
 
 EXPECTED_VIEWS = {
     'v_enterprise_applications', 'v_enterprise_job_stats', 'v_home_stats',
@@ -206,11 +208,12 @@ class TableInventoryTest(IsolatedDatabaseTest):
         self.assertEqual(tables, EXPECTED_TABLES)
 
     def test_table_count_matches_the_spec(self):
-        """spec 4.4 写作「36 -> 56」，实测是 57，差异在 pest_entries。
+        """spec 4.4 写作「36 -> 56」，实测是 58，差异在 pest_entries 与迁移记录表。
 
         spec 把 pest_entries 算作「已存在，改为补列」，但现库里并没有这张表，
         病虫害内容此前只活在 domain_data 里，从未落库。所以它是新建而非补列，
-        36 + 21 = 57。这里断言真实建出的表数，让文档与库的差异显式可见。
+        36 + 21 = 57；T05 又加了 schema_migrations（迁移记录表），故 58。
+        这里断言真实建出的表数，让文档与库的差异显式可见。
         """
         self.assertEqual(len(self.probe('tables')), EXPECTED_TABLE_COUNT)
 

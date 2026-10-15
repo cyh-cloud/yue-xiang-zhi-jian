@@ -14,6 +14,7 @@
 | `js/` | 跨页复用的前端模块 |
 | `images/` `uploads/` | 静态图片素材、用户上传产物 |
 | `data/` | SQLite 库与运行日志（不进版本库，见 `.gitignore`） |
+ | `migrations/` | 一次性内容迁移脚本与测试探针（ADR 0002） |
 
 仓库根还放着多页面前端的 HTML 页面、全局样式与脚本，以及 `requirements.txt`
 与 `.env`（配置模板是 `.env.example`）。
@@ -37,6 +38,16 @@
 
 自托管单机：`python backend/run.py` 起一个 Flask 进程，默认多线程，静态文件由
 同一个进程伺服。没有反向代理、没有多 worker、没有 serverless。
+
+### 新环境怎么起
+
+库文件不进版本库，新环境用基线库还原：
+
+    python migrations/0001_content_to_db.py --make-baseline
+    cp data/baseline.db data/yuexiang.db
+    python backend/run.py
+
+详见 `docs/baseline-database.md`。
 
 ## 功能模块
 
