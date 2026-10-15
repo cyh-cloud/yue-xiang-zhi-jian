@@ -153,8 +153,8 @@ class OperatorRoleTest(unittest.TestCase):
         self.assertFalse(body['success'])
         self.assertEqual(body['message'], u'无效的角色类型')
         # 注册被拒时不得留下账号
-        import database
-        self.assertIsNone(database.get_user_by_id(username))
+        from db_domains.users import get_user_by_id
+        self.assertIsNone(get_user_by_id(username))
 
     def test_login_hands_the_frontend_the_capability_list(self):
         """登录必须下发能力清单，前端据此按能力显隐，不自己复制一份能力表。"""
@@ -241,6 +241,12 @@ class ExistingRolesUnchangedTest(unittest.TestCase):
     def test_existing_roles_keep_their_capability_surface(self):
         """五个既有角色持有的能力集合逐条不变（与 T01 的能力表一致）。"""
         from core.permissions import CAPABILITIES, can
+        from core.permissions import ROLES
+        # 支撑域的 .read 是 T03 删掉 database.py 后补上的：跨域读从隐式变成显式
+        # import 边，必须有明确归属，机械检查才判得了权。它们对全部已登录角色
+        # 一致放行，不改变任何角色能做的事，所以这里按「全角色共有」处理。
+        logged_in_reads = {c for c, holders in CAPABILITIES.items()
+                           if c.endswith('.read') and len(holders) == len(ROLES)}
         expected = {
             'student': set(),
             'teacher': {'craft.manage', 'course.read', 'course.manage',
@@ -257,6 +263,7 @@ class ExistingRolesUnchangedTest(unittest.TestCase):
         }
         for role, wanted in expected.items():
             # 只数**显式授予**的能力：公开能力（空元组）对任何角色都返回 True，            # 把它算进来会让每个角色都带上全部 .read，掩盖真正的边界。            granted = {c for c, holders in CAPABILITIES.items() if role in holders}
+            granted -= logged_in_reads
             with self.subTest(role=role):
                 self.assertEqual(granted, wanted,
                                  '%s 的能力集合变了' % role)
@@ -315,9 +322,11 @@ class CapabilityTableConsistencyTest(unittest.TestCase):
         """下发给前端的能力清单与能力表逐条一致（单一真相源的守门测试）。"""
         from core.permissions import CAPABILITIES, can, capabilities_for_role
         granted = capabilities_for_role('operator')
+        # 只列 manage 侧：.read 大多是公开元组，下发给前端会让「显隐」退化成
+        # 「全部显示」，没有判断价值（见 capabilities_for_role 的 docstring）。
         self.assertEqual(set(granted),
                          {c for c, holders in CAPABILITIES.items()
-                          if 'operator' in holders})
+                          if 'operator' in holders and c.endswith('.manage')})
         self.assertNotIn('user.manage', granted)
         self.assertNotIn('review.moderate', granted)
         for capability in granted:
@@ -327,8 +336,8 @@ class CapabilityTableConsistencyTest(unittest.TestCase):
 
 def _cleanup_user(username, sid):
     """删掉注册用例造出的账号与会话，避免污染后续用例。"""
-    import database
-    conn = database.get_connection()
+    from db_connection import get_connection
+    conn = get_connection()
     if sid:
         conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
     conn.execute("DELETE FROM user_sessions WHERE user_id = ?", (username,))
