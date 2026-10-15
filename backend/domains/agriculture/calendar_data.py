@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""农业培训域的农事日历数据兜底与两个纯函数。
+"""农业培训域的农事日历数据兜底。
 
-farming_products 表读空时的回退目录、物候期命中判定、提醒文案用的一行摘要。
-它们只服务 calendar.py 的两条日历/提醒路径，没有第二个消费方，因此单独成模块、
-不摊在路由文件里（路由文件有 600 行上限，见 spec 的验收门槛）。
+farming_products 表读空时的回退目录与 AI 不可用时的静态建议。两者都是 T10
+要删的内容常量（REFACTOR-PLAN 4.2），届时本模块随之消失，所以不往这里加新东西。
+
+T06 已把 _month_in_phase 与 _farming_task_brief 两个纯函数移入
+backend/db_domains/farming.py：它们服务的是农时内容，跟着数据走，读侧只认一处。
 """
 
 import logging
@@ -36,26 +38,7 @@ def _static_agri_suggestions(product):
     return list(_STATIC_AGRI_SUGGESTIONS.get(product, _STATIC_AGRI_SUGGESTIONS["lychee"]))
 
 
-def _month_in_phase(month, start_month, end_month):
-    """物候期命中判定。start_month > end_month 表示跨年区间（如 11月 → 次年1月）。"""
-    if start_month <= end_month:
-        return start_month <= month <= end_month
-    return month >= start_month or month <= end_month
-
-
-def _farming_task_brief(task):
-    """把任务压成「05日 花前病虫害预防」的一行摘要，供提醒文案使用。"""
-    md = (task.get('task_md') or '')
-    day = None
-    if '-' in md:
-        try:
-            day = int(md.split('-', 1)[1])
-        except (ValueError, IndexError):
-            day = None
-    return ('%d日 %s' % (day, task.get('title', ''))) if day else task.get('title', '')
-
-
 __all__ = [
     '_DEFAULT_AGRICULTURE_PRODUCTS', '_STATIC_AGRI_SUGGESTIONS',
-    '_static_agri_suggestions', '_month_in_phase', '_farming_task_brief',
+    '_static_agri_suggestions',
 ]

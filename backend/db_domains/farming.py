@@ -3,6 +3,10 @@
 """农业培训域：农时日历的作物、生育期、农事任务、订阅与提醒。
 
 T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分前逐字节一致。
+T06 把分类标签与两个纯函数收进本模块：分类标签改读 farming_categories 表
+（原 get_farming_category_labels 从 domain_data.agriculture.farming_data 现取，
+是当时唯一的 domain_data 残留），_month_in_phase 与 _farming_task_brief 从
+domains/agriculture/calendar_data.py 移入，一并列在 __all__ 里。
 """
 
 import sqlite3
@@ -13,9 +17,17 @@ from db_connection import get_connection
 # 本模块，谁就必须持 farming.manage（读操作受 farming.read 管）。
 CAPABILITY = 'farming'
 
-import sys
-
-import repo_paths
+__all__ = [
+    'CAPABILITY',
+    'clear_farming_reminder_log', 'get_due_farming_tasks',
+    'get_farming_categories', 'get_farming_category_labels',
+    'get_farming_phenophases', 'get_farming_product', 'get_farming_products',
+    'get_farming_source_map', 'get_farming_sources', 'get_farming_subscribers',
+    'get_farming_subscriptions', 'get_farming_task_by_id', 'get_farming_tasks',
+    'has_farming_reminder_sent', 'is_farming_subscribed',
+    'mark_farming_reminder_sent', 'set_farming_subscription',
+    'month_in_phase', 'farming_task_brief',
+]
 
 
 def get_farming_products(active_only=True):
@@ -52,15 +64,40 @@ def get_farming_source_map():
     return {s['key']: s for s in get_farming_sources()}
 
 def get_farming_category_labels():
-    """返回 {分类key: 中文标签}，来自种子数据模块"""
-    # T05/T06：路径基准跟随 T02 改为仓库根，模块搬进子目录后不能再从 __file__ 推导
-    if repo_paths.REPO_ROOT not in sys.path:
-        sys.path.insert(0, repo_paths.REPO_ROOT)
+    """返回 {分类key: 中文标签}，来自 farming_categories 表。"""
+    return {row['key']: row['label'] for row in get_farming_categories()}
+
+
+def get_farming_categories():
+    """返回分类标签行（按 sort_order、key 排序）。"""
+    conn = get_connection()
     try:
-        from domain_data.agriculture import farming_data as fd
-        return dict(getattr(fd, 'FARMING_CATEGORY_LABELS', {}) or {})
-    except Exception:
-        return {}
+        rows = conn.execute(
+            "SELECT key, label FROM farming_categories ORDER BY sort_order, key").fetchall()
+    except sqlite3.OperationalError:
+        rows = []          # 旧库尚未建表时降级为空
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+def month_in_phase(month, start_month, end_month):
+    """物候期命中判定。start_month > end_month 表示跨年区间（如 11月 → 次年1月）。"""
+    if start_month <= end_month:
+        return start_month <= month <= end_month
+    return month >= start_month or month <= end_month
+
+
+def farming_task_brief(task):
+    """把任务压成「05日 花前病虫害预防」的一行摘要，供提醒文案使用。"""
+    md = (task.get('task_md') or '')
+    day = None
+    if '-' in md:
+        try:
+            day = int(md.split('-', 1)[1])
+        except (ValueError, IndexError):
+            day = None
+    return ('%d日 %s' % (day, task.get('title', ''))) if day else task.get('title', '')
 
 def get_farming_phenophases(product_id=None):
     """返回物候期列表（可按产品过滤）"""

@@ -21,13 +21,16 @@ from flask import jsonify, request
 
 from core.session import get_session_user
 from domains.agriculture.calendar_data import _DEFAULT_AGRICULTURE_PRODUCTS
-from domains.agriculture.calendar_data import _farming_task_brief, _month_in_phase
 from domains.agriculture.routes import agriculture_bp
 from shared.solar_terms import solar_terms_of_month
 from db_domains import farming, notifications
 # 本域读 farming（公开），并在农事提醒到期时写 notification。写别人的域要显式
 # 声明，让 tools/check_architecture.py 有据可判，也让「谁在给全员发通知」可查。
 CAPABILITIES_USED = ('farming.read', 'notification.read')
+
+# T06：_month_in_phase 与 _farming_task_brief 两个纯函数已随农时内容一并移入
+# db_domains.farming（按 REFACTOR-PLAN 4.2）。这里按域 import 后经 farming 取用，
+# 不再从 domains.agriculture.calendar_data 取——纯函数跟着数据走，读侧只认一处。
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +97,7 @@ def get_farming_calendar(product_id):
     # 物候期：标记当月命中项，并给出「当前物候期」（取首个命中项）
     phase_current = None
     for ph in phases:
-        ph['in_month'] = _month_in_phase(month, ph['start_month'], ph['end_month'])
+        ph['in_month'] = farming.month_in_phase(month, ph['start_month'], ph['end_month'])
         if ph['in_month'] and phase_current is None:
             phase_current = ph
 
@@ -304,7 +307,7 @@ def check_farming_reminders():
             continue
         # 文案带具体日期：优先高优先级，最多 3 条
         picked = [t for t in due if t.get('priority') == 'high'][:3] or due[:3]
-        highlights = [_farming_task_brief(t) for t in picked]
+        highlights = [farming.farming_task_brief(t) for t in picked]
         title = '%d月%s农事提醒' % (now.month, product['name'])
         content = '本月已到期农事：' + '、'.join(highlights) + '。详情见「农业技能 · 农时智能日历」。'
         try:

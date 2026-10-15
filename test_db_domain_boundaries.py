@@ -37,6 +37,7 @@ OWNED_TABLES = {
     'farming': {
         'farming_products', 'farming_phenophases', 'farming_tasks',
         'farming_subscriptions', 'farming_reminder_log', 'farming_sources',
+        'farming_categories',
     },
     'students': {'students'},
     'teaching': {'announcements', 'assignments', 'assignment_submissions'},

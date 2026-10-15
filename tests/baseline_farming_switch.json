@@ -1,0 +1,674 @@
+{
+  "/api/agriculture/calendar/lychee": {
+    "body": {
+      "dates_provisional": true,
+      "is_configured": true,
+      "month": 10,
+      "phenophase_current": {
+        "color": "#1f5e43",
+        "description": "控梢促花，积累养分",
+        "id": 180,
+        "name": "秋梢老熟期"
+      },
+      "phenophases": [
+        {
+          "color": "#4a8a6a",
+          "description": "恢复树势，培养健壮秋梢",
+          "end_month": 8,
+          "id": 179,
+          "in_month": false,
+          "name": "采后恢复期",
+          "start_month": 7
+        },
+        {
+          "color": "#1f5e43",
+          "description": "控梢促花，积累养分",
+          "end_month": 10,
+          "id": 180,
+          "in_month": true,
+          "name": "秋梢老熟期",
+          "start_month": 9
+        },
+        {
+          "color": "#4a6fa5",
+          "description": "控氮增磷钾，促进花芽分化",
+          "end_month": 1,
+          "id": 181,
+          "in_month": false,
+          "name": "花芽分化期",
+          "start_month": 11
+        },
+        {
+          "color": "#d9a227",
+          "description": "保花保果，花期忌施药",
+          "end_month": 3,
+          "id": 182,
+          "in_month": false,
+          "name": "花期",
+          "start_month": 2
+        },
+        {
+          "color": "#ef4444",
+          "description": "壮果、防蒂蛀虫、防裂果",
+          "end_month": 6,
+          "id": 183,
+          "in_month": false,
+          "name": "果期",
+          "start_month": 4
+        }
+      ],
+      "product": {
+        "icon": "apple-alt",
+        "id": "lychee",
+        "name": "荔枝"
+      },
+      "solar_terms": [
+        {
+          "date": "2026-10-08",
+          "day": 8,
+          "name": "寒露"
+        },
+        {
+          "date": "2026-10-23",
+          "day": 23,
+          "name": "霜降"
+        }
+      ],
+      "source_summary": {
+        "sourced": 2,
+        "sources": [
+          {
+            "doc_no": "待核",
+            "doc_type": "地方标准",
+            "key": "GD-LYCHEE-TG",
+            "name": "荔枝生产技术规程",
+            "org": "广东省市场监督管理局",
+            "url": "https://dbba.sacinfo.org.cn/"
+          },
+          {
+            "doc_no": "待核",
+            "doc_type": "政府技术指导意见",
+            "key": "GD-FERT-GUIDE",
+            "name": "广东省主要农作物施肥指导意见",
+            "org": "广东省农业农村厅",
+            "url": "http://dara.gd.gov.cn/"
+          }
+        ],
+        "total": 2,
+        "unsourced": 0,
+        "verified": 0
+      },
+      "sources_all": [
+        {
+          "doc_no": "待核",
+          "doc_type": "地方标准",
+          "key": "GD-LYCHEE-TG",
+          "name": "荔枝生产技术规程",
+          "org": "广东省市场监督管理局",
+          "url": "https://dbba.sacinfo.org.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "政府技术指导意见",
+          "key": "GD-FERT-GUIDE",
+          "name": "广东省主要农作物施肥指导意见",
+          "org": "广东省农业农村厅",
+          "url": "http://dara.gd.gov.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "病虫测报",
+          "key": "MOA-PEST-MON",
+          "name": "农作物病虫情报（病虫测报）",
+          "org": "全国农业技术推广服务中心",
+          "url": "http://www.natesc.org.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "产业技术体系",
+          "key": "CARS-LZ",
+          "name": "荔枝龙眼栽培管理技术要点",
+          "org": "农业农村部 国家荔枝龙眼产业技术体系",
+          "url": "https://www.cars33.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "农业气象服务",
+          "key": "CMA-AGRO",
+          "name": "农业气象旬报/月报与农事窗口",
+          "org": "中国气象局 / 广东省气象局",
+          "url": "http://data.cma.cn/"
+        }
+      ],
+      "success": true,
+      "tasks": [
+        {
+          "category": "manage",
+          "category_label": "管理",
+          "date": "2026-10-20",
+          "date_basis": "入冬前清除园内杂草落叶，压减越冬病虫基数，为12月全面清园打基础。",
+          "day": 20,
+          "description": "清理果园杂草，准备冬季管理",
+          "evidence_level": "sourced",
+          "icon": "broom",
+          "id": 448,
+          "is_verified": 0,
+          "phase_color": "#1f5e43",
+          "phase_id": 180,
+          "phase_name": "秋梢老熟期",
+          "priority": "low",
+          "sort_order": 17,
+          "source": {
+            "doc_no": "待核",
+            "doc_type": "地方标准",
+            "key": "GD-LYCHEE-TG",
+            "name": "荔枝生产技术规程",
+            "org": "广东省市场监督管理局",
+            "url": "https://dbba.sacinfo.org.cn/"
+          },
+          "task_md": "10-20",
+          "tip": "清除园内杂草和落叶，减少病虫越冬场所",
+          "title": "冬季清园准备"
+        },
+        {
+          "category": "fertilize",
+          "category_label": "施肥",
+          "date": "2026-10-25",
+          "date_basis": "末次秋梢老熟后开始控氮、增施磷钾诱导花芽分化，广东花芽生理分化自10月下旬启动。",
+          "day": 25,
+          "description": "控制氮肥，增施磷钾肥促进花芽分化",
+          "evidence_level": "sourced",
+          "icon": "seedling",
+          "id": 449,
+          "is_verified": 0,
+          "phase_color": "#1f5e43",
+          "phase_id": 180,
+          "phase_name": "秋梢老熟期",
+          "priority": "high",
+          "sort_order": 18,
+          "source": {
+            "doc_no": "待核",
+            "doc_type": "政府技术指导意见",
+            "key": "GD-FERT-GUIDE",
+            "name": "广东省主要农作物施肥指导意见",
+            "org": "广东省农业农村厅",
+            "url": "http://dara.gd.gov.cn/"
+          },
+          "task_md": "10-25",
+          "tip": "叶面喷施0.3%磷酸二氢钾",
+          "title": "花芽分化期"
+        }
+      ],
+      "year": 2026
+    },
+    "bytes": 5548,
+    "sha256": "58d862d80fe42e9998c6162295309ba8c711dc78399949f44e6979831d09f09c",
+    "status": 200
+  },
+  "/api/agriculture/calendar/lychee?month=3&year=2026": {
+    "body": {
+      "dates_provisional": true,
+      "is_configured": true,
+      "month": 3,
+      "phenophase_current": {
+        "color": "#d9a227",
+        "description": "保花保果，花期忌施药",
+        "id": 182,
+        "name": "花期"
+      },
+      "phenophases": [
+        {
+          "color": "#4a8a6a",
+          "description": "恢复树势，培养健壮秋梢",
+          "end_month": 8,
+          "id": 179,
+          "in_month": false,
+          "name": "采后恢复期",
+          "start_month": 7
+        },
+        {
+          "color": "#1f5e43",
+          "description": "控梢促花，积累养分",
+          "end_month": 10,
+          "id": 180,
+          "in_month": false,
+          "name": "秋梢老熟期",
+          "start_month": 9
+        },
+        {
+          "color": "#4a6fa5",
+          "description": "控氮增磷钾，促进花芽分化",
+          "end_month": 1,
+          "id": 181,
+          "in_month": false,
+          "name": "花芽分化期",
+          "start_month": 11
+        },
+        {
+          "color": "#d9a227",
+          "description": "保花保果，花期忌施药",
+          "end_month": 3,
+          "id": 182,
+          "in_month": true,
+          "name": "花期",
+          "start_month": 2
+        },
+        {
+          "color": "#ef4444",
+          "description": "壮果、防蒂蛀虫、防裂果",
+          "end_month": 6,
+          "id": 183,
+          "in_month": false,
+          "name": "果期",
+          "start_month": 4
+        }
+      ],
+      "product": {
+        "icon": "apple-alt",
+        "id": "lychee",
+        "name": "荔枝"
+      },
+      "solar_terms": [
+        {
+          "date": "2026-03-05",
+          "day": 5,
+          "name": "惊蛰"
+        },
+        {
+          "date": "2026-03-20",
+          "day": 20,
+          "name": "春分"
+        }
+      ],
+      "source_summary": {
+        "sourced": 2,
+        "sources": [
+          {
+            "doc_no": "待核",
+            "doc_type": "产业技术体系",
+            "key": "CARS-LZ",
+            "name": "荔枝龙眼栽培管理技术要点",
+            "org": "农业农村部 国家荔枝龙眼产业技术体系",
+            "url": "https://www.cars33.cn/"
+          }
+        ],
+        "total": 2,
+        "unsourced": 0,
+        "verified": 0
+      },
+      "sources_all": [
+        {
+          "doc_no": "待核",
+          "doc_type": "地方标准",
+          "key": "GD-LYCHEE-TG",
+          "name": "荔枝生产技术规程",
+          "org": "广东省市场监督管理局",
+          "url": "https://dbba.sacinfo.org.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "政府技术指导意见",
+          "key": "GD-FERT-GUIDE",
+          "name": "广东省主要农作物施肥指导意见",
+          "org": "广东省农业农村厅",
+          "url": "http://dara.gd.gov.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "病虫测报",
+          "key": "MOA-PEST-MON",
+          "name": "农作物病虫情报（病虫测报）",
+          "org": "全国农业技术推广服务中心",
+          "url": "http://www.natesc.org.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "产业技术体系",
+          "key": "CARS-LZ",
+          "name": "荔枝龙眼栽培管理技术要点",
+          "org": "农业农村部 国家荔枝龙眼产业技术体系",
+          "url": "https://www.cars33.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "农业气象服务",
+          "key": "CMA-AGRO",
+          "name": "农业气象旬报/月报与农事窗口",
+          "org": "中国气象局 / 广东省气象局",
+          "url": "http://data.cma.cn/"
+        }
+      ],
+      "success": true,
+      "tasks": [
+        {
+          "category": "manage",
+          "category_label": "管理",
+          "date": "2026-03-15",
+          "date_basis": "妃子笑3月中下旬盛花，蜂群须在盛花前3–5天引入才能赶上授粉高峰；花期严禁喷药。",
+          "day": 15,
+          "description": "放蜂授粉，遇连续阴雨需人工辅助授粉",
+          "evidence_level": "sourced",
+          "icon": "spa",
+          "id": 435,
+          "is_verified": 0,
+          "phase_color": "#d9a227",
+          "phase_id": 182,
+          "phase_name": "花期",
+          "priority": "high",
+          "sort_order": 4,
+          "source": {
+            "doc_no": "待核",
+            "doc_type": "产业技术体系",
+            "key": "CARS-LZ",
+            "name": "荔枝龙眼栽培管理技术要点",
+            "org": "农业农村部 国家荔枝龙眼产业技术体系",
+            "url": "https://www.cars33.cn/"
+          },
+          "task_md": "03-15",
+          "tip": "花期忌喷农药，如需防治请在花前完成",
+          "title": "花期管理"
+        },
+        {
+          "category": "fertilize",
+          "category_label": "施肥",
+          "date": "2026-03-28",
+          "date_basis": "谢花后即进入第一次生理落果，保果须在谢花后3–7天内完成，过晚效果显著下降。",
+          "day": 28,
+          "description": "喷施磷酸二氢钾+硼肥，提高坐果率",
+          "evidence_level": "sourced",
+          "icon": "hand-holding-heart",
+          "id": 436,
+          "is_verified": 0,
+          "phase_color": "#d9a227",
+          "phase_id": 182,
+          "phase_name": "花期",
+          "priority": "medium",
+          "sort_order": 5,
+          "source": {
+            "doc_no": "待核",
+            "doc_type": "产业技术体系",
+            "key": "CARS-LZ",
+            "name": "荔枝龙眼栽培管理技术要点",
+            "org": "农业农村部 国家荔枝龙眼产业技术体系",
+            "url": "https://www.cars33.cn/"
+          },
+          "task_md": "03-28",
+          "tip": "浓度0.2%磷酸二氢钾+0.1%硼砂，花期喷2次",
+          "title": "保花保果"
+        }
+      ],
+      "year": 2026
+    },
+    "bytes": 5433,
+    "sha256": "c4f44c2eff90f086dac57e15ed7ba9516803840cfce61d7d51f81e8d13e7a2b8",
+    "status": 200
+  },
+  "/api/agriculture/calendar/no-such-product": {
+    "body": {
+      "message": "未找到该农产品信息",
+      "success": false
+    },
+    "bytes": 85,
+    "sha256": "9cebca40c342fc8ca46eb31a69e8d1081ef24c1ed4701fde62d24aeb8af40e6e",
+    "status": 404
+  },
+  "/api/agriculture/calendar/rice?month=6&year=2026": {
+    "body": {
+      "dates_provisional": true,
+      "is_configured": true,
+      "month": 6,
+      "phenophase_current": {
+        "color": "#1f5e43",
+        "description": "育秧、移栽、分蘖与晒田",
+        "id": 195,
+        "name": "早稻生育期"
+      },
+      "phenophases": [
+        {
+          "color": "#4a6fa5",
+          "description": "翻耕晒田，杀灭越冬虫源",
+          "end_month": 1,
+          "id": 194,
+          "in_month": false,
+          "name": "冬闲期",
+          "start_month": 12
+        },
+        {
+          "color": "#1f5e43",
+          "description": "育秧、移栽、分蘖与晒田",
+          "end_month": 6,
+          "id": 195,
+          "in_month": true,
+          "name": "早稻生育期",
+          "start_month": 2
+        },
+        {
+          "color": "#4a8a6a",
+          "description": "穗肥、病虫害防治、灌浆收割",
+          "end_month": 10,
+          "id": 196,
+          "in_month": false,
+          "name": "晚稻生育期",
+          "start_month": 7
+        },
+        {
+          "color": "#d9a227",
+          "description": "稻草还田，改良土壤",
+          "end_month": 11,
+          "id": 197,
+          "in_month": false,
+          "name": "秋冬管理期",
+          "start_month": 11
+        }
+      ],
+      "product": {
+        "icon": "seedling",
+        "id": "rice",
+        "name": "水稻"
+      },
+      "solar_terms": [
+        {
+          "date": "2026-06-05",
+          "day": 5,
+          "name": "芒种"
+        },
+        {
+          "date": "2026-06-21",
+          "day": 21,
+          "name": "夏至"
+        }
+      ],
+      "source_summary": {
+        "sourced": 1,
+        "sources": [
+          {
+            "doc_no": "待核",
+            "doc_type": "行业标准与技术指导",
+            "key": "MOA-RICE-TG",
+            "name": "水稻生产技术规程与育插秧技术指导意见",
+            "org": "农业农村部 / 全国农业技术推广服务中心",
+            "url": "http://www.natesc.org.cn/"
+          }
+        ],
+        "total": 1,
+        "unsourced": 0,
+        "verified": 0
+      },
+      "sources_all": [
+        {
+          "doc_no": "待核",
+          "doc_type": "行业标准与技术指导",
+          "key": "MOA-RICE-TG",
+          "name": "水稻生产技术规程与育插秧技术指导意见",
+          "org": "农业农村部 / 全国农业技术推广服务中心",
+          "url": "http://www.natesc.org.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "农业气象服务",
+          "key": "CMA-AGRO",
+          "name": "农业气象旬报/月报与农事窗口",
+          "org": "中国气象局 / 广东省气象局",
+          "url": "http://data.cma.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "政府技术指导意见",
+          "key": "GD-FERT-GUIDE",
+          "name": "广东省主要农作物施肥指导意见",
+          "org": "广东省农业农村厅",
+          "url": "http://dara.gd.gov.cn/"
+        },
+        {
+          "doc_no": "待核",
+          "doc_type": "病虫测报",
+          "key": "MOA-PEST-MON",
+          "name": "农作物病虫情报（病虫测报）",
+          "org": "全国农业技术推广服务中心",
+          "url": "http://www.natesc.org.cn/"
+        }
+      ],
+      "success": true,
+      "tasks": [
+        {
+          "category": "water",
+          "category_label": "水分",
+          "date": "2026-06-05",
+          "date_basis": "晒田须在够苗后至分蘖末期进行：此时晒田可抑制无效分蘖、促进根系下扎，过晚则穗数已定、作用有限。广东早稻6月上旬达到够苗，故晒田窗口落在6月上中旬。",
+          "day": 5,
+          "description": "排水晒田，控制无效分蘖",
+          "evidence_level": "sourced",
+          "icon": "sun",
+          "id": 486,
+          "is_verified": 0,
+          "phase_color": "#1f5e43",
+          "phase_id": 195,
+          "phase_name": "早稻生育期",
+          "priority": "high",
+          "sort_order": 55,
+          "source": {
+            "doc_no": "待核",
+            "doc_type": "行业标准与技术指导",
+            "key": "MOA-RICE-TG",
+            "name": "水稻生产技术规程与育插秧技术指导意见",
+            "org": "农业农村部 / 全国农业技术推广服务中心",
+            "url": "http://www.natesc.org.cn/"
+          },
+          "task_md": "06-05",
+          "tip": "田面出现鸡爪裂时复水",
+          "title": "晒田控苗"
+        }
+      ],
+      "year": 2026
+    },
+    "bytes": 4283,
+    "sha256": "88d28e0e1e44183269a1331ff1e6611161e97b7cd7e87add8e9eafabdc439807",
+    "status": 200
+  },
+  "/api/agriculture/products": {
+    "body": {
+      "products": [
+        {
+          "desc": "广东特色水果",
+          "icon": "apple-alt",
+          "id": "lychee",
+          "name": "荔枝"
+        },
+        {
+          "desc": "岭南佳果",
+          "icon": "circle",
+          "id": "longan",
+          "name": "龙眼"
+        },
+        {
+          "desc": "广东大宗水果",
+          "icon": "lemon",
+          "id": "citrus",
+          "name": "柑橘"
+        },
+        {
+          "desc": "岭南特色蕉类",
+          "icon": "leaf",
+          "id": "banana",
+          "name": "香蕉"
+        },
+        {
+          "desc": "鱼虾蟹贝",
+          "icon": "fish",
+          "id": "aquatic",
+          "name": "水产养殖"
+        },
+        {
+          "desc": "主要粮食作物",
+          "icon": "seedling",
+          "id": "rice",
+          "name": "水稻"
+        },
+        {
+          "desc": "广东名茶",
+          "icon": "mug-hot",
+          "id": "tea",
+          "name": "茶叶"
+        },
+        {
+          "desc": "时令蔬菜",
+          "icon": "carrot",
+          "id": "vegetable",
+          "name": "蔬菜"
+        }
+      ],
+      "success": true
+    },
+    "bytes": 794,
+    "sha256": "e93dcdd68ebeb074c23258539821cb61ac4b123437da6e15f67cf451b38b13fb",
+    "status": 200
+  },
+  "/api/agriculture/subscriptions": {
+    "body": {
+      "message": "请先登录",
+      "success": false
+    },
+    "bytes": 55,
+    "sha256": "78194e0855ca72e6d7f47fb8224363fa0a2293e960a35ea1e98af10a13e1dac1",
+    "status": 401
+  },
+  "DELETE /api/agriculture/subscribe/lychee": {
+    "body": {
+      "product_ids": [
+        "longan"
+      ],
+      "subscribed": false,
+      "success": true
+    },
+    "bytes": 61,
+    "sha256": "07a5db5b6e1cb2409f70a0969b49eedc8234f591df07f2fa9e59eb6ce89517b9",
+    "status": 200
+  },
+  "POST /api/agriculture/subscribe (anon)": {
+    "body": {
+      "message": "请先登录",
+      "success": false
+    },
+    "bytes": 55,
+    "sha256": "78194e0855ca72e6d7f47fb8224363fa0a2293e960a35ea1e98af10a13e1dac1",
+    "status": 401
+  },
+  "POST /api/agriculture/subscribe (missing product_id)": {
+    "body": {
+      "message": "缺少 product_id",
+      "success": false
+    },
+    "bytes": 54,
+    "sha256": "e4a36e6bd05fc7d1e734bdda0ce661d6504d9199ccd2acfe06983c3e388f0b5d",
+    "status": 400
+  },
+  "POST /api/agriculture/subscribe (unknown product)": {
+    "body": {
+      "message": "未找到该农产品信息",
+      "success": false
+    },
+    "bytes": 85,
+    "sha256": "9cebca40c342fc8ca46eb31a69e8d1081ef24c1ed4701fde62d24aeb8af40e6e",
+    "status": 404
+  }
+}
