@@ -13,13 +13,15 @@ from db_credentials import hash_password
 def seed_demo_accounts(cursor):
     """全新库：灌入演示账号、积分、证书与学员名册。
 
-    五个演示账号对应五种角色（超管 / 政府 / 企业 / 教师 / 学员），
+    六个演示账号对应六种角色（超管 / 政府 / 企业 / 教师 / 运营 / 学员），
     口令散列走 db_credentials，与登录校验用的是同一份算法。
+    运营账号由 T13 新增，用于演示运营后台（T14/T15）。
     """
     admin_pw = hash_password('admin123')
     gov_pw = hash_password('123456')
     enterprise_pw = hash_password('123456')
     teacher_pw = hash_password('123456')
+    operator_pw = hash_password('123456')
     student_pw = hash_password('123456')
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
                    ('admin_demo', admin_pw, '系统管理员', 'super_admin'))
@@ -30,6 +32,8 @@ def seed_demo_accounts(cursor):
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
                    ('teacher_demo', teacher_pw, '张老师', 'teacher'))
     cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
+                   ('operator_demo', operator_pw, '运营专员', 'operator'))
+    cursor.execute("INSERT INTO users (username, password_hash, name, role) VALUES (?, ?, ?, ?)",
                    ('student_demo', student_pw, '李同学', 'student'))
 
     # 积分
@@ -38,7 +42,8 @@ def seed_demo_accounts(cursor):
                        {"action": "完成课程", "points": 50, "date": "2024-06-10"},
                        {"action": "通过考试", "points": 100, "date": "2024-06-08"}
                    ])))
-    for uid in ('admin_demo', 'gov_demo', 'enterprise_demo', 'teacher_demo'):
+    for uid in ('admin_demo', 'gov_demo', 'enterprise_demo', 'teacher_demo',
+                'operator_demo'):
         cursor.execute("INSERT INTO points (user_id, balance, history) VALUES (?, ?, ?)",
                        (uid, 0, '[]'))
 
@@ -64,6 +69,7 @@ def ensure_demo_accounts(cursor):
         ('admin_demo', 'admin123', '系统管理员', 'super_admin', ''),
         ('gov_demo', '123456', '王主任', 'government', '广东省农业农村厅'),
         ('enterprise_demo', '123456', '陈经理', 'enterprise', '广州'),
+        ('operator_demo', '123456', '运营专员', 'operator', ''),
     ]
     for username, password, name, role, region in demo_accounts:
         existing = cursor.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
