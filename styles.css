@@ -8198,6 +8198,29 @@ html[data-large-text] .large-text-toggle { background: var(--brand-tint); color:
     color: var(--text-muted);
 }
 
+/* 分页控件：只在筛选后条数超过一页时由 JS 显示 */
+.pest-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pest-page-btn {
+    padding: 7px 16px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.pest-page-btn:hover:not(:disabled) { border-color: var(--brand-soft); color: var(--brand); }
+.pest-page-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.pest-page-status { font-size: 0.85rem; color: var(--text-muted); }
+
 .pest-guide-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));

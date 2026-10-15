@@ -1,33 +1,39 @@
 {
   "/api/agriculture/pest-knowledge": {
-    "bytes": 164038,
-    "sha256": "13e2619711d0e76a70dd51fea5daf3facbeb530a6efcabda3fcdf69f16f5e3b4",
-    "status": 200
+    "status": 200,
+    "bytes": 164049,
+    "sha256": "851eb00a18b8d79b3e41bc820891666dd194f7d7a6015a3bfc2e4f1a5013872b",
+    "sha256_ex_total": "7b89aba8d062df0b3feff0c5d17640b9ea60ea68e198b1733689a7eb8de041c3"
   },
   "/api/agriculture/pest-knowledge?crop=lychee": {
-    "bytes": 23974,
-    "sha256": "7f3687cc566e744a0f08956961d5545ad88ccb3e6d4770ad1fddd92b283aa875",
-    "status": 200
+    "status": 200,
+    "bytes": 23984,
+    "sha256": "c81a1aaf0e7b8132d1e030b4a13dc04ce6cf43a3db0a66249c7d8fe45e5b355c",
+    "sha256_ex_total": "9ac787338e2a60a62e6b0943ac2b231cb7b83f54338bb756c1ec4fbef9b89aad"
   },
   "/api/agriculture/pest-knowledge?crop=no-such-crop": {
+    "status": 400,
     "bytes": 143,
     "sha256": "ef1c7d402e739fb0973f8a5616964877e3932f308da4394e59fe07b91d077110",
-    "status": 400
+    "sha256_ex_total": "284a45248dd1ac8a6ba3727dd1e7aae657911d9b37a410d0d71d8ddf5c48b5c0"
   },
   "/api/agriculture/pest-knowledge?kind=pest": {
-    "bytes": 75145,
-    "sha256": "de6af67a57a1b7fe06f95dc49e8e34524d164513e8740db5ef8ff6ade1bfef5a",
-    "status": 200
+    "status": 200,
+    "bytes": 75156,
+    "sha256": "30ab3dd62c0ed9f5cd86a508be301fa7f0c52cf5b1c9ad3467386f6e0729aa03",
+    "sha256_ex_total": "7248e754d8075581f3eed6e309e4b2a62df3eb7c40d030761e7957551c7028ab"
   },
   "/api/agriculture/pest-knowledge?kind=virus": {
+    "status": 400,
     "bytes": 114,
     "sha256": "4076e74e1765bc15373857bd08409186c9ebec0ed3ebe62d1ca10671e52a37f4",
-    "status": 400
+    "sha256_ex_total": "fb6c8338ac5e857313cc441153c98adc830c6779e9e914372166302f15f0318c"
   },
   "/api/agriculture/pest-knowledge?q=炭疽": {
-    "bytes": 18838,
-    "sha256": "bf14c506424f3aa90b808e30ffd086ef318b460b21316d275f9d23e257029390",
-    "status": 200
+    "status": 200,
+    "bytes": 18848,
+    "sha256": "272e4a41c7033c84a5d1a1fa11539bfa128cc04b8feef4c41f0b381146ab7ee8",
+    "sha256_ex_total": "e3ace87c387eaa0073d8d51f4ec781ffc879993624bd675aa79560c791e93400"
   },
   "POST /api/agriculture/diagnose (fallback)": {
     "body": {

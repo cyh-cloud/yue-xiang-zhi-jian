@@ -41,8 +41,9 @@ def diagnose_pest():
 def get_pest_knowledge():
     """常见病虫害速查 —— 只读。
 
-    数据量很小（数十条），一次取回由前端本地筛选，避免每次切作物都打一次请求。
-    支持 crop / kind / q 三个可选筛选参数，便于将来直接以 URL 定位。
+    筛选与分页都在服务端做：crop / kind / q 之外新增 limit / offset
+    （默认每页 50 条），响应带 total 与筛选后的 crops[].count。
+    见 knowledge.py 的模块说明（ADR 0002 记录的唯一一处接口变化）。
     """
     return read_pest_knowledge()
 

@@ -3630,11 +3630,15 @@ function renderDiagnosis(d) {
 
 // ==================== 常见病虫害速查 ====================
 //
-// 数据来自只读接口 /api/agriculture/pest-knowledge：一次取回、本地筛选。
+// 数据来自只读接口 /api/agriculture/pest-knowledge：筛选与分页都在服务端做，前端只渲染。
+// 筛选变化就重新请求（关键词输入加 300ms 防抖），不再在本地 filter。
 // 与后台一致的三条硬约定：
 //   1. 来源资料没给出的数值就是「未提供」，界面绝不替用户推断（安全间隔期尤其如此）；
 //   2. 没有授权实拍图时显示「暂无实拍图」占位，绝不用示意图或生成图冒充真实病征；
 //   3. 加载失败必须是可见的错误态 + 重试，不能用空列表冒充「没有数据」。
+
+// 每页条数。与后端 DEFAULT_PAGE_SIZE 一致；后端 limit 上限 100，这里只做首次取值。
+const PEST_PAGE_SIZE = 50;
 
 const PestGuideState = {
     loaded: false,
@@ -3642,11 +3646,16 @@ const PestGuideState = {
     entries: [],
     crops: [],
     disclaimer: '',
+    total: 0,
+    stats: null,
     crop: '',                 // '' 表示全部作物
     // A4：速查的作物筛选默认跟随顶部「当前作物」，理由与诊断面板一致 ——
     // 同一个页面里「当前作物」只应有一套含义。用户在这里手选过筛选之后不再被覆盖。
     userSelectedCrop: false,
     keyword: '',
+    offset: 0,                // 当前页起点，随请求一起上行
+    keywordTimer: null,       // 关键词防抖计时器
+    pendingReload: false,     // 请求在飞时筛选又变了：落地后按最新状态再取一次
     bound: false,
     lastFocus: null,          // 打开详情前的焦点元素，关闭后还回去
     prevBodyOverflow: null
@@ -3727,17 +3736,40 @@ function bindPestGuideOnce() {
             PestGuideState.crop = next;
             // A4：手选即上锁，此后顶部作物变化不再改这里的筛选（与诊断面板同语义）
             PestGuideState.userSelectedCrop = true;
+            // 换作物等于换一批数据：回到第一页再请求
+            PestGuideState.offset = 0;
             renderPestCropFilter();
-            renderPestCards();
+            loadPestKnowledge(true);
         });
     }
 
-    // 搜索：本地过滤，不上行，无需防抖
+    // 搜索：改由服务端筛选，输入停下来再请求（300ms 防抖，避免每敲一个字打一次接口）
     const search = document.getElementById('pest-guide-search');
     if (search) {
         search.addEventListener('input', function() {
             PestGuideState.keyword = this.value || '';
-            renderPestCards();
+            // 防抖期间先把结果清空并显示骨架，避免旧结果在新关键词下多留 300ms
+            renderPestSearching();
+            clearTimeout(PestGuideState.keywordTimer);
+            PestGuideState.keywordTimer = setTimeout(function() {
+                PestGuideState.offset = 0;
+                loadPestKnowledge(true);
+            }, 300);
+        });
+    }
+
+    // 翻页
+    const pager = document.getElementById('pest-pager');
+    if (pager) {
+        pager.addEventListener('click', function(e) {
+            const btn = e.target.closest ? e.target.closest('[data-pest-page]') : null;
+            if (!btn || !pager.contains(btn)) return;
+            const step = Number(btn.getAttribute('data-pest-page'));
+            if (!step) return;
+            const next = PestGuideState.offset + step * PEST_PAGE_SIZE;
+            if (next < 0 || next >= PestGuideState.total) return;
+            PestGuideState.offset = next;
+            loadPestKnowledge(true);
         });
     }
 
@@ -3785,8 +3817,36 @@ function isPestModalOpen() {
 
 // ---------- 取数与状态渲染 ----------
 
+// 把当前筛选与翻页状态拼成查询串。空值一律不带上去，让请求保持「不带参数」的干净形状。
+function pestKnowledgeQuery() {
+    const params = [];
+    if (PestGuideState.crop) params.push('crop=' + encodeURIComponent(PestGuideState.crop));
+    if (PestGuideState.keyword) params.push('q=' + encodeURIComponent(PestGuideState.keyword));
+    if (PestGuideState.offset) params.push('offset=' + PestGuideState.offset);
+    // 每页条数始终显式带上：后端默认值与这里一致，但显式写出来，
+    // 后端改默认值时前端不会静默跟着变。
+    params.push('limit=' + PEST_PAGE_SIZE);
+    return params.length ? '?' + params.join('&') : '';
+}
+
+// 防抖等待期间的状态：清掉旧卡片与旧计数，显示骨架屏。
+// 不清的话，旧关键词的结果会在新关键词下多留 300ms，看起来像筛错了。
+function renderPestSearching() {
+    const grid = document.getElementById('pest-guide-grid');
+    const metaEl = document.getElementById('pest-guide-meta');
+    const emptyEl = document.getElementById('pest-guide-empty');
+    if (emptyEl) emptyEl.classList.add('is-hidden');
+    if (metaEl) metaEl.textContent = '';
+    if (grid) showSkeleton(grid, 'card', 6);
+}
+
 function loadPestKnowledge(force) {
-    if (PestGuideState.loading) return Promise.resolve();
+    if (PestGuideState.loading) {
+        // 已有请求在飞。直接再发一次会把两次响应的顺序搅乱；标记一下，
+        // 等在飞那次落地后按最新筛选重取。否则回来的旧数据会配上新筛选的按钮。
+        PestGuideState.pendingReload = true;
+        return Promise.resolve();
+    }
     if (PestGuideState.loaded && !force) return Promise.resolve();
 
     const grid = document.getElementById('pest-guide-grid');
@@ -3799,16 +3859,24 @@ function loadPestKnowledge(force) {
     // 骨架屏复用 core.js 的通用实现，不另造一套加载样式
     if (grid) showSkeleton(grid, 'card', 6);
 
-    return apiCall('/api/agriculture/pest-knowledge').then(function(data) {
+    return apiCall('/api/agriculture/pest-knowledge' + pestKnowledgeQuery()).then(function(data) {
         if (!data || data.success !== true) {
             throw new Error((data && data.message) || '数据格式异常');
         }
         PestGuideState.entries = pestArray(data.entries);
         PestGuideState.crops = pestArray(data.crops);
+        PestGuideState.stats = data.stats || null;
+        PestGuideState.total = Number(data.total) || 0;
         PestGuideState.disclaimer = data.disclaimer || '';
         PestGuideState.loaded = true;
-        // A4：首次拿到数据时按顶部「当前作物」预筛一次（用户此前手选过则不覆盖）
-        applyPestGuideCrop(false);
+        // A4：首次拿到数据时按顶部「当前作物」预筛一次（用户此前手选过则不覆盖）。
+        // 作物现在是请求参数而不是本地过滤条件，所以「跟随」的意思是改完再取一次。
+        if (applyPestGuideCrop(false)) {
+            // 先释放 loading 再重取，否则这次重取会被自己的门禁挡掉，
+            // 结果是按钮显示新作物、卡片还是全量。
+            PestGuideState.loading = false;
+            return loadPestKnowledge(true);
+        }
         renderPestDisclaimer();
         renderPestCropFilter();
         renderPestCards();
@@ -3817,6 +3885,10 @@ function loadPestKnowledge(force) {
         renderPestGuideError(err);
     }).then(function() {
         PestGuideState.loading = false;
+        if (PestGuideState.pendingReload) {
+            PestGuideState.pendingReload = false;
+            return loadPestKnowledge(true);
+        }
     });
 }
 
@@ -3858,8 +3930,9 @@ function applyPestGuideCrop(force) {
 function resetPestGuideCropToCurrent() {
     PestGuideState.userSelectedCrop = false;
     if (PestGuideState.loaded && applyPestGuideCrop(true)) {
+        PestGuideState.offset = 0;
         renderPestCropFilter();
-        renderPestCards();
+        loadPestKnowledge(true);
     }
 }
 
@@ -3867,17 +3940,37 @@ function renderPestCropFilter() {
     const wrap = document.getElementById('pest-crop-filter');
     if (!wrap) return;
 
-    const counts = {};
-    PestGuideState.entries.forEach(function(entry) {
-        const key = entry.crop || '';
-        counts[key] = (counts[key] || 0) + 1;
-    });
-
-    let html = pestCropBtnHTML('', '全部作物', '📚', PestGuideState.entries.length);
+    // 计数直接读服务端给的 crops[].count（当前筛选条件下该作物的条数），
+    // 不再本地数 entries —— 翻页后本地只剩一页，数出来就是错的。
+    // 「全部作物」按钮显示 total，即当前筛选条件下的总条数。
+    let html = pestCropBtnHTML('', '全部作物', '📚', PestGuideState.total);
     PestGuideState.crops.forEach(function(crop) {
-        html += pestCropBtnHTML(crop.id, crop.name, crop.icon, counts[crop.id] || 0);
+        html += pestCropBtnHTML(crop.id, crop.name, crop.icon, crop.count || 0);
     });
     wrap.innerHTML = html;
+}
+
+// ---------- 分页 ----------
+
+// 只在 total > limit 时出现：一页能装下就没有翻页的必要，多一排按钮只是噪音。
+function renderPestPager() {
+    const wrap = document.getElementById('pest-pager');
+    if (!wrap) return;
+    if (!PestGuideState.loaded || PestGuideState.total <= PEST_PAGE_SIZE) {
+        wrap.innerHTML = '';
+        wrap.classList.add('is-hidden');
+        return;
+    }
+    const pages = Math.ceil(PestGuideState.total / PEST_PAGE_SIZE);
+    const current = Math.floor(PestGuideState.offset / PEST_PAGE_SIZE) + 1;
+    wrap.classList.remove('is-hidden');
+    wrap.innerHTML =
+        '<button type="button" class="pest-page-btn" data-pest-page="-1"' +
+        (current <= 1 ? ' disabled' : '') + ' aria-label="上一页">‹ 上一页</button>' +
+        '<span class="pest-page-status" role="status">第 ' + current + ' / ' + pages +
+        ' 页 · 共 ' + PestGuideState.total + ' 条</span>' +
+        '<button type="button" class="pest-page-btn" data-pest-page="1"' +
+        (current >= pages ? ' disabled' : '') + ' aria-label="下一页">下一页 ›</button>';
 }
 
 function pestCropBtnHTML(id, name, icon, count) {
@@ -3893,26 +3986,19 @@ function pestCropBtnHTML(id, name, icon, count) {
 
 // ---------- 卡片列表 ----------
 
-function pestGuideMatches() {
-    const kw = String(PestGuideState.keyword || '').trim().toLowerCase();
-    return PestGuideState.entries.filter(function(entry) {
-        if (PestGuideState.crop && entry.crop !== PestGuideState.crop) return false;
-        if (!kw) return true;
-        const blob = [
-            entry.disease, entry.alias, entry.pathogen, entry.crop_name,
-            pestArray(entry.symptoms).join(' ')
-        ].join(' ').toLowerCase();
-        return blob.indexOf(kw) !== -1;
-    });
-}
-
-function pestGuideMetaText(shown) {
+// 摘要行措辞与改动前一致（空态与错误态措辞同样不动），只是数字改读服务端：
+// 「匹配/共 N 条」用 total（筛选后总条数），「速查共 N 条」用 stats.entries（整库条数）。
+function pestGuideMetaText() {
     if (!PestGuideState.loaded) return '';
-    const total = PestGuideState.entries.length;
     const kw = String(PestGuideState.keyword || '').trim();
     const scope = pestCropName(PestGuideState.crop);
-    if (kw) return '「' + kw + '」匹配 ' + shown + ' 条 · ' + scope + ' · 速查共 ' + total + ' 条';
-    return scope + '：' + shown + ' 条 · 速查共 ' + total + ' 条';
+    const all = PestGuideState.stats && PestGuideState.stats.entries
+        ? PestGuideState.stats.entries : 0;
+    if (kw) {
+        return '「' + kw + '」匹配 ' + PestGuideState.total + ' 条 · ' + scope +
+            ' · 速查共 ' + all + ' 条';
+    }
+    return scope + '：' + PestGuideState.total + ' 条 · 速查共 ' + all + ' 条';
 }
 
 function renderPestCards() {
@@ -3921,15 +4007,17 @@ function renderPestCards() {
     const metaEl = document.getElementById('pest-guide-meta');
     if (!grid) return;
 
-    const list = pestGuideMatches();
+    // 服务端已经筛好并切好页，这里直接渲染，不再本地 filter。
+    const list = PestGuideState.entries;
     grid.innerHTML = list.map(pestCardHTML).join('');
-    if (metaEl) metaEl.textContent = pestGuideMetaText(list.length);
+    if (metaEl) metaEl.textContent = pestGuideMetaText();
 
     // 只有「确实取到数据、但筛完为空」才提示无匹配；
     // 数据还没取到时不能显示「没有匹配的条目」。
     if (emptyEl) {
         emptyEl.classList.toggle('is-hidden', !(PestGuideState.loaded && list.length === 0));
     }
+    renderPestPager();
 }
 
 function pestCardHTML(entry) {

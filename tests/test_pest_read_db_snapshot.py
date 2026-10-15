@@ -34,6 +34,13 @@ if BACKEND not in sys.path:
 BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                         'baseline_pest_switch.json')
 
+# T12 起速查改成服务端筛选 + 分页，响应多了 total，crops[].count 语义也变了。
+# 所以速查那六个变体不再比整个响应体，而是比「除掉分页字段之后」的规范形式
+# （见 _strip_pagination），并把 sha256 换成键名 sha256_ex_total 的基线条目。
+# 分页本身的新形状由 test_pest_domains.py 的 PestKnowledgeServerFilterTest 覆盖。
+#
+# 用「排序后 JSON 的 sha256」而不是原文字节数：JSON 键序由 dict 插入顺序决定，
+# 新增一个键就会让后面所有键错位，那样比的其实是「JSON 序列化细节」而不是内容。
 # 速查的六个变体：全量 + 三个成功筛选 + 两个错误分支。全量那条覆盖
 # 45 条条目、8 个作物、18 张授权图与全部来源展开，是比对的主体。
 KNOWLEDGE_VARIANTS = (
@@ -57,8 +64,28 @@ def _key(path, args):
     return '%s?%s' % (path, query)
 
 
+def _strip_pagination(body):
+    u"""剥掉 T12 新增/改语义的分页字段，留下切换前的等价内容。
+
+    剥 total 是因为它是新增字段；剥 crops[].count 是因为它的语义从「该作物全部
+    条目数」改成了「当前筛选条件下该作物的条目数」，两者本来就不可比。
+    entries / stats / disclaimer / crops 的其余字段一律保留，逐字节比对。
+    """
+    stripped = dict(body)
+    stripped.pop('total', None)
+    if 'crops' in stripped:
+        stripped['crops'] = [
+            {k: v for k, v in crop.items() if k != 'count'} for crop in stripped['crops']
+        ]
+    return stripped
+
+
 class PestSwitchSnapshotTest(unittest.TestCase):
-    """切换到读库之后，两条病虫害接口的响应与切换前逐字节一致。"""
+    """切换到读库之后，病虫害接口的响应与切换前一致。
+
+    诊断降级那条仍逐字节比对（它没被 T12 碰过）；速查那六条比对去掉分页字段后的
+    规范形式，因为 T12 新增了 total 并改了 crops[].count 的语义。
+    """
 
     def setUp(self):
         from app import app
@@ -78,6 +105,23 @@ class PestSwitchSnapshotTest(unittest.TestCase):
                          '%s 的响应体与切换前不一致（%d 字节 vs 基线 %d 字节）'
                          % (key, len(body), expected['bytes']))
 
+    def _assert_knowledge_unchanged(self, key, response):
+        expected = self.baseline[key]
+        self.assertEqual(response.status_code, expected['status'],
+                         '%s 的状态码从 %d 变成了 %d'
+                         % (key, expected['status'], response.status_code))
+        body = json.loads(response.data.decode('utf-8'))
+        canonical = json.dumps(_strip_pagination(body), ensure_ascii=False,
+                               sort_keys=True).encode('utf-8')
+        self.assertEqual(
+            hashlib.sha256(canonical).hexdigest(), expected['sha256_ex_total'],
+            '%s 去掉分页字段后与切换前不一致' % key)
+
+    def _knowledge(self, args):
+        query = '&'.join('%s=%s' % item for item in sorted(args.items()))
+        return self.client.get('/api/agriculture/pest-knowledge',
+                               query_string=args if args else None)
+
     def _diagnose_fallback(self):
         import ai.client as ai_client
         original = ai_client.ai_configured
@@ -94,7 +138,7 @@ class PestSwitchSnapshotTest(unittest.TestCase):
         for path, args in KNOWLEDGE_VARIANTS:
             key = _key(path, args)
             with self.subTest(key):
-                self._assert_same(key, self.client.get(path, query_string=args))
+                self._assert_knowledge_unchanged(key, self._knowledge(args))
 
     def test_diagnosis_fallback_is_byte_identical(self):
         """降级路径：整段响应逐字节一致（含来源角标与免责说明）。"""

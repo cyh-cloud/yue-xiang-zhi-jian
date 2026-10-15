@@ -469,5 +469,160 @@ class PestKnowledgeTest(PestDomainTestBase):
         self.assertTrue(any(image is None for image in images))
 
 
+class PestKnowledgeServerFilterTest(PestDomainTestBase):
+    """速查的服务端筛选与分页（T12）—— 本次唯一一处对外接口形状变化。
+
+    新形状：新增 limit / offset（默认 limit=50）与响应字段 total（筛选后总条数），
+    crops[].count 改为「当前筛选条件下该作物的条数」。其余一律不动：卡片字段、
+    详情字段、disclaimer、stats、空态与错误态措辞、两条硬约定。
+    """
+
+    FULL_ENTRY_KEYS = ('id', 'crop', 'crop_name', 'crop_icon', 'disease', 'alias',
+                       'kind', 'pathogen', 'part', 'severity', 'symptoms',
+                       'occurrence', 'treatment', 'prevention', 'registered',
+                       'chem_table', 'safety_note', 'image', 'sources',
+                       'is_verified')
+
+    def _knowledge(self, query=''):
+        response = self.client.get('/api/agriculture/pest-knowledge' + query)
+        self.assertEqual(response.status_code, 200)
+        return json.loads(response.data)
+
+    def test_no_params_returns_every_entry_with_the_same_fields(self):
+        """验收 1：不带参数时条目集合与字段和改动前一致，另带 total。"""
+        body = self._knowledge()
+        self.assertEqual(body['total'], 45)
+        self.assertEqual(len(body['entries']), 45)
+        self.assertEqual(len(body['crops']), 8)
+        for entry in body['entries']:
+            for key in self.FULL_ENTRY_KEYS:
+                self.assertIn(key, entry)
+
+    def test_crop_param_returns_only_that_crop(self):
+        """验收 2：带 crop=<某作物> 只返回该作物的条目。"""
+        body = self._knowledge('?crop=lychee')
+        self.assertGreater(len(body['entries']), 0)
+        for entry in body['entries']:
+            self.assertEqual(entry['crop'], 'lychee')
+            self.assertEqual(entry['crop_name'], u'荔枝')
+        self.assertEqual(body['total'], len(body['entries']))
+
+    def test_limit_caps_the_page_and_total_counts_every_match(self):
+        """验收 3：limit=10 只返回 10 条，total 是筛选后总条数。"""
+        page = self._knowledge('?limit=10')
+        self.assertEqual(len(page['entries']), 10)
+        self.assertEqual(page['total'], 45)
+
+        full = self._knowledge()
+        self.assertEqual([e['id'] for e in page['entries']],
+                         [e['id'] for e in full['entries'][:10]],
+                         '第一页必须是全量顺序的前 10 条')
+
+    def test_paging_through_every_page_has_no_gap_and_no_duplicate(self):
+        """验收 3：翻页不重不漏 —— 逐页取完，id 序列与一次取完逐条相同。"""
+        full = self._knowledge()
+        seen = []
+        offset = 0
+        pages = 0
+        while True:
+            body = self._knowledge('?limit=10&offset=%d' % offset)
+            ids = [entry['id'] for entry in body['entries']]
+            self.assertLessEqual(len(ids), 10)
+            if not ids:
+                break
+            seen.extend(ids)
+            offset += 10
+            pages += 1
+            self.assertLess(pages, 20, '翻页没有收敛，offset 失去作用了')
+        self.assertEqual(len(seen), len(set(seen)), '翻页有重复条目')
+        self.assertEqual(seen, [entry['id'] for entry in full['entries']],
+                         '翻页有遗漏或顺序与全量不一致')
+        self.assertEqual(pages, 5, '45 条按每页 10 条应是 5 页')
+
+    def test_offset_beyond_total_returns_an_empty_page(self):
+        body = self._knowledge('?limit=10&offset=45')
+        self.assertEqual(body['entries'], [])
+        self.assertEqual(body['total'], 45)
+
+    def test_filtered_paging_keeps_total_and_order(self):
+        """带筛选翻页：total 是筛选后条数，页面是筛选结果的一段。"""
+        matched = self._knowledge('?kind=pest')
+        self.assertGreater(matched['total'], 10)
+        page = self._knowledge('?kind=pest&limit=10&offset=10')
+        self.assertEqual(page['total'], matched['total'])
+        self.assertEqual([e['id'] for e in page['entries']],
+                         [e['id'] for e in matched['entries'][10:20]])
+
+    def test_keyword_and_crop_paging_stays_consistent(self):
+        """关键词 + 作物 + 分页三个参数同时生效，且互不干扰。"""
+        matched = self._knowledge('?crop=lychee&q=' + u'炭疽')
+        self.assertGreater(matched['total'], 0)
+        for entry in matched['entries']:
+            self.assertEqual(entry['crop'], 'lychee')
+        page = self._knowledge('?crop=lychee&q=' + u'炭疽' + '&limit=1')
+        self.assertEqual(page['total'], matched['total'])
+        self.assertEqual(len(page['entries']), 1)
+        self.assertEqual(page['entries'][0]['id'], matched['entries'][0]['id'])
+
+    def test_crop_counts_follow_the_current_filter(self):
+        """crops[].count 是当前筛选条件下该作物的条数，且与按钮语义一致。"""
+        full = self._knowledge()
+        per_crop = {}
+        for entry in full['entries']:
+            per_crop[entry['crop']] = per_crop.get(entry['crop'], 0) + 1
+        for crop in full['crops']:
+            self.assertEqual(crop['count'], per_crop.get(crop['id'], 0))
+        self.assertEqual(sum(c['count'] for c in full['crops']), full['total'])
+
+        # kind 筛选之后计数跟着变：各作物计数之和仍等于筛选后总条数
+        pest_only = self._knowledge('?kind=pest')
+        self.assertEqual(sum(c['count'] for c in pest_only['crops']), pest_only['total'])
+        self.assertNotEqual({c['id']: c['count'] for c in pest_only['crops']}, per_crop)
+
+        # 选中某个作物时，按钮计数仍是「点下去会看到多少条」，不被当前 crop 筛选清零
+        scoped = self._knowledge('?crop=lychee')
+        self.assertEqual(scoped['crops'][0]['count'], per_crop['lychee'])
+        self.assertEqual(scoped['total'], per_crop['lychee'])
+
+    def test_bad_pagination_params_are_rejected(self):
+        for query in ('?limit=0', '?limit=-1', '?limit=abc', '?limit=1000',
+                      '?offset=-1', '?offset=abc'):
+            response = self.client.get('/api/agriculture/pest-knowledge' + query)
+            self.assertEqual(response.status_code, 400, query)
+            body = json.loads(response.data)
+            self.assertFalse(body['success'])
+            self.assertEqual(body['code'], 'bad_request')
+
+    def test_paging_keeps_the_two_hard_promises(self):
+        """翻页之后两条硬约定不破：缺数值不代填、无授权图不冒充。"""
+        full = self._knowledge()
+        blank = {e['id']: e for e in full['entries']
+                 if not e['chem_table'] or not e['registered']}
+        imageless = set(e['id'] for e in full['entries'] if e['image'] is None)
+        self.assertTrue(blank, '库里应当有没有用量表或登记药剂的条目')
+        self.assertTrue(imageless, '库里应当有没有授权实拍图的条目')
+
+        seen = set()
+        offset = 0
+        while offset < 100:
+            body = self._knowledge('?limit=10&offset=%d' % offset)
+            if not body['entries']:
+                break
+            for entry in body['entries']:
+                seen.add(entry['id'])
+                source = blank.get(entry['id'])
+                if source:
+                    for field in ('chem_table', 'registered'):
+                        if not source.get(field):
+                            self.assertEqual(entry[field], [],
+                                             '%s 的 %s 不得代填' % (entry['id'], field))
+                if entry['id'] in imageless:
+                    self.assertIsNone(entry['image'],
+                                      '%s 没有授权图，不得补一个URL' % entry['id'])
+            offset += 10
+            self.assertLess(offset, 100, '翻页没有收敛，offset 失去作用了')
+        self.assertEqual(len(seen), 45)
+
+
 if __name__ == '__main__':
     unittest.main()
