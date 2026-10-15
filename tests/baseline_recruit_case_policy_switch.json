@@ -1,7 +1,7 @@
 {
   "/api/employment/jobs": {
     "recruit_payload": {
-      "sha256": "5944f5ec535fa8e6176cbb34c8f39371f999aa63d89c0f1e238dbfb848c0a7d3",
+      "sha256": "0de5438df219fd2cfab072d5451adb9be2086f3c1ea8c3ce4a5e2f8c594c8a55",
       "value": {
         "category_options": {
           "enterprise": [
@@ -497,7 +497,7 @@
   },
   "/api/employment/jobs?category=基层服务": {
     "recruit_payload": {
-      "sha256": "437e183d23d7ce9f053145e90e8ad1c1f4e14d69ddce092471787a9b24dfc054",
+      "sha256": "4a607579d96942709bc04a934c1edaf32cf11c98cd451307382910a8ac8d403c",
       "value": {
         "category_options": {
           "enterprise": [
@@ -949,7 +949,7 @@
   },
   "/api/employment/jobs?keyword=公益性": {
     "recruit_payload": {
-      "sha256": "e8bb8d1402c0a1bbfb80718bd7ffb5974ba9b3a9ed4f61b0786f450a65f0c166",
+      "sha256": "8a890ba93e9c7c4edce15039a97e43fb10e8e2ab075ddfb451cc40acd12038be",
       "value": {
         "category_options": {
           "enterprise": [
@@ -1216,7 +1216,7 @@
   },
   "/api/employment/jobs?location=茂名": {
     "recruit_payload": {
-      "sha256": "7a9cd5e47d80262d5527635296c9687a9ccdb70e30c5339b64c9e640da7ce09a",
+      "sha256": "c1e2e70e23e3a1ea535b3b742757337fcde6c89c541142ace00488c047635cee",
       "value": {
         "category_options": {
           "enterprise": [
@@ -1390,7 +1390,7 @@
   },
   "/api/employment/jobs?salary=3K-5K": {
     "recruit_payload": {
-      "sha256": "436bc564258cf69206b100a65c1026a28b58ea29a82935d04fd229da2b93cc1f",
+      "sha256": "59a1d1c44afb9492533ab43fead8ca2bfb6af3ee7bb0da2ce710f22967df9392",
       "value": {
         "category_options": {
           "enterprise": [

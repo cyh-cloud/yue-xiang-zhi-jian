@@ -89,6 +89,23 @@ def _canonical(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
 
 
+# 招募公告里由**当天日期**算出的字段。它们是派生值而不是内容本身，随运行日期
+# 自然变化，纳入字节比对会让这条用例隔天就红。比对时置成常量，内容字段仍逐字节比。
+VOLATILE_FIELDS = ('days_left', 'starts_in')
+
+
+def _strip_volatile(value):
+    """把公告数组里随时间漂移的派生字段置成 None，其余原样保留。"""
+    if not isinstance(value, list):
+        return value
+    out = []
+    for item in value:
+        if isinstance(item, dict):
+            item = {k: (None if k in VOLATILE_FIELDS else v) for k, v in item.items()}
+        out.append(item)
+    return out
+
+
 class RecruitCasePolicySwitchSnapshotTest(unittest.TestCase):
     """切换到读库之后，三条接口的响应与切换前逐字节一致。"""
 
@@ -125,10 +142,15 @@ class RecruitCasePolicySwitchSnapshotTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200, key)
                 body = json.loads(response.get_data())
                 actual = {name: body[name] for name in RECRUIT_COMPARED_KEYS}
+                # days_left / starts_in 由当天日期算出，随运行日期漂移，不能进字节比对
+                actual['recruitments'] = _strip_volatile(actual['recruitments'])
                 expected = self.baseline[key]['recruit_payload']
+                expected_value = dict(expected['value'])
+                expected_value['recruitments'] = _strip_volatile(
+                    expected_value.get('recruitments'))
                 self.assertEqual(_sha(_canonical(actual)), expected['sha256'],
                                  '%s 的公告部分与切换前不一致' % key)
-                self.assertEqual(_canonical(actual), _canonical(expected['value']),
+                self.assertEqual(_canonical(actual), _canonical(expected_value),
                                  '%s 的公告部分与切换前不一致' % key)
     def test_the_content_tables_actually_have_rows(self):
         """快照有意义的前提：七张内容表里真的有内容，不是空库碰巧一致。
