@@ -20,8 +20,9 @@ from flask import Blueprint, jsonify, request
 
 from core.permissions import require_capability
 from core.session import get_session_user
+from db_connection import get_connection
+from db_domains import reviews
 
-import database
 
 enterprise_bp = Blueprint('enterprise', __name__)
 
@@ -30,7 +31,7 @@ enterprise_bp = Blueprint('enterprise', __name__)
 @require_capability('job.manage')
 def enterprise_get_jobs():
     user = get_session_user()
-    conn = database.get_connection()
+    conn = get_connection()
     rows = conn.execute(
         "SELECT * FROM job_listings WHERE enterprise_id = ? ORDER BY posted_at DESC",
         (user['username'],)).fetchall()
@@ -41,7 +42,7 @@ def enterprise_get_jobs():
         d['requirements'] = json.loads(d['requirements'])
         # 附上最近一次审核记录：企业需要知道「是否被驳回、为什么」才能修改重投。
         # 只给一个「已驳回」状态、不给理由，企业只能干等（2026-10-07 补）。
-        review = database.get_review_by_content('job', d['id'])
+        review = reviews.get_review_by_content('job', d['id'])
         d['review_comment'] = (review or {}).get('review_comment') or ''
         d['reviewed_at'] = (review or {}).get('reviewed_at') or ''
         jobs.append(d)
@@ -53,7 +54,7 @@ def enterprise_get_jobs():
 def enterprise_create_job():
     user = get_session_user()
     data = request.get_json()
-    conn = database.get_connection()
+    conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO job_listings (title, company, salary, requirements, description, "
@@ -70,7 +71,7 @@ def enterprise_create_job():
     conn.commit()
     job_id = cursor.lastrowid
     conn.close()
-    database.create_content_review('job', job_id, user['username'])
+    reviews.create_content_review('job', job_id, user['username'])
     return jsonify({"success": True, "id": job_id, "message": "职位发布成功，等待审核"})
 
 
@@ -79,7 +80,7 @@ def enterprise_create_job():
 def enterprise_update_job(job_id):
     user = get_session_user()
     data = request.get_json()
-    conn = database.get_connection()
+    conn = get_connection()
     updates = []
     params = []
     for k in ('title', 'company', 'salary', 'description', 'location',
@@ -98,7 +99,7 @@ def enterprise_update_job(job_id):
         conn.commit()
     conn.close()
     if updates:
-        database.create_content_review('job', job_id, user['username'])
+        reviews.create_content_review('job', job_id, user['username'])
         return jsonify({"success": True, "message": "更新成功，需重新审核"})
     return jsonify({"success": True, "message": "更新成功"})
 
@@ -107,7 +108,7 @@ def enterprise_update_job(job_id):
 @require_capability('job.manage')
 def enterprise_delete_job(job_id):
     user = get_session_user()
-    conn = database.get_connection()
+    conn = get_connection()
     # 只能删自己发布的岗位（此前不校验归属，任何企业账号都能按 id 删别人的岗位）
     row = conn.execute("SELECT enterprise_id FROM job_listings WHERE id = ?", (job_id,)).fetchone()
     if not row or row['enterprise_id'] != user['username']:
@@ -133,7 +134,7 @@ def enterprise_delete_job(job_id):
 @require_capability('job.manage')
 def enterprise_get_applications():
     user = get_session_user()
-    conn = database.get_connection()
+    conn = get_connection()
     # ⚠️ 原先只 JOIN users，**没有 JOIN resumes** → 企业端只能看到申请人姓名/电话/邮箱，
     #   学员在「我的简历」里填的意向岗位、学历、年限、技能、经历**企业完全看不到**，
     #   「简历管理」名不副实（2026-10-09）。这里 LEFT JOIN 补上，学员没填简历时
@@ -167,7 +168,7 @@ def enterprise_update_application(app_id):
     new_status = data.get('status', '')
     if new_status not in ('approved', 'rejected', 'interview'):
         return jsonify({"success": False, "message": "无效的状态"}), 400
-    conn = database.get_connection()
+    conn = get_connection()
     conn.execute("UPDATE job_applications SET status = ? WHERE id = ?", (new_status, app_id))
     conn.commit()
     conn.close()
@@ -179,7 +180,7 @@ def enterprise_update_application(app_id):
 @require_capability('job.manage')
 def enterprise_get_stats():
     user = get_session_user()
-    conn = database.get_connection()
+    conn = get_connection()
     # ⚠️ 「在招职位」只算**审核通过**的：企业刚发布的岗位是 `pending`，学员端只展示
     #    `review_status='approved'`（见 get_job_listings_base）。若这里把未审核岗位也数进去，
     #    企业会以为岗位已经对外可见 —— 与「职位管理」列表/学员端口径必须一致。

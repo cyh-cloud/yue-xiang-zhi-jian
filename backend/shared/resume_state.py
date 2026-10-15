@@ -11,7 +11,8 @@ shared/copywriting.py 一样是可以放在共享层的纯函数。数据访问�
 共享层不 import 任何领域路由模块。
 """
 
-import database
+from db_domains.employment import get_resume
+
 
 
 def user_has_resume(user_id):
@@ -21,7 +22,7 @@ def user_has_resume(user_id):
     （否则学员以为简历已随申请投出去），「我的求职」要据此给出持久提示。
     分成两份实现必然漂移，因此只有这一处。
     """
-    r = database.get_resume(user_id) or {}
+    r = get_resume(user_id) or {}
     keys = ('title', 'region', 'education', 'work_years', 'self_eval',
             'skills', 'experience', 'phone', 'email')
     return any((r.get(k) or '').strip() for k in keys)

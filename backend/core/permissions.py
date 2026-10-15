@@ -70,16 +70,56 @@ CAPABILITIES = {
     'teaching.manage': ('teacher', 'super_admin'),
     # 企业岗位
     'job.manage': ('enterprise',),
+    # 岗位读侧：企业看自己发布的岗位与投递明细，都在 job.manage 上。T03 删掉
+    # 转发层后 employment 域要 import 它，所以必须有一条 read，否则机械检查
+    # 会按「读不公开」要求 manage，而 enterprise 域只该有 manage。
+    'job.read': (),
     # 平台用户
     'user.manage': ('super_admin',),
+    # 用户读侧：任何已登录角色都要读自己的资料（user_profile 域）或按用户名
+    # 解析身份（auth 域）。user.manage 才是超管专属的增删改。
+    'user.read': ('student', 'teacher', 'enterprise', 'government', 'operator',
+                  'super_admin'),
     # 内容审核
     'review.moderate': ('super_admin',),
+    # 审核读侧：enterprise 与 admin 都要读审核记录（前者看自己提交的、后者裁定）。
+    'review.read': (),
     # 平台级内容监管。这两个域不在 spec 的十一个内容域里，但管理端确实有「全员公告」
     # 与「评论/帖子删除」两类只有 super_admin 能做的操作。不给它们能力名，就只能把
     # 它们挂到 user.manage 上，名不副实。
     'announcement.manage': ('super_admin',),
+    # 公告读侧：public 与 notifications 域都要读，所以是公开的。
+    'announcement.read': (),
     'community.manage': ('super_admin',),
+    # 社区读侧：讨论与评论任何人可看，写才需要登录（写侧在路由里单独校验）。
+    'community.read': (),
 }
+
+# 以下各域在 spec 的十一个内容域之外，是数据层按域拆分时自然出现的支撑域。
+# 它们没有「管理后台」，读侧一律要求已登录，写侧按业务归属收在具体角色上。
+# T03 删掉 database.py 转发层后，各域改为 from db_domains import <域>，这些
+# import 边会被 check_architecture.py 逐条判权，所以读侧必须有明确归属。
+CAPABILITIES.update({
+    # 会话：auth 域建会话、其它域校验会话。读侧等于「已登录」。
+    'auth.read': ('student', 'teacher', 'enterprise', 'government', 'operator',
+                  'super_admin'),
+    # 站内信：只有收发双方能读，按 user_id 过滤在数据层做。
+    'message.read': ('student', 'teacher', 'enterprise', 'government', 'operator',
+                     'super_admin'),
+    # 通知：同上，只发给指定用户。
+    'notification.read': ('student', 'teacher', 'enterprise', 'government',
+                          'operator', 'super_admin'),
+    # 学员名册：教师管理自己的学员，就业域做能力档案时也要读。
+    'student.read': (),
+    # 积分余额：本人与教师可见。
+    'point.read': (),
+    # 证书与实训进度：本人与教师可见。
+    'certificate.read': (),
+    # 本土资源（案例正文之外的拼装层）：公开可读。
+    'resource.read': (),
+    # 采购需求：公开发布的对所有人可见，未发布的只给发布方。
+    'procurement.read': (),
+})
 
 
 def can(role, capability):

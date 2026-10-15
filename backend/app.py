@@ -8,7 +8,7 @@ Flask后端应用
 import repo_paths
 
 # 后端代码整体迁入 backend/ 后，本文件与它 import 的 core / ai / shared /
-# db_domains / domain_data / domains / database 都同在 backend/ 下。把 backend/
+# db_domains / domain_data / domains / db_init 都同在 backend/ 下。把 backend/
 # 放进 sys.path，这些 import 才能继续用顶层包名解析，不必把每一处都改成
 # backend.xxx 的限位导入。放在 repo_paths 之后、其它 import 之前。
 import os as _os
@@ -29,7 +29,6 @@ from flask import jsonify
 from datetime import datetime
 import os
 import logging
-import database
 
 # 共享层：应用级横切、上游模型调用、纯函数工具（见 docs/adr/0001-backend-domain-split.md）
 from core.app_factory import BASE_DIR, create_app
@@ -92,7 +91,7 @@ _ALLOWED_STATIC_DIRS = static_allowlist_dirs
 # 方言知识库 DIALECTS_DATA 与方言降级话术库（原 generate_dynamic_voice_answer）在
 # domains.resources.dialect_voice，随域一起搬走；方言语音问答的限流额度 VOICE_RATE_LIMIT
 # 也随它走。案例与政策的内容事实源在 domain_data.resources（cases_data /
-# policies_data），经 database 契约层读取，这里不持有第二份。
+# policies_data），经 db_domains.resources 读取，这里不持有第二份。
 # 用药口径的判定函数与免责声明文案仍在共享层 shared.agri_dosage（农业培训域、病虫害
 # 诊断域也判定它），本域按 chem_notice 单独字段下发，拼法见域内 _chem_dose_notice_for。
 
@@ -172,11 +171,11 @@ _ALLOWED_STATIC_DIRS = static_allowlist_dirs
 # 审核三种动作对四个领域公开状态的影响没有动：T05 已把审核状态变更收敛为
 # db_domains/reviews.py 的 set_review_status() 单一分派入口，按内容类型分派到
 # 课程 / 岗位 / 3D 模型各域的窄接口。admin_bp 只调
-# database.approve_review / reject_review / revoke_review 这三个转发入口，
+# db_domains.reviews 的 approve_review / reject_review / revoke_review 这三个入口，
 # 不在路由层直接写任何领域表。
 #
 # 政策发布/更新的三条口径（normalize_policy_category / policy_sources_to_json /
-# default_policy_summary）都在 db_domains/resources.py，经 database 契约层访问；
+# default_policy_summary）都在 db_domains/resources.py，调用方按域 import 访问；
 # 政策内容的事实源是 domain_data/resources/policies_data，本文件不持有副本。
 
 
@@ -205,7 +204,8 @@ if __name__ == '__main__':
     # 端口与 run.py / _serve.py 同一解析逻辑：环境变量 PORT > .env 的 PORT > 默认 5000。
     from run import resolve_port
     port, port_source = resolve_port()
-    database.init_db()
+    from db_init import init_db
+    init_db()
     print("🌾 启动粤乡智匠服务...")
     print("=" * 50)
     print("🌱 粤乡智匠 - AI驱动的农村人才赋能平台")

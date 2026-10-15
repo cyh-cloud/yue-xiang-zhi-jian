@@ -17,6 +17,8 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import notifications, reviews, users
 
 # 后端代码整体迁入 backend/ 后，被测的 database / db_domains / domain_data
 # 都在 backend/ 下，因此路径基准指向 backend/ 而不是仓库根。
@@ -24,7 +26,6 @@ REPO_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class ReviewDispatchTest(unittest.TestCase):
@@ -53,19 +54,19 @@ class ReviewDispatchTest(unittest.TestCase):
                              headers={'X-Session-Id': teacher})
         self.assertEqual(r.status_code, 200, r.data)
         course_id = json.loads(r.data)['id']
-        review = database.get_review_by_content('course', course_id)
+        review = reviews.get_review_by_content('course', course_id)
         self.assertIsNotNone(review, '创建课程必须同时生成审核记录')
         return course_id, review['id']
 
     def _review_status_of(self, table, row_id):
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute("SELECT review_status FROM %s WHERE id = ?" % table,
                            (row_id,)).fetchone()
         conn.close()
         return row['review_status'] if row else None
 
     def _published_flag_of(self, table, row_id):
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute("SELECT is_published FROM %s WHERE id = ?" % table,
                            (row_id,)).fetchone()
         conn.close()
@@ -73,28 +74,28 @@ class ReviewDispatchTest(unittest.TestCase):
 
     def test_approve_sets_approved_and_publishes_course(self):
         course_id, review_id = self._course_review()
-        database.approve_review(review_id, 'admin_demo')
+        reviews.approve_review(review_id, 'admin_demo')
         self.assertEqual(self._review_status_of('courses', course_id), 'approved')
         self.assertEqual(self._published_flag_of('courses', course_id), 1)
 
     def test_reject_sets_rejected_and_unpublishes_course(self):
         course_id, review_id = self._course_review()
-        database.reject_review(review_id, 'admin_demo', '不合规')
+        reviews.reject_review(review_id, 'admin_demo', '不合规')
         self.assertEqual(self._review_status_of('courses', course_id), 'rejected')
         self.assertEqual(self._published_flag_of('courses', course_id), 0)
 
     def test_revoke_returns_both_to_pending(self):
         course_id, review_id = self._course_review()
-        database.approve_review(review_id, 'admin_demo')
-        self.assertEqual(database.revoke_review(review_id), 'ok')
+        reviews.approve_review(review_id, 'admin_demo')
+        self.assertEqual(reviews.revoke_review(review_id), 'ok')
         self.assertEqual(self._review_status_of('courses', course_id), 'pending')
 
     def test_approve_clears_the_previous_rejection_comment(self):
         """先驳回再通过，通过后不得残留上一轮的驳回理由。"""
         course_id, review_id = self._course_review()
-        database.reject_review(review_id, 'admin_demo', '自审：临时驳回')
-        database.approve_review(review_id, 'admin_demo')
-        review = database.get_review_by_content('course', course_id)
+        reviews.reject_review(review_id, 'admin_demo', '自审：临时驳回')
+        reviews.approve_review(review_id, 'admin_demo')
+        review = reviews.get_review_by_content('course', course_id)
         self.assertEqual(review['status'], 'approved')
         self.assertEqual(review['review_comment'], '')
 
@@ -112,11 +113,11 @@ class ReviewDispatchTest(unittest.TestCase):
                              headers={'X-Session-Id': enterprise})
         self.assertEqual(r.status_code, 200, r.data)
         job_id = json.loads(r.data)['id']
-        review = database.get_review_by_content('job', job_id)
+        review = reviews.get_review_by_content('job', job_id)
         self.assertIsNotNone(review)
-        database.reject_review(review['id'], 'admin_demo', '信息不完整')
+        reviews.reject_review(review['id'], 'admin_demo', '信息不完整')
         self.assertEqual(self._review_status_of('job_listings', job_id), 'rejected')
-        database.revoke_review(review['id'])
+        reviews.revoke_review(review['id'])
         self.assertEqual(self._review_status_of('job_listings', job_id), 'pending')
 
     def test_success_case_needs_no_target_writeback(self):
@@ -124,11 +125,11 @@ class ReviewDispatchTest(unittest.TestCase):
         # 用案例清单里不存在的 content_id：拿真实案例 id 反复 approve 会往
         # content_reviews 里堆多条记录，把 approved 计数撑爆，污染其它用例。
         probe_id = 999001
-        review_id = database.create_content_review('success_case', probe_id, 'admin_demo')
-        database.approve_review(review_id, 'admin_demo')
+        review_id = reviews.create_content_review('success_case', probe_id, 'admin_demo')
+        reviews.approve_review(review_id, 'admin_demo')
         self.assertEqual(
-            database.get_review_by_content('success_case', probe_id)['status'], 'approved')
-        conn = database.get_connection()
+            reviews.get_review_by_content('success_case', probe_id)['status'], 'approved')
+        conn = get_connection()
         conn.execute('DELETE FROM content_reviews WHERE content_type = ? AND content_id = ?',
                      ('success_case', probe_id))
         conn.commit()
@@ -149,7 +150,7 @@ class UnreadCountTest(unittest.TestCase):
             '/api/auth/login',
             data=json.dumps({'username': 'student_demo', 'password': '123456'}),
             content_type='application/json').data)['session_id']
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             notif = conn.execute(
                 "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0",
@@ -181,7 +182,7 @@ class UnreadCountTest(unittest.TestCase):
                 ('student_demo',)).fetchone()[0]
         finally:
             conn.close()
-        self.assertEqual(database.get_total_unread_count('student_demo'),
+        self.assertEqual(notifications.get_total_unread_count('student_demo'),
                          notif + msgs + apps + anns)
 
 
@@ -215,28 +216,28 @@ class DuplicateDefinitionTest(unittest.TestCase):
     """两处重复定义清理后：只有一份实现，且行为与清理前生效的那份一致。"""
 
     def test_get_user_by_id_resolves_by_username(self):
-        user = database.get_user_by_id('student_demo')
+        user = users.get_user_by_id('student_demo')
         self.assertIsNotNone(user)
         self.assertEqual(user['username'], 'student_demo')
         # 生效版本是 SELECT *，必须带出资料字段
         self.assertIn('bio', user)
         self.assertIn('region', user)
-        self.assertIsNone(database.get_user_by_id('no-such-user'))
+        self.assertIsNone(users.get_user_by_id('no-such-user'))
 
     def test_update_user_profile_writes_all_supported_fields(self):
         """生效版本支持 7 个字段且按 username 定位。"""
-        database.update_user_profile('student_demo', region='T05 契约测试')
+        users.update_user_profile('student_demo', region='T05 契约测试')
         try:
-            user = database.get_user_by_id('student_demo')
+            user = users.get_user_by_id('student_demo')
             self.assertEqual(user['region'], 'T05 契约测试')
         finally:
-            database.update_user_profile('student_demo', region='')
+            users.update_user_profile('student_demo', region='')
 
     def test_update_user_profile_is_idempotent_with_no_fields(self):
         """不传字段时不得报错，也不得改动任何列。"""
-        before = database.get_user_by_id('student_demo')
-        database.update_user_profile('student_demo')
-        after = database.get_user_by_id('student_demo')
+        before = users.get_user_by_id('student_demo')
+        users.update_user_profile('student_demo')
+        after = users.get_user_by_id('student_demo')
         self.assertEqual(before, after)
 
 

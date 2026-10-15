@@ -18,13 +18,16 @@ from datetime import datetime
 
 from flask import jsonify, request
 
-import database
 
 from core.session import get_session_user
 from domains.agriculture.calendar_data import _DEFAULT_AGRICULTURE_PRODUCTS
 from domains.agriculture.calendar_data import _farming_task_brief, _month_in_phase
 from domains.agriculture.routes import agriculture_bp
 from shared.solar_terms import solar_terms_of_month
+from db_domains import farming, notifications
+# 本域读 farming（公开），并在农事提醒到期时写 notification。写别人的域要显式
+# 声明，让 tools/check_architecture.py 有据可判，也让「谁在给全员发通知」可查。
+CAPABILITIES_USED = ('farming.read', 'notification.read')
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +39,7 @@ def get_products():
     返回结构与旧版保持一致（desc 由 summary 映射），表为空时回退硬编码列表。
     """
     try:
-        rows = database.get_farming_products()
+        rows = farming.get_farming_products()
     except Exception as e:
         logger.warning('读取农产品目录失败，回退硬编码: %s', e)
         rows = []
@@ -60,7 +63,7 @@ def get_farming_calendar(product_id):
       year   可选，缺省取服务器当前年
       month  可选，1-12；传 0 视为 0-indexed 的一月（兼容旧调用）；缺省取当前月
     """
-    product = database.get_farming_product(product_id)
+    product = farming.get_farming_product(product_id)
     if not product or not product.get('is_active', 1):
         return jsonify({"success": False, "message": "未找到该农产品信息"}), 404
 
@@ -83,10 +86,10 @@ def get_farming_calendar(product_id):
         if month < 1 or month > 12:
             month = now.month
 
-    phases = database.get_farming_phenophases(product_id)
-    tasks = database.get_farming_tasks(product_id, month=month)
-    labels = database.get_farming_category_labels()
-    source_map = database.get_farming_source_map()
+    phases = farming.get_farming_phenophases(product_id)
+    tasks = farming.get_farming_tasks(product_id, month=month)
+    labels = farming.get_farming_category_labels()
+    source_map = farming.get_farming_source_map()
 
     # 物候期：标记当月命中项，并给出「当前物候期」（取首个命中项）
     phase_current = None
@@ -178,7 +181,7 @@ def get_farming_calendar(product_id):
     # 该作物全年用到的来源集合（供「数据依据」说明面板一次列全，避免逐月变动）
     year_keys = []
     try:
-        for t in database.get_farming_tasks(product_id):
+        for t in farming.get_farming_tasks(product_id):
             k = t.get('source_key') or ''
             if k and k in source_map and k not in year_keys:
                 year_keys.append(k)
@@ -230,7 +233,7 @@ def get_my_farming_subscriptions():
         return jsonify({"success": False, "message": "请先登录"}), 401
     return jsonify({
         "success": True,
-        "product_ids": database.get_farming_subscriptions(user['username']),
+        "product_ids": farming.get_farming_subscriptions(user['username']),
     })
 
 
@@ -244,14 +247,14 @@ def subscribe_farming():
     pid = (data.get('product_id') or '').strip()
     if not pid:
         return jsonify({"success": False, "message": "缺少 product_id"}), 400
-    _p = database.get_farming_product(pid)
+    _p = farming.get_farming_product(pid)
     if not _p or not _p.get('is_active', 1):
         # 与 /api/agriculture/calendar/<id> 保持一致：停用作物不可订阅，避免订阅后无日历可看
         return jsonify({"success": False, "message": "未找到该农产品信息"}), 404
-    database.set_farming_subscription(user['username'], pid, True)
+    farming.set_farming_subscription(user['username'], pid, True)
     return jsonify({
         "success": True, "subscribed": True,
-        "product_ids": database.get_farming_subscriptions(user['username']),
+        "product_ids": farming.get_farming_subscriptions(user['username']),
     })
 
 
@@ -261,12 +264,12 @@ def unsubscribe_farming(product_id):
     user = get_session_user()
     if not user:
         return jsonify({"success": False, "message": "请先登录"}), 401
-    database.set_farming_subscription(user['username'], product_id, False)
+    farming.set_farming_subscription(user['username'], product_id, False)
     # 同步清理当期提醒日志：否则「退订 → 当月重新订阅」会因幂等键命中而静默收不到提醒
-    database.clear_farming_reminder_log(user['username'], product_id)
+    farming.clear_farming_reminder_log(user['username'], product_id)
     return jsonify({
         "success": True, "subscribed": False,
-        "product_ids": database.get_farming_subscriptions(user['username']),
+        "product_ids": farming.get_farming_subscriptions(user['username']),
     })
 
 
@@ -289,14 +292,14 @@ def check_farming_reminders():
     period = '%04d-%02d' % (now.year, now.month)
     sent, details = 0, []
 
-    for pid in database.get_farming_subscriptions(uid):
-        if database.has_farming_reminder_sent(uid, pid, period):
+    for pid in farming.get_farming_subscriptions(uid):
+        if farming.has_farming_reminder_sent(uid, pid, period):
             continue
-        product = database.get_farming_product(pid)
+        product = farming.get_farming_product(pid)
         # 与 /api/agriculture/calendar/<id> 一致：停用作物不再推送（否则点进通知是 404）
         if not product or not product.get('is_active', 1):
             continue
-        due = database.get_due_farming_tasks(pid, now.year, now.month, until_day=now.day)
+        due = farming.get_due_farming_tasks(pid, now.year, now.month, until_day=now.day)
         if not due:
             continue
         # 文案带具体日期：优先高优先级，最多 3 条
@@ -305,11 +308,11 @@ def check_farming_reminders():
         title = '%d月%s农事提醒' % (now.month, product['name'])
         content = '本月已到期农事：' + '、'.join(highlights) + '。详情见「农业技能 · 农时智能日历」。'
         try:
-            database.create_notification(uid, 'farming_reminder', title, content, 'farming', pid)
+            notifications.create_notification(uid, 'farming_reminder', title, content, 'farming', pid)
         except Exception as e:
             logger.warning('农事提醒写入通知失败(%s/%s): %s', uid, pid, e)
             continue
-        database.mark_farming_reminder_sent(uid, pid, period)
+        farming.mark_farming_reminder_sent(uid, pid, period)
         sent += 1
         details.append({
             "product_id": pid, "product_name": product['name'],

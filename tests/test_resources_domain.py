@@ -19,12 +19,13 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import policies
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class ResourcesDomainTestBase(unittest.TestCase):
@@ -248,7 +249,7 @@ class PolicyTest(ResourcesDomainTestBase):
     """政策列表：只认政府端已发布政策，下架必须真实生效。"""
 
     def _set_all_published(self, published):
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute("UPDATE government_policies SET is_published = ?", (published,))
             conn.commit()
@@ -285,7 +286,7 @@ class PolicyTest(ResourcesDomainTestBase):
 
     def test_published_state_is_restored_after_the_unpublish_probe(self):
         """上面的用例动过库，这里确认它把发布态还原了（否则会污染后续用例）。"""
-        self.assertGreater(len(database.get_government_policies()), 0)
+        self.assertGreater(len(policies.get_government_policies()), 0)
 
 
 if __name__ == '__main__':

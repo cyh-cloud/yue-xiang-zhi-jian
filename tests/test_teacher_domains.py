@@ -24,8 +24,10 @@ REPO_ROOT = os.path.join(
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 import repo_paths  # noqa: E402
+from db_connection import get_connection
+from db_domains import teaching, users
+from db_domains import courses as courses_db
 
 
 class TeacherDomainTestBase(unittest.TestCase):
@@ -53,7 +55,7 @@ class RosterCrudTest(TeacherDomainTestBase):
     """名册增删改查：字段、状态码、错误码。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM students WHERE name LIKE '__T16%'")
         conn.execute("DELETE FROM users WHERE username LIKE '__t16%' OR username = '__t16free'")
         conn.commit()
@@ -134,7 +136,7 @@ class RosterCrudTest(TeacherDomainTestBase):
         self.addCleanup(self._cleanup)
         self.addCleanup(self._unlink, 'student_demo')
         sid = self._login()
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM students WHERE name = '__T16占位__'")
         conn.execute("INSERT INTO students (id, name, user_id) "
                      "VALUES ('STU999', '__T16占位__', 'student_demo')")
@@ -153,7 +155,7 @@ class RosterCrudTest(TeacherDomainTestBase):
         self.assertEqual([s for s in roster if s['name'] == '__T16占用__'], [])
 
     def _unlink(self, username):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM students WHERE name = '__T16占位__'")
         conn.commit()
         conn.close()
@@ -195,7 +197,7 @@ class AccountLinkTest(TeacherDomainTestBase):
     """账号绑定：可关联清单、绑定与解除、占用与不存在。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM students WHERE name LIKE '__T16%'")
         conn.execute("DELETE FROM users WHERE username LIKE '__t16%' OR username = '__t16free'")
         conn.commit()
@@ -210,11 +212,11 @@ class AccountLinkTest(TeacherDomainTestBase):
         """
         self.addCleanup(self._cleanup)
         sid = self._login()
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM users WHERE username = '__t16free'")
         conn.commit()
         conn.close()
-        database.register_user('__t16free', '123456', '__T16未占用__', 'student')
+        users.register_user('__t16free', '123456', '__T16未占用__', 'student')
 
         data = json.loads(self.client.get(
             '/api/teacher/linkable-accounts', headers={'X-Session-Id': sid}).data)
@@ -231,7 +233,7 @@ class AccountLinkTest(TeacherDomainTestBase):
             '/api/teacher/linkable-accounts', headers={'X-Session-Id': sid}).data)['accounts']
         self.assertNotIn('__t16free', [a['username'] for a in again])
 
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM users WHERE username = '__t16free'")
         conn.commit()
         conn.close()
@@ -272,7 +274,7 @@ class TeacherReportTest(TeacherDomainTestBase):
     """教师报表：空名册不调 AI、口径用证书真实完成度、AI 不可用走兜底。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM students WHERE name LIKE '__T16%'")
         conn.execute("DELETE FROM users WHERE username LIKE '__t16%' OR username = '__t16free'")
         conn.commit()
@@ -287,7 +289,7 @@ class TeacherReportTest(TeacherDomainTestBase):
     def test_empty_roster_returns_a_report_without_calling_ai(self):
         self.addCleanup(self._cleanup)
         self.addCleanup(self._restore_roster)
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM students")
         conn.commit()
         conn.close()
@@ -311,7 +313,7 @@ class TeacherReportTest(TeacherDomainTestBase):
         self.assertIn('暂无数据', body['report']['content'])
 
     def _restore_roster(self):
-        conn = database.get_connection()
+        conn = get_connection()
         if conn.execute("SELECT COUNT(*) FROM students").fetchone()[0] == 0:
             conn.execute(
                 "INSERT INTO students (id, user_id, name, class_name, direction) "
@@ -348,7 +350,7 @@ class TeacherReportTest(TeacherDomainTestBase):
             'directions', 'at_risk', 'excellent', 'focus', 'title',
             'highlight_stats'})
         self.assertEqual(report['overview']['total'],
-                         len(database.get_roster_completion()))
+                         len(teaching.get_roster_completion()))
 
     def test_report_sends_roster_context_to_the_upstream(self):
         """上游调用必须带上名册数据，且报告主题随 prompt 切换。
@@ -399,7 +401,7 @@ class DashboardAndAnalyticsTest(TeacherDomainTestBase):
         stats = data['dashboard']['stats']
         self.assertEqual(set(stats), {'total_students', 'certificates_earned',
                                       'completion_rate', 'avg_score', 'no_cert_count'})
-        self.assertEqual(stats['total_students'], len(database.get_roster_completion()))
+        self.assertEqual(stats['total_students'], len(teaching.get_roster_completion()))
         self.assertLessEqual(stats['completion_rate'], 100)
 
     def test_analytics_reports_certificate_basis(self):
@@ -409,7 +411,7 @@ class DashboardAndAnalyticsTest(TeacherDomainTestBase):
         self.assertTrue(data['success'])
         analytics = data['analytics']
         self.assertEqual(analytics['basis'], 'certificates')
-        self.assertEqual(analytics['roster_count'], len(database.get_roster_completion()))
+        self.assertEqual(analytics['roster_count'], len(teaching.get_roster_completion()))
         self.assertEqual([d['label'] for d in analytics['progress_distribution']],
                          ['0-20%', '21-40%', '41-60%', '61-80%', '81-100%'])
         for d in analytics['direction_progress']:
@@ -422,7 +424,7 @@ class AnnouncementTest(TeacherDomainTestBase):
     """公告：教师增删、学员可读、参数校验。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM announcements WHERE title LIKE '__T16%'")
         conn.execute("DELETE FROM notifications WHERE title LIKE '新通知'")
         conn.commit()
@@ -474,7 +476,7 @@ class AnnouncementTest(TeacherDomainTestBase):
         self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
         # 清掉历史通知，让计数从已知起点开始
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute('DELETE FROM notifications')
         conn.commit()
         conn.close()
@@ -488,7 +490,7 @@ class AnnouncementTest(TeacherDomainTestBase):
 
         self.assertEqual(r.status_code, 200)
         self.assertTrue(json.loads(r.data)['success'])
-        conn = database.get_connection()
+        conn = get_connection()
         rows = conn.execute(
             'SELECT user_id, type, title, link_type, link_id FROM notifications'
         ).fetchall()
@@ -522,7 +524,7 @@ class GradingTest(TeacherDomainTestBase):
     """实训批改：参数校验、批改落库与通知。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM notifications WHERE title = '实训已批改' "
                      "AND content = '得分：88'")
         conn.commit()
@@ -539,7 +541,7 @@ class GradingTest(TeacherDomainTestBase):
     def test_grading_a_submission_notifies_the_student(self):
         self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
-        conn = database.get_connection()
+        conn = get_connection()
         sub = conn.execute("SELECT id FROM assignment_submissions LIMIT 1").fetchone()
         conn.close()
         self.assertIsNotNone(sub, '库里需要有实训提交记录')
@@ -549,7 +551,7 @@ class GradingTest(TeacherDomainTestBase):
                        session_id=sid)
         self.assertTrue(json.loads(r.data)['success'])
         self.assertEqual(json.loads(r.data)['message'], '批改成功')
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute("SELECT score, feedback, status FROM assignment_submissions "
                            "WHERE id = ?", (sub['id'],)).fetchone()
         conn.close()
@@ -606,7 +608,7 @@ class CourseCrudTest(TeacherDomainTestBase):
     """课程增删改：角色边界与返回结构。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM courses WHERE title LIKE '__T16%'")
         conn.commit()
         conn.close()
@@ -658,7 +660,7 @@ class CourseCrudTest(TeacherDomainTestBase):
         self.assertEqual(r.status_code, 403)
 
     def test_materials_get_is_public_but_write_needs_teacher(self):
-        conn = database.get_connection()
+        conn = get_connection()
         course_id = conn.execute("SELECT id FROM courses WHERE teacher_id='teacher_demo' "
                                  "LIMIT 1").fetchone()['id']
         conn.close()
@@ -681,7 +683,7 @@ class MaterialUploadTest(TeacherDomainTestBase):
     """课程材料上传：类型判定、上传往返、删除。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM course_materials WHERE course_id >= 990100")
         conn.commit()
         conn.close()
@@ -700,7 +702,7 @@ class MaterialUploadTest(TeacherDomainTestBase):
         self.assertEqual(uploaded.status_code, 200)
         mat_id = json.loads(uploaded.data)['id']
 
-        row = next(r for r in database.get_course_materials(course_id)
+        row = next(r for r in courses_db.get_course_materials(course_id)
                    if r['id'] == mat_id)
         self.assertEqual(row['material_type'], 'pdf')
         self.assertEqual(row['file_name'], 't16_probe_material.pdf')
@@ -732,7 +734,7 @@ class MaterialUploadTest(TeacherDomainTestBase):
             headers={'X-Session-Id': sid})
         self.assertEqual(uploaded.status_code, 200)
         mat_id = json.loads(uploaded.data)['id']
-        row = next(r for r in database.get_course_materials(course_id) if r['id'] == mat_id)
+        row = next(r for r in courses_db.get_course_materials(course_id) if r['id'] == mat_id)
         self.assertEqual(row['material_type'], 'video')
         self.client.delete('/api/teacher/materials/%d' % mat_id,
                            headers={'X-Session-Id': sid})
@@ -747,7 +749,7 @@ class MaterialUploadTest(TeacherDomainTestBase):
             headers={'X-Session-Id': sid})
         self.assertEqual(uploaded.status_code, 200)
         mat_id = json.loads(uploaded.data)['id']
-        row = next(r for r in database.get_course_materials(course_id) if r['id'] == mat_id)
+        row = next(r for r in courses_db.get_course_materials(course_id) if r['id'] == mat_id)
         self.assertEqual(row['material_type'], 'other')
         self.client.delete('/api/teacher/materials/%d' % mat_id,
                            headers={'X-Session-Id': sid})
@@ -776,7 +778,7 @@ class MaterialUploadTest(TeacherDomainTestBase):
             data={'file': (io.BytesIO(b'x'), 't16_probe.pdf')},
             headers={'X-Session-Id': sid})
         mat_id = json.loads(uploaded.data)['id']
-        row = next(r for r in database.get_course_materials(course_id) if r['id'] == mat_id)
+        row = next(r for r in courses_db.get_course_materials(course_id) if r['id'] == mat_id)
         self.assertTrue(row['file_path'].endswith('_t16_probe.pdf'))
         self.client.delete('/api/teacher/materials/%d' % mat_id,
                            headers={'X-Session-Id': sid})
@@ -786,7 +788,7 @@ class Model3dTest(TeacherDomainTestBase):
     """3D 模型管理：格式白名单、上传往返、删除。"""
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         rows = conn.execute(
             "SELECT id, file_path FROM models_3d WHERE title LIKE '__T16%'").fetchall()
         for r in rows:
@@ -815,7 +817,7 @@ class Model3dTest(TeacherDomainTestBase):
         self.assertIn('等待审核', body['message'])
         model_id = body['id']
 
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute("SELECT * FROM models_3d WHERE id = ?", (model_id,)).fetchone()
         conn.close()
         self.assertEqual(row['file_size'], len(payload))
@@ -868,7 +870,7 @@ class Model3dTest(TeacherDomainTestBase):
         uploaded = self._upload(sid, 't16_probe_default.glb', b'glTF')
         self.assertEqual(uploaded.status_code, 200)
         model_id = json.loads(uploaded.data)['id']
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute("SELECT title FROM models_3d WHERE id = ?", (model_id,)).fetchone()
         conn.close()
         self.assertEqual(row['title'], 't16_probe_default.glb')
@@ -956,7 +958,7 @@ class RoleBoundaryTest(TeacherDomainTestBase):
         """
         self.addCleanup(self._restore, 'teacher_demo')
         sid = self._login('teacher_demo')
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE users SET status='suspended' WHERE username='teacher_demo'")
         conn.commit()
         conn.close()
@@ -966,7 +968,7 @@ class RoleBoundaryTest(TeacherDomainTestBase):
         self.assertEqual(json.loads(r.data)['message'], '账号已被停用')
 
     def _restore(self, username):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE users SET status='active' WHERE username = ?", (username,))
         conn.commit()
         conn.close()

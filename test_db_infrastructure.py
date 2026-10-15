@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""数据层基础设施的契约测试（后端按领域拆分 T04）。
+"""数据层基础设施的契约测试（后端按领域拆分 T04；T03 删转发层后重写符号面一段）。
 
 锁住四件事，改动数据结构前先跑它：
 
@@ -8,8 +8,8 @@
 2. 建表定义：建表语句只出现在一处，init_db 建出全部表且重复执行不改变结构；
 3. 初始化入口：`database.init_db()` 首次建表并播种、重复执行幂等（种子不翻倍、
    审核结论不被覆盖、真实企业数据不被清）；
-4. 对外契约：`import database` + `database.xxx()` 的符号面在拆分后不变，
-   且基础设施模块不反向 import database（否则成环）。
+4. 符号面：每个 `db_domains` 模块对外暴露的函数集合不变，调用方按域 import 后
+   仍然拿得到全部名字（转发层 database.py 已在 T03 删除）。
 
 ⚠️ 为什么碰库的用例一律跑子进程：DB_PATH 在 import db_connection 时就定下来了
 （既有行为，部署入口也依赖「导入即定位」）。同进程里改 os.environ 不会改变它，
@@ -19,6 +19,7 @@ db_infrastructure_probe.py 那个子进程里，用环境变量 YUEXIANG_DB 把�
 """
 
 import ast
+import importlib
 import io
 import json
 import os
@@ -28,7 +29,7 @@ import sys
 import tempfile
 import unittest
 
-# 后端代码整体迁入 backend/ 后，被测的 database / db_domains / domain_data
+# 后端代码整体迁入 backend/ 后，被测的 db_init / db_domains / domain_data
 # 都在 backend/ 下，因此路径基准指向 backend/ 而不是仓库根。
 REPO_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
 if REPO_ROOT not in sys.path:
@@ -49,8 +50,89 @@ SEED_MODULES = tuple(sorted(
 # db_schema_probe.py 是 T04 的 schema 契约测试探针，同样只被测试以子进程调用，
 # 不是产品代码；把它纳入机械检查，将来有人在探针里写建表语句才会被发现。
 INFRA_MODULES = ('db_connection.py', 'db_schema.py', 'db_credentials.py',
-                 'db_schema_probe.py') + SEED_MODULES
-DATA_LAYER_MODULES = ('database.py',) + INFRA_MODULES
+                 'db_schema_probe.py', 'db_init.py') + SEED_MODULES
+DATA_LAYER_MODULES = ('db_init.py',) + INFRA_MODULES
+
+# 符号面的期望清单：模块名 -> 该模块必须对外暴露的名字。
+# 断言按模块逐个数，不再数 database.py 那个聚合后的 163 个符号：转发层已删，
+# 调用方按 from db_domains import farming 后 farming.get_x() 取数，所以, farming
+# 「名字还在不在原模块里」就是唯一有意义的形状。
+DOMAIN_MODULES = tuple(sorted(
+    name for name in os.listdir(os.path.join(REPO_ROOT, 'db_domains'))
+    if name.endswith('.py') and name != '__init__.py'
+))
+DOMAIN_SYMBOLS = {
+    'announcements.py': ('add_system_announcement', 'delete_system_announcement',
+                         'get_active_system_announcement_ids', 'get_system_announcements'),
+    'auth.py': ('authenticate_user', 'create_session', 'delete_session', 'get_session'),
+    'certificates.py': ('get_certificates',),
+    'community.py': ('add_comment', 'create_discussion', 'get_comments', 'get_discussion',
+                     'get_discussions', 'soft_delete_comment', 'soft_delete_discussion'),
+    'courses.py': ('add_course_material', 'create_course', 'create_model_3d', 'delete_course',
+                   'delete_course_material', 'delete_model_3d', 'get_course',
+                   'get_course_materials', 'get_courses', 'get_models_3d', 'update_course'),
+    'employment.py': ('ENTERPRISE_JOB_CATEGORIES', 'RESUME_FIELDS', 'add_job_intent',
+                      'apply_for_job', 'count_pending_job_listings',
+                      'count_unread_job_applications', 'get_application_counts',
+                      'get_employment_stats', 'get_job_application_ids', 'get_job_by_id',
+                      'get_job_category_counts', 'get_job_intents', 'get_job_listings',
+                      'get_job_listings_base', 'get_job_listings_filtered',
+                      'get_learner_profile', 'get_resume', 'get_saved_jobs', 'get_similar_jobs',
+                      'get_user_applications', 'mark_resume_ai_used', 'parse_salary_bounds',
+                      'remove_job_intent', 'save_job', 'save_resume', 'unsave_job'),
+    'farming.py': ('clear_farming_reminder_log', 'get_due_farming_tasks',
+                   'get_farming_category_labels', 'get_farming_phenophases',
+                   'get_farming_product', 'get_farming_products', 'get_farming_source_map',
+                   'get_farming_sources', 'get_farming_subscribers',
+                   'get_farming_subscriptions', 'get_farming_task_by_id',
+                   'get_farming_tasks', 'has_farming_reminder_sent', 'is_farming_subscribed',
+                   'mark_farming_reminder_sent', 'set_farming_subscription'),
+    'messages.py': ('count_unread_conversations', 'get_inbox', 'get_messages',
+                    'get_unread_count', 'mark_all_messages_read', 'mark_messages_read',
+                    'send_message'),
+    'notifications.py': ('clear_read_notifications', 'clear_read_refs', 'create_notification',
+                         'create_notification_for_all_students', 'get_notifications',
+                         'get_read_refs', 'get_total_unread_count',
+                         'get_unread_notification_count', 'mark_notifications_read',
+                         'mark_ref_read', 'mark_refs_read'),
+    'points.py': ('get_points', 'update_points'),
+    # profile_sources 是取数窄接口（CAPABILITY = ''），本身不拥有能力域，
+    # 由拼装方负责权限，因此单独登记。
+    'profile_sources.py': ('get_profile_basic', 'get_profile_certificates',
+                           'get_points_balance', 'get_recent_training_results',
+                           'get_student_progress_for_profile'),
+    'policies.py': ('create_policy', 'delete_policy', 'get_all_government_policies',
+                    'get_government_overview', 'get_government_policies',
+                    'get_policy_by_id', 'update_policy'),
+    'procurements.py': ('create_procurement', 'delete_procurement', 'get_procurements',
+                        'update_procurement'),
+    'resources.py': ('CASE_REVIEW_TYPE', 'default_policy_summary', 'get_case_notes',
+                     'get_case_review_stats', 'get_policy_notes', 'get_success_cases',
+                     'normalize_policy_category', 'policy_sources_to_json'),
+    'reviews.py': ('approve_review', 'count_reviews_by_status', 'create_content_review',
+                   'get_pending_reviews', 'get_review_by_content', 'get_reviews_by_status',
+                   'reject_review', 'revoke_review', 'set_review_status'),
+    'students.py': ('add_student', 'delete_student', 'get_linkable_student_accounts',
+                    'get_student', 'get_students', 'set_student_account', 'update_student'),
+    'teaching.py': ('TRAINING_DESCRIPTIONS', 'TRAINING_TITLE_FMTS',
+                    'LIVE_ASSIGNMENT_DIRECTION', 'LIVE_ASSIGNMENT_TITLE_FMT',
+                    'create_announcement', 'delete_announcement', 'get_announcements',
+                    'get_all_trainings', 'get_analytics_data', 'get_dashboard_stats',
+                    'get_live_trainings', 'get_or_create_live_assignment',
+                    'get_or_create_training_assignment', 'get_roster_completion',
+                    'get_trainings', 'grade_submission', 'save_live_training'),
+    'users.py': ('change_password', 'count_super_admins', 'count_user_relations',
+                 'delete_user_by_admin', 'get_admin_overview', 'get_all_users',
+                 'get_user_by_id', 'get_user_by_username', 'register_user', 'set_user_status',
+                 'update_user_by_admin', 'update_user_profile'),
+}
+
+# 基础设施侧必须对外暴露的名字。
+INFRA_SYMBOLS = {
+    'db_init.py': ('init_db',),
+    'db_connection.py': ('DB_DIR', 'DB_PATH', 'get_connection'),
+    'db_credentials.py': ('hash_password', 'verify_password'),
+}
 
 def read_module(name):
     with io.open(os.path.join(REPO_ROOT, name), encoding='utf-8') as handle:
@@ -175,62 +257,60 @@ class SeedOrchestrationTest(IsolatedDatabaseTest):
                          '演示岗位必须按标题就地更新（id 不变），不得删后重建')
 
 
-class ExternalContractTest(unittest.TestCase):
-    """`import database` + `database.xxx()` 的符号面不变。"""
+class DomainSymbolSurfaceTest(unittest.TestCase):
+    """每个数据层模块对外暴露的名字集合不变（T03 删掉 database.py 转发层后重写）。
 
-    APP_SYMBOLS = (
-        'init_db', 'get_connection', 'DB_DIR', 'DB_PATH',
-        'TRAINING_TITLE_FMTS', 'ENTERPRISE_JOB_CATEGORIES',
-        'hash_password', 'verify_password',
-        'POLICIES_DATA', 'POLICY_SOURCES', 'POLICIES_SEED_VERSION',
-        'DEMO_JOBS', 'DEMO_JOB_ENTERPRISE_ID', 'DEMO_JOBS_SEED_KEY',
-        'CASE_REVIEW_TYPE', 'LIVE_ASSIGNMENT_DIRECTION',
-        'LIVE_ASSIGNMENT_TITLE_FMT', 'TRAINING_DESCRIPTIONS', 'RESUME_FIELDS',
-    )
+    转发层活着的时候，这条断言数的是 database 这个聚合模块上的 163 个名字。
+    删掉之后调用方改成按域 import，所以改成按模块数：名字少一个，就是某个域
+    在删转发层时被顺手删掉或改名了。期望清单里的模块必须与 db_domains/ 的
+    实际内容一一对应，新增模块要同步登记，否则下面的清单一致性用例会红。
+    """
 
-    def setUp(self):
-        # database 在 import 时定下 DB_PATH；指到临时文件，父进程不写真实库。
-        self._tmp = tempfile.TemporaryDirectory(prefix='t04_contract_')
-        self.addCleanup(self._tmp.cleanup)
-        self._original = os.environ.get('YUEXIANG_DB')
-        os.environ['YUEXIANG_DB'] = os.path.join(self._tmp.name, 'contract.db')
-        self.addCleanup(self._restore)
+    def test_domain_modules_match_the_expected_list(self):
+        expected = tuple(sorted(DOMAIN_SYMBOLS))
+        self.assertEqual(DOMAIN_MODULES, expected,
+                         'db_domains 的模块与 DOMAIN_SYMBOLS 的登记不一致：'
+                         '多出 %s，缺少 %s'
+                         % (set(DOMAIN_MODULES) - set(expected),
+                            set(expected) - set(DOMAIN_MODULES)))
 
-    def _restore(self):
-        sys.modules.pop('database', None)
-        if self._original is None:
-            os.environ.pop('YUEXIANG_DB', None)
-        else:
-            os.environ['YUEXIANG_DB'] = self._original
+    def test_every_domain_module_exposes_its_symbols(self):
+        for name, expected in sorted(DOMAIN_SYMBOLS.items()):
+            module = importlib.import_module('db_domains.' + name[:-3])
+            missing = [symbol for symbol in expected
+                       if not hasattr(module, symbol)]
+            self.assertEqual(missing, [],
+                             '%s 少了这些对外名字：%s' % (name, missing))
 
-    def database(self):
-        import database
-        return database
+    def test_infrastructure_modules_expose_their_symbols(self):
+        for name, expected in sorted(INFRA_SYMBOLS.items()):
+            module = importlib.import_module(name[:-3])
+            missing = [symbol for symbol in expected
+                       if not hasattr(module, symbol)]
+            self.assertEqual(missing, [],
+                             '%s 少了这些对外名字：%s' % (name, missing))
 
-    def test_database_still_exposes_every_symbol_app_relies_on(self):
-        database = self.database()
-        for name in self.APP_SYMBOLS:
-            self.assertTrue(hasattr(database, name),
-                            'database.%s 在拆分后消失了' % name)
-
-    def test_get_connection_is_reexported_not_redefined(self):
-        import database
-        self.assertIs(database.get_connection, db_connection.get_connection)
+    def test_get_connection_is_not_redefined_in_db_init(self):
+        """db_init 只是调用方，连接工厂仍只有 db_connection 一处实现。"""
+        import db_init
+        self.assertIs(db_init.get_connection, db_connection.get_connection)
 
     def test_hash_password_round_trip_still_works(self):
-        database = self.database()
-        stored = database.hash_password('secret')
-        self.assertTrue(database.verify_password(stored, 'secret'))
-        self.assertFalse(database.verify_password(stored, 'wrong'))
+        from db_credentials import hash_password, verify_password
+        stored = hash_password('secret')
+        self.assertTrue(verify_password(stored, 'secret'))
+        self.assertFalse(verify_password(stored, 'wrong'))
 
-    def test_infrastructure_modules_do_not_import_database(self):
-        for name in INFRA_MODULES:
+    def test_no_module_reintroduces_the_forwarder(self):
+        """转发层不得复活：任何模块都不得再 import database。"""
+        for name in INFRA_MODULES + tuple(
+                'db_domains/' + m for m in DOMAIN_MODULES):
             source = read_module(name)
             self.assertNotIn('import database', source,
-                             '%s 反向 import database 会形成环' % name)
+                             '%s 又 import 了已删除的 database' % name)
 
-    def test_repo_never_imports_names_from_database(self):
-        pattern = re.compile(r'^\s*from\s+database\s+import\b', re.M)
+    def test_repo_never_imports_from_the_forwarder(self):
+        pattern = re.compile(r'^\s*(?:from\s+database\s+import|import\s+database)\b', re.M)
         offenders = []
         for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
             dirnames[:] = [d for d in dirnames
@@ -243,7 +323,7 @@ class ExternalContractTest(unittest.TestCase):
                 if pattern.search(read_module(path)):
                     offenders.append(os.path.relpath(path, REPO_ROOT))
         self.assertEqual(offenders, [],
-                         '外部只应 import database + database.xxx()：%s' % offenders)
+                         'database.py 已删除，不得再有人 import 它：%s' % offenders)
 
 
 if __name__ == '__main__':

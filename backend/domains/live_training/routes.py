@@ -25,7 +25,6 @@ import re
 
 from ai.client import AI_REASONING_TOKEN_RESERVE, chat_completion, chat_model
 from core.session import client_key, get_session_user, rate_limited
-import database
 from shared.ec_products import (
     EC_COPY_MAX_LEN,
     EC_CS_TRANSCRIPT_MAX_TURNS,
@@ -37,6 +36,10 @@ from shared.ec_products import (
 )
 from shared.live_reading import LIVE_RUBRIC_RE, LIVE_SPEED_IDEAL, live_cjk, live_speed_score
 from shared.training_status import training_status_label
+from db_domains import teaching
+
+# 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
+CAPABILITIES_USED = ('teaching.read',)
 
 live_bp = Blueprint('live_training', __name__)
 
@@ -196,7 +199,7 @@ def _training_submit_core(kind):
     """把一次实训落库到既有作业链路（EC7 + 2026-10-05 文案/客服闭环）。
 
     kind ∈ {'live','copy','cs'}：落点都是 `assignments` + `assignment_submissions`，
-    只以题目 title 前缀区分（见 database.TRAINING_TITLE_FMTS）。
+    只以题目 title 前缀区分（见 teaching.TRAINING_TITLE_FMTS）。
     需要登录；同一学员同一作物同一 kind 只保留最新一次提交，attempts 递增。
     """
     user = get_session_user()
@@ -269,8 +272,8 @@ def _training_submit_core(kind):
         return jsonify({"success": False, "code": "login_required",
                         "message": "登录后即可保存实训记录"}), 401
 
-    aid = database.get_or_create_training_assignment(product, kind)
-    sid, attempts = database.save_live_training(aid, student_id, payload, overall)
+    aid = teaching.get_or_create_training_assignment(product, kind)
+    sid, attempts = teaching.save_live_training(aid, student_id, payload, overall)
     # ⚠️ 只回 rule_score（系统规则分）。score 列现在是**教师批改分**，
     #    提交接口不该回一个自己刚算出来的规则分冒充「分数」。
     return jsonify({"success": True, "submission_id": sid, "assignment_id": aid,
@@ -299,7 +302,7 @@ def submit_cs_training():
 def get_my_live_trainings():
     """当前登录学员的实训记录（每个作物一条）。
 
-    `?kind=` 可取 live（默认）/ copy / cs；只认 database.TRAINING_TITLE_FMTS 里的键。
+    `?kind=` 可取 live（默认）/ copy / cs；只认 teaching.TRAINING_TITLE_FMTS 里的键。
     """
     user = get_session_user()
     if not user:
@@ -307,9 +310,9 @@ def get_my_live_trainings():
                         "message": "登录后可查看实训记录"}), 401
     student_id = str(user.get('username') or user.get('id') or '')
     kind = str(request.args.get('kind', '') or 'live').strip()
-    if kind not in database.TRAINING_TITLE_FMTS:
+    if kind not in teaching.TRAINING_TITLE_FMTS:
         kind = 'live'
-    rows = database.get_trainings(student_id, kind)
+    rows = teaching.get_trainings(student_id, kind)
     out = []
     for r in rows:
         try:

@@ -15,6 +15,8 @@ import os
 import re
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import resources
 
 # 后端代码整体迁入 backend/ 后，被测的 database / db_domains / domain_data
 # 都在 backend/ 下，因此路径基准指向 backend/ 而不是仓库根。
@@ -193,8 +195,7 @@ class SharedDbHygieneTest(unittest.TestCase):
     """
 
     def test_no_duplicate_review_rows_per_content_and_status(self):
-        import database
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             dupes = conn.execute(
                 'SELECT content_type, content_id, status, COUNT(*) AS n '
@@ -211,9 +212,8 @@ class SharedDbHygieneTest(unittest.TestCase):
 
     def test_approved_case_count_matches_the_content_source(self):
         """approved 计数必须等于内容源里的案例数，多出来就是被测试撑爆的。"""
-        import database
         from domain_data.resources import cases_data
-        stats = database.get_case_review_stats()['case_review']
+        stats = resources.get_case_review_stats()['case_review']
         total_cases = len(cases_data.get_cases())
         self.assertEqual(stats['total'], total_cases,
                          '审核记录覆盖的内容数与内容源不一致')

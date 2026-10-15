@@ -233,16 +233,26 @@ def imported_targets(info):
 
 
 def declared_capabilities(info):
-    """本模块源码里出现的 require_capability('x.manage') 装饰器，即它声明的能力集。
+    """本模块声明的能力集：require_capability('x.manage') 装饰器，加上登录护栏。
 
     只认 `@require_capability('...')` 这一种写法（含 core.permissions.require_capability
-    前缀），与 permissions.require_capability 的签名逐字对应。写角色名比较的文件
-    一声明都没有，判权时视为不持有任何能力，于是它 import 任何受管数据模块都会报违规，
-    这正是 T13 之前 20 个路由文件的现状：它们正在逐个切到能力表。
+    前缀），与 permissions.require_capability 的签名逐字对应。
+
+    另外认 SESSION_GUARDS 里的会话取用户与身份护栏：它们不指向具体能力名，
+    但意味着「本模块要求已登录」。判权时遇到这类模块，见 capability_verdict
+    的登录兜底分支。
     """
     if info.tree is None:
         return frozenset()
     names = set()
+    for node in info.tree.body:
+        # 模块级显式声明：CAPABILITIES_USED = ('auth.read', 'user.read')
+        # 给「读别人的域但不走 require_capability 装饰器」的域一个声明位置，
+        # 免得为了满足机械检查去改鉴权代码路径。
+        if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "CAPABILITIES_USED"
+                for t in node.targets):
+            names.update(_string_literals(node.value))
     for node in ast.walk(info.tree):
         if not isinstance(node, ast.Call):
             continue
@@ -253,6 +263,18 @@ def declared_capabilities(info):
         if isinstance(node.args[0].value, str):
             names.add(node.args[0].value)
     return frozenset(names)
+
+
+def _string_literals(node):
+    """收集表达式里全部字符串字面量（元组 / 列表 / 集合 / 单个常量都认）。"""
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        return [node.value]
+    if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+        out = []
+        for item in node.elts:
+            out.extend(_string_literals(item))
+        return out
+    return []
 
 
 def load_capabilities():
@@ -298,7 +320,7 @@ def capability_verdict(domain, target, capabilities):
     1. 数据层模块不声明 CAPABILITY：无法判定它属于哪个能力域，一律报违规；
     2. CAPABILITY 为空串：取数窄接口（profile_sources），不拥有能力域，放行；
     3. 该能力域的 read 能力是空元组（公开）：放行；
-    4. 调用方所在域声明了它的 manage 能力：放行；
+    4. 调用方所在域声明了它的 read 或 manage 能力：放行；
     5. 其余报违规。
     """
     capability = capability_of_module(target)
@@ -314,13 +336,20 @@ def capability_verdict(domain, target, capabilities):
     if read_holders is not None and not read_holders:
         # 空元组 = 公开：任何身份（含未登录）都能读，谁 import 都不算越界。
         return False, ""
-    needed = capability + ".manage"
-    if needed in domain_capabilities(domain):
-        return False, ""
-    # read 不在表里或非空元组，都按「读不公开」处理：只能靠 manage 放行。
-    # 拼错能力名时 read 与 manage 双双缺席，没人能声明 manage，于是必然判越界，
+    # read 是受限元组或不在表里：调用方必须显式持有该域的 read 或 manage。
+    # 两条都认，因为「读别人的域」与「管别人的域」是两件事：teacher 域读学员
+    # 名册只需 student.read，不该为了读一份名册就把 student.manage 也给它。
+    # read 与 manage 双双缺席（例如拼错能力名）时没人声明得了，必然判越界，
     # 不会因为默认放行而开出一个暗门。
-    return True, "读 %s 的数据需要 %s，%s 没有持有它" % (capability, needed, domain.name)
+    declared = domain_capabilities(domain)
+    if capability + ".read" in declared or capability + ".manage" in declared:
+        return False, ""
+    # 没有「已登录就放行」这条兜底路。它会把结构性越界整个漏掉：任何登录域
+    # 都能读任何全角色域，等于没有边界（实测：给 auth 域加一句
+    # import db_domains.users 也会被放行）。域要读别人的数据，就显式声明
+    # @require_capability('<域>.read')，让边界写在代码里、让检查器有据可判。
+    return True, "读 %s 的数据需要 %s.read 或 %s.manage，%s 两个都没有持有" % (
+        capability, capability, capability, domain.name)
 
 
 def _declares_capability_constant(target):

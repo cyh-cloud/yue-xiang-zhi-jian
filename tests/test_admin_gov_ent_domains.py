@@ -21,12 +21,14 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import employment, reviews, users
+from db_domains import policies as policies_db
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class AdminGovEntTestBase(unittest.TestCase):
@@ -62,7 +64,7 @@ class AdminGovEntTestBase(unittest.TestCase):
 
 class _DbCleanupMixin(AdminGovEntTestBase):
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM job_applications WHERE user_id = 'student_demo'")
         conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
         conn.execute("DELETE FROM job_listings WHERE title LIKE '__T17%'")
@@ -115,7 +117,7 @@ class SuperAdminUserManagementTest(_DbCleanupMixin):
                             headers=self._headers(self.sessions['admin']))
         self.assertEqual(r.status_code, 200)
         ov = json.loads(r.data)['overview']
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             self.assertEqual(ov['users']['total'], conn.execute(
                 "SELECT COUNT(*) FROM users").fetchone()[0])
@@ -135,7 +137,7 @@ class SuperAdminUserManagementTest(_DbCleanupMixin):
                        {'name': 'T17改名', 'role': 'teacher', 'status': 'active'},
                        session_id=self.sessions['admin'])
         self.assertEqual(r.status_code, 200)
-        target = database.get_user_by_id('__t17user')
+        target = users.get_user_by_id('__t17user')
         self.assertEqual(target['name'], 'T17改名')
         self.assertEqual(target['role'], 'teacher')
 
@@ -151,14 +153,14 @@ class SuperAdminUserManagementTest(_DbCleanupMixin):
         body = json.loads(r.data)
         self.assertFalse(body['success'])
         self.assertIn('超级管理员', body['message'])
-        self.assertEqual(database.get_user_by_id('admin_demo')['role'], 'super_admin')
+        self.assertEqual(users.get_user_by_id('admin_demo')['role'], 'super_admin')
 
     def test_suspend_and_restore_account(self):
         self._create_user('__t17suspend')
         r = self._json('POST', '/api/admin/users/__t17suspend/status',
                        {'status': 'suspended'}, session_id=self.sessions['admin'])
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(database.get_user_by_id('__t17suspend')['status'], 'suspended')
+        self.assertEqual(users.get_user_by_id('__t17suspend')['status'], 'suspended')
         login = self.client.post('/api/auth/login', data=json.dumps(
             {'username': '__t17suspend', 'password': '123456'}),
             content_type='application/json')
@@ -167,7 +169,7 @@ class SuperAdminUserManagementTest(_DbCleanupMixin):
         r = self._json('POST', '/api/admin/users/__t17suspend/status',
                        {'status': 'active'}, session_id=self.sessions['admin'])
         self.assertEqual(r.status_code, 200)
-        self.assertEqual(database.get_user_by_id('__t17suspend')['status'], 'active')
+        self.assertEqual(users.get_user_by_id('__t17suspend')['status'], 'active')
 
     def test_cannot_suspend_self_or_use_bad_status(self):
         r = self._json('POST', '/api/admin/users/admin_demo/status',
@@ -201,7 +203,7 @@ class SuperAdminUserManagementTest(_DbCleanupMixin):
                                headers=self._headers(self.sessions['admin']))
         self.assertEqual(r.status_code, 200)
         self.assertTrue(json.loads(r.data)['success'])
-        self.assertIsNone(database.get_user_by_id('__t17delete'))
+        self.assertIsNone(users.get_user_by_id('__t17delete'))
 
 
 class SuperAdminReviewTest(_DbCleanupMixin):
@@ -218,7 +220,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
                        session_id=self.sessions['teacher'])
         self.assertEqual(r.status_code, 200, r.data)
         course_id = json.loads(r.data)['id']
-        return course_id, database.get_review_by_content('course', course_id)['id']
+        return course_id, reviews.get_review_by_content('course', course_id)['id']
 
     def _create_job_review(self):
         r = self._json('POST', '/api/enterprise/jobs',
@@ -227,10 +229,10 @@ class SuperAdminReviewTest(_DbCleanupMixin):
                        session_id=self.sessions['enterprise'])
         self.assertEqual(r.status_code, 200, r.data)
         job_id = json.loads(r.data)['id']
-        return job_id, database.get_review_by_content('job', job_id)['id']
+        return job_id, reviews.get_review_by_content('job', job_id)['id']
 
     def _create_model_3d_review(self):
-        conn = database.get_connection()
+        conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(
             "INSERT INTO models_3d (title, description, craft_type, file_path, "
@@ -241,8 +243,8 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         model_id = cursor.lastrowid
         conn.commit()
         conn.close()
-        database.create_content_review('model_3d', model_id, 'teacher_demo')
-        return model_id, database.get_review_by_content('model_3d', model_id)['id']
+        reviews.create_content_review('model_3d', model_id, 'teacher_demo')
+        return model_id, reviews.get_review_by_content('model_3d', model_id)['id']
 
     def test_reviews_list_shape_and_filters(self):
         r = self.client.get('/api/admin/reviews',
@@ -279,7 +281,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
             self.assertEqual(r.status_code, 200)
             self.assertTrue(json.loads(r.data)['success'])
 
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             self.assertEqual(conn.execute(
                 "SELECT is_published FROM courses WHERE id=?", (course_id,)
@@ -309,7 +311,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
                            {'comment': 'T17驳回理由'}, session_id=self.sessions['admin'])
             self.assertEqual(r.status_code, 200)
 
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             self.assertEqual(conn.execute(
                 "SELECT is_published FROM courses WHERE id=?", (course_id,)
@@ -325,7 +327,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         jobs = json.loads(self.client.get('/api/employment/jobs').data)['jobs']
         self.assertNotIn(job_id, [j['id'] for j in jobs])
 
-        review = database.get_review_by_content('job', job_id)
+        review = reviews.get_review_by_content('job', job_id)
         self.assertEqual(review['review_comment'], 'T17驳回理由')
         mine = json.loads(self._json(
             'GET', '/api/enterprise/jobs',
@@ -348,7 +350,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
                        session_id=self.sessions['admin'])
         self.assertEqual(r.status_code, 200)
 
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             row = conn.execute(
                 "SELECT review_status, is_published FROM courses WHERE id=?",
@@ -374,7 +376,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         _, pending_review = self._create_course_review()
         r = self._json('POST', '/api/admin/reviews/%d/revoke' % pending_review, {},
                        session_id=self.sessions['admin'])
-        # 现状：本就是 pending 时 database.revoke_review 返回 'unchanged'，它不在
+        # 现状：本就是 pending 时 reviews.revoke_review 返回 'unchanged'，它不在
         # 路由层的两个分支里，因此落回成功分支。这是拆分前的行为，本次只锁不改。
         self.assertEqual(r.status_code, 200)
         self.assertTrue(json.loads(r.data)['success'])
@@ -401,7 +403,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         cases = cases_data.get_cases()
         self.assertTrue(cases, 'cases_data 为空，无法验证案例审核门禁')
         case_id = cases[0]['id']
-        conn = database.get_connection()
+        conn = get_connection()
         # 记下原始状态，cleanup 按原样恢复（不是无条件全置 approved）：
         # 若某条内容原本有多条审核记录，无条件置 approved 会让同一个 content_id
         # 出现多条 approved，把 get_case_review_stats 的 approved 计数撑爆，
@@ -413,7 +415,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
                         "FROM content_reviews WHERE content_type='success_case'")}
         created_ids = []
         conn.close()
-        conn = database.get_connection()
+        conn = get_connection()
         # 预置案例默认已通过，先整体退回 pending，才能观察「过审后重新可见」。
         conn.execute(
             "UPDATE content_reviews SET status='pending', "
@@ -447,7 +449,7 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         并删掉测试期间新建的记录。无条件「全部置 approved」会让同一 content_id
         出现多条 approved，把 approved 计数撑爆（T17 合并后实测踩到过）。
         """
-        conn = database.get_connection()
+        conn = get_connection()
         for review_id in created_ids:
             conn.execute('DELETE FROM content_reviews WHERE id = ?', (review_id,))
         for review_id, state in original.items():
@@ -569,14 +571,14 @@ class GovernmentDomainTest(_DbCleanupMixin):
                        {'title': '__T17政策改__', 'is_published': 0, 'source': '新来源'},
                        session_id=self.sessions['gov'])
         self.assertEqual(r.status_code, 200)
-        row = database.get_policy_by_id(policy_id)
+        row = policies_db.get_policy_by_id(policy_id)
         self.assertEqual(row['title'], '__T17政策改__')
         self.assertEqual(row['is_published'], 0)
 
         r = self.client.delete('/api/government/policies/%d' % policy_id,
                                headers=self._headers(self.sessions['gov']))
         self.assertEqual(r.status_code, 200)
-        self.assertIsNone(database.get_policy_by_id(policy_id))
+        self.assertIsNone(policies_db.get_policy_by_id(policy_id))
 
     def test_policy_create_requires_title_and_content(self):
         for payload in ({'title': '', 'content': 'x'}, {'title': 'x', 'content': ''}):
@@ -664,7 +666,7 @@ class EnterpriseDomainTest(_DbCleanupMixin):
                        session_id=self.sessions['enterprise'])
         self.assertEqual(r.status_code, 200)
         self.assertIn('需重新审核', json.loads(r.data)['message'])
-        row = database.get_job_by_id(job_id)
+        row = employment.get_job_by_id(job_id)
         self.assertEqual(row['review_status'], 'pending')
         self.assertEqual(row['requirements'], ['会写字'])
 
@@ -705,7 +707,7 @@ class EnterpriseDomainTest(_DbCleanupMixin):
 
     def test_applications_join_resume_fields(self):
         job_id = self._create_job()
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (job_id,))
         conn.commit()
         conn.close()
@@ -732,14 +734,14 @@ class EnterpriseDomainTest(_DbCleanupMixin):
 
     def test_update_application_status(self):
         job_id = self._create_job()
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (job_id,))
         conn.commit()
         conn.close()
         self._json('POST', '/api/employment/apply',
                    {'user_id': 'student_demo', 'job_id': job_id},
                    session_id=self.sessions['student'])
-        conn = database.get_connection()
+        conn = get_connection()
         app_id = conn.execute(
             "SELECT id FROM job_applications WHERE job_id=?", (job_id,)).fetchone()[0]
         conn.close()
@@ -748,7 +750,7 @@ class EnterpriseDomainTest(_DbCleanupMixin):
                        {'status': 'interview'}, session_id=self.sessions['enterprise'])
         self.assertEqual(r.status_code, 200)
         self.assertIn('已通知面试', json.loads(r.data)['message'])
-        row = database.get_connection().execute(
+        row = get_connection().execute(
             "SELECT status FROM job_applications WHERE id=?", (app_id,)).fetchone()
         self.assertEqual(row[0], 'interview')
 
@@ -764,7 +766,7 @@ class EnterpriseDomainTest(_DbCleanupMixin):
         self.assertEqual(r.status_code, 200)
         stats = json.loads(r.data)['stats']
         self.assertEqual(set(stats), {'total_jobs', 'pending_jobs', 'total_applications'})
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             approved = conn.execute(
                 "SELECT COUNT(*) FROM job_listings WHERE enterprise_id='enterprise_demo' "
@@ -781,7 +783,7 @@ class EnterpriseDomainTest(_DbCleanupMixin):
         self.assertEqual(stats['pending_jobs'], pending)
         self.assertEqual(stats['total_applications'], apps)
 
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (job_id,))
         conn.commit()
         conn.close()

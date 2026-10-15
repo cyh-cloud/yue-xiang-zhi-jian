@@ -14,12 +14,12 @@ _BACKEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend
 if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
-import database
 from run import resolve_port  # noqa: E402
 
-database.init_db()
+db_init.init_db()
 
 from app import app
+import db_init  # noqa: E402
 
 if __name__ == '__main__':
     port, _source = resolve_port()

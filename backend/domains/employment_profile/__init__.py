@@ -17,7 +17,7 @@ AI 简历辅助。两者共用 `/api/employment/*` 前缀但分属不同领域�
 
 跨域边界：
 
-- 能力档案的五段数据一律走 `database.get_learner_profile()`（T05 已把它的取数拆成
+- 能力档案的五段数据一律走 `employment.get_learner_profile()`（T05 已把它的取数拆成
   各领域窄接口，本域只拼装、不读别人的表），每个字段都来自真实数据，不补默认值；
 - AI 调用走共享层 ai.client，且「上游是否已配置」按模块属性调用
   ai.client.ai_configured()：测试改写的是这个模块属性（开关的真正持有者），

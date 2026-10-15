@@ -6,7 +6,7 @@
 数据来源有两条，务必分清：
 
   · jobs         —— 企业端发布且**已通过审核**的岗位（可在站内申请 / 收藏）。
-                    审核过滤在 `database.get_job_listings_base()` 里，
+                    审核过滤在 `employment.get_job_listings_base()` 里，
                     学员端永远拿不到 `pending` 岗位（见该函数 docstring）；
   · recruitments —— 公开招聘（招募）公告，策展内容、不落库、**不做站内申请**，
                     卡片提供「查看公告」直达发布单位原文，事实源是
@@ -19,10 +19,10 @@
 
 from flask import Blueprint, jsonify, request
 
-import database
 from domain_data.employment import jobs_data
 from shared.options import category_option_list
 from shared.resume_state import user_has_resume
+from db_domains import certificates, employment, points
 
 employment_bp = Blueprint('employment', __name__)
 
@@ -36,7 +36,7 @@ def get_jobs():
       · recruitments —— 公开招聘（招募）公告（策展内容，不落库、**不做站内申请**，
                         卡片提供「查看公告」直达发布单位原文）
 
-    注意：jobs 侧的审核过滤在 `database.get_job_listings_base()` 里，
+    注意：jobs 侧的审核过滤在 `employment.get_job_listings_base()` 里，
     学员端永远拿不到 `pending` 岗位 —— 见该函数 docstring。
 
     另下发 `category_options`（两类各自的真实条数）+ `salary_filtered_out`：
@@ -50,7 +50,7 @@ def get_jobs():
 
     # 先取「不含分类过滤」的基础集，才能统计每个分类各多少条
     # （若先按分类过滤，统计永远只剩当前选中的那一项）。
-    jobs_base = database.get_job_listings_base(keyword, location, salary_range)
+    jobs_base = employment.get_job_listings_base(keyword, location, salary_range)
     ent_counts = {}
     for j in jobs_base:
         c = (j.get('category') or '').strip() or '未分类'
@@ -85,20 +85,20 @@ def get_jobs():
         "recruit_disclaimer": notes['disclaimer'],
         # 分类下拉：两组各自真实的条数（口径 = 已应用 关键词/地点/薪资，未应用分类）
         "category_options": {
-            "enterprise": category_option_list(ent_counts, database.ENTERPRISE_JOB_CATEGORIES),
+            "enterprise": category_option_list(ent_counts, employment.ENTERPRISE_JOB_CATEGORIES),
             "recruit": category_option_list(rec_counts, jobs_data.CATEGORY_LIST),
         },
         # 薪资筛选对公告不生效，被隐藏的公告条数 —— 前端据此给出明确说明
         "recruit_hidden_by_salary": len(rec_pool) if salary_range else 0,
         # 尚未过审的企业岗位条数。企业发布的岗位要经管理员审核才露出，
         # 若此刻一条都没通过，学员端应说明「岗位审核中」而不是「没有岗位」。
-        "enterprise_review_pending": database.count_pending_job_listings(),
+        "enterprise_review_pending": employment.count_pending_job_listings(),
     })
 
 
 @employment_bp.route('/api/employment/jobs/<int:job_id>', methods=['GET'])
 def get_job_detail(job_id):
-    job = database.get_job_by_id(job_id)
+    job = employment.get_job_by_id(job_id)
     # 未通过审核的岗位对学员端等同「不存在」——
     # 否则随便猜个 id 就能看到 pending 岗位，审核门禁被直链绕过。
     if not job or (job.get('review_status') or '') != 'approved':
@@ -108,22 +108,22 @@ def get_job_detail(job_id):
 
 @employment_bp.route('/api/employment/jobs/<int:job_id>/similar', methods=['GET'])
 def get_similar_jobs(job_id):
-    job = database.get_job_by_id(job_id)
+    job = employment.get_job_by_id(job_id)
     if not job or (job.get('review_status') or '') != 'approved':
         return jsonify({"success": True, "jobs": []})
-    similar = database.get_similar_jobs(job_id, job.get('category', ''), 3)
+    similar = employment.get_similar_jobs(job_id, job.get('category', ''), 3)
     return jsonify({"success": True, "jobs": similar})
 
 
 @employment_bp.route('/api/employment/certificates/<user_id>', methods=['GET'])
 def get_certificates(user_id):
-    certs = database.get_certificates(user_id)
+    certs = certificates.get_certificates(user_id)
     return jsonify({"success": True, "certificates": certs})
 
 
 @employment_bp.route('/api/employment/points/<user_id>', methods=['GET'])
 def get_points(user_id):
-    pts = database.get_points(user_id)
+    pts = points.get_points(user_id)
     return jsonify({"success": True, "points": pts['balance'], "history": pts['history']})
 
 
@@ -134,7 +134,7 @@ def exchange_points():
     item = data.get('item', '商品')
     cost = data.get('cost', 0)
 
-    new_balance = database.update_points(user_id, -cost, f"兑换{item}")
+    new_balance = points.update_points(user_id, -cost, f"兑换{item}")
     if new_balance == -1:
         return jsonify({"success": False, "message": "积分不足"})
     return jsonify({"success": True, "message": f"成功兑换：{item}", "remaining_points": new_balance})
@@ -150,10 +150,10 @@ def apply_job():
     if not user_id or not job_id:
         return jsonify({"success": False, "message": "参数不完整"})
 
-    result = database.apply_for_job(user_id, job_id)
+    result = employment.apply_for_job(user_id, job_id)
     if result == 'ok':
         # 申请成功加积分
-        database.update_points(user_id, 20, "申请职位奖励")
+        points.update_points(user_id, 20, "申请职位奖励")
         return jsonify({"success": True, "message": "申请成功！已获得20积分奖励",
                         # 前端据此在提示里补一句「你还没有填写简历」——
                         # 否则学员以为简历已经随申请投出去了（2026-10-07）。
@@ -168,13 +168,13 @@ def apply_job():
 @employment_bp.route('/api/employment/applications/<user_id>', methods=['GET'])
 def get_user_applications(user_id):
     status_filter = request.args.get('status', '')
-    apps = database.get_user_applications(user_id, status_filter)
+    apps = employment.get_user_applications(user_id, status_filter)
     return jsonify({"success": True, "applications": apps})
 
 
 @employment_bp.route('/api/employment/applications/<user_id>/counts', methods=['GET'])
 def get_application_counts(user_id):
-    counts = database.get_application_counts(user_id)
+    counts = employment.get_application_counts(user_id)
     return jsonify({"success": True, "counts": counts})
 
 
@@ -185,7 +185,7 @@ def save_job():
     job_id = data.get('job_id')
     if not user_id or not job_id:
         return jsonify({"success": False, "message": "参数不完整"})
-    success = database.save_job(user_id, job_id)
+    success = employment.save_job(user_id, job_id)
     if success:
         return jsonify({"success": True, "message": "收藏成功"})
     return jsonify({"success": False, "message": "已收藏过该职位"})
@@ -198,17 +198,17 @@ def unsave_job():
     job_id = data.get('job_id')
     if not user_id or not job_id:
         return jsonify({"success": False, "message": "参数不完整"})
-    database.unsave_job(user_id, job_id)
+    employment.unsave_job(user_id, job_id)
     return jsonify({"success": True, "message": "已取消收藏"})
 
 
 @employment_bp.route('/api/employment/saved/<user_id>', methods=['GET'])
 def get_saved_jobs(user_id):
-    saved_ids = database.get_saved_jobs(user_id)
+    saved_ids = employment.get_saved_jobs(user_id)
     return jsonify({"success": True, "saved_ids": saved_ids})
 
 
 @employment_bp.route('/api/employment/stats/<user_id>', methods=['GET'])
 def get_employment_stats(user_id):
-    stats = database.get_employment_stats(user_id)
+    stats = employment.get_employment_stats(user_id)
     return jsonify({"success": True, "stats": stats})

@@ -30,7 +30,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import core.session as session  # noqa: E402
-import database  # noqa: E402
+from db_connection import get_connection
 
 
 class EcommerceDomainTestBase(unittest.TestCase):
@@ -60,7 +60,7 @@ class EcommerceDomainTestBase(unittest.TestCase):
         return json.loads(response.data)['session_id']
 
     def _cleanup_sessions(self, sid):
-        conn = database.get_connection()
+        conn = get_connection()
         if sid:
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
         conn.commit()

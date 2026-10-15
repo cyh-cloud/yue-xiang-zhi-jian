@@ -17,15 +17,19 @@ P1-3：Hero 三个统计数字原为硬编码假数据（12000/86/3500），违�
 """
 
 from flask import Blueprint, jsonify, request
+from db_connection import get_connection
+from db_domains import announcements, courses as courses_db
 
-import database
+
+# 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
+CAPABILITIES_USED = ('course.read',)
 
 public_bp = Blueprint('public', __name__)
 
 
 @public_bp.route('/api/home/stats', methods=['GET'])
 def public_home_stats():
-    conn = database.get_connection()
+    conn = get_connection()
     try:
         farmers = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
         courses = conn.execute("SELECT COUNT(*) FROM courses").fetchone()[0]
@@ -44,29 +48,29 @@ def public_home_stats():
 
 @public_bp.route('/api/system-announcements', methods=['GET'])
 def public_get_system_announcements():
-    anns = database.get_system_announcements(active_only=True)
+    anns = announcements.get_system_announcements(active_only=True)
     return jsonify({"success": True, "announcements": anns})
 
 
 @public_bp.route('/api/teacher/public-courses', methods=['GET'])
 def public_get_courses():
-    courses = database.get_courses(published_only=True)
+    courses = courses_db.get_courses(published_only=True)
     return jsonify({"success": True, "courses": courses})
 
 
 @public_bp.route('/api/teacher/public-courses/<int:course_id>', methods=['GET'])
 def public_get_course_detail(course_id):
-    course = database.get_course(course_id)
+    course = courses_db.get_course(course_id)
     if not course:
         return jsonify({"success": False, "message": "课程不存在"}), 404
-    materials = database.get_course_materials(course_id)
+    materials = courses_db.get_course_materials(course_id)
     return jsonify({"success": True, "course": course, "materials": materials})
 
 
 @public_bp.route('/api/teacher/public-models-3d', methods=['GET'])
 def public_get_models_3d():
     craft_type = request.args.get('craft_type', '')
-    models = database.get_models_3d(published_only=True)
+    models = courses_db.get_models_3d(published_only=True)
     if craft_type:
         models = [m for m in models if m.get('craft_type') == craft_type]
     return jsonify({"success": True, "models": models})

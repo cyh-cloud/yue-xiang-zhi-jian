@@ -12,9 +12,9 @@
 import logging
 import threading
 
-import database
 
 from shared.agri_dosage import CHEM_DOSE_NOTICE, CHEM_DOSE_NOTICE_BLOCK
+from db_domains import farming
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +123,7 @@ def _agriculture_product_name(product):
 
     name = ''
     try:
-        row = database.get_farming_product(product)
+        row = farming.get_farming_product(product)
         if row and row.get('name'):
             name = str(row['name']).strip()
     except Exception as e:

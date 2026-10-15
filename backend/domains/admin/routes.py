@@ -8,7 +8,7 @@
 1. 角色把关走能力表（core.permissions.require_capability），未登录与能力不符都回 403，
    与拆分前逐字一致。四个能力：user.manage / review.moderate /
    announcement.manage / community.manage。
-2. 审核状态变更只调 database.approve_review / reject_review / revoke_review，
+2. 审核状态变更只调 reviews.approve_review / reject_review / revoke_review，
    由 db_domains.reviews.set_review_status 按内容类型分派回写各领域表，
    路由层不直接写任何领域表。
 3. 数据访问一律走 database 契约层。
@@ -18,8 +18,14 @@ from flask import Blueprint, jsonify, request
 
 from core.permissions import require_capability
 from core.session import get_session_user
+from db_connection import get_connection
+from db_domains import announcements, community, courses, employment
+from db_domains import users as users_db
+from db_domains import reviews as reviews_db
 
-import database
+
+# 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
+CAPABILITIES_USED = ('user.read', 'review.read', 'course.read')
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -38,7 +44,7 @@ def admin_dashboard():
     user = get_session_user()
     # 鉴权由 @require_capability('review.moderate') 承担；这里仍取一次会话用户，
     # 是为了让「谁在看仪表盘」在后续埋点或审计里有据可查（当前仅用于 cases 计数兜底）。
-    ov = database.get_admin_overview()
+    ov = users_db.get_admin_overview()
     try:
         from domain_data.resources import cases_data
         ov['content']['cases'] = len(cases_data.get_cases())
@@ -54,17 +60,17 @@ def admin_get_users():
     user = get_session_user()
     search = request.args.get('search', '')
     role_filter = request.args.get('role', '')
-    users = database.get_all_users(search=search or None, role=role_filter or None)
+    users = users_db.get_all_users(search=search or None, role=role_filter or None)
 
     # 逐条算出「能不能删」。
     # ⚠️ 规则只放后端 —— 前端照 can_delete 渲染，不再自己判断，
     #    否则「界面藏了按钮、接口照样能删」等于没拦。
     me = user['username']
-    super_admin_count = database.count_super_admins()
+    super_admin_count = users_db.count_super_admins()
     for u in users:
         # password_hash 绝不下发给前端（它是 SELECT * 带出来的）
         u.pop('password_hash', None)
-        rel = database.count_user_relations(u['username'])
+        rel = users_db.count_user_relations(u['username'])
         u['relation_count'] = rel['total']
         u['relations'] = rel['items']
         if u['username'] == me:
@@ -89,7 +95,7 @@ def admin_get_users():
 def admin_update_user(user_id):
     user = get_session_user()
     data = request.get_json(silent=True) or {}
-    target = database.get_user_by_id(user_id)
+    target = users_db.get_user_by_id(user_id)
     if not target:
         return jsonify({"success": False, "message": "用户不存在"}), 404
 
@@ -102,12 +108,12 @@ def admin_update_user(user_id):
     new_role = data.get('role')
     if (new_role is not None and new_role != 'super_admin'
             and target.get('role') == 'super_admin'
-            and database.count_super_admins() <= 1):
+            and users_db.count_super_admins() <= 1):
         return jsonify({
             "success": False,
             "message": "系统必须保留至少一个超级管理员，不能把最后一个超级管理员改成其他角色"}), 400
 
-    ok = database.update_user_by_admin(user_id,
+    ok = users_db.update_user_by_admin(user_id,
         name=data.get('name'), role=new_role, status=data.get('status'),
         phone=data.get('phone'), email=data.get('email'))
     if not ok:
@@ -131,7 +137,7 @@ def admin_set_user_status(user_id):
     status = data.get('status', '')
     if status not in ('active', 'suspended'):
         return jsonify({"success": False, "message": "状态只能是 active 或 suspended"}), 400
-    n = database.set_user_status(user_id, status)
+    n = users_db.set_user_status(user_id, status)
     if n <= 0:
         return jsonify({"success": False, "message": "用户不存在"}), 404
     return jsonify({"success": True,
@@ -153,14 +159,14 @@ def admin_delete_user(user_id):
     if user_id == user['username']:
         return jsonify({"success": False, "message": "不能删除当前登录的账号"}), 400
 
-    target = database.get_user_by_id(user_id)
+    target = users_db.get_user_by_id(user_id)
     if not target:
         return jsonify({"success": False, "message": "用户不存在"}), 404
 
-    if target.get('role') == 'super_admin' and database.count_super_admins() <= 1:
+    if target.get('role') == 'super_admin' and users_db.count_super_admins() <= 1:
         return jsonify({"success": False, "message": "系统必须保留至少一个超级管理员"}), 400
 
-    rel = database.count_user_relations(user_id)
+    rel = users_db.count_user_relations(user_id)
     if rel['total'] > 0:
         return jsonify({
             "success": False,
@@ -169,7 +175,7 @@ def admin_delete_user(user_id):
             "relation_total": rel['total'],
         }), 409
 
-    n = database.delete_user_by_admin(user_id)
+    n = users_db.delete_user_by_admin(user_id)
     if n <= 0:
         return jsonify({"success": False, "message": "用户不存在"}), 404
     return jsonify({"success": True, "message": "删除成功"})
@@ -193,7 +199,7 @@ def admin_get_reviews():
     sort = request.args.get('sort', '') or 'modified'
     if sort not in ('modified', 'created'):
         sort = 'modified'
-    reviews = database.get_reviews_by_status(None if status == 'all' else status, ct, sort)
+    reviews = reviews_db.get_reviews_by_status(None if status == 'all' else status, ct, sort)
 
     # 关联审核内容详情
     enriched = []
@@ -207,11 +213,11 @@ def admin_get_reviews():
             # 「看不到内容、界面也没有处理入口」的孤儿卡片。
             continue
         if ctype == 'course':
-            rd['detail'] = database.get_course(cid)
+            rd['detail'] = courses.get_course(cid)
         elif ctype == 'job':
-            rd['detail'] = database.get_job_by_id(cid)
+            rd['detail'] = employment.get_job_by_id(cid)
         elif ctype == 'model_3d':
-            conn = database.get_connection()
+            conn = get_connection()
             row = conn.execute("SELECT * FROM models_3d WHERE id=?", (cid,)).fetchone()
             conn.close()
             rd['detail'] = dict(row) if row else None
@@ -226,7 +232,7 @@ def admin_get_reviews():
         rd['is_self_reviewed'] = bool(r.get('submitter_id') and r.get('reviewed_by')
                                       and r['submitter_id'] == r['reviewed_by'])
         enriched.append(rd)
-    counts = database.count_reviews_by_status(ct)
+    counts = reviews_db.count_reviews_by_status(ct)
     return jsonify({"success": True, "reviews": enriched, "counts": counts, "status": status})
 
 
@@ -234,7 +240,7 @@ def admin_get_reviews():
 @require_capability('review.moderate')
 def admin_approve_review(review_id):
     user = get_session_user()
-    database.approve_review(review_id, user['username'])
+    reviews_db.approve_review(review_id, user['username'])
     return jsonify({"success": True, "message": "已审核通过"})
 
 
@@ -244,7 +250,7 @@ def admin_reject_review(review_id):
     user = get_session_user()
     data = request.get_json()
     comment = data.get('comment', '')
-    database.reject_review(review_id, user['username'], comment)
+    reviews_db.reject_review(review_id, user['username'], comment)
     return jsonify({"success": True, "message": "已驳回"})
 
 
@@ -260,7 +266,7 @@ def admin_revoke_review(review_id):
     user = get_session_user()
     # revoke_review 不接收操作者，这里取会话用户仅为保持与 approve / reject
     # 一致的形状，后续补审计日志时不必再改函数签名。
-    result = database.revoke_review(review_id)
+    result = reviews_db.revoke_review(review_id)
     if result == 'not_found':
         return jsonify({"success": False, "message": "审核记录不存在"}), 404
     if result == 'not_reviewed':
@@ -274,7 +280,7 @@ def admin_revoke_review(review_id):
 @require_capability('announcement.manage')
 def admin_get_system_announcements():
     user = get_session_user()
-    anns = database.get_system_announcements(active_only=False)
+    anns = announcements.get_system_announcements(active_only=False)
     return jsonify({"success": True, "announcements": anns})
 
 
@@ -283,7 +289,7 @@ def admin_get_system_announcements():
 def admin_add_system_announcement():
     user = get_session_user()
     data = request.get_json()
-    ann_id = database.add_system_announcement(
+    ann_id = announcements.add_system_announcement(
         data.get('title', ''), data.get('content', ''),
         data.get('is_pinned', 0), user['username'])
     return jsonify({"success": True, "id": ann_id, "message": "发布成功"})
@@ -293,7 +299,7 @@ def admin_add_system_announcement():
 @require_capability('announcement.manage')
 def admin_delete_system_announcement(ann_id):
     user = get_session_user()
-    database.delete_system_announcement(ann_id)
+    announcements.delete_system_announcement(ann_id)
     return jsonify({"success": True, "message": "已删除"})
 
 
@@ -303,7 +309,7 @@ def admin_delete_system_announcement(ann_id):
 @require_capability('community.manage')
 def admin_delete_comment(comment_id):
     user = get_session_user()
-    database.soft_delete_comment(comment_id, user['username'])
+    community.soft_delete_comment(comment_id, user['username'])
     return jsonify({"success": True, "message": "已删除违规评论"})
 
 
@@ -311,5 +317,5 @@ def admin_delete_comment(comment_id):
 @require_capability('community.manage')
 def admin_delete_discussion(disc_id):
     user = get_session_user()
-    database.soft_delete_discussion(disc_id)
+    community.soft_delete_discussion(disc_id)
     return jsonify({"success": True, "message": "已删除违规帖子"})

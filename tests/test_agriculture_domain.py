@@ -14,12 +14,13 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import farming
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class AgricultureDomainTestBase(unittest.TestCase):
@@ -34,7 +35,7 @@ class AgricultureDomainTestBase(unittest.TestCase):
         return json.loads(response.data)['session_id']
 
     def _cleanup_sessions(self, sid):
-        conn = database.get_connection()
+        conn = get_connection()
         if sid:
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
         conn.commit()
@@ -56,12 +57,12 @@ class ProductCatalogTest(AgricultureDomainTestBase):
 
     def test_products_falls_back_to_the_builtin_catalog_when_table_is_empty(self):
         """表读空时回退硬编码目录：六种作物的 id/name/icon/desc 与拆分前逐字一致。"""
-        original = database.get_farming_products
+        original = farming.get_farming_products
         try:
-            database.get_farming_products = lambda: []
+            farming.get_farming_products = lambda: []
             response = self.client.get('/api/agriculture/products')
         finally:
-            database.get_farming_products = original
+            farming.get_farming_products = original
         self.assertEqual(response.status_code, 200)
         body = json.loads(response.data)
         self.assertTrue(body['success'])
@@ -74,16 +75,16 @@ class ProductCatalogTest(AgricultureDomainTestBase):
 
     def test_products_survives_a_database_failure(self):
         """读表异常时同样回退内置目录，不外抛 500。"""
-        original = database.get_farming_products
+        original = farming.get_farming_products
 
         def boom():
             raise RuntimeError('database down')
 
         try:
-            database.get_farming_products = boom
+            farming.get_farming_products = boom
             response = self.client.get('/api/agriculture/products')
         finally:
-            database.get_farming_products = original
+            farming.get_farming_products = original
         self.assertEqual(response.status_code, 200)
         body = json.loads(response.data)
         self.assertTrue(body['success'])
@@ -153,7 +154,7 @@ class FarmingCalendarTest(AgricultureDomainTestBase):
     def test_calendar_deactivated_product_is_404(self):
         """停用作物不可订阅也不可看日历，否则订阅后点进通知是 404。"""
         pid = 't10_inactive_crop'
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute(
                 "INSERT OR REPLACE INTO farming_products (id, name, summary, icon, is_active, sort_order) "
@@ -177,7 +178,7 @@ class SubscriptionTest(AgricultureDomainTestBase):
         return next(p['id'] for p in products if p.get('is_active', 1) != 0)
 
     def _drop_subscription(self, username, pid):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM farming_subscriptions WHERE user_id = ? AND product_id = ?",
                      (username, pid))
         conn.execute("DELETE FROM farming_reminder_log WHERE user_id = ? AND product_id = ?",
@@ -279,7 +280,7 @@ class SubscriptionTest(AgricultureDomainTestBase):
         """停用作物不可订阅（与日历接口同一口径）。"""
         pid = 't10_inactive_crop'
         sid = self._login()
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute(
                 "INSERT OR REPLACE INTO farming_products (id, name, summary, icon, is_active, sort_order) "
@@ -341,7 +342,7 @@ class ReminderCheckTest(AgricultureDomainTestBase):
     """到期提醒：登录补发，幂等按「用户 + 作物 + 月份」记日志。"""
 
     def _drop_subscription(self, username, pid):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM farming_subscriptions WHERE user_id = ? AND product_id = ?",
                      (username, pid))
         conn.execute("DELETE FROM farming_reminder_log WHERE user_id = ? AND product_id = ?",

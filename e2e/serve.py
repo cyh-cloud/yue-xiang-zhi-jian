@@ -18,9 +18,10 @@ for suffix in ("", "-wal", "-shm", "-journal"):
     if candidate.exists():
         candidate.unlink()
 
-import database  # noqa: E402
 
-database.init_db()
+import db_init  # noqa: E402
+
+db_init.init_db()
 
 from app import app  # noqa: E402
 
