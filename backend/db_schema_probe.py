@@ -285,10 +285,11 @@ def probe_view_columns():
     print(json.dumps(out))
 
 
-def probe_upgrade(db_path):
+def probe_upgrade():
     """在现库副本上跑 apply_schema()，逐表比升级前后的行数。
 
     副本由调用方（测试）准备好，本探针只负责跑升级与比对，不自己拷文件。
+    库路径只从 YUEXIANG_DB 读，不接受命令行参数，避免「传了路径却被忽略」。
     """
     # 用数据层唯一的连接工厂读副本（本文件不得出现第二个 sqlite3.connect，
     # 那条约束由 test_db_infrastructure.py 机械检查）。
@@ -329,7 +330,7 @@ PROBES = {
     'views_selectable': probe_views_selectable,
     'view_equivalence': probe_view_equivalence,
     'view_columns': probe_view_columns,
-    'upgrade': lambda: probe_upgrade(sys.argv[2]),
+    'upgrade': probe_upgrade,
 }
 
 

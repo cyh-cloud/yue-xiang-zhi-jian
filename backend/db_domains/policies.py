@@ -8,9 +8,9 @@ T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分�
 from datetime import datetime
 from db_connection import get_connection
 
-# 本模块的数据归属这个能力域。机械检查（tools/check_architecture.py）与
-# backend/core/permissions.py 的 CAPABILITIES 都以此为准：谁 import 本模块，
-# 谁就必须持 ${cap}.manage（读操作受 ${cap}.read 管）。
+# 本模块的数据归属这个能力域。backend/core/permissions.py 的 CAPABILITIES
+# 与 tools/check_architecture.py（T02 起按能力表判权）都以此为准：谁 import
+# 本模块，谁就必须持 policy.manage（读操作受 policy.read 管）。
 CAPABILITY = 'policy'
 
 # 预置政策的标题白名单与政策来源辅助，与播种同住政策域

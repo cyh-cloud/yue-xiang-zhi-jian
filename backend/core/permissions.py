@@ -96,11 +96,6 @@ def is_student(role):
     return role == STUDENT
 
 
-def roles_with(capability):
-    """持有该能力的角色集合，供展示与测试用（不是判权入口，判权一律走 can）。"""
-    return frozenset(CAPABILITIES.get(capability, ()))
-
-
 def require_capability(capability, anonymous=403):
     """能力鉴权装饰器：当前用户不持有 capability 时拒之门外。
 
@@ -136,5 +131,5 @@ def require_capability(capability, anonymous=403):
 
 __all__ = [
     'ROLES', 'STUDENT', 'TEACHER', 'CAPABILITIES', 'can', 'is_student',
-    'require_capability', 'roles_with',
+    'require_capability',
 ]

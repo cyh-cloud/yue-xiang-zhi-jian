@@ -36,6 +36,7 @@ if REPO_ROOT not in sys.path:
 
 import db_connection  # noqa: E402
 import repo_paths  # noqa: E402
+from test_db_schema import EXPECTED_TABLES  # noqa: E402
 
 PROBE = os.path.join(REPO_ROOT, 'db_infrastructure_probe.py')
 
@@ -50,28 +51,6 @@ SEED_MODULES = tuple(sorted(
 INFRA_MODULES = ('db_connection.py', 'db_schema.py', 'db_credentials.py',
                  'db_schema_probe.py') + SEED_MODULES
 DATA_LAYER_MODULES = ('database.py',) + INFRA_MODULES
-
-# init_db() 建出的全部表。新增表时同步更新这里，让「漏建表」在单测里就炸。
-# 内容落库（T04）后多出 21 张：farming_categories、pest_* 六张、recruitments 与
-# recruitment_sources、success_cases 与 case_* 四张、dialect* 三张、craft* 五张。
-# 完整清单与「为什么 pest_entries 是新建而非补列」见 test_db_schema.py。
-EXPECTED_TABLES = {
-    'announcements', 'assignment_submissions', 'assignments', 'carousels',
-    'case_lessons', 'case_milestones', 'case_sources', 'case_stats',
-    'certificates', 'comments', 'content_reviews', 'course_materials', 'courses',
-    'craft_budgets', 'craft_purchase_categories', 'craft_purchase_items',
-    'craft_steps', 'crafts', 'dialect_phrases', 'dialect_quick_questions',
-    'dialects', 'discussions', 'farming_categories', 'farming_phenophases',
-    'farming_products', 'farming_reminder_log', 'farming_seed_meta',
-    'farming_sources', 'farming_subscriptions', 'farming_tasks',
-    'government_policies', 'job_applications', 'job_intents', 'job_listings',
-    'messages', 'models_3d', 'news_articles', 'notification_reads',
-    'notifications', 'pest_crops', 'pest_entries', 'pest_entry_sources',
-    'pest_images', 'pest_sources', 'points', 'policies', 'procurements',
-    'recruitment_sources', 'recruitments', 'resumes', 'saved_jobs', 'seed_meta',
-    'students', 'success_cases', 'system_announcements', 'user_sessions', 'users',
-}
-
 
 def read_module(name):
     with io.open(os.path.join(REPO_ROOT, name), encoding='utf-8') as handle:

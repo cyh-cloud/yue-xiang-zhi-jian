@@ -208,7 +208,7 @@ class TableInventoryTest(IsolatedDatabaseTest):
     def test_table_count_matches_the_spec(self):
         """spec 4.4 写作「36 -> 56」，实测是 57，差异在 pest_entries。
 
-        spec 把 pest_entries 算作「已存在，改为补列」，但现库里并没有这张表 ——
+        spec 把 pest_entries 算作「已存在，改为补列」，但现库里并没有这张表，
         病虫害内容此前只活在 domain_data 里，从未落库。所以它是新建而非补列，
         36 + 21 = 57。这里断言真实建出的表数，让文档与库的差异显式可见。
         """
@@ -294,7 +294,7 @@ class ExistingDatabaseUpgradeTest(unittest.TestCase):
         env['YUEXIANG_DB'] = copy
         env['PYTHONIOENCODING'] = 'utf-8'
         env['PYTHONUTF8'] = '1'
-        result = subprocess.run([sys.executable, PROBE, 'upgrade', copy],
+        result = subprocess.run([sys.executable, PROBE, 'upgrade'],
                                 cwd=REPO_ROOT, env=env, capture_output=True)
         self.assertEqual(result.returncode, 0,
                          '升级探针失败：\n%s\n%s' % (

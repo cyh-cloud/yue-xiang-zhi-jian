@@ -423,6 +423,10 @@ SCHEMA_SQL = """
             --   0 = 按农时规律推算的参考日期（前端显示「约」并挂全局提示条）
             --   1 = 已人工复核，可视作权威日期
             is_verified INTEGER DEFAULT 0,
+            -- verified_by / verified_at：谁在何时复核的。is_verified 只记结果，
+            -- 这两列让它可追溯、可按时间筛出该重新核的条目（见 apply_schema 的补列段）。
+            verified_by TEXT NOT NULL DEFAULT '',
+            verified_at TEXT NOT NULL DEFAULT '',
             is_active   INTEGER DEFAULT 1,
             sort_order  INTEGER DEFAULT 0,
             extra TEXT NOT NULL DEFAULT '{}',
@@ -807,7 +811,7 @@ SCHEMA_SQL = """
 """
 
 # 本模块建表语句覆盖的全部表名。存在的唯一理由：让下面的「清理废弃表」
-# 不会误删刚刚才建出来的表。success_cases 就这样被误删过 —— 内容落库
+# 不会误删刚刚才建出来的表。success_cases 就这样被误删过：内容落库
 # （ADR 0002）把它从「已废弃」翻回正式表，database.py 里那条 DROP 却照旧执行，
 # 每次 init_db() 都把它连同灌进去的内容一起删掉。真相只有一份，故在这里比对。
 SCHEMA_TABLES = frozenset(re.findall(r"CREATE TABLE IF NOT EXISTS (\w+)", SCHEMA_SQL))

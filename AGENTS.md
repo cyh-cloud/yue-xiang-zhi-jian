@@ -22,7 +22,7 @@
 
 ## 后端结构
 
-后端代码全部在 `backend/` 下，前端文件与 `data/`、`uploads/`、`.env`、`requirements.txt` 留在仓库根。一个领域一个蓝图，领域之间不互相 import，共享层不感知任何具体领域。改后端前先读 `docs/adr/0001-backend-domain-split.md`（边界与裁决），再看 `GLOSSARY.md` 的「后端结构」一节（术语）。
+后端代码全部在 `backend/` 下，前端文件与 `data/`、`uploads/`、`.env`、`requirements.txt` 留在仓库根。一个领域一个蓝图，共享层不感知任何具体领域。领域之间的数据访问按权限判定，不再以「不得 import」一禁了之（ADR 0002 修订了 ADR 0001 的这条）。改后端前先读 `docs/adr/0001-backend-domain-split.md`（边界与裁决）与 `docs/adr/0002-content-into-database.md`（内容落库），再看 `GLOSSARY.md` 的「后端结构」一节（术语）。
 
 - `backend/app.py`：入口。创建应用 + 健康检查探针 + 启动。业务路由不在这里。
 - `backend/core/`：应用工厂、会话与角色鉴权、限流、统一错误响应。
@@ -30,9 +30,9 @@
 - `backend/shared/`：零领域状态的纯函数与纯配置（节气、朗读评分、文案评分、作物白名单、实训状态标签等）。
 - `backend/db_domains/`：按领域切分的数据访问层，一个领域一个模块。
 - `backend/db_connection.py` / `db_schema.py` / `db_seed_*.py`：数据层基础设施与播种。
-- `backend/domain_data/`：按领域归置的内容数据模块（不落库、import 即用）。
 - `backend/domains/`：领域路由蓝图，一个领域一个目录。
-- `backend/database.py`：对外的数据层契约层，`import database` + `database.xxx()` 的调用面保持不变。
+- `backend/core/permissions.py`：全站唯一的「角色到能力」映射，路由鉴权走它，不写角色名比较。
+- `backend/database.py`：数据层的转发与聚合面，正在按域拆散（ADR 0002），新代码直接 `from db_domains import <域>`。
 - `backend/repo_paths.py`：路径唯一基准，`REPO_ROOT` 指向**仓库根**（不是 backend/），因为 `data/`、`uploads/`、`.env` 都在仓库根。
 
 新增可审核内容类型、新增领域、或需要跨领域取数时，先读 ADR 0001 的裁决，不要凭空发明放法。

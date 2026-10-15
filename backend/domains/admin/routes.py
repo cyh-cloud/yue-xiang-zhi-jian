@@ -28,7 +28,6 @@ admin_bp = Blueprint('admin', __name__)
 @require_capability('review.moderate')
 def admin_dashboard():
     """超级管理员仪表盘统计。
-    user = get_session_user()
 
     ⚠️ 前端此前调的是 `/api/government/dashboard`（只允许 government）→ super_admin
        恒 403，统计区长期空白。这里给 admin 自己的口径。
@@ -37,6 +36,8 @@ def admin_dashboard():
         成功案例正文不落库，条数从 domain_data.resources.cases_data 取（与审核详情同一来源）。
     """
     user = get_session_user()
+    # 鉴权由 @require_capability('review.moderate') 承担；这里仍取一次会话用户，
+    # 是为了让「谁在看仪表盘」在后续埋点或审计里有据可查（当前仅用于 cases 计数兜底）。
     ov = database.get_admin_overview()
     try:
         from domain_data.resources import cases_data
@@ -118,7 +119,6 @@ def admin_update_user(user_id):
 @require_capability('user.manage')
 def admin_set_user_status(user_id):
     """启用 / 停用账号 —— **删除的替代方案**（2026-10-08）。
-    user = get_session_user()
 
     删用户会留下跨表孤儿（students.user_id 是名册收件人与证书归属的唯一依据），
     所以凡是有业务数据的账号一律走「停用」：登录接口本来就认 status='suspended'，
@@ -142,7 +142,6 @@ def admin_set_user_status(user_id):
 @require_capability('user.manage')
 def admin_delete_user(user_id):
     """删除用户。四道关依次拦：自删 / 末位超管 / 关联数据 / 不存在。
-    user = get_session_user()
 
     ⚠️ 2026-10-08 之前本路由无条件返回 200「删除成功」——删一个不存在的人
        也照样报成功，且能把自己删掉（删完全站再无 super_admin，会话立即失效、
@@ -253,13 +252,14 @@ def admin_reject_review(review_id):
 @require_capability('review.moderate')
 def admin_revoke_review(review_id):
     """撤销审核：把已通过 / 已驳回的记录退回「待审核」，可重新处理。
-    user = get_session_user()
 
     2026-10-08 新增（管理端「内容审核」要能回看并纠正历史）。
     与 approve / reject 走同一套对称回写规则，目标表的 review_status 一并退回
     pending，不会出现「审核表已撤销、岗位却还挂着 approved」的不一致。
     """
     user = get_session_user()
+    # revoke_review 不接收操作者，这里取会话用户仅为保持与 approve / reject
+    # 一致的形状，后续补审计日志时不必再改函数签名。
     result = database.revoke_review(review_id)
     if result == 'not_found':
         return jsonify({"success": False, "message": "审核记录不存在"}), 404

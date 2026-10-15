@@ -9,9 +9,9 @@ import json
 from datetime import datetime
 from db_connection import get_connection
 
-# 本模块的数据归属这个能力域。机械检查（tools/check_architecture.py）与
-# backend/core/permissions.py 的 CAPABILITIES 都以此为准：谁 import 本模块，
-# 谁就必须持 ${cap}.manage（读操作受 ${cap}.read 管）。
+# 本模块的数据归属这个能力域。backend/core/permissions.py 的 CAPABILITIES
+# 与 tools/check_architecture.py（T02 起按能力表判权）都以此为准：谁 import
+# 本模块，谁就必须持 point.manage（读操作受 point.read 管）。
 CAPABILITY = 'point'
 
 

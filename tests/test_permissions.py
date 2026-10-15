@@ -77,7 +77,7 @@ class PermissionMatrixTest(unittest.TestCase):
 
     def test_capability_holders_get_through(self):
         """持有能力的角色不被能力判定拦下（可能是 200，也可能是业务上的空结果）。"""
-        from core.permissions import CAPABILITIES, can
+        from core.permissions import can
         for capability, (path, method) in PROBES.items():
             for role in ACCOUNTS:
                 if not can(role, capability):
@@ -91,7 +91,7 @@ class PermissionMatrixTest(unittest.TestCase):
 
     def test_non_holders_are_rejected(self):
         """不持有能力的角色一律 403。"""
-        from core.permissions import CAPABILITIES, can
+        from core.permissions import can
         for capability, (path, method) in PROBES.items():
             for role in ACCOUNTS:
                 if can(role, capability):
