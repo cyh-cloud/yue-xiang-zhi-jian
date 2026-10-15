@@ -11,14 +11,13 @@
 2. 审核状态变更只调 reviews.approve_review / reject_review / revoke_review，
    由 db_domains.reviews.set_review_status 按内容类型分派回写各领域表，
    路由层不直接写任何领域表。
-3. 数据访问一律走 database 契约层。
+3. 数据访问一律走数据层（db_domains 各域模块），路由层不自己开连接。
 """
 
 from flask import Blueprint, jsonify, request
 
 from core.permissions import require_capability
 from core.session import get_session_user
-from db_connection import get_connection
 from db_domains import announcements, community, content, courses, employment
 from db_domains import users as users_db
 from db_domains import reviews as reviews_db
@@ -217,10 +216,8 @@ def admin_get_reviews():
         elif ctype == 'job':
             rd['detail'] = employment.get_job_by_id(cid)
         elif ctype == 'model_3d':
-            conn = get_connection()
-            row = conn.execute("SELECT * FROM models_3d WHERE id=?", (cid,)).fetchone()
-            conn.close()
-            rd['detail'] = dict(row) if row else None
+            # 3D 模型属课程域，审核详情走 v_reviewable_models 取，域路由不直连
+            rd['detail'] = courses.get_model_3d_by_id(cid)
         elif ctype == 'success_case':
             # 案例正文在库（T09 起读 content 域的五张表），详情直接取数据模块
             rd['detail'] = content.get_case(cid)

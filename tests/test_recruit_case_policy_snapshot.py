@@ -91,7 +91,10 @@ def _canonical(value):
 
 # 招募公告里由**当天日期**算出的字段。它们是派生值而不是内容本身，随运行日期
 # 自然变化，纳入字节比对会让这条用例隔天就红。比对时置成常量，内容字段仍逐字节比。
-VOLATILE_FIELDS = ('days_left', 'starts_in')
+# ⚠️ status / status_label 同样由日期算出（open / upcoming / closed 三种状态会随
+#    截止日期翻转），d6275da 只剔了 days_left / starts_in，公告一过期就红 ——
+#    红的原因与「内容是否被改对」无关，故一并剔除（T11 实测 8 条已过期）。
+VOLATILE_FIELDS = ('days_left', 'starts_in', 'status', 'status_label')
 
 
 def _strip_volatile(value):

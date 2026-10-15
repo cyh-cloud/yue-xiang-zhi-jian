@@ -15,6 +15,21 @@ from db_connection import get_connection
 CAPABILITY = ''
 
 
+def get_home_stats():
+    """首页 Hero 三个统计数字：服务农户 / 培训课程 / 就业对接。
+
+    三个数字分别来自学员、课程、岗位三个能力域，原先是 public 域自己写三次
+    COUNT 直连三张表。现在走 v_home_stats：JOIN 与计数口径只有一份，
+    且与「学员端看到的真实条数」同源。本模块是取数窄接口（CAPABILITY = ''），
+    跨域取数后交给 public 域下发，与档案三段同构。
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT farmers, courses, jobs FROM v_home_stats").fetchone()
+    conn.close()
+    return {'farmers': row['farmers'], 'courses': row['courses'], 'jobs': row['jobs']}
+
+
 def get_profile_basic(user_id):
     """用户域的档案窄接口：学员的基础资料。"""
     conn = get_connection()

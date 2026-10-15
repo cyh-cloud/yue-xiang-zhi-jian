@@ -1,7 +1,7 @@
 {
   "/api/employment/jobs": {
     "recruit_payload": {
-      "sha256": "0de5438df219fd2cfab072d5451adb9be2086f3c1ea8c3ce4a5e2f8c594c8a55",
+      "sha256": "18f2800d06193ec0e29ed19ffc22d1fc85b3866d4477b688bae7e93f9391ab71",
       "value": {
         "category_options": {
           "enterprise": [
@@ -47,7 +47,7 @@
           {
             "category": "农业技术",
             "contact": "0754-87369892（咨询时段：2026-10-10 至 10-16 工作日）",
-            "days_left": 1,
+            "days_left": null,
             "deadline": "2026-10-16",
             "description": "招聘单位为汕头市濠江区动物疫病预防控制中心（公益一类正股级事业单位），承担辖区动物疫病监测、检测、诊断、流行病学调查、疫情报告及预防控制等技术工作。本次招聘工作人员5名，旨在补齐基层畜牧兽医专业人才短板、健全动物防疫监管人才梯队。岗位具体条件见公告附件《岗位表》。考试采取“笔试+面试”方式，聘用后约定在本单位服务期限5年（含试用期）。",
             "education": "",
@@ -71,14 +71,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "汕头市濠江区农业农村和水务局下属事业单位2026年度公开招聘工作人员"
           },
           {
             "category": "基层服务",
             "contact": "0762-4642835",
-            "days_left": 4,
+            "days_left": null,
             "deadline": "2026-10-19",
             "description": "根据《连平县人民政府办公室关于印发连平县机关事业单位编外人员管理办法的通知》（连府办〔2024〕6号），结合工作需要，面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。采取网上报名和资格初审，不接受现场报名；考试采取结构化面试方式，按 1:3 比例择优确定面试人员。",
             "education": "大专及以上学历，不限专业",
@@ -102,14 +102,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "连平县绣缎镇人民政府2026年公开招聘编外人员"
           },
           {
             "category": "基层服务",
             "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
-            "days_left": 16,
+            "days_left": null,
             "deadline": "2026-10-31",
             "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
             "education": "",
@@ -133,14 +133,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "博罗县2026年公益性岗位公开招聘"
           },
           {
             "category": "基层服务",
             "contact": "",
-            "days_left": 26,
+            "days_left": null,
             "deadline": "2026-11-10",
             "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
             "education": "",
@@ -164,8 +164,8 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "信宜市2026年度乡村公益性岗位招聘"
           },
           {
@@ -207,8 +207,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "广东省2026年高校毕业生“三支一扶”计划招募"
           },
           {
@@ -238,8 +238,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "阳山县江英镇2026年公益性岗位公开招聘"
           },
           {
@@ -269,8 +269,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市农业农村局特聘动物防疫专员招聘"
           },
           {
@@ -300,8 +300,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
           },
           {
@@ -331,8 +331,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
           },
           {
@@ -362,8 +362,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市公益性岗位公开招聘（第四批）"
           },
           {
@@ -393,8 +393,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "台山市白沙镇人民政府招聘合同制工作人员"
           },
           {
@@ -424,8 +424,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "连平县三角镇人民政府2026年公开招聘编外人员"
           },
           {
@@ -455,8 +455,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年江城区乡村公益性岗位公开招聘"
           },
           {
@@ -486,8 +486,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "连南瑶族自治县三江镇公开招聘专职网格管理员、网格员"
           }
         ]
@@ -497,7 +497,7 @@
   },
   "/api/employment/jobs?category=基层服务": {
     "recruit_payload": {
-      "sha256": "4a607579d96942709bc04a934c1edaf32cf11c98cd451307382910a8ac8d403c",
+      "sha256": "065777ad7cf6cd29ca2723aa360fed33af9cff3e5cd74005830c377215d1aca5",
       "value": {
         "category_options": {
           "enterprise": [
@@ -543,7 +543,7 @@
           {
             "category": "基层服务",
             "contact": "0762-4642835",
-            "days_left": 4,
+            "days_left": null,
             "deadline": "2026-10-19",
             "description": "根据《连平县人民政府办公室关于印发连平县机关事业单位编外人员管理办法的通知》（连府办〔2024〕6号），结合工作需要，面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。采取网上报名和资格初审，不接受现场报名；考试采取结构化面试方式，按 1:3 比例择优确定面试人员。",
             "education": "大专及以上学历，不限专业",
@@ -567,14 +567,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "连平县绣缎镇人民政府2026年公开招聘编外人员"
           },
           {
             "category": "基层服务",
             "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
-            "days_left": 16,
+            "days_left": null,
             "deadline": "2026-10-31",
             "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
             "education": "",
@@ -598,14 +598,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "博罗县2026年公益性岗位公开招聘"
           },
           {
             "category": "基层服务",
             "contact": "",
-            "days_left": 26,
+            "days_left": null,
             "deadline": "2026-11-10",
             "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
             "education": "",
@@ -629,8 +629,8 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "信宜市2026年度乡村公益性岗位招聘"
           },
           {
@@ -672,8 +672,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "广东省2026年高校毕业生“三支一扶”计划招募"
           },
           {
@@ -703,8 +703,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "阳山县江英镇2026年公益性岗位公开招聘"
           },
           {
@@ -734,8 +734,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
           },
           {
@@ -765,8 +765,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
           },
           {
@@ -796,8 +796,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市公益性岗位公开招聘（第四批）"
           },
           {
@@ -827,8 +827,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "台山市白沙镇人民政府招聘合同制工作人员"
           },
           {
@@ -858,8 +858,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "连平县三角镇人民政府2026年公开招聘编外人员"
           },
           {
@@ -889,8 +889,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年江城区乡村公益性岗位公开招聘"
           }
         ]
@@ -949,7 +949,7 @@
   },
   "/api/employment/jobs?keyword=公益性": {
     "recruit_payload": {
-      "sha256": "8a890ba93e9c7c4edce15039a97e43fb10e8e2ab075ddfb451cc40acd12038be",
+      "sha256": "5c594d2d8f5b59c05dd3b22ef4743476edcbc7effcdc75cb9515c5656fd9d509",
       "value": {
         "category_options": {
           "enterprise": [
@@ -995,7 +995,7 @@
           {
             "category": "基层服务",
             "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
-            "days_left": 16,
+            "days_left": null,
             "deadline": "2026-10-31",
             "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
             "education": "",
@@ -1019,14 +1019,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "博罗县2026年公益性岗位公开招聘"
           },
           {
             "category": "基层服务",
             "contact": "",
-            "days_left": 26,
+            "days_left": null,
             "deadline": "2026-11-10",
             "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
             "education": "",
@@ -1050,8 +1050,8 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "信宜市2026年度乡村公益性岗位招聘"
           },
           {
@@ -1081,8 +1081,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "阳山县江英镇2026年公益性岗位公开招聘"
           },
           {
@@ -1112,8 +1112,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
           },
           {
@@ -1143,8 +1143,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
           },
           {
@@ -1174,8 +1174,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市公益性岗位公开招聘（第四批）"
           },
           {
@@ -1205,8 +1205,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年江城区乡村公益性岗位公开招聘"
           }
         ]
@@ -1216,7 +1216,7 @@
   },
   "/api/employment/jobs?location=茂名": {
     "recruit_payload": {
-      "sha256": "c1e2e70e23e3a1ea535b3b742757337fcde6c89c541142ace00488c047635cee",
+      "sha256": "07098ef729fec3757d6250deec9ff66e7be98dd22f89808772e9d4fe98c62375",
       "value": {
         "category_options": {
           "enterprise": [
@@ -1262,7 +1262,7 @@
           {
             "category": "基层服务",
             "contact": "",
-            "days_left": 26,
+            "days_left": null,
             "deadline": "2026-11-10",
             "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
             "education": "",
@@ -1286,8 +1286,8 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "信宜市2026年度乡村公益性岗位招聘"
           },
           {
@@ -1317,8 +1317,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市农业农村局特聘动物防疫专员招聘"
           },
           {
@@ -1348,8 +1348,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
           },
           {
@@ -1379,8 +1379,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市公益性岗位公开招聘（第四批）"
           }
         ]
@@ -1390,7 +1390,7 @@
   },
   "/api/employment/jobs?salary=3K-5K": {
     "recruit_payload": {
-      "sha256": "59a1d1c44afb9492533ab43fead8ca2bfb6af3ee7bb0da2ce710f22967df9392",
+      "sha256": "2432c71914cb0502576c77be2cbfdf7df4a22affb7573cb15c22fbf5dafae4b3",
       "value": {
         "category_options": {
           "enterprise": [
@@ -1436,7 +1436,7 @@
           {
             "category": "农业技术",
             "contact": "0754-87369892（咨询时段：2026-10-10 至 10-16 工作日）",
-            "days_left": 1,
+            "days_left": null,
             "deadline": "2026-10-16",
             "description": "招聘单位为汕头市濠江区动物疫病预防控制中心（公益一类正股级事业单位），承担辖区动物疫病监测、检测、诊断、流行病学调查、疫情报告及预防控制等技术工作。本次招聘工作人员5名，旨在补齐基层畜牧兽医专业人才短板、健全动物防疫监管人才梯队。岗位具体条件见公告附件《岗位表》。考试采取“笔试+面试”方式，聘用后约定在本单位服务期限5年（含试用期）。",
             "education": "",
@@ -1460,14 +1460,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "汕头市濠江区农业农村和水务局下属事业单位2026年度公开招聘工作人员"
           },
           {
             "category": "基层服务",
             "contact": "0762-4642835",
-            "days_left": 4,
+            "days_left": null,
             "deadline": "2026-10-19",
             "description": "根据《连平县人民政府办公室关于印发连平县机关事业单位编外人员管理办法的通知》（连府办〔2024〕6号），结合工作需要，面向社会公开招聘编外人员（普通类）1名，从事镇政府相关工作。采取网上报名和资格初审，不接受现场报名；考试采取结构化面试方式，按 1:3 比例择优确定面试人员。",
             "education": "大专及以上学历，不限专业",
@@ -1491,14 +1491,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "连平县绣缎镇人民政府2026年公开招聘编外人员"
           },
           {
             "category": "基层服务",
             "contact": "观音阁镇 0752-6230169、麻陂镇 0752-6133856 等 9 个用人单位，电话详见公告",
-            "days_left": 16,
+            "days_left": null,
             "deadline": "2026-10-31",
             "description": "根据《广东省公益性岗位开发管理办法》（粤人社规〔2025〕15号）和《关于做好2026年惠州市公益性岗位开发和管理工作的通知》等文件要求，为强化对就业困难人员的就业帮扶、发挥公益性岗位兜底安置作用，全县共设置50个公益性岗位、公开招聘50人。资格审查通过后由各用人单位组织面试，体检合格后由县人社局公示拟聘用人员名单。具体岗位与报名地址见公告附件《博罗县2026年公开招聘公益性岗位情况表》。",
             "education": "",
@@ -1522,14 +1522,14 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "博罗县2026年公益性岗位公开招聘"
           },
           {
             "category": "基层服务",
             "contact": "",
-            "days_left": 26,
+            "days_left": null,
             "deadline": "2026-11-10",
             "description": "根据《关于进一步加强公益性岗位开发管理的通知》（信人社〔2026〕15号）文件精神，为发挥公益性岗位兜底作用、支持就业困难人员实现就业，面向全市公开招聘乡村公益性岗位人员，全市各乡镇（街道）共161个。招聘按个人报名、资格审查、用人单位自主招聘、拟聘用人员公示、签订劳动合同或劳务协议的程序进行，额满即止。具体岗位、工作地点与条件详见公告附件。",
             "education": "",
@@ -1553,8 +1553,8 @@
               }
             ],
             "starts_in": null,
-            "status": "open",
-            "status_label": "报名中",
+            "status": null,
+            "status_label": null,
             "title": "信宜市2026年度乡村公益性岗位招聘"
           },
           {
@@ -1596,8 +1596,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "广东省2026年高校毕业生“三支一扶”计划招募"
           },
           {
@@ -1627,8 +1627,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "阳山县江英镇2026年公益性岗位公开招聘"
           },
           {
@@ -1658,8 +1658,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市农业农村局特聘动物防疫专员招聘"
           },
           {
@@ -1689,8 +1689,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "乐昌市北乡镇2026年乡村公益性岗位招聘"
           },
           {
@@ -1720,8 +1720,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "化州市同庆镇2026年第二批乡村公益性岗位公开招聘"
           },
           {
@@ -1751,8 +1751,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年高州市公益性岗位公开招聘（第四批）"
           },
           {
@@ -1782,8 +1782,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "台山市白沙镇人民政府招聘合同制工作人员"
           },
           {
@@ -1813,8 +1813,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "连平县三角镇人民政府2026年公开招聘编外人员"
           },
           {
@@ -1844,8 +1844,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "2026年江城区乡村公益性岗位公开招聘"
           },
           {
@@ -1875,8 +1875,8 @@
               }
             ],
             "starts_in": null,
-            "status": "closed",
-            "status_label": "已过报名期",
+            "status": null,
+            "status_label": null,
             "title": "连南瑶族自治县三江镇公开招聘专职网格管理员、网格员"
           }
         ]

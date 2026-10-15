@@ -4,6 +4,9 @@
 
 T18 从 app.py 迁出。T09 搬公开域与社区域时漏掉了这个区块，它一直滞留到 T18 前。
 
+T11：单条已读原先在本文件里直连 UPDATE notifications（绕过数据层），
+已收进 db_domains/notifications.py 的 mark_notification_read。
+
 身份护栏与消息域共用共享层的 core.session.messages_self_guard（它本质是鉴权，
 放任一业务域都会让另一个域反向依赖）。未读总数由 db_domains/notifications.py 的
 get_total_unread_count 算出，本域只负责把它下发。
@@ -12,7 +15,6 @@ get_total_unread_count 算出，本域只负责把它下发。
 from flask import Blueprint, jsonify, request
 
 from core.session import messages_self_guard
-from db_connection import get_connection
 from db_domains import announcements, employment, messages
 from db_domains import notifications as notifications_db
 
@@ -88,16 +90,8 @@ def mark_one_notification_read():
         return jsonify({"success": False, "message": "参数不完整"}), 400
 
     if source == 'notifications':
-        conn = get_connection()
-        # 只允许标自己的，避免拿别人的通知 id 乱标
-        cur = conn.execute(
-            "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ? AND is_read = 0",
-            (user_id, ref_id)
-        )
-        conn.commit()
-        changed = cur.rowcount
-        conn.close()
-        if not changed:
+        # 只允许标自己的，避免拿别人的通知 id 乱标（过滤条件收在数据层里）
+        if not notifications_db.mark_notification_read(user_id, ref_id):
             return jsonify({"success": False, "message": "通知不存在"}), 404
     elif source == 'messages':
         messages.mark_messages_read(ref_id, user_id)

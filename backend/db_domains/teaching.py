@@ -47,6 +47,21 @@ def delete_announcement(ann_id):
 #    create_assignment / get_assignments / get_assignment / submit_assignment /
 #    get_student_submissions（经核查前端零调用）。
 
+def get_submission_context(submission_id):
+    """批改前取提交上下文：学员是谁、这条提交挂在哪个作业上。
+
+    走 v_submission_context（提交 JOIN 作业），四列一起取。返回 None 表示
+    没有这条提交。原先这段 SQL 写在 domains/teaching_support/routes.py 里，
+    跨域直连 assignment_submissions，T11 收进本域。
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT submission_id, assignment_id, student_id FROM v_submission_context "
+        "WHERE submission_id = ?", (submission_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def grade_submission(submission_id, score, feedback=''):
     conn = get_connection()
     conn.execute("UPDATE assignment_submissions SET score = ?, feedback = ?, status = 'graded', graded_at = datetime('now','localtime') WHERE id = ?",

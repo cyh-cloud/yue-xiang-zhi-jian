@@ -37,6 +37,132 @@ def set_job_review_status(job_id, review_status):
     conn.close()
 
 
+# ==================== 企业端窄接口（T11：enterprise 域的直连 SQL 收进来） ====================
+# 原先这些 SQL 写在 domains/enterprise/routes.py 里，跨域直连 employment 域的表。
+# 现在收在这里：域路由只调窄接口，不碰连接工厂。
+
+def get_enterprise_jobs(enterprise_id):
+    """企业自己发布的岗位（按发布时间倒序）。requirements 解析为列表。"""
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM job_listings WHERE enterprise_id = ? ORDER BY posted_at DESC",
+        (enterprise_id,)).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d['requirements'] = json.loads(d['requirements'])
+        out.append(d)
+    return out
+
+
+def create_enterprise_job(data, enterprise_id, company_name):
+    """企业发布岗位。发布即 pending（审核门禁见 enterprise 域的模块文档）。"""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO job_listings (title, company, salary, requirements, description, "
+        "location, category, job_type, education, experience, company_size, industry, "
+        "enterprise_id, review_status, posted_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now','localtime'))",
+        (data.get('title', ''), company_name or data.get('company', ''),
+         data.get('salary', ''), json.dumps(data.get('requirements', [])),
+         data.get('description', ''), data.get('location', ''),
+         data.get('category', ''), data.get('job_type', '全职'),
+         data.get('education', ''), data.get('experience', ''),
+         company_name or '', data.get('industry', ''),
+         enterprise_id, 'pending'))
+    conn.commit()
+    job_id = cursor.lastrowid
+    conn.close()
+    return job_id
+
+
+def update_enterprise_job(job_id, data):
+    """企业改岗位。返回是否真的改了字段（空更新 = 不重新走审核）。"""
+    updates = []
+    params = []
+    for k in ('title', 'company', 'salary', 'description', 'location',
+              'category', 'job_type', 'education', 'experience', 'industry'):
+        if k in data and data[k] is not None:
+            updates.append('%s=?' % k)
+            params.append(data[k])
+    if 'requirements' in data:
+        updates.append("requirements=?")
+        params.append(json.dumps(data['requirements']))
+    if not updates:
+        return False
+    # 内容改了就重新走审核：否则「先发一条合规的骗过审核、通过后再改成违规内容」
+    # 会绕过整个审核链路。改回 pending 由调用方新开一条审核记录。
+    updates.append("review_status=?")
+    params.append('pending')
+    params.append(job_id)
+    conn = get_connection()
+    conn.execute("UPDATE job_listings SET %s WHERE id=?" % ', '.join(updates), params)
+    conn.commit()
+    conn.close()
+    return True
+
+
+def get_job_owner(job_id):
+    """岗位的发布者 username，不存在返回 None（删除前校验归属用）。"""
+    conn = get_connection()
+    row = conn.execute("SELECT enterprise_id FROM job_listings WHERE id = ?",
+                       (job_id,)).fetchone()
+    conn.close()
+    return row['enterprise_id'] if row else None
+
+
+def delete_job_and_dependents(job_id):
+    """删除岗位及其收藏。审核记录由 reviews 域单独删（共享表属主是它）。"""
+    conn = get_connection()
+    conn.execute("DELETE FROM job_listings WHERE id = ?", (job_id,))
+    conn.execute("DELETE FROM saved_jobs WHERE job_id = ?", (job_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_enterprise_applications(enterprise_id):
+    """企业看申请人：投递 + 岗位 + 用户 + 简历四表 JOIN，走 v_enterprise_applications。
+
+    视图把四张表合成一行，域路由不再自己写 JOIN。ORDER BY 留在读取侧，
+    因为视图不背排序（定义与建表同住 db_schema.py，多个调用方排序需求不同）。
+    """
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT * FROM v_enterprise_applications WHERE job_id IN "
+        "(SELECT id FROM job_listings WHERE enterprise_id = ?) "
+        "ORDER BY applied_at DESC", (enterprise_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def set_job_application_status(app_id, status):
+    """企业改投递状态（approved / rejected / interview）。"""
+    conn = get_connection()
+    conn.execute("UPDATE job_applications SET status = ? WHERE id = ?", (status, app_id))
+    conn.commit()
+    conn.close()
+
+
+def get_enterprise_stats(enterprise_id):
+    """企业岗位统计：走 v_enterprise_job_stats（两表 JOIN + 分组计数）。
+
+    ⚠️ total_jobs 延续原口径：数的是**审核通过**的在招职位，不是岗位总数；
+       未通过的单列 pending_jobs。视图里 COALESCE 兜住历史 NULL 行。
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT total_jobs, pending_jobs, total_apps FROM v_enterprise_job_stats "
+        "WHERE enterprise_id = ?", (enterprise_id,)).fetchone()
+    conn.close()
+    if not row:
+        return {'total_jobs': 0, 'pending_jobs': 0, 'total_applications': 0}
+    return {'total_jobs': row['total_jobs'] or 0,
+            'pending_jobs': row['pending_jobs'] or 0,
+            'total_applications': row['total_apps'] or 0}
+
+
 def count_job_listings(review_status=None):
     """就业域窄接口：岗位条数，可按审核状态过滤。"""
     conn = get_connection()
@@ -404,6 +530,8 @@ def save_resume(user_id, data):
 
     ⚠️ 只接受 RESUME_FIELDS 白名单字段（防越权改写 user_id / ai_used）。
     ⚠️ 更新时用 UPDATE 而非「先删后插」，否则 id 会变、创建时间会丢。
+    ⚠️ 需要真事务（见 db_domains/points.py 的 TRANSACTION_CRITICAL 名单）：
+       查存在性与插/改是同一次判断的两半，中间不得插入不相关语句。
     """
     existing = get_resume(user_id)
     payload = {}

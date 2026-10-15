@@ -231,10 +231,11 @@ class TestYueXiangApp(unittest.TestCase):
                 conn = get_connection()
                 conn.execute("DELETE FROM job_applications WHERE job_id = ?", (job_id,))
                 conn.execute("DELETE FROM saved_jobs WHERE job_id = ?", (job_id,))
-                conn.execute("DELETE FROM content_reviews WHERE content_type='job' AND content_id = ?", (job_id,))
                 conn.execute("DELETE FROM job_listings WHERE id = ?", (job_id,))
                 conn.commit()
                 conn.close()
+                # 先关本连接再走 reviews 域的删除入口：两个连接同时持写锁会自死锁
+                reviews.delete_reviews_for('job', job_id)
             if ent_sid:
                 try:
                     conn = _db.get_connection()
@@ -590,11 +591,10 @@ class TestYueXiangApp(unittest.TestCase):
             self.assertEqual(after['review_comment'], '岗位信息不完整，请补充职责描述')
         finally:
             conn = get_connection()
-            conn.execute("DELETE FROM content_reviews WHERE content_type='job' AND content_id=?",
-                         (jid,))
             conn.execute("DELETE FROM job_listings WHERE id = ?", (jid,))
             conn.commit()
             conn.close()
+            reviews.delete_reviews_for('job', jid)
 
     def test_login(self):
         """测试登录功能"""

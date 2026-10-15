@@ -449,9 +449,9 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         并删掉测试期间新建的记录。无条件「全部置 approved」会让同一 content_id
         出现多条 approved，把 approved 计数撑爆（T17 合并后实测踩到过）。
         """
-        conn = get_connection()
         for review_id in created_ids:
-            conn.execute('DELETE FROM content_reviews WHERE id = ?', (review_id,))
+            reviews.delete_review_by_id(review_id)
+        conn = get_connection()
         for review_id, state in original.items():
             status, comment, reviewed_by, reviewed_at = state
             conn.execute(

@@ -63,6 +63,9 @@ def get_student(student_id):
 def add_student(name, class_name, direction, user_id=''):
     """添加学员（只写名册行）。
 
+    ⚠️ 需要真事务（见 db_domains/points.py 的 TRANSACTION_CRITICAL 名单）：
+       先查最大学号再插入，两步之间不得插入任何不相关语句。
+
     ⚠️ 名册行与平台账号是**两套数据**：不传 user_id 就只是一行名册记录，
        该学员无法登录、收不到通知、其证书也不会进入教师端统计。
        调用方（app.add_student）负责在需要时关联/创建账号。

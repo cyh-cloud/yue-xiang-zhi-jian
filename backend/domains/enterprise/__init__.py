@@ -18,9 +18,10 @@ T17 从 app.py 的「企业用户 API」区块整体迁出，URL、请求响应�
 3. 「在招职位」只算审核通过的，未通过的单列 pending_jobs —— 企业不能以为岗位
    已经对外可见。
 
-跨域边界：会话取用户与角色判定只用共享层 core.session；数据访问一律走
-database 契约层（含 get_connection 的直查，与拆分前逐字一致）。本域不 import
-任何其他领域路由模块。
+跨域边界：会话取用户与角色判定只用共享层 core.session；数据访问一律走就业域
+（db_domains.employment）的窄接口与 reviews 域的共享表入口，本域不 import
+任何其他领域路由模块。T11 起本域不再自己开数据库连接：六处直连 SQL 收进
+就业域窄接口，两处跨表 JOIN 改走视图，审核记录的跨域删除走 reviews 域。
 """
 
 

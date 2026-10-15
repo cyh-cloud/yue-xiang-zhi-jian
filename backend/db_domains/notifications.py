@@ -69,6 +69,22 @@ def mark_notifications_read(user_id):
     conn.commit()
     conn.close()
 
+def mark_notification_read(user_id, ref_id):
+    """把单条通知标为已读。只允许标自己的，返回是否真的有这一行。
+
+    归属过滤（user_id 匹配）写在这里而不是路由层：同一个口径只有一个实现，
+    否则将来多一条调用点就会漏掉「只能标自己的」这一半。
+    """
+    conn = get_connection()
+    cur = conn.execute(
+        "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ? AND is_read = 0",
+        (user_id, ref_id))
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0
+
+
 def clear_read_notifications(user_id):
     conn = get_connection()
     conn.execute(

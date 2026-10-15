@@ -89,9 +89,11 @@ def delete_procurement(proc_id):
     """删除求购"""
     conn = get_connection()
     conn.execute("DELETE FROM procurements WHERE id = ?", (proc_id,))
-    conn.execute("DELETE FROM content_reviews WHERE content_type='procurement' AND content_id=?", (proc_id,))
     conn.commit()
     conn.close()
+    # 同 courses.delete_model_3d：先关本连接，再走 reviews 域的删除入口，避免自死锁
+    from db_domains.reviews import delete_reviews_for
+    delete_reviews_for('procurement', proc_id)
     return True
 
 

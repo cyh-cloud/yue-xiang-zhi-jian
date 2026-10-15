@@ -32,7 +32,6 @@ from core.app_factory import BASE_DIR
 from core.permissions import TEACHER, require_capability
 from core.session import get_session_user
 from shared.training_status import training_status_label
-from db_connection import get_connection
 from db_domains import notifications, teaching
 from db_domains import courses as courses_db
 
@@ -112,10 +111,9 @@ def grade_submission():
     feedback = data.get('feedback', '')
     if submission_id is None or score is None:
         return jsonify({"success": False, "message": "请填写批改信息"})
-    # 获取提交信息以发送通知
-    conn = get_connection()
-    sub = conn.execute("SELECT student_id, assignment_id FROM assignment_submissions WHERE id = ?", (submission_id,)).fetchone()
-    conn.close()
+    # 取提交上下文以发送通知：学员是谁、这条提交挂在哪个作业上。
+    # 走 v_submission_context（提交 JOIN 作业），域路由不自己写 SQL。
+    sub = teaching.get_submission_context(submission_id)
     if teaching.grade_submission(submission_id, score, feedback):
         if sub:
             notifications.create_notification(sub['student_id'], 'grade', '实训已批改', f'得分：{score}', 'assignment', sub['assignment_id'])

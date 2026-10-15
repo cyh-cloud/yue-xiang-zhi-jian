@@ -35,6 +35,47 @@ def _target_writer(content_type):
     return REVIEW_TARGET_WRITERS.get(content_type)
 
 
+# 已知的可审核内容类型。delete_reviews_for() 只认这些类型，写错类型名立刻报错，
+# 而不是静默删零行让调用方以为删干净了。
+KNOWN_CONTENT_TYPES = ('course', 'job', 'procurement', 'model_3d', 'success_case')
+
+
+def delete_reviews_for(content_type, content_id):
+    """删掉某条内容在 content_reviews 里的全部审核记录。**跨域删除的唯一入口**。
+
+    content_reviews 是共享表（四类内容域都要删自己的审核记录），属主是本域。
+    域路由与其它领域模块一律调这里，不各自写 DELETE FROM content_reviews ——
+    那样一处分派口径漂移，就会出现「内容删了、审核记录还挂着」的孤儿卡片。
+
+    与 REVIEW_TARGET_WRITERS 同形状：新增一类可审核内容，只需在
+    KNOWN_CONTENT_TYPES 里认下它的类型名，调用方零改动。返回被删掉的行数。
+    """
+    if content_type not in KNOWN_CONTENT_TYPES:
+        raise ValueError('未知的审核内容类型：%r' % (content_type,))
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "DELETE FROM content_reviews WHERE content_type = ? AND content_id = ?",
+            (content_type, content_id))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted
+
+
+def delete_review_by_id(review_id):
+    """按审核记录 id 删掉一条。与 delete_reviews_for 同属本域的删除出口。"""
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM content_reviews WHERE id = ?", (review_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted
+
+
 def create_content_review(content_type, content_id, submitter_id):
     """创建内容审核记录"""
     conn = get_connection()
@@ -67,6 +108,10 @@ def set_review_status(review_id, status, reviewer_id='', comment=''):
 
     先改自己的 content_reviews，再按内容类型分派到对应领域回写 review_status。
     返回 'ok' / 'not_found'（没有这条记录）/ 'unchanged'（状态没变）。
+
+    ⚠️ 需要真事务（见 db_domains/points.py 的 TRANSACTION_CRITICAL 名单）：
+       先改自己的 content_reviews，再分派写目标领域的表。两步之间不得插入
+       任何不相关语句，否则会出现「审核记录说通过了、岗位还挂着 pending」。
 
     ⚠️ 通过时必须清掉 review_comment：一条记录可能「先驳回、再撤销、后通过」，
     若不清，已通过的卡片上会残留上一轮的驳回理由，极易被误读为

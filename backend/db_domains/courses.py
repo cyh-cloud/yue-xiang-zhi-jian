@@ -103,9 +103,11 @@ def delete_course(course_id):
     conn = get_connection()
     conn.execute("DELETE FROM course_materials WHERE course_id = ?", (course_id,))
     conn.execute("DELETE FROM courses WHERE id = ?", (course_id,))
-    conn.execute("DELETE FROM content_reviews WHERE content_type='course' AND content_id=?", (course_id,))
     conn.commit()
     conn.close()
+    # 同 delete_model_3d：先关本连接，再走 reviews 域的删除入口，避免自死锁
+    from db_domains.reviews import delete_reviews_for
+    delete_reviews_for('course', course_id)
     return True
 
 
@@ -158,6 +160,15 @@ def create_model_3d(title, description, craft_type, file_path, file_name, file_s
     create_content_review('model_3d', model_id, teacher_id)
     return model_id
 
+def get_model_3d_by_id(model_id):
+    """按 id 取单个 3D 模型，没有返回 None。审核详情下发改走 v_reviewable_models。"""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT * FROM v_reviewable_models WHERE id = ?", (model_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
 def get_models_3d(teacher_id=None, published_only=True):
     """获取3D模型列表"""
     conn = get_connection()
@@ -178,9 +189,13 @@ def delete_model_3d(model_id):
     conn = get_connection()
     row = conn.execute("SELECT file_path FROM models_3d WHERE id = ?", (model_id,)).fetchone()
     conn.execute("DELETE FROM models_3d WHERE id = ?", (model_id,))
-    conn.execute("DELETE FROM content_reviews WHERE content_type='model_3d' AND content_id=?", (model_id,))
     conn.commit()
     conn.close()
+    # content_reviews 是共享表，属主是 reviews 域：跨域删除只走它一个入口。
+    # ⚠️ 必须在本连接 commit + close 之后调：delete_reviews_for 自己开连接，
+    #    两个连接在同一线程上同时持写锁会互相等待，直接死锁（T11 实测踩到）。
+    from db_domains.reviews import delete_reviews_for
+    delete_reviews_for('model_3d', model_id)
     return row['file_path'] if row else None
 
 

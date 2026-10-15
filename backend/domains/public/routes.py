@@ -10,15 +10,16 @@
 ---- 首页统计（公开，真实库计数）----
 P1-3：Hero 三个统计数字原为硬编码假数据（12000/86/3500），违反「不编造」红线。
 改为读取数据库真实条数：服务农户=学员数、培训课程=课程数、就业对接=岗位数。
-即便演示库稀疏也照实展示，绝不虚构。
+即便演示库稀疏也照实展示，绝不虚构。三个数字跨学员 / 课程 / 岗位三个能力域，
+T11 起改走 v_home_stats（取数窄接口在 profile_sources），域路由不再自己开连接。
 
 ---- 公开求购（用户端可见）：2026-10-06 随「供应链求购不做」整体下线 ----
 学员端从未渲染过该接口（首页只有标题文案），此处一并移除，不留无界面的空接口。
 """
 
 from flask import Blueprint, jsonify, request
-from db_connection import get_connection
 from db_domains import announcements, courses as courses_db
+from db_domains.profile_sources import get_home_stats
 
 
 # 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
@@ -29,21 +30,8 @@ public_bp = Blueprint('public', __name__)
 
 @public_bp.route('/api/home/stats', methods=['GET'])
 def public_home_stats():
-    conn = get_connection()
-    try:
-        farmers = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
-        courses = conn.execute("SELECT COUNT(*) FROM courses").fetchone()[0]
-        jobs = conn.execute("SELECT COUNT(*) FROM job_listings").fetchone()[0]
-    finally:
-        conn.close()
-    return jsonify({
-        "success": True,
-        "stats": {
-            "farmers": farmers,
-            "courses": courses,
-            "jobs": jobs
-        }
-    })
+    stats = get_home_stats()
+    return jsonify({"success": True, "stats": stats})
 
 
 @public_bp.route('/api/system-announcements', methods=['GET'])

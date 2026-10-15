@@ -73,7 +73,11 @@ def change_password(user_id, old_password, new_password):
 
 def register_user(username, password, name, role='student', email='', phone='',
                   company_name='', region=''):
-    """注册新用户"""
+    """注册新用户
+
+    ⚠️ 需要真事务（见 db_domains/points.py 的 TRANSACTION_CRITICAL 名单）：
+       写 users 与建积分行必须同进同退。两步之间不得插入不相关语句。
+    """
     conn = get_connection()
     existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
     if existing:
@@ -357,7 +361,11 @@ def delete_user_by_admin(user_id):
     ⚠️ 调用方**必须**先过三道关（见 app.py 的 admin_delete_user）：
        ① 不是自己；② 不是最后一个 super_admin；③ count_user_relations() == 0。
        本函数只清理 users / user_sessions / points 三张表，其余表里的 user_id
-       引用会变成跨表孤儿。2026-10-08 之前它无条件 `return True`，
+       引用会变成跨表孤儿。
+
+    ⚠️ 需要真事务（见 db_domains/points.py 的 TRANSACTION_CRITICAL 名单）：
+       三条 DELETE 必须同进同退，否则会留下「用户删了、积分还在」的孤儿行。
+2026-10-08 之前它无条件 `return True`，
        于是「删一个不存在的用户」也会向前端谎报「删除成功」。
     """
     conn = get_connection()

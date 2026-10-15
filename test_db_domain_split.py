@@ -129,11 +129,7 @@ class ReviewDispatchTest(unittest.TestCase):
         reviews.approve_review(review_id, 'admin_demo')
         self.assertEqual(
             reviews.get_review_by_content('success_case', probe_id)['status'], 'approved')
-        conn = get_connection()
-        conn.execute('DELETE FROM content_reviews WHERE content_type = ? AND content_id = ?',
-                     ('success_case', probe_id))
-        conn.commit()
-        conn.close()
+        reviews.delete_reviews_for('success_case', probe_id)
 
 
 class UnreadCountTest(unittest.TestCase):
