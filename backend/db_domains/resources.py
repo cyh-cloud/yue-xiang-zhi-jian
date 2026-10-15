@@ -8,6 +8,7 @@ T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分�
 import json
 import re
 from db_connection import get_connection
+from db_domains import content
 
 # 本模块的数据归属这个能力域。backend/core/permissions.py 的 CAPABILITIES
 # 与 tools/check_architecture.py（T02 起按能力表判权）都以此为准：谁 import
@@ -21,16 +22,15 @@ CASE_REVIEW_TYPE = 'success_case'
 def get_success_cases(only_approved=True):
     """获取成功案例
 
-    内容唯一事实源 = cases_data.py（不读数据库）。
-    按 domain_data.resources.cases_data 的既有约定：改完重启服务即生效，无需 init_db()。
+    T09 起案例正文改读 content 域的五张表（ADR 0002），本函数只负责**可见性**：
+    内容从 db_domains.content 取，审核状态从 content_reviews 取，两边在这里汇合。
 
     ⚠️ 审核：案例需经**超级管理员**审核通过才对学员端可见。
     审核状态复用 `content_reviews`（`content_type='success_case'`、`content_id=案例 id`），
     由 `_seed_case_reviews()` 在 init_db() 时为每条案例补一条 pending 记录。
     `only_approved=False` 仅给管理端/自检用（看到含未通过的全部案例）。
     """
-    from domain_data.resources import cases_data
-    cases = cases_data.get_cases()
+    cases = content.get_cases()
     if not only_approved:
         return cases
     conn = get_connection()
@@ -43,8 +43,7 @@ def get_success_cases(only_approved=True):
 
 def get_case_review_stats():
     """案例审核统计（供前端区分"审核中"与"加载失败"，避免把待审当成没数据）。"""
-    from domain_data.resources import cases_data
-    cases = cases_data.get_cases()
+    cases = content.get_cases()
     valid = {c['id'] for c in cases}
     total = len(cases)
 
@@ -59,15 +58,14 @@ def get_case_review_stats():
     covered = 0
     for r in rows:
         if r['content_id'] not in valid:
-            continue          # 已被 cases_data 删掉的案例，不计入
+            continue          # 内容表里已删掉的案例，不计入
         covered += r['n']
         if r['status'] in stat:
             # 查询按 (content_id, status) 分组 —— 这里必须**累加**，不能赋值
             stat[r['status']] += r['n']
 
     stat['total'] = total
-    # 还没有任何审核记录的案例（如刚加进 cases_data.py、尚未跑过 init_db）一律按待审计。
-    # （cases_data 现位于 domain_data/resources/cases_data.py）
+    # 还没有任何审核记录的案例（如内容表新增案例、尚未跑过 init_db）一律按待审计。
     # ⚠️ 这里必须用 total - covered（未被覆盖的数），不能只减 approved/rejected ——
     #    否则已计入 pending 的行会被重复统计（混合状态时 pending 虚高）。
     stat['pending'] += max(0, total - covered)
@@ -75,16 +73,11 @@ def get_case_review_stats():
 
 def get_case_notes():
     """案例页口径说明文案（与内容同源，避免前端硬编码漂移）。"""
-    from domain_data.resources import cases_data
-    return {
-        "source_note": cases_data.CASE_SOURCE_NOTE,
-        "lessons_note": cases_data.LESSONS_NOTE,
-    }
+    return content.get_case_notes()
 
 def get_policy_notes():
     """政策页口径说明文案（来源说明 + 免责声明，与内容同源）。"""
-    from domain_data.resources import policies_data
-    return policies_data.get_policy_notes()
+    return content.get_policy_notes()
 
 
 # ---- 政策分类归一化 ----

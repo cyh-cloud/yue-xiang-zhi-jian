@@ -58,6 +58,11 @@ OWNED_TABLES = {
     'dialects': {'dialects', 'dialect_phrases', 'dialect_quick_questions'},
     'pest': {'pest_crops', 'pest_entries', 'pest_sources',
              'pest_entry_sources', 'pest_images'},
+    # 键是 db_domains 下的**模块名**，不是 CAPABILITY 字符串：本文件按文件名扫模块。
+    # T09 新增的两个内容域模块。
+    'recruitments': {'recruitments', 'recruitment_sources'},
+    'content': {'success_cases', 'case_stats', 'case_milestones',
+                 'case_sources', 'case_lessons'},
 }
 
 # profile_sources 不拥有任何表：它是「能力档案的取数窄接口」模块，只跨域取数

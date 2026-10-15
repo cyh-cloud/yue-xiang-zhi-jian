@@ -6,8 +6,8 @@
 本域的边界（见 docs/adr/0001-backend-domain-split.md）：
 
 - 方言知识库与方言话术库（上游不可用时的降级文案）在 dialect_voice.py，本域自己的资产；
-- 案例与政策的**内容**在 domain_data.resources（cases_data / policies_data），
-  读取与口径说明经 database 契约层取，本域不持有第二份内容；
+- 案例与政策的**内容**在 db_domains.content（T09 起改读库，ADR 0002），
+  口径说明与内容同源，本域不持有第二份；
 - 农技口径（用药数值判定 + 免责声明）在共享层 shared.agri_dosage，与农业培训域、
   病虫害诊断域共用同一份，只在本域按 chem_notice 单独字段下发；
 - 上游调用走共享层 ai.client，限流与限流键走共享层 core.session。
@@ -73,7 +73,7 @@ def get_dialect_info():
 
 @resources_bp.route('/api/resources/cases', methods=['GET'])
 def get_success_cases():
-# 内容唯一事实源 = domain_data.resources.cases_data（经 resources.get_success_cases 读取，不落库）
+    # 案例正文读 content 域的表（T09），可见性（过审才下发）仍由 resources 域组装
     # ⚠️ 只下发**超级管理员审核通过**的案例（审核状态存 content_reviews，见 _seed_case_reviews）
     cases = resources.get_success_cases()
     payload = {"success": True, "cases": cases}
@@ -104,7 +104,7 @@ def get_policies():
     #    下架是政府对外的正式动作，必须真实生效；学员端「空」就是要如实呈现为空。
     policies = policies_db.get_government_policies()
     payload = {"success": True, "policies": policies}
-# 口径说明（来源说明 + 免责声明）与内容同源，由 domain_data.resources.policies_data 提供
+    # 口径说明（来源说明 + 免责声明）与内容同源，由 content 域下发
     payload.update(resources.get_policy_notes())
     return jsonify(payload)
 
