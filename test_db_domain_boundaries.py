@@ -52,6 +52,11 @@ OWNED_TABLES = {
     'policies': {'government_policies', 'content_reviews'},
     'announcements': {'system_announcements'},
     'reviews': {'content_reviews'},
+    'crafts': {'crafts', 'craft_steps', 'craft_purchase_categories',
+               'craft_purchase_items', 'craft_budgets'},
+    'dialects': {'dialects', 'dialect_phrases', 'dialect_quick_questions'},
+    'pest': {'pest_crops', 'pest_entries', 'pest_sources',
+             'pest_entry_sources', 'pest_images'},
 }
 
 # profile_sources 不拥有任何表：它是「能力档案的取数窄接口」模块，只跨域取数

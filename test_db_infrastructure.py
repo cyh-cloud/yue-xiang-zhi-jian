@@ -125,6 +125,11 @@ DOMAIN_SYMBOLS = {
                  'delete_user_by_admin', 'get_admin_overview', 'get_all_users',
                  'get_user_by_id', 'get_user_by_username', 'register_user', 'set_user_status',
                  'update_user_by_admin', 'update_user_profile'),
+    'crafts.py': ('get_craft_detail', 'get_crafts'),
+    'dialects.py': ('get_dialect_info', 'get_dialects'),
+    'pest.py': ('get_pest_crop', 'get_pest_crop_ids', 'get_pest_crops',
+                'get_pest_entries', 'get_pest_entry', 'get_pest_source_map',
+                'get_pest_stats'),
 }
 
 # 基础设施侧必须对外暴露的名字。
