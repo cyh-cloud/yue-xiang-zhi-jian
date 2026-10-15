@@ -14,12 +14,13 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import users
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class AuthDomainTest(unittest.TestCase):
@@ -35,7 +36,7 @@ class AuthDomainTest(unittest.TestCase):
             content_type='application/json')
 
     def _cleanup(self, sid, *usernames):
-        conn = database.get_connection()
+        conn = get_connection()
         if sid:
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
         for username in usernames:
@@ -86,7 +87,7 @@ class AuthDomainTest(unittest.TestCase):
              'role': 'student'}), content_type='application/json')
         self.assertEqual(registered.status_code, 200)
         try:
-            database.set_user_status(username, 'suspended')
+            users.set_user_status(username, 'suspended')
             response = self._login(username, '123456')
             self.assertEqual(response.status_code, 403)
             body = json.loads(response.data)
@@ -245,7 +246,7 @@ class UserProfileDomainTest(unittest.TestCase):
         return json.loads(response.data)['session_id']
 
     def _cleanup(self, sid):
-        conn = database.get_connection()
+        conn = get_connection()
         if sid:
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
         conn.execute("UPDATE users SET email = '' WHERE username = 'student_demo'")
@@ -282,7 +283,7 @@ class UserProfileDomainTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(json.loads(response.data),
                              {"success": True, "message": u"资料更新成功"})
-            stored = database.get_user_by_id('student_demo')
+            stored = users.get_user_by_id('student_demo')
             self.assertEqual(stored['email'], 't08-profile@example.com')
         finally:
             self._cleanup(sid)
@@ -310,14 +311,14 @@ class UserProfileDomainTest(unittest.TestCase):
         """资料接口没有 user_id 参数：会话是谁就只能改谁。"""
         sid = self._login()
         try:
-            before = database.get_user_by_id('teacher_demo')['name']
+            before = users.get_user_by_id('teacher_demo')['name']
             response = self.client.put('/api/user/profile', data=json.dumps(
                 {'name': u'被写上的名字', 'email': 'attacker@example.com'}),
                 content_type='application/json', headers={'X-Session-Id': sid})
             self.assertEqual(response.status_code, 200)
-            self.assertEqual(database.get_user_by_id('student_demo')['name'],
+            self.assertEqual(users.get_user_by_id('student_demo')['name'],
                              u'被写上的名字')
-            self.assertEqual(database.get_user_by_id('teacher_demo')['name'], before,
+            self.assertEqual(users.get_user_by_id('teacher_demo')['name'], before,
                              u'教师账号的资料不得被学员会话改写')
         finally:
             self._cleanup(sid)
@@ -332,7 +333,7 @@ class UserProfileDomainTest(unittest.TestCase):
     def test_password_change_validates_input_before_touching_the_store(self):
         sid = self._login()
         try:
-            original = database.get_user_by_id('student_demo')['password_hash']
+            original = users.get_user_by_id('student_demo')['password_hash']
             cases = [
                 ({'old_password': '', 'new_password': 'abcdef',
                   'confirm_password': 'abcdef'}, u'请填写完整'),
@@ -349,7 +350,7 @@ class UserProfileDomainTest(unittest.TestCase):
                 body = json.loads(response.data)
                 self.assertFalse(body['success'])
                 self.assertEqual(body['message'], message, payload)
-            self.assertEqual(database.get_user_by_id('student_demo')['password_hash'],
+            self.assertEqual(users.get_user_by_id('student_demo')['password_hash'],
                              original, u'校验不通过时不得改动口令')
         finally:
             self._cleanup(sid)
@@ -363,7 +364,7 @@ class UserProfileDomainTest(unittest.TestCase):
                 {'username': username, 'password': '123456', 'name': u'改密码'}),
                 content_type='application/json')
             sid = json.loads(registered.data)['session_id']
-            original = database.get_user_by_id(username)['password_hash']
+            original = users.get_user_by_id(username)['password_hash']
 
             rejected = self.client.put('/api/user/password', data=json.dumps(
                 {'old_password': 'WRONG-OLD', 'new_password': 'abcdef',
@@ -371,7 +372,7 @@ class UserProfileDomainTest(unittest.TestCase):
                 headers={'X-Session-Id': sid})
             body = json.loads(rejected.data)
             self.assertFalse(body['success'])
-            self.assertEqual(database.get_user_by_id(username)['password_hash'],
+            self.assertEqual(users.get_user_by_id(username)['password_hash'],
                              original, u'旧密码错误时口令不得被改动')
 
             # 旧密码错误时口令不得被改动，这一点由上一段守住。至于「改成功」这条
@@ -386,11 +387,11 @@ class UserProfileDomainTest(unittest.TestCase):
             body = json.loads(accepted.data)
             self.assertFalse(body['success'])
             self.assertEqual(body['message'], u'用户不存在')
-            self.assertEqual(database.get_user_by_id(username)['password_hash'],
+            self.assertEqual(users.get_user_by_id(username)['password_hash'],
                              original, u'响应为失败时口令不得被改动')
         finally:
             self._cleanup(sid)
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM user_sessions WHERE user_id = ?", (username,))
             conn.execute("DELETE FROM users WHERE username = ?", (username,))
             conn.commit()

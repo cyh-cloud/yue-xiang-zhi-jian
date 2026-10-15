@@ -15,12 +15,12 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class _CommunityCase(unittest.TestCase):
@@ -55,7 +55,7 @@ class PublicDomainTest(_CommunityCase):
         self.assertTrue(body['success'])
         stats = body['stats']
         self.assertEqual(set(stats), {'farmers', 'courses', 'jobs'})
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             for key, table in (('farmers', 'students'), ('courses', 'courses'),
                                ('jobs', 'job_listings')):
@@ -139,7 +139,7 @@ class CommunityDomainTest(_CommunityCase):
         self._created_ids = []
 
     def tearDown(self):
-        conn = database.get_connection()
+        conn = get_connection()
         for disc_id in self._created_ids:
             conn.execute("DELETE FROM comments WHERE target_type='discussion' AND target_id=?", (disc_id,))
             conn.execute("DELETE FROM discussions WHERE id=?", (disc_id,))
@@ -262,7 +262,7 @@ class CommunityDomainTest(_CommunityCase):
     def test_soft_deleted_discussion_disappears_from_list_but_detail_keeps_working(self):
         """软删帖子：列表不再返回它，详情仍可读（与拆分前一致，不改成 404）。"""
         disc_id = self._create_discussion('T09软删帖子')
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute("UPDATE discussions SET is_deleted = 1 WHERE id = ?", (disc_id,))
             conn.commit()
@@ -283,9 +283,9 @@ class CommunityDomainTest(_CommunityCase):
         self._post_json('/api/comments', {
             'target_type': 'discussion', 'target_id': disc_id,
             'content': 'T09将被软删'}, sid)
-        comment_id = database.get_connection().execute(
+        comment_id = get_connection().execute(
             "SELECT id FROM comments WHERE content = ?", ('T09将被软删',)).fetchone()[0]
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute("UPDATE comments SET is_deleted = 1 WHERE id = ?", (comment_id,))
             conn.commit()

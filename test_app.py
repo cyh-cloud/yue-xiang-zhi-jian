@@ -16,6 +16,10 @@ if _BACKEND_DIR not in sys.path:
     sys.path.insert(0, _BACKEND_DIR)
 
 from app import app
+from db_connection import get_connection
+import db_init
+from db_domains import employment, reviews
+from db_domains import employment as _db
 
 class TestYueXiangApp(unittest.TestCase):
     """测试粤乡智匠应用"""
@@ -177,7 +181,6 @@ class TestYueXiangApp(unittest.TestCase):
           ③ 未审岗位不能被申请（apply_for_job 返回 unavailable 且不落投递记录）。
         用例结束会删除自建岗位，不污染真实数据。
         """
-        import database
         ent_sid = None
         job_id = None
         try:
@@ -208,14 +211,14 @@ class TestYueXiangApp(unittest.TestCase):
                 'user_id': 'student_demo', 'job_id': job_id
             }), content_type='application/json')
             self.assertFalse(json.loads(r.data)['success'])
-            conn = database.get_connection()
+            conn = get_connection()
             cnt = conn.execute(
                 "SELECT COUNT(*) FROM job_applications WHERE job_id = ?", (job_id,)).fetchone()[0]
             conn.close()
             self.assertEqual(cnt, 0, '未审岗位不得产生投递记录')
 
             # 审核通过 → 立即对学员端可见（证明门禁只挡未审，不挡正常流程）
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("UPDATE job_listings SET review_status = 'approved' WHERE id = ?", (job_id,))
             conn.commit()
             conn.close()
@@ -225,7 +228,7 @@ class TestYueXiangApp(unittest.TestCase):
                 self.client.get('/api/employment/jobs/%d' % job_id).status_code, 200)
         finally:
             if job_id:
-                conn = database.get_connection()
+                conn = get_connection()
                 conn.execute("DELETE FROM job_applications WHERE job_id = ?", (job_id,))
                 conn.execute("DELETE FROM saved_jobs WHERE job_id = ?", (job_id,))
                 conn.execute("DELETE FROM content_reviews WHERE content_type='job' AND content_id = ?", (job_id,))
@@ -233,7 +236,6 @@ class TestYueXiangApp(unittest.TestCase):
                 conn.commit()
                 conn.close()
             if ent_sid:
-                import database as _db
                 try:
                     conn = _db.get_connection()
                     conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (ent_sid,))
@@ -286,7 +288,6 @@ class TestYueXiangApp(unittest.TestCase):
            改写入口文件上的同名属性已不再生效。
         """
         import ai.client as ai_client
-        import database
         sid = None
         orig_ai_configured = ai_client.ai_configured
         try:
@@ -319,7 +320,7 @@ class TestYueXiangApp(unittest.TestCase):
             # 积分**不写死常数**：演示账号会被真实使用改变余额（学员每投一次 +20，
             # 浏览器走查点一次「申请职位」就 +20）→ 写死必然误报。
             # 真正要守的契约是「能力档案里的积分 = points 表的真实余额，不是编的」。
-            _conn = database.get_connection()
+            _conn = get_connection()
             _row = _conn.execute(
                 "SELECT balance FROM points WHERE user_id = 'student_demo'").fetchone()
             _conn.close()
@@ -366,7 +367,7 @@ class TestYueXiangApp(unittest.TestCase):
             self.assertEqual(r.status_code, 400)
         finally:
             ai_client.ai_configured = orig_ai_configured
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
             if sid:
                 conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
@@ -380,7 +381,6 @@ class TestYueXiangApp(unittest.TestCase):
         所以它走 job_intents 这条独立通道；接口文案必须声明「平台不代办报名」，
         避免学员误以为登记意向 = 已报名。
         """
-        import database
         from domain_data.employment import jobs_data
         sid = None
         try:
@@ -414,7 +414,7 @@ class TestYueXiangApp(unittest.TestCase):
                                                   'recruit_key': key, 'note': '改了'}),
                                  content_type='application/json', headers=headers)
             self.assertFalse(json.loads(r.data)['created'])
-            self.assertEqual(len(database.get_job_intents('student_demo')), 1)
+            self.assertEqual(len(employment.get_job_intents('student_demo')), 1)
 
             # 不存在的公告 key → 404
             self.assertEqual(
@@ -445,9 +445,9 @@ class TestYueXiangApp(unittest.TestCase):
                                                     'recruit_key': key}),
                                    content_type='application/json', headers=headers)
             self.assertTrue(json.loads(r.data)['success'])
-            self.assertEqual(database.get_job_intents('student_demo'), [])
+            self.assertEqual(employment.get_job_intents('student_demo'), [])
         finally:
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM job_intents WHERE user_id = 'student_demo'")
             if sid:
                 conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
@@ -471,8 +471,7 @@ class TestYueXiangApp(unittest.TestCase):
              **不覆盖已有审核结论**、不碰真实企业岗位及其投递/收藏；
           ⑥ 驳回会回写 `job_listings.review_status`（见 test_reject_review_writes_back_job_status）。
         """
-        import database
-        conn = database.get_connection()
+        conn = get_connection()
         demo = conn.execute(
             "SELECT id, title, company, description, review_status, enterprise_id "
             "FROM job_listings WHERE is_demo = 1").fetchall()
@@ -486,7 +485,7 @@ class TestYueXiangApp(unittest.TestCase):
                              '演示岗位必须挂在企业演示账号下，企业端才能管理、审核才能对上')
 
         # ③ 每条演示岗位都必须有审核记录
-        conn = database.get_connection()
+        conn = get_connection()
         for jid in demo_ids:
             rv = conn.execute(
                 "SELECT status FROM content_reviews WHERE content_type='job' AND content_id=?",
@@ -496,23 +495,23 @@ class TestYueXiangApp(unittest.TestCase):
 
         # ④ 未过审 → 学员端列表看不到、直链 404
         probe_id = sorted(demo_ids)[0]
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE job_listings SET review_status='pending' WHERE id=?", (probe_id,))
         conn.commit()
         conn.close()
         try:
-            listed = {j['id'] for j in database.get_job_listings_filtered()}
+            listed = {j['id'] for j in employment.get_job_listings_filtered()}
             self.assertNotIn(probe_id, listed, '未过审的岗位不得出现在学员端列表')
             r = self.client.get('/api/employment/jobs/%d' % probe_id)
             self.assertEqual(r.status_code, 404, '未过审的岗位直链必须 404（否则猜 id 可绕开审核）')
         finally:
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (probe_id,))
             conn.commit()
             conn.close()
 
         # ⑤ 造一条真实企业岗位 + 投递，并把一条演示岗位标成 rejected，重灌后都必须原样存活
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE job_listings SET review_status='rejected' WHERE id=?", (probe_id,))
         conn.execute("""
             INSERT INTO job_listings (title, company, salary, requirements, description,
@@ -529,9 +528,9 @@ class TestYueXiangApp(unittest.TestCase):
         conn.close()
 
         try:
-            database.init_db()
+            db_init.init_db()
 
-            conn = database.get_connection()
+            conn = get_connection()
             # 演示岗位的审核结论不得被种子逻辑改写（驳回后一重启就变回待审 = 静默覆盖数据）
             row = conn.execute("SELECT review_status FROM job_listings WHERE id = ?",
                                (probe_id,)).fetchone()
@@ -551,7 +550,7 @@ class TestYueXiangApp(unittest.TestCase):
             self.assertEqual(after, demo_ids, '演示岗位必须按标题就地更新（id 不变），不得删后重建')
             conn.close()
         finally:
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?", (probe_id,))
             conn.execute("DELETE FROM job_applications WHERE job_id = ?", (real_id,))
             conn.execute("DELETE FROM saved_jobs WHERE job_id = ?", (real_id,))
@@ -566,8 +565,7 @@ class TestYueXiangApp(unittest.TestCase):
         此前只改 `content_reviews`，两边不对称：被驳回的企业岗位在企业端永远停在
         「待审核」，企业既不知道被拒、也不会去改内容重投（2026-10-07 修）。
         """
-        import database
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("""
             INSERT INTO job_listings (title, company, salary, requirements, description,
                                       location, category, enterprise_id, review_status, is_demo)
@@ -578,21 +576,21 @@ class TestYueXiangApp(unittest.TestCase):
         jid = conn.execute(
             "SELECT id FROM job_listings WHERE title = '__单测驳回岗位__'").fetchone()[0]
         conn.close()
-        database.create_content_review('job', jid, 'enterprise_demo')
-        rv = database.get_review_by_content('job', jid)
+        reviews.create_content_review('job', jid, 'enterprise_demo')
+        rv = reviews.get_review_by_content('job', jid)
         try:
-            database.reject_review(rv['id'], 'admin_demo', '岗位信息不完整，请补充职责描述')
-            conn = database.get_connection()
+            reviews.reject_review(rv['id'], 'admin_demo', '岗位信息不完整，请补充职责描述')
+            conn = get_connection()
             row = conn.execute("SELECT review_status FROM job_listings WHERE id = ?",
                                (jid,)).fetchone()
             conn.close()
             self.assertEqual(row['review_status'], 'rejected',
                              '驳回必须回写 job_listings.review_status')
-            after = database.get_review_by_content('job', jid)
+            after = reviews.get_review_by_content('job', jid)
             self.assertEqual(after['status'], 'rejected')
             self.assertEqual(after['review_comment'], '岗位信息不完整，请补充职责描述')
         finally:
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM content_reviews WHERE content_type='job' AND content_id=?",
                          (jid,))
             conn.execute("DELETE FROM job_listings WHERE id = ?", (jid,))
@@ -628,13 +626,12 @@ class TestYueXiangApp(unittest.TestCase):
     def test_verify_session_returns_user_id(self):
         """会话校验必须与登录返回同一套 user 结构（含 id）。
 
-        回归背景：/api/auth/verify 曾直接返回 database.get_session() 的结果
+        回归背景：/api/auth/verify 曾直接返回 auth.get_session() 的结果
         （{user_id, name, role}，键名是 user_id，没有 id）。而前端 restoreSession()
         会用它整体覆盖 AppState.user → AppState.user.id 变成 undefined →
         所有 `/api/xxx/${AppState.user.id}` 被拼成 `/api/xxx/undefined`。
         旧接口大多不校验 user_id 所以没暴露；就业对接的 _self_only() 会直接 403。
         """
-        import database
         r = self.client.post('/api/auth/login',
             data=json.dumps({'username': 'student_demo', 'password': '123456'}),
             content_type='application/json')
@@ -657,7 +654,7 @@ class TestYueXiangApp(unittest.TestCase):
                 content_type='application/json')
             self.assertEqual(bad.status_code, 401)
         finally:
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
             conn.commit()
             conn.close()

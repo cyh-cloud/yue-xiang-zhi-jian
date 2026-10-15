@@ -14,7 +14,7 @@ T17 从 app.py 的「超级管理员 API」区块整体迁出，URL、请求响�
 - 会话取用户与角色判定只用共享层 core.session；本域的三种把关写法（函数内 inline
   403）与拆分前逐字一致，不统一成装饰器 —— 改写判定形式就是改行为；
 - 数据访问一律走 database 契约层，路由层不直接写任何领域表；
-- 审核状态变更只走 database.approve_review / reject_review / revoke_review，
+- 审核状态变更只走 reviews.approve_review / reject_review / revoke_review，
   它们最终收敛到 db_domains.reviews.set_review_status 的单一分派入口，
   按内容类型分派到课程 / 岗位 / 3D 模型各域的窄接口。本域不 import 任何其他
   领域路由模块。

@@ -15,13 +15,13 @@ import re
 import sys
 import threading
 import unittest
+from db_connection import get_connection
 
 REPO_ROOT = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 # 名册行的识别前缀。清理只删这个前缀的行，不碰库里任何既有数据。
 NAME_PREFIX = '__RACE'
@@ -52,7 +52,7 @@ class StudentIdTestBase(unittest.TestCase):
             content_type='application/json', headers={'X-Session-Id': session_id})
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute("DELETE FROM students WHERE name LIKE ?", (NAME_PREFIX + '%',))
             conn.commit()
@@ -60,7 +60,7 @@ class StudentIdTestBase(unittest.TestCase):
             conn.close()
 
     def _max_numeric_suffix(self):
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             return conn.execute(
                 "SELECT MAX(CAST(SUBSTR(id, 4) AS INTEGER)) FROM students "
@@ -112,7 +112,7 @@ class StudentIdRaceTest(StudentIdTestBase):
             self.assertRegex(sid, STUDENT_ID_RE)
         self.assertEqual(len(set(ids)), len(ids), '并发下产生了重复学号：%r' % (ids,))
 
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             stored = [r[0] for r in conn.execute(
                 "SELECT id FROM students WHERE name LIKE ?", (NAME_PREFIX + '%',))]
@@ -144,7 +144,7 @@ class StudentIdFormatTest(StudentIdTestBase):
         """
         self.addCleanup(self._cleanup)
         session_id = self._login()
-        conn = database.get_connection()
+        conn = get_connection()
         try:
             conn.execute("INSERT INTO students (id, user_id, name, class_name, direction) "
                          "VALUES ('STU999', '', ?, '并发班', '荔枝种植')", (NAME_PREFIX + '预置999',))

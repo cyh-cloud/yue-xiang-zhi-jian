@@ -18,12 +18,13 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
+from db_domains import employment
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 
 class EmploymentDomainTestBase(unittest.TestCase):
@@ -40,7 +41,7 @@ class EmploymentDomainTestBase(unittest.TestCase):
         return json.loads(r.data)['session_id']
 
     def _cleanup(self):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM job_intents WHERE user_id LIKE '__t15%'")
         conn.execute("DELETE FROM job_intents WHERE user_id = 'student_demo'")
         conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
@@ -87,7 +88,7 @@ class JobListTest(EmploymentDomainTestBase):
         for name in jobs_data.CATEGORY_LIST:
             self.assertIn(name, recruit_values)
         enterprise_values = [o['value'] for o in options['enterprise']]
-        for name in database.ENTERPRISE_JOB_CATEGORIES:
+        for name in employment.ENTERPRISE_JOB_CATEGORIES:
             self.assertIn(name, enterprise_values)
         # 条数与列表一致
         self.assertEqual(sum(o['count'] for o in options['recruit']),
@@ -134,7 +135,7 @@ class JobDetailTest(EmploymentDomainTestBase):
     """详情与相似推荐：未过审岗位等同不存在，不能靠猜 id 绕过审核。"""
 
     def test_approved_job_detail_and_similar(self):
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute(
             "SELECT id FROM job_listings WHERE review_status='approved' "
             "AND is_demo=0").fetchone()
@@ -156,7 +157,7 @@ class JobDetailTest(EmploymentDomainTestBase):
 
     def test_pending_job_is_invisible_and_unapplicable(self):
         self.addCleanup(self._cleanup)
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("""
             INSERT INTO job_listings (title, company, salary, requirements, description,
                                       location, category, enterprise_id, review_status, is_demo)
@@ -198,7 +199,7 @@ class CertificatesAndPointsTest(EmploymentDomainTestBase):
         data = json.loads(self.client.get(
             '/api/employment/certificates/student_demo').data)
         self.assertTrue(data['success'])
-        conn = database.get_connection()
+        conn = get_connection()
         expected = [dict(r) for r in conn.execute(
             "SELECT name, status, progress, date FROM certificates "
             "WHERE user_id = 'student_demo' ORDER BY id")]
@@ -209,7 +210,7 @@ class CertificatesAndPointsTest(EmploymentDomainTestBase):
         data = json.loads(self.client.get(
             '/api/employment/points/student_demo').data)
         self.assertTrue(data['success'])
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute(
             "SELECT balance, history FROM points WHERE user_id='student_demo'").fetchone()
         conn.close()
@@ -243,7 +244,7 @@ class ApplyAndSaveTest(EmploymentDomainTestBase):
     """投递与收藏：参数校验、重复投递、收藏增删查。"""
 
     def _make_approved_job(self, title='__T15已审岗位__'):
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("""
             INSERT INTO job_listings (title, company, salary, requirements, description,
                                       location, category, enterprise_id, review_status, is_demo)
@@ -423,7 +424,7 @@ class LearnerProfileTest(EmploymentDomainTestBase):
                 self.assertIn(c['status'], ('earned', 'in_progress', 'locked'))
                 self.assertEqual(c['earned'], c['status'] == 'earned')
             # 积分必须等于 points 表的真实余额，不是编的
-            conn = database.get_connection()
+            conn = get_connection()
             row = conn.execute(
                 "SELECT balance FROM points WHERE user_id='student_demo'").fetchone()
             conn.close()
@@ -592,8 +593,8 @@ class JobIntentTest(EmploymentDomainTestBase):
         self.assertTrue(body['success'])
         self.assertFalse(body['created'])
         self.assertEqual(body['message'], '意向备注已更新')
-        self.assertEqual(len(database.get_job_intents('student_demo')), 1)
-        self.assertEqual(database.get_job_intents('student_demo')[0]['note'], '改了')
+        self.assertEqual(len(employment.get_job_intents('student_demo')), 1)
+        self.assertEqual(employment.get_job_intents('student_demo')[0]['note'], '改了')
 
         # 聚合接口把意向补全为可直接渲染的字段
         data = json.loads(self.client.get(
@@ -617,7 +618,7 @@ class JobIntentTest(EmploymentDomainTestBase):
                                                 'recruit_key': key}),
                                content_type='application/json', headers=headers)
         self.assertTrue(json.loads(r.data)['removed'])
-        self.assertEqual(database.get_job_intents('student_demo'), [])
+        self.assertEqual(employment.get_job_intents('student_demo'), [])
         # 再取消一次：未找到记录，仍然 200
         r = self.client.delete('/api/employment/intent',
                                data=json.dumps({'user_id': 'student_demo',
@@ -678,21 +679,21 @@ class SelfOnlyHelperOwnershipTest(EmploymentDomainTestBase):
     def test_has_resume_requires_real_content(self):
         from shared.resume_state import user_has_resume
         self.addCleanup(self._cleanup)
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
         conn.commit()
         conn.close()
         self.assertFalse(user_has_resume('student_demo'),
                          '没有简历行时必须判为没有简历')
 
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("INSERT INTO resumes (user_id, title) VALUES ('student_demo', '')")
         conn.commit()
         conn.close()
         self.assertFalse(user_has_resume('student_demo'),
                          '空白字段不算写过简历')
 
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute("UPDATE resumes SET title = '农产品电商运营' "
                      "WHERE user_id = 'student_demo'")
         conn.commit()
@@ -714,12 +715,12 @@ class SelfOnlyHelperOwnershipTest(EmploymentDomainTestBase):
         sid = self._login()
         try:
             self.addCleanup(self._cleanup)
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
             conn.commit()
             conn.close()
 
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("""
                 INSERT INTO job_listings (title, company, salary, requirements, description,
                                           location, category, enterprise_id, review_status, is_demo)

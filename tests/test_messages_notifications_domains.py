@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -57,8 +58,7 @@ class MessagesGuardTest(_LoggedInBase):
             content_type='application/json',
             headers=self._headers(self.sessions['student']))
         self.assertEqual(r.status_code, 200, r.data)
-        import database
-        conn = database.get_connection()
+        conn = get_connection()
         row = conn.execute(
             "SELECT id, sender_id FROM messages WHERE content = ?",
             ('__T18 伪造发送者__',)).fetchone()
@@ -66,7 +66,7 @@ class MessagesGuardTest(_LoggedInBase):
         self.assertIsNotNone(row)
         self.assertEqual(row['sender_id'], 'student_demo',
                          '发送者必须是会话用户，不能由请求体伪造')
-        conn = database.get_connection()
+        conn = get_connection()
         conn.execute('DELETE FROM messages WHERE id = ?', (row['id'],))
         conn.commit()
         conn.close()
@@ -88,8 +88,7 @@ class MessagesGuardTest(_LoggedInBase):
             '/api/messages/conversation/teacher_demo?user_id=student_demo',
             headers=self._headers(self.sessions['student']))
         self.assertEqual(r.status_code, 200)
-        import database
-        conn = database.get_connection()
+        conn = get_connection()
         unread = conn.execute(
             "SELECT COUNT(*) FROM messages WHERE sender_id = ? AND receiver_id = ? "
             "AND is_read = 0", ('teacher_demo', 'student_demo')).fetchone()[0]
@@ -122,8 +121,7 @@ class NotificationsGuardTest(_LoggedInBase):
 
     def test_total_unread_count_matches_the_four_sources(self):
         """未读总数 = 通知 + 私信会话 + 就业投递 + 系统公告，口径不得漂移。"""
-        import database
-        conn = database.get_connection()
+        conn = get_connection()
         notif = conn.execute(
             "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0",
             ('student_demo',)).fetchone()[0]

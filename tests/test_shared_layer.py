@@ -21,6 +21,7 @@ from shared.agri_dosage import has_chem_dosage  # noqa: E402
 from shared.copywriting import copy_score  # noqa: E402
 from shared.live_reading import live_cjk, live_speed_score  # noqa: E402
 from shared.options import category_option_list  # noqa: E402
+from db_connection import get_connection
 from shared.solar_terms import solar_terms, solar_terms_of_month  # noqa: E402
 
 
@@ -43,7 +44,6 @@ class SessionAuthTest(unittest.TestCase):
         self.assertIsNone(session.get_session_user())
 
     def test_valid_session_returns_user(self):
-        import database
         import json
         from flask import request
         client = self.app.test_client()
@@ -56,7 +56,7 @@ class SessionAuthTest(unittest.TestCase):
             user = session.get_session_user()
             self.assertEqual(user['username'], 'student_demo')
         finally:
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (session_id,))
             conn.commit()
             conn.close()

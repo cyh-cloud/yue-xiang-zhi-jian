@@ -101,8 +101,8 @@ def main():
 
     # 启动Flask应用
     try:
-        import database
-        database.init_db()
+        from db_init import init_db
+        init_db()
         print("✅ 数据库初始化完成")
         from app import app
         app.run(

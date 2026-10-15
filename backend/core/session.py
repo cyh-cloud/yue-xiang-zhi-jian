@@ -9,9 +9,10 @@ import os
 import threading
 import time
 
+from db_domains.auth import get_session
+from db_domains.users import get_user_by_id
 from flask import jsonify, request
 
-import database
 
 # 限流窗口（秒）。各接口的限额由各自的常量给出，窗口口径全站统一。
 RATE_WINDOW = 300
@@ -39,10 +40,10 @@ def get_session_user():
     session_id = request.headers.get('X-Session-Id', '')
     if not session_id:
         return None
-    session = database.get_session(session_id)
+    session = get_session(session_id)
     if not session:
         return None
-    user = database.get_user_by_id(session['user_id'])
+    user = get_user_by_id(session['user_id'])
     return user
 
 

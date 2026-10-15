@@ -12,7 +12,11 @@ get_total_unread_count 算出，本域只负责把它下发。
 from flask import Blueprint, jsonify, request
 
 from core.session import messages_self_guard
-import database
+from db_connection import get_connection
+from db_domains import announcements, employment, messages
+from db_domains import notifications as notifications_db
+
+CAPABILITIES_USED = ('notification.read', 'message.read')
 
 notifications_bp = Blueprint('notifications', __name__)
 
@@ -24,7 +28,7 @@ def get_notifications():
     _, err = messages_self_guard(user_id)
     if err:
         return err
-    notifications = database.get_notifications(user_id)
+    notifications = notifications_db.get_notifications(user_id)
     return jsonify({"success": True, "notifications": notifications})
 
 
@@ -38,12 +42,12 @@ def mark_notifications_read():
     # 全部已读必须覆盖消息中心的**四个数据源**：站内通知、私信、投递状态、系统公告。
     # 此前只标了 notifications 一张表，企业通知与系统公告永远不会变已读 ——
     # 表现为「点了全部已读，未读项一条不少」（2026-10-09 用户走查反馈）。
-    database.mark_notifications_read(user_id)
-    database.mark_all_messages_read(user_id)
-    database.mark_refs_read(user_id, 'job_application',
-                            database.get_job_application_ids(user_id))
-    database.mark_refs_read(user_id, 'system_announcement',
-                            database.get_active_system_announcement_ids())
+    notifications_db.mark_notifications_read(user_id)
+    messages.mark_all_messages_read(user_id)
+    notifications_db.mark_refs_read(user_id, 'job_application',
+                            employment.get_job_application_ids(user_id))
+    notifications_db.mark_refs_read(user_id, 'system_announcement',
+                            announcements.get_active_system_announcement_ids())
     return jsonify({"success": True})
 
 
@@ -57,8 +61,8 @@ def get_notification_read_state():
     return jsonify({
         "success": True,
         "refs": {
-            "system_announcement": database.get_read_refs(user_id, 'system_announcement'),
-            "job_application": database.get_read_refs(user_id, 'job_application')
+            "system_announcement": notifications_db.get_read_refs(user_id, 'system_announcement'),
+            "job_application": notifications_db.get_read_refs(user_id, 'job_application')
         }
     })
 
@@ -84,7 +88,7 @@ def mark_one_notification_read():
         return jsonify({"success": False, "message": "参数不完整"}), 400
 
     if source == 'notifications':
-        conn = database.get_connection()
+        conn = get_connection()
         # 只允许标自己的，避免拿别人的通知 id 乱标
         cur = conn.execute(
             "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND id = ? AND is_read = 0",
@@ -96,9 +100,9 @@ def mark_one_notification_read():
         if not changed:
             return jsonify({"success": False, "message": "通知不存在"}), 404
     elif source == 'messages':
-        database.mark_messages_read(ref_id, user_id)
+        messages.mark_messages_read(ref_id, user_id)
     elif source in ('system_announcement', 'job_application'):
-        database.mark_ref_read(user_id, source, ref_id)
+        notifications_db.mark_ref_read(user_id, source, ref_id)
     else:
         return jsonify({"success": False, "message": "未知的通知来源"}), 400
     return jsonify({"success": True})
@@ -110,7 +114,7 @@ def clear_read_notifications():
     _, err = messages_self_guard(user_id)
     if err:
         return err
-    database.clear_read_notifications(user_id)
+    notifications_db.clear_read_notifications(user_id)
     return jsonify({"success": True})
 
 
@@ -122,7 +126,7 @@ def get_unread_notification_count():
         return err
     # 口径与消息中心「未读」页签一致：四个数据源一起数。
     # 此前只数 notifications 表，红点数字比「未读」页签少一截。
-    count = database.get_total_unread_count(user_id)
+    count = notifications_db.get_total_unread_count(user_id)
     return jsonify({"success": True, "count": count})
 
 

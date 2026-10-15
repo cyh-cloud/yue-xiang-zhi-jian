@@ -31,8 +31,12 @@ from flask import Blueprint, jsonify, request
 from core.app_factory import BASE_DIR
 from core.permissions import TEACHER, require_capability
 from core.session import get_session_user
-import database
 from shared.training_status import training_status_label
+from db_connection import get_connection
+from db_domains import notifications, teaching
+from db_domains import courses as courses_db
+
+CAPABILITIES_USED = ('notification.read',)
 
 teaching_support_bp = Blueprint('teaching_support', __name__)
 
@@ -47,7 +51,7 @@ _MODEL_3D_MAX_BYTES = 50 * 1024 * 1024
 @teaching_support_bp.route('/api/teacher/announcements', methods=['GET'])
 @require_capability('teaching.read', anonymous=401)
 def get_announcements():
-    announcements = database.get_announcements()
+    announcements = teaching.get_announcements()
     return jsonify({"success": True, "announcements": announcements})
 
 
@@ -61,9 +65,9 @@ def create_announcement():
     pinned = 1 if data.get('pinned') else 0
     if not title or not content:
         return jsonify({"success": False, "message": "请填写标题和内容"})
-    aid = database.create_announcement(title, content, category, pinned)
+    aid = teaching.create_announcement(title, content, category, pinned)
     # 自动给所有学员发通知
-    database.create_notification_for_all_students(
+    notifications.create_notification_for_all_students(
         'announcement', f'新{category}', title, 'announcement', aid
     )
     return jsonify({"success": True, "message": "发布成功", "id": aid})
@@ -72,7 +76,7 @@ def create_announcement():
 @teaching_support_bp.route('/api/teacher/announcements/<int:ann_id>', methods=['DELETE'])
 @require_capability('teaching.manage', anonymous=401)
 def delete_announcement(ann_id):
-    if database.delete_announcement(ann_id):
+    if teaching.delete_announcement(ann_id):
         return jsonify({"success": True, "message": "删除成功"})
     return jsonify({"success": False, "message": "未找到通知"})
 
@@ -87,7 +91,7 @@ def delete_announcement(ann_id):
 @teaching_support_bp.route('/api/student/announcements', methods=['GET'])
 def get_my_announcements():
     """获取通知公告列表（学员可见）"""
-    announcements = database.get_announcements(limit=30)
+    announcements = teaching.get_announcements(limit=30)
     return jsonify({"success": True, "announcements": announcements})
 
 
@@ -109,12 +113,12 @@ def grade_submission():
     if submission_id is None or score is None:
         return jsonify({"success": False, "message": "请填写批改信息"})
     # 获取提交信息以发送通知
-    conn = database.get_connection()
+    conn = get_connection()
     sub = conn.execute("SELECT student_id, assignment_id FROM assignment_submissions WHERE id = ?", (submission_id,)).fetchone()
     conn.close()
-    if database.grade_submission(submission_id, score, feedback):
+    if teaching.grade_submission(submission_id, score, feedback):
         if sub:
-            database.create_notification(sub['student_id'], 'grade', '实训已批改', f'得分：{score}', 'assignment', sub['assignment_id'])
+            notifications.create_notification(sub['student_id'], 'grade', '实训已批改', f'得分：{score}', 'assignment', sub['assignment_id'])
         return jsonify({"success": True, "message": "批改成功"})
     return jsonify({"success": False, "message": "批改失败"})
 
@@ -128,7 +132,7 @@ def teacher_get_trainings():
     批改仍走既有 /api/teacher/assignments/grade，会给学员发站内通知。
     """
     out = []
-    for r in database.get_all_trainings():
+    for r in teaching.get_all_trainings():
         detail = {}
         try:
             detail = json.loads(r.get('content') or '{}')
@@ -178,7 +182,7 @@ def teacher_get_trainings():
 @teaching_support_bp.route('/api/teacher/analytics', methods=['GET'])
 @require_capability('teaching.read', anonymous=401)
 def get_analytics():
-    data = database.get_analytics_data()
+    data = teaching.get_analytics_data()
     return jsonify({"success": True, "analytics": data})
 
 
@@ -188,8 +192,8 @@ def get_analytics():
 @require_capability('course.read')
 def teacher_get_courses():
     user = get_session_user()
-    courses = database.get_courses(teacher_id=user['username'], published_only=False)
-    return jsonify({"success": True, "courses": courses})
+    course_list = courses_db.get_courses(teacher_id=user['username'], published_only=False)
+    return jsonify({"success": True, "courses": course_list})
 
 
 @teaching_support_bp.route('/api/teacher/courses', methods=['POST'])
@@ -197,7 +201,7 @@ def teacher_get_courses():
 def teacher_create_course():
     user = get_session_user()
     data = request.get_json()
-    course_id = database.create_course(
+    course_id = courses_db.create_course(
         data.get('title', ''), data.get('description', ''),
         data.get('category', ''), user['username'],
         data.get('cover_url', ''))
@@ -209,7 +213,7 @@ def teacher_create_course():
 def teacher_update_course(course_id):
     user = get_session_user()
     data = request.get_json()
-    database.update_course(course_id, **{k: v for k, v in data.items()
+    courses_db.update_course(course_id, **{k: v for k, v in data.items()
         if k in ('title', 'description', 'category', 'cover_url')})
     return jsonify({"success": True, "message": "更新成功"})
 
@@ -218,7 +222,7 @@ def teacher_update_course(course_id):
 @require_capability('course.manage')
 def teacher_delete_course(course_id):
     user = get_session_user()
-    database.delete_course(course_id)
+    courses_db.delete_course(course_id)
     return jsonify({"success": True, "message": "删除成功"})
 
 
@@ -226,7 +230,7 @@ def teacher_delete_course(course_id):
 
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>/materials', methods=['GET'])
 def teacher_get_materials(course_id):
-    materials = database.get_course_materials(course_id)
+    materials = courses_db.get_course_materials(course_id)
     return jsonify({"success": True, "materials": materials})
 
 
@@ -252,7 +256,7 @@ def teacher_add_material(course_id):
         mtype = 'pdf'
     else:
         mtype = 'other'
-    mat_id = database.add_course_material(course_id, mtype, f.filename, filepath)
+    mat_id = courses_db.add_course_material(course_id, mtype, f.filename, filepath)
     return jsonify({"success": True, "id": mat_id, "message": "上传成功"})
 
 
@@ -260,7 +264,7 @@ def teacher_add_material(course_id):
 @require_capability('course.manage')
 def teacher_delete_material(mat_id):
     user = get_session_user()
-    filepath = database.delete_course_material(mat_id)
+    filepath = courses_db.delete_course_material(mat_id)
     if filepath:
         full = os.path.join(BASE_DIR, filepath)
         if os.path.exists(full):
@@ -276,7 +280,7 @@ def teacher_get_models_3d():
     user = get_session_user()
     # 教师只看自己上传的；其他持 course.read 的角色看全部
     teacher_id = user['username'] if user['role'] == TEACHER else None
-    models = database.get_models_3d(teacher_id=teacher_id,
+    models = courses_db.get_models_3d(teacher_id=teacher_id,
                                     published_only=False)
     return jsonify({"success": True, "models": models})
 
@@ -309,7 +313,7 @@ def teacher_create_model_3d():
         if os.path.exists(save_full):
             os.remove(save_full)
         return jsonify({"success": False, "message": "文件过大，模型文件不能超过 50MB"}), 400
-    model_id = database.create_model_3d(title, description, craft_type,
+    model_id = courses_db.create_model_3d(title, description, craft_type,
                                          filepath, f.filename, file_size, user['username'])
     return jsonify({"success": True, "id": model_id, "message": "3D模型上传成功，等待审核"})
 
@@ -317,7 +321,7 @@ def teacher_create_model_3d():
 @teaching_support_bp.route('/api/teacher/models-3d/<int:model_id>', methods=['DELETE'])
 @require_capability('course.manage', anonymous=401)
 def teacher_delete_model_3d(model_id):
-    filepath = database.delete_model_3d(model_id)
+    filepath = courses_db.delete_model_3d(model_id)
     if filepath:
         full = os.path.join(BASE_DIR, filepath)
         if os.path.exists(full):

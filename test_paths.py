@@ -20,7 +20,7 @@ import sys
 import tempfile
 import unittest
 
-# 探针复制的是 database.py 与 app.py，它们在 backend/ 下，故基准指向 backend/。
+# 探针复制的是 db_connection.py 与 app.py，它们在 backend/ 下，故基准指向 backend/。
 # repo_paths.REPO_ROOT 仍是仓库根，两者不要混：前者是「后端代码在哪」，
 # 后者是「data/、uploads/、.env 在哪」。
 REPO_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'backend')
@@ -28,6 +28,8 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import repo_paths  # noqa: E402
+from db_connection import get_connection
+from db_domains import courses
 
 
 # database.py 在 T04 之后是聚合模块，import 时会拉进 db_connection 等兄弟模块。
@@ -50,7 +52,7 @@ def _restore_infra_modules(snapshot):
     """把基础设施模块恢复成探针之前的**同一个**模块对象。
 
     不能图省事写成「踢掉再 import」：重新 import 会产生新的函数对象，
-    database.get_connection 仍指向旧的那个，于是 database 与 db_connection
+    db_connection.get_connection 仍指向旧的那个，于是 database 与 db_connection
     的同一个函数变成两个身份，后续用例会连到两份不同的库上。
     """
     for name, module in snapshot.items():
@@ -79,7 +81,7 @@ def load_copy(probe_dir, filename, module_name):
     finally:
         sys.modules.pop(module_name, None)
         # 探针跑完把基础设施模块原样放回，避免后续用例拿到被踢掉的半成品，
-        # 同时不改变 database.get_connection 这些已绑定符号的身份。
+        # 同时不改变 db_connection.get_connection 这些已绑定符号的身份。
         _restore_infra_modules(snapshot)
     return module
 
@@ -112,7 +114,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
                          os.path.dirname(os.path.dirname(
                              os.path.abspath(repo_paths.__file__))))
         # 后端代码的标记文件在 backend/ 下
-        for marker in ('app.py', 'database.py', 'repo_paths.py'):
+        for marker in ('app.py', 'db_connection.py', 'repo_paths.py'):
             self.assertTrue(
                 os.path.isfile(os.path.join(repo_paths.REPO_ROOT, 'backend', marker)),
                 '%s 不在 %s 下' % (marker, repo_paths.REPO_ROOT))
@@ -123,7 +125,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
                 '%s 不在 %s 下' % (marker, repo_paths.REPO_ROOT))
 
     def test_database_dir_follows_repo_root_not_module_location(self):
-        probe = load_copy(self.probe_dir, 'database.py', 'database_probe_moved')
+        probe = load_copy(self.probe_dir, 'db_connection.py', 'database_probe_moved')
         self.assertNotEqual(os.path.dirname(probe.__file__), repo_paths.REPO_ROOT,
                             '探针必须真的位于子目录里，否则这条用例没有意义')
         self.assertEqual(probe.DB_DIR, os.path.join(repo_paths.REPO_ROOT, 'data'))
@@ -136,7 +138,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
         previous_cwd = os.getcwd()
         os.chdir(elsewhere)
         self.addCleanup(os.chdir, previous_cwd)
-        probe = load_copy(self.probe_dir, 'database.py', 'database_probe_cwd')
+        probe = load_copy(self.probe_dir, 'db_connection.py', 'database_probe_cwd')
         self.assertEqual(probe.DB_DIR, os.path.join(repo_paths.REPO_ROOT, 'data'))
         self.assertEqual(probe.DB_PATH,
                          os.path.join(repo_paths.REPO_ROOT, 'data', 'yuexiang.db'))
@@ -148,7 +150,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
         original = os.environ.get('YUEXIANG_DB')
         os.environ['YUEXIANG_DB'] = isolated
         self.addCleanup(self._restore_env, 'YUEXIANG_DB', original)
-        probe = load_copy(self.probe_dir, 'database.py', 'database_probe_override')
+        probe = load_copy(self.probe_dir, 'db_connection.py', 'database_probe_override')
         self.assertEqual(probe.DB_PATH, isolated)
         conn = probe.get_connection()
         conn.close()
@@ -184,7 +186,6 @@ class RepoRootPathBaselineTest(unittest.TestCase):
 
     def test_uploaded_files_round_trip_through_the_static_route(self):
         """上传落盘目录与静态放行目录必须指向同一处：存得下，也要原路取回。"""
-        import database
         from app import app
 
         client = app.test_client()
@@ -207,7 +208,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
                 headers=headers)
             self.assertEqual(uploaded.status_code, 200)
             material_id = json.loads(uploaded.data)['id']
-            row = next(r for r in database.get_course_materials(course_id)
+            row = next(r for r in courses.get_course_materials(course_id)
                        if r['id'] == material_id)
             self._assert_round_trip(client, row['file_path'], material_bytes, written)
 
@@ -219,7 +220,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
                 headers=headers)
             self.assertEqual(model.status_code, 200)
             model_id = json.loads(model.data)['id']
-            conn = database.get_connection()
+            conn = get_connection()
             model_row = conn.execute(
                 "SELECT file_path FROM models_3d WHERE id = ?", (model_id,)).fetchone()
             conn.close()
@@ -229,7 +230,7 @@ class RepoRootPathBaselineTest(unittest.TestCase):
                 client.delete('/api/teacher/materials/%d' % material_id, headers=headers)
             if model_id:
                 client.delete('/api/teacher/models-3d/%d' % model_id, headers=headers)
-            conn = database.get_connection()
+            conn = get_connection()
             conn.execute("DELETE FROM course_materials WHERE course_id = ?", (course_id,))
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (session_id,))
             conn.commit()

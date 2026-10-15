@@ -24,11 +24,16 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from core.session import TEACHER_ROLES, require_role
-import database
+from db_domains import students as students_db
+from db_domains.teaching import get_dashboard_stats, get_roster_completion
+from db_domains.users import register_user
 
 from domains.teacher.reports import _build_fallback_overview, _build_fallback_report, generate_report
 
 logger = logging.getLogger(__name__)
+
+# 本域读 users：给新学员建账号时要按用户名解析是否已存在。
+CAPABILITIES_USED = ('user.read', 'teaching.read')
 
 teacher_bp = Blueprint('teacher', __name__)
 
@@ -38,7 +43,7 @@ teacher_bp = Blueprint('teacher', __name__)
 def get_teacher_dashboard():
     # 2026-10-07：原返回里有一段硬编码的 recent_activities（"张小明 2小时前" 等
     # 编造数据），前端从未渲染它。按「不编造」红线直接移除，只回真实统计。
-    stats = database.get_dashboard_stats()
+    stats = get_dashboard_stats()
     return jsonify({"success": True, "dashboard": {"stats": stats}})
 
 
@@ -46,10 +51,10 @@ def get_teacher_dashboard():
 @require_role(*TEACHER_ROLES)
 def get_students():
     search = request.args.get('search', None)
-    students = database.get_students(search)
+    students = students_db.get_students(search)
     # 附上「证书真实完成度」—— 名册自己的 progress 是手填字段，学员端没有任何入口
     # 会更新它；前端「已获得证书」的判定改用真实证书数据（2026-10-07）。
-    comp = {r['id']: r for r in database.get_roster_completion()}
+    comp = {r['id']: r for r in get_roster_completion()}
     for s in students:
         r = comp.get(s['id'])
         if r:
@@ -64,9 +69,9 @@ def get_students():
 @require_role(*TEACHER_ROLES)
 def get_student_detail(student_id):
     """获取学员详情（附证书真实完成度）"""
-    student = database.get_student(student_id)
+    student = students_db.get_student(student_id)
     if student:
-        for r in database.get_roster_completion():
+        for r in get_roster_completion():
             if r['id'] == student_id:
                 student.update({
                     'cert_total': r['cert_total'], 'cert_earned': r['cert_earned'],
@@ -104,19 +109,19 @@ def add_student():
     if new_username:
         if len(new_password) < 6:
             return jsonify({"success": False, "message": "初始密码至少 6 位"}), 400
-        uid, msg = database.register_user(new_username, new_password, name, 'student')
+        uid, msg = register_user(new_username, new_password, name, 'student')
         if not uid:
             return jsonify({"success": False, "message": f"账号创建失败：{msg}"}), 400
         account_username = uid
     elif link_username:
         account_username = link_username
 
-    sid = database.add_student(name, class_name, direction)
+    sid = students_db.add_student(name, class_name, direction)
     if account_username:
-        ok, msg = database.set_student_account(sid, account_username)
+        ok, msg = students_db.set_student_account(sid, account_username)
         if not ok:
             # 关联失败（账号不存在 / 已被别人占用…）→ 回滚名册行，避免留下孤儿记录
-            database.delete_student(sid)
+            students_db.delete_student(sid)
             return jsonify({"success": False, "message": msg}), 400
         tail = (f'已新建并关联账号 {account_username}' if new_username
                 else f'已关联账号 {account_username}')
@@ -131,7 +136,7 @@ def add_student():
 @require_role(*TEACHER_ROLES)
 def get_linkable_accounts():
     """可供名册关联的学员账号（role=student 且未被占用）。"""
-    return jsonify({"success": True, "accounts": database.get_linkable_student_accounts()})
+    return jsonify({"success": True, "accounts": students_db.get_linkable_student_accounts()})
 
 
 @teacher_bp.route('/api/teacher/students/<student_id>/link', methods=['POST'])
@@ -140,7 +145,7 @@ def link_student_account(student_id):
     """关联 / 解除名册与平台账号。body: {"username": "xxx"}，空串表示解除。"""
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
-    ok, msg = database.set_student_account(student_id, username)
+    ok, msg = students_db.set_student_account(student_id, username)
     if not ok:
         return jsonify({"success": False, "message": msg}), 400
     return jsonify({"success": True, "message": msg, "user_id": username})
@@ -151,7 +156,7 @@ def link_student_account(student_id):
 def update_student(student_id):
     """编辑学员"""
     data = request.get_json()
-    result = database.update_student(
+    result = students_db.update_student(
         student_id,
         name=data.get('name'),
         class_name=data.get('class_name'),
@@ -168,7 +173,7 @@ def update_student(student_id):
 @require_role(*TEACHER_ROLES)
 def delete_student(student_id):
     """删除学员"""
-    result = database.delete_student(student_id)
+    result = students_db.delete_student(student_id)
     if result:
         return jsonify({"success": True, "message": "删除成功"})
     return jsonify({"success": False, "message": "未找到学员"})
@@ -187,7 +192,7 @@ def generate_teacher_report():
         # 2026-10-07：改用「证书真实完成度」口径（get_roster_completion）。
         # 原 context 直接聚合 students.progress —— 那是**手填**字段，学员端没有任何
         # 入口会更新它，AI 据此写出的「学员进度」与真实学习情况无关。
-        roster = database.get_roster_completion()
+        roster = get_roster_completion()
         if not roster:
             return jsonify({"success": True, "report": {
                 "title": "AI 教学报告",
@@ -207,7 +212,7 @@ def generate_teacher_report():
         logger.error(f"报告生成失败: {e}")
         # 兜底报告（口径与主路径一致：证书真实完成度）
         try:
-            roster = database.get_roster_completion()
+            roster = get_roster_completion()
             fallback = _build_fallback_report(roster, user_prompt)
             overview = _build_fallback_overview(roster, user_prompt)
         except Exception:

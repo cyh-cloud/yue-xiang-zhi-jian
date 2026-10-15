@@ -14,10 +14,11 @@ tests/test_auth_profile_domains.py 锁定）。
 """
 
 from flask import Blueprint, jsonify, request
+from db_domains import auth, users
 
 from core.permissions import capabilities_for_role
 
-import database
+CAPABILITIES_USED = ('auth.read', 'user.read')
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -35,11 +36,11 @@ def login():
     if not username or not password:
         return jsonify({"success": False, "message": "请输入用户名和密码"}), 400
 
-    user = database.authenticate_user(username, password)
+    user = auth.authenticate_user(username, password)
     if user:
         if user.get('status') == 'suspended':
             return jsonify({"success": False, "message": "账号已被停用，请联系管理员"}), 403
-        session_id = database.create_session(username)
+        session_id = auth.create_session(username)
         return jsonify({
             "success": True,
             "session_id": session_id,
@@ -61,7 +62,7 @@ def logout():
     data = request.get_json()
     session_id = data.get('session_id')
     if session_id:
-        database.delete_session(session_id)
+        auth.delete_session(session_id)
     return jsonify({"success": True, "message": "已退出登录"})
 
 
@@ -72,14 +73,14 @@ def verify_session():
     if not session_id:
         return jsonify({"success": False, "message": "未提供session"}), 401
 
-    session = database.get_session(session_id)
+    session = auth.get_session(session_id)
     if session:
         # ⚠️ 这里必须与 /api/auth/login 返回同一套 user 结构。
-        # 前端 restoreSession() 会用它**整体覆盖** AppState.user，而 database.get_session()
+        # 前端 restoreSession() 会用它**整体覆盖** AppState.user，而 auth.get_session()
         # 只给 {user_id, name, role}（键名是 user_id，没有 id）→ AppState.user.id 变成
         # undefined，此后所有 `/api/.../${AppState.user.id}` 都会拼成 `/api/.../undefined`。
         # 旧接口大多不校验 user_id 所以没暴露；就业对接的 _self_only() 会直接 403。
-        user = database.get_user_by_id(session['user_id']) or {}
+        user = users.get_user_by_id(session['user_id']) or {}
         return jsonify({
             "success": True,
             "user": {
@@ -121,11 +122,11 @@ def register():
     if role not in SELF_SERVICE_ROLES:
         return jsonify({"success": False, "message": "无效的角色类型"}), 400
 
-    user_id, msg = database.register_user(username, password, name, role,
+    user_id, msg = users.register_user(username, password, name, role,
                                           email, phone, company_name, region)
     if user_id:
-        session_id = database.create_session(username)
-        user = database.get_user_by_id(username)
+        session_id = auth.create_session(username)
+        user = users.get_user_by_id(username)
         return jsonify({
             "success": True,
             "message": msg,

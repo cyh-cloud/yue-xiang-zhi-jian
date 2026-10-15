@@ -23,7 +23,6 @@ from flask import Blueprint, jsonify, request
 from ai.client import AI_REASONING_TOKEN_RESERVE, call_ai_service
 import ai.client
 from core.session import client_key, rate_limited, self_only_guard
-import database
 from domains.employment_profile.prompts import (
     RESUME_AI_RATE_LIMIT,
     RESUME_AI_SECTION_MAX_LEN,
@@ -32,6 +31,7 @@ from domains.employment_profile.prompts import (
 )
 from domains.employment_profile.service import profile_for_ai
 from domains.employment_profile.service import user_has_resume
+from db_domains import employment
 
 employment_profile_bp = Blueprint('employment_profile', __name__)
 
@@ -60,7 +60,7 @@ def get_employment_profile(user_id):
     user, err = _self_only(user_id)
     if err:
         return err
-    profile = database.get_learner_profile(user_id)
+    profile = employment.get_learner_profile(user_id)
     return jsonify({"success": True, "profile": profile})
 
 
@@ -69,7 +69,7 @@ def get_resume(user_id):
     user, err = _self_only(user_id)
     if err:
         return err
-    return jsonify({"success": True, "resume": database.get_resume(user_id)})
+    return jsonify({"success": True, "resume": employment.get_resume(user_id)})
 
 
 @employment_profile_bp.route('/api/employment/resume/<user_id>', methods=['PUT'])
@@ -79,7 +79,7 @@ def save_resume(user_id):
     if err:
         return err
     data = request.get_json(silent=True) or {}
-    resume = database.save_resume(user_id, data)
+    resume = employment.save_resume(user_id, data)
     return jsonify({"success": True, "message": "简历已保存", "resume": resume})
 
 
@@ -117,11 +117,11 @@ def resume_ai_generate():
         return jsonify({"success": False, "code": "ai_not_configured",
                         "message": "AI 辅助功能尚未启用，请联系管理员（12316）"}), 503
 
-    profile = database.get_learner_profile(user_id)
+    profile = employment.get_learner_profile(user_id)
     material = profile_for_ai(profile)
     label = RESUME_AI_SECTIONS[section]
 
-    resume = database.get_resume(user_id) or {}
+    resume = employment.get_resume(user_id) or {}
     own_input = ''
     if section == 'experience':
         exp = resume.get('experience') or []
@@ -153,7 +153,7 @@ def resume_ai_generate():
         return jsonify({"success": False, "code": "ai_unavailable",
                         "message": "AI 没有返回内容，请稍后重试"}), 503
 
-    database.mark_resume_ai_used(user_id)
+    employment.mark_resume_ai_used(user_id)
     return jsonify({
         "success": True,
         "section": section,
@@ -185,7 +185,7 @@ def add_job_intent():
         return jsonify({"success": False, "code": "not_found",
                         "message": "公告不存在或已下架"}), 404
 
-    created = database.add_job_intent(user_id, recruit_key, note)
+    created = employment.add_job_intent(user_id, recruit_key, note)
     return jsonify({
         "success": True,
         "created": created,
@@ -205,7 +205,7 @@ def remove_job_intent():
     user, err = _self_only(user_id)
     if err:
         return err
-    removed = database.remove_job_intent(user_id, recruit_key)
+    removed = employment.remove_job_intent(user_id, recruit_key)
     return jsonify({"success": True, "removed": removed,
                     "message": "已取消意向登记" if removed else "未找到该意向记录"})
 
@@ -222,14 +222,14 @@ def get_my_jobs(user_id):
     if err:
         return err
 
-    applications = database.get_user_applications(user_id)
+    applications = employment.get_user_applications(user_id)
     for a in applications:
         a['channel'] = 'enterprise'
 
     # 意向记录只有 recruit_key，这里补上公告的标题/单位/地区/报名截止，
     # 并对**已从 jobs_data 中移除**的公告做剪枝（否则会渲染出一条点不开的空卡）。
     intents = []
-    for it in database.get_job_intents(user_id):
+    for it in employment.get_job_intents(user_id):
         rec = jobs_data.get_recruitment(it['recruit_key'])
         if not rec:
             continue

@@ -15,12 +15,12 @@ import json
 import os
 import sys
 import unittest
+from db_connection import get_connection
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-import database  # noqa: E402
 
 # 一张合法的最小 PNG data URL，供「成功路径」用例使用。
 PNG_DATA_URL = 'data:image/png;base64,' + base64.b64encode(
@@ -46,7 +46,7 @@ class PestDomainTestBase(unittest.TestCase):
         return json.loads(response.data)['session_id']
 
     def _cleanup_sessions(self, sid):
-        conn = database.get_connection()
+        conn = get_connection()
         if sid:
             conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (sid,))
         conn.commit()

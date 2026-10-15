@@ -15,8 +15,8 @@
 from flask import Blueprint, jsonify, request
 
 from core.session import get_session_user
+from db_domains import community
 
-import database
 
 community_bp = Blueprint('community', __name__)
 
@@ -27,7 +27,7 @@ def public_get_comments():
     target_id = request.args.get('target_id', 0, type=int)
     if not target_type or not target_id:
         return jsonify({"success": False, "message": "参数不完整"}), 400
-    comments = database.get_comments(target_type, target_id)
+    comments = community.get_comments(target_type, target_id)
     return jsonify({"success": True, "comments": comments})
 
 
@@ -42,7 +42,7 @@ def public_add_comment():
     content = data.get('content', '').strip()
     if not target_type or not target_id or not content:
         return jsonify({"success": False, "message": "参数不完整"}), 400
-    comment_id = database.add_comment(target_type, target_id, user['username'], content)
+    comment_id = community.add_comment(target_type, target_id, user['username'], content)
     return jsonify({"success": True, "id": comment_id, "message": "评论成功"})
 
 
@@ -50,7 +50,7 @@ def public_add_comment():
 def public_get_discussions():
     category = request.args.get('category', '')
     page = request.args.get('page', 1, type=int)
-    discs, total = database.get_discussions(category=category or None, page=page)
+    discs, total = community.get_discussions(category=category or None, page=page)
     return jsonify({"success": True, "discussions": discs, "total": total})
 
 
@@ -65,14 +65,14 @@ def public_create_discussion():
     category = data.get('category', 'general')
     if not title or not content:
         return jsonify({"success": False, "message": "标题和内容不能为空"}), 400
-    disc_id = database.create_discussion(title, content, category, user['username'])
+    disc_id = community.create_discussion(title, content, category, user['username'])
     return jsonify({"success": True, "id": disc_id, "message": "发布成功"})
 
 
 @community_bp.route('/api/discussions/<int:disc_id>', methods=['GET'])
 def public_get_discussion(disc_id):
-    disc = database.get_discussion(disc_id)
+    disc = community.get_discussion(disc_id)
     if not disc:
         return jsonify({"success": False, "message": "帖子不存在"}), 404
-    comments = database.get_comments('discussion', disc_id)
+    comments = community.get_comments('discussion', disc_id)
     return jsonify({"success": True, "discussion": disc, "comments": comments})

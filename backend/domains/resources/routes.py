@@ -28,7 +28,8 @@ from ai.client import (
     chat_model,
 )
 from core.session import client_key, rate_limited
-import database
+from db_domains import resources
+from db_domains import policies as policies_db
 
 from domains.resources.dialect_voice import (
     _chem_dose_notice_for,
@@ -72,20 +73,20 @@ def get_dialect_info():
 
 @resources_bp.route('/api/resources/cases', methods=['GET'])
 def get_success_cases():
-# 内容唯一事实源 = domain_data.resources.cases_data（经 database.get_success_cases 读取，不落库）
+# 内容唯一事实源 = domain_data.resources.cases_data（经 resources.get_success_cases 读取，不落库）
     # ⚠️ 只下发**超级管理员审核通过**的案例（审核状态存 content_reviews，见 _seed_case_reviews）
-    cases = database.get_success_cases()
+    cases = resources.get_success_cases()
     payload = {"success": True, "cases": cases}
-    payload.update(database.get_case_notes())
+    payload.update(resources.get_case_notes())
     # 附审核统计：前端据此区分"审核中"与"加载失败"，不把待审当成没数据
-    payload.update(database.get_case_review_stats())
+    payload.update(resources.get_case_review_stats())
     return jsonify(payload)
 
 
 @resources_bp.route('/api/resources/cases/<int:case_id>', methods=['GET'])
 def get_success_case(case_id):
     # 同样只认审核通过的案例 —— 否则未通过/已驳回的案例能靠直链看到，审核就形同虚设
-    cases = database.get_success_cases()
+    cases = resources.get_success_cases()
     case = next((c for c in cases if c['id'] == case_id), None)
     if case:
         return jsonify({"success": True, "case": case})
@@ -101,10 +102,10 @@ def get_policies():
     #    `get_government_policies()` 返回空 → 降级逻辑把旧表那 5 条端上学員端
     #    → 政务人员明明点了「下架」，学员端却一条没少（实测表现为"下架完全无效"）。
     #    下架是政府对外的正式动作，必须真实生效；学员端「空」就是要如实呈现为空。
-    policies = database.get_government_policies()
+    policies = policies_db.get_government_policies()
     payload = {"success": True, "policies": policies}
 # 口径说明（来源说明 + 免责声明）与内容同源，由 domain_data.resources.policies_data 提供
-    payload.update(database.get_policy_notes())
+    payload.update(resources.get_policy_notes())
     return jsonify(payload)
 
 

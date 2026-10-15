@@ -14,7 +14,10 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import database
+from db_connection import get_connection
+from db_init import init_db
+from db_seed_demo_jobs import DEMO_JOBS
+from db_seed_policies import POLICIES_DATA
 
 
 def table_names(conn):
@@ -34,15 +37,15 @@ def table_counts(conn):
 
 
 def probe_tables():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     names = table_names(conn)
     conn.close()
     print(json.dumps(names))
 
 
 def probe_pragmas():
-    conn = database.get_connection()
+    conn = get_connection()
     print(json.dumps({
         'journal': conn.execute('PRAGMA journal_mode').fetchone()[0].lower(),
         'foreign_keys': conn.execute('PRAGMA foreign_keys').fetchone()[0],
@@ -53,11 +56,11 @@ def probe_pragmas():
 
 
 def probe_seed_counts():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     out = {
-        'policies_total': len(database.POLICIES_DATA),
-        'demo_jobs': len(database.DEMO_JOBS),
+        'policies_total': len(POLICIES_DATA),
+        'demo_jobs': len(DEMO_JOBS),
     }
     for name in ('users', 'points', 'students', 'certificates', 'policies',
                  'government_policies', 'carousels', 'system_announcements',
@@ -69,20 +72,20 @@ def probe_seed_counts():
 
 
 def probe_schema_stable_across_rerun():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     before = table_columns(conn)
     conn.close()
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     after = table_columns(conn)
     conn.close()
     print(json.dumps([before, after]))
 
 
 def probe_seed_idempotent():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     before = table_counts(conn)
     before['demo_job_ids'] = sorted(
         r[0] for r in conn.execute(
@@ -92,8 +95,8 @@ def probe_seed_idempotent():
             'SELECT id, review_status FROM job_listings WHERE is_demo = 1'
         ).fetchall())
     conn.close()
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     after = table_counts(conn)
     after['demo_job_ids'] = sorted(
         r[0] for r in conn.execute(
@@ -107,8 +110,8 @@ def probe_seed_idempotent():
 
 
 def probe_review_conclusions_survive_rerun():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     demo_id = conn.execute(
         'SELECT id FROM job_listings WHERE is_demo = 1 ORDER BY id LIMIT 1'
     ).fetchone()[0]
@@ -125,9 +128,8 @@ def probe_review_conclusions_survive_rerun():
         "SELECT id FROM job_listings WHERE title = '__t04真实岗位__'").fetchone()[0]
     conn.close()
 
-    database.init_db()
-
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     print(json.dumps({
         'demo_status': conn.execute(
             'SELECT review_status FROM job_listings WHERE id = ?',
@@ -142,22 +144,22 @@ def probe_review_conclusions_survive_rerun():
 
 
 def probe_legacy_demo_jobs_cleaned():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     conn.execute("INSERT INTO job_listings (title, company, enterprise_id) "
                  "VALUES ('__t04遗留预置__', '假公司', '')")
     conn.commit()
     conn.close()
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     print(json.dumps(conn.execute(
         "SELECT COUNT(*) FROM job_listings WHERE enterprise_id = ''").fetchone()[0]))
     conn.close()
 
 
 def probe_demo_job_review_records():
-    database.init_db()
-    conn = database.get_connection()
+    init_db()
+    conn = get_connection()
     print(json.dumps(conn.execute(
         "SELECT COUNT(*) FROM content_reviews WHERE content_type = 'job'"
     ).fetchone()[0]))
@@ -165,7 +167,7 @@ def probe_demo_job_review_records():
 
 
 def probe_override_creates_db():
-    conn = database.get_connection()
+    conn = get_connection()
     conn.close()
     print(json.dumps(os.path.isfile(os.environ['YUEXIANG_DB'])))
 
