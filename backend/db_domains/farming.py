@@ -27,6 +27,15 @@ __all__ = [
     'has_farming_reminder_sent', 'is_farming_subscribed',
     'mark_farming_reminder_sent', 'set_farming_subscription',
     'month_in_phase', 'farming_task_brief',
+    'create_farming_category', 'delete_farming_category',
+    'update_farming_category', 'create_farming_phenophase',
+    'update_farming_phenophase', 'delete_farming_phenophase',
+    'get_farming_phenophase_by_id', 'create_farming_source',
+    'update_farming_source', 'delete_farming_source',
+    'get_farming_source_by_key', 'create_farming_product',
+    'update_farming_product', 'delete_farming_product', 'create_farming_task',
+    'update_farming_task', 'delete_farming_task', 'verify_farming_task',
+    'get_farming_overdue_tasks',
 ]
 
 
@@ -248,4 +257,390 @@ def get_due_farming_tasks(product_id, year, month, until_day=None):
     return out
 
 
-# ==================== 认证 ====================
+# ==================== 运营维护（写侧，T14） ====================
+# 下面这批函数服务运营后台（domains/operator）。三条口径：
+#
+# 1. 列名白名单：update_* 只收 fields 字典里登记过的列，未知键一律忽略。
+#    客户端改不到 id / created_at，也不必为每个字段写一个参数。
+# 2. 校验归路由层，写侧只保证落库的形状合法：任务缺 product_id / title / month
+#    这类缺了就渲染不出来的字段直接 ValueError，由路由转 400。
+# 3. 本域没有跨域删除：farming_* 全部由外键级联兜住（foreign_keys=ON），
+#    所以这里不需要「先 commit 再删别人」的顺序，也不需要 reviews 域参与
+#    —— farming 的内容不送审。
+
+# 任务表可写的列。id / created_at / verified_* 不在其中：id 由自增分配，
+# verified_* 只能经 verify_farming_task 改（要留复核人）。
+_TASK_FIELDS = ('product_id', 'phase_id', 'title', 'category', 'priority',
+                'task_md', 'month', 'icon', 'description', 'tip', 'source_key',
+                'date_basis', 'is_verified', 'is_active', 'sort_order')
+_PHASE_FIELDS = ('product_id', 'name', 'start_month', 'end_month', 'color',
+                 'description', 'sort_order')
+_PRODUCT_FIELDS = ('name', 'icon', 'summary', 'region', 'sort_order', 'is_active')
+_SOURCE_FIELDS = ('name', 'org', 'doc_type', 'doc_no', 'url', 'sort_order')
+_CATEGORY_FIELDS = ('label', 'color', 'sort_order')
+
+# 复核过期阈值（天）。「半年前核的、该重新核了」按 183 天算：半年按 365/2 取整，
+# 不按 30*6，否则 2 月核的到 8 月就该重核，比「半年」短了 12 天。
+REVIEW_STALE_DAYS = 183
+
+
+def _pick(fields, allowed):
+    """按白名单挑出要写的列。None 表示「不碰这一列」，与「置空」是两件事。"""
+    return {k: v for k, v in fields.items() if k in allowed and v is not None}
+
+
+def _int_or(value, default):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+# ---- 农事任务 ----
+
+def create_farming_task(product_id, title, category, month, **fields):
+    """新增一条农事任务，返回新 id。"""
+    product_id = (product_id or '').strip()
+    title = (title or '').strip()
+    category = (category or '').strip()
+    if not product_id:
+        raise ValueError('缺少 product_id')
+    if not title:
+        raise ValueError('任务标题不能为空')
+    if not category:
+        raise ValueError('缺少 category')
+    month = _int_or(month, None)
+    if month is None or month < 1 or month > 12:
+        raise ValueError('month 需为 1 到 12 的整数')
+
+    values = _pick(fields, _TASK_FIELDS)
+    values.update({'product_id': product_id, 'title': title,
+                   'category': category, 'month': month})
+    columns = ', '.join(values)
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO farming_tasks (%s) VALUES (%s)"
+        % (columns, ', '.join('?' * len(values))), list(values.values()))
+    task_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return task_id
+
+
+def update_farming_task(task_id, **fields):
+    """按白名单改一条农事任务。字段全是 None 时不动库，返回是否真的改了。"""
+    updates = _pick(fields, _TASK_FIELDS)
+    if 'product_id' in updates:
+        updates['product_id'] = (updates['product_id'] or '').strip()
+    if 'title' in updates:
+        updates['title'] = (updates['title'] or '').strip()
+    if 'category' in updates:
+        updates['category'] = (updates['category'] or '').strip()
+    if not updates:
+        return False
+    # 只校验**这次传进来的**字段：PUT 是局部改，运营改一个标题不该被要求
+    # 把整条任务重填一遍，所以不能拿「没传的字段也是空」当错误。
+    for key in ('product_id', 'title', 'category'):
+        if key in updates and not updates[key]:
+            raise ValueError('%s 不允许置空' % key)
+    if 'month' in updates:
+        month = _int_or(updates['month'], None)
+        if month is None or month < 1 or month > 12:
+            raise ValueError('month 需为 1 到 12 的整数')
+        updates['month'] = month
+    if 'task_md' in updates:
+        updates['task_md'] = (updates['task_md'] or '').strip()
+    set_clause = ', '.join('%s=?' % column for column in updates)
+    conn = get_connection()
+    cur = conn.execute("UPDATE farming_tasks SET %s WHERE id=?"
+                       % set_clause, list(updates.values()) + [task_id])
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0
+
+
+def delete_farming_task(task_id):
+    """删除一条农事任务。返回是否真的删掉了行。"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM farming_tasks WHERE id = ?", (task_id,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted > 0
+
+
+def verify_farming_task(task_id, verifier):
+    """标记已复核：写 is_verified=1 与 verified_by / verified_at（当前登录用户）。
+
+    verified_at 走 SQLite 的 localtime，与库里其它时间列同一口径
+    （datetime('now','localtime')），不引入 Python 侧时钟，避免两台机器时区不一致。
+    """
+    verifier = (verifier or '').strip()
+    if not verifier:
+        raise ValueError('复核人不能为空')
+    conn = get_connection()
+    cur = conn.execute(
+        "UPDATE farming_tasks SET is_verified = 1, verified_by = ?, "
+        "verified_at = datetime('now','localtime') WHERE id = ?", (verifier, task_id))
+    updated = cur.rowcount
+    conn.commit()
+    conn.close()
+    return updated > 0
+
+
+def get_farming_overdue_tasks(days=REVIEW_STALE_DAYS, product_id=None):
+    """复核超期的农事任务：超过 days 天没再核的，以及从未复核的。
+
+    「半年前核的、该重新核了」的口径：verified_at 距今天超过 days 天算超期；
+    verified_at 为空的（从未复核）同样该核，一并列出。按复核时间升序，
+    让「最早该重核的」排在列表最上面。
+    """
+    conn = get_connection()
+    sql = ("SELECT t.*, p.name AS phase_name, p.color AS phase_color "
+           "FROM farming_tasks t "
+           "LEFT JOIN farming_phenophases p ON p.id = t.phase_id "
+           "WHERE t.is_active = 1 AND (t.verified_at = '' OR "
+           "julianday('now', 'localtime') - julianday(t.verified_at) > ?)")
+    params = [days]
+    if product_id:
+        sql += " AND t.product_id = ?"
+        params.append(product_id)
+    sql += " ORDER BY t.verified_at = '' DESC, t.verified_at"
+    rows = [dict(r) for r in conn.execute(sql, params).fetchall()]
+    conn.close()
+    return rows
+
+
+# ---- 物候期 ----
+
+# ---- 物候期 ----
+
+def get_farming_phenophase_by_id(phase_id):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM farming_phenophases WHERE id = ?",
+                       (phase_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def create_farming_phenophase(product_id, name, start_month, end_month, **fields):
+    """新增物候期，返回新 id。"""
+    product_id = (product_id or '').strip()
+    name = (name or '').strip()
+    if not product_id:
+        raise ValueError('缺少 product_id')
+    if not name:
+        raise ValueError('物候期名称不能为空')
+    start = _int_or(start_month, None)
+    end = _int_or(end_month, None)
+    for value in (start, end):
+        if value is None or value < 1 or value > 12:
+            raise ValueError('start_month / end_month 需为 1 到 12 的整数')
+
+    values = _pick(fields, _PHASE_FIELDS)
+    values.update({'product_id': product_id, 'name': name,
+                   'start_month': start, 'end_month': end})
+    columns = ', '.join(values)
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO farming_phenophases (%s) VALUES (%s)"
+        % (columns, ', '.join('?' * len(values))), list(values.values()))
+    phase_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return phase_id
+
+
+def update_farming_phenophase(phase_id, **fields):
+    updates = _pick(fields, _PHASE_FIELDS)
+    if not updates:
+        return False
+    if 'name' in updates:
+        updates['name'] = (updates['name'] or '').strip()
+    if not updates.get('name'):
+        raise ValueError('物候期名称不能为空')
+    for key in ('start_month', 'end_month'):
+        if key in updates:
+            value = _int_or(updates[key], None)
+            if value is None or value < 1 or value > 12:
+                raise ValueError('%s 需为 1 到 12 的整数' % key)
+            updates[key] = value
+    set_clause = ', '.join('%s=?' % column for column in updates)
+    conn = get_connection()
+    cur = conn.execute("UPDATE farming_phenophases SET %s WHERE id=?"
+                       % set_clause, list(updates.values()) + [phase_id])
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0
+
+
+def delete_farming_phenophase(phase_id):
+    """删除物候期。任务的 phase_id 由外键置 NULL，任务本身不随之消失。"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM farming_phenophases WHERE id = ?", (phase_id,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted > 0
+
+
+# ---- 农产品目录 ----
+
+def create_farming_product(product_id, name, **fields):
+    """新增农产品，返回新 id（调用方给出的 slug）。"""
+    product_id = (product_id or '').strip()
+    name = (name or '').strip()
+    if not product_id:
+        raise ValueError('缺少 id')
+    if not name:
+        raise ValueError('作物名称不能为空')
+    values = _pick(fields, _PRODUCT_FIELDS)
+    values.update({'id': product_id, 'name': name})
+    columns = ', '.join(values)
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO farming_products (%s) VALUES (%s)"
+        % (columns, ', '.join('?' * len(values))), list(values.values()))
+    conn.commit()
+    conn.close()
+    return product_id
+
+
+def update_farming_product(product_id, **fields):
+    updates = _pick(fields, _PRODUCT_FIELDS)
+    if not updates:
+        return False
+    if 'name' in updates:
+        updates['name'] = (updates['name'] or '').strip()
+    if not updates.get('name'):
+        raise ValueError('作物名称不能为空')
+    set_clause = ', '.join('%s=?' % column for column in updates)
+    conn = get_connection()
+    cur = conn.execute("UPDATE farming_products SET %s WHERE id=?"
+                       % set_clause, list(updates.values()) + [product_id])
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0
+
+
+def delete_farming_product(product_id):
+    """删除作物。物候期、任务、订阅、提醒日志由外键级联删除。"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM farming_products WHERE id = ?", (product_id,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted > 0
+
+
+# ---- 来源登记 ----
+
+def get_farming_source_by_key(key):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM farming_sources WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def create_farming_source(key, name, **fields):
+    key = (key or '').strip()
+    name = (name or '').strip()
+    if not key:
+        raise ValueError('来源 key 不能为空')
+    if not name:
+        raise ValueError('来源名称不能为空')
+    values = _pick(fields, _SOURCE_FIELDS)
+    values.update({'key': key, 'name': name})
+    columns = ', '.join(values)
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO farming_sources (%s) VALUES (%s)"
+        % (columns, ', '.join('?' * len(values))), list(values.values()))
+    conn.commit()
+    conn.close()
+    return key
+
+
+def update_farming_source(key, **fields):
+    updates = _pick(fields, _SOURCE_FIELDS)
+    if not updates:
+        return False
+    if 'name' in updates:
+        updates['name'] = (updates['name'] or '').strip()
+    if not updates.get('name'):
+        raise ValueError('来源名称不能为空')
+    set_clause = ', '.join('%s=?' % column for column in updates)
+    conn = get_connection()
+    cur = conn.execute("UPDATE farming_sources SET %s WHERE key=?"
+                       % set_clause, list(updates.values()) + [key])
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0
+
+
+def delete_farming_source(key):
+    """删除来源。任务的 source_key 不会被外键清掉（无 FK），由路由层先摘掉引用。"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM farming_sources WHERE key = ?", (key,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted > 0
+
+
+# ---- 分类标签 ----
+
+def create_farming_category(key, label, **fields):
+    key = (key or '').strip()
+    label = (label or '').strip()
+    if not key:
+        raise ValueError('分类 key 不能为空')
+    if not label:
+        raise ValueError('分类标签不能为空')
+    values = _pick(fields, _CATEGORY_FIELDS)
+    values.update({'key': key, 'label': label})
+    columns = ', '.join(values)
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO farming_categories (%s) VALUES (%s)"
+        % (columns, ', '.join('?' * len(values))), list(values.values()))
+    conn.commit()
+    conn.close()
+    return key
+
+
+def update_farming_category(key, **fields):
+    updates = _pick(fields, _CATEGORY_FIELDS)
+    if not updates:
+        return False
+    if 'label' in updates:
+        updates['label'] = (updates['label'] or '').strip()
+    if not updates.get('label'):
+        raise ValueError('分类标签不能为空')
+    set_clause = ', '.join('%s=?' % column for column in updates)
+    conn = get_connection()
+    cur = conn.execute("UPDATE farming_categories SET %s WHERE key=?"
+                       % set_clause, list(updates.values()) + [key])
+    changed = cur.rowcount
+    conn.commit()
+    conn.close()
+    return changed > 0
+
+
+def delete_farming_category(key):
+    """删除分类标签。任务的 category 是裸字符串（无外键），由路由层先确认无引用。"""
+    conn = get_connection()
+    cur = conn.execute("DELETE FROM farming_categories WHERE key = ?", (key,))
+    deleted = cur.rowcount
+    conn.commit()
+    conn.close()
+    return deleted > 0

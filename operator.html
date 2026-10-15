@@ -9,7 +9,33 @@
     <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         :root { --portal-accent: #2f6b4f; --portal-accent-hover: #1f5e43; }
-        /* 骨架占位：T14/T15 落地各内容块的表单与列表后，这里的说明文字随之替换。 */
+        /* T14 落地农时与病虫害两块后的运营台样式。只补 portal.css 没有的：
+           页内选项卡、表单栅格、复核徽章、操作列。 */
+        .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+        .tab {
+            padding: 6px 14px; border-radius: 999px; border: 1px solid var(--portal-input-border);
+            background: var(--portal-card-bg, #fff); color: var(--portal-text);
+            font-size: 0.85rem; cursor: pointer;
+        }
+        .tab.active { background: var(--portal-accent); border-color: var(--portal-accent); color: #fff; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .field label { font-size: 0.8rem; color: var(--portal-text-muted); }
+        .field .hint { font-size: 0.75rem; color: var(--portal-text-muted); }
+        .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .form-error {
+            display: none; margin-bottom: 12px; padding: 10px 12px; border-radius: 8px;
+            background: #fee2e2; color: #991b1b; font-size: 0.85rem;
+        }
+        .form-error.show { display: block; }
+        .verified-cell { white-space: nowrap; font-size: 0.8rem; }
+        .verified-cell .muted { color: var(--portal-text-muted); }
+        .table-wrap { overflow-x: auto; }
+        .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+        .toolbar select, .toolbar input { width: auto; }
+        .toolbar .grow { flex: 1; min-width: 160px; }
+        /* T15 未落地的四块占位。样式与 T13 骨架一致，避免换一页就换一副面孔。 */
         .operator-todo {
             max-width: 640px;
             margin: 8px auto 0;
@@ -21,16 +47,6 @@
             color: var(--portal-text-muted, #64748b);
             font-size: 0.9rem;
         }
-        .operator-todo h3 { margin: 0 0 10px; font-size: 1rem; color: var(--portal-text, #1f2937); }
-        .operator-todo ul { margin: 8px 0 0; padding-left: 20px; }
-        .operator-todo li { margin: 4px 0; }
-        .operator-todo code {
-            background: rgba(47, 107, 79, 0.1);
-            color: var(--portal-accent);
-            padding: 1px 6px;
-            border-radius: 4px;
-            font-size: 0.82rem;
-        }
     </style>
 </head>
 <body>
@@ -40,7 +56,7 @@
         <div class="logo"><i class="fas fa-sliders"></i>运营工作台</div>
         <nav>
             <!-- 六块内容管理，能力与 backend/core/permissions.py 的 manage 能力一一对应。
-                 T14 落农时与病虫害，T15 落技艺 / 方言 / 招募 / 案例；接口就绪前这些页只占位。 -->
+                 T14 落农时与病虫害，T15 落技艺 / 方言 / 招募 / 案例。 -->
             <a href="#" class="active" data-page="overview"><i class="fas fa-tachometer-alt"></i>总览</a>
             <a href="#" data-page="farming" data-capability="farming.manage"><i class="fas fa-seedling"></i>农时日历</a>
             <a href="#" data-page="pest" data-capability="pest.manage"><i class="fas fa-bug"></i>病虫害知识</a>
@@ -63,22 +79,126 @@
         </div>
         <div class="portal-content">
             <div class="page active" id="page-overview">
-                <div class="operator-todo">
-                    <h3>运营工作台</h3>
-                    <p>这里维护平台的教学内容：农时日历、病虫害知识、手工技艺、方言知识、招募公告与成功案例。
-                       改动经接口写入后前台立即生效，不需要重启服务。</p>
-                    <p>用户管理与内容审核不归运营：那是超级管理员的职责，本工作台不提供这两个入口。</p>
-                    <ul>
-                        <li>农时日历、病虫害知识：T14 落地</li>
-                        <li>手工技艺、方言知识、招募公告、成功案例：T15 落地</li>
-                    </ul>
+                <div class="stat-grid">
+                    <div class="stat-card"><div class="num" id="ov-tasks">-</div><div class="label">农事任务</div></div>
+                    <div class="stat-card"><div class="num" id="ov-overdue-tasks">-</div><div class="label">待重新复核的农事任务</div></div>
+                    <div class="stat-card"><div class="num" id="ov-entries">-</div><div class="label">病虫害条目</div></div>
+                    <div class="stat-card"><div class="num" id="ov-overdue-entries">-</div><div class="label">待重新复核的病虫害条目</div></div>
+                </div>
+                <div class="card">
+                    <h3>这里维护什么</h3>
+                    <p style="line-height:1.8;color:var(--portal-text-muted)">
+                        农时日历、病虫害知识两块内容已在维护中；手工技艺、方言知识、招募公告与成功案例随后上线。
+                        所有改动经接口写入后前台立即生效，不需要重启服务。
+                    </p>
+                    <p style="line-height:1.8;color:var(--portal-text-muted)">
+                        复核满半年的条目会出现在各页的「该重新核了」筛选里：内容会过期，复核结论也会。
+                        用户管理与内容审核不归运营，那是超级管理员的职责，本工作台不提供这两个入口。
+                    </p>
                 </div>
             </div>
 
-            <!-- 以下六页是骨架，T14/T15 填入表单与列表。提前建容器是为了让
-                 侧栏跳转与 PORTAL.onPageChange 的形状先定下来。 -->
-            <div class="page" id="page-farming"><div class="operator-todo">农时日历维护：T14 落地。</div></div>
-            <div class="page" id="page-pest"><div class="operator-todo">病虫害知识维护：T14 落地。</div></div>
+            <!-- ============ 农时日历（T14） ============ -->
+            <div class="page" id="page-farming">
+                <div class="card">
+                    <div class="section-header">
+                        <h3>农事任务</h3>
+                        <button class="btn btn-primary" id="farming-task-new"><i class="fas fa-plus"></i> 新建任务</button>
+                    </div>
+                    <div class="toolbar">
+                        <select id="farming-task-product"></select>
+                        <select id="farming-task-month">
+                            <option value="">全部月份</option>
+                        </select>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem">
+                            <input type="checkbox" id="farming-task-overdue" style="width:auto">
+                            只看该重新核的（超 183 天或从未复核）
+                        </label>
+                        <button class="btn btn-outline" id="farming-task-refresh"><i class="fas fa-rotate-right"></i> 刷新</button>
+                    </div>
+                    <div class="form-error" id="farming-task-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>日期</th><th>标题</th><th>分类</th><th>优先级</th><th>复核</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="farming-task-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="farming-task-empty">
+                        <i class="fas fa-inbox"></i><div>没有符合条件的任务</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>物候期、来源与分类</h3>
+                    <div class="tabs" id="farming-ref-tabs">
+                        <button class="tab active" data-ref="phenophases">物候期</button>
+                        <button class="tab" data-ref="sources">来源登记</button>
+                        <button class="tab" data-ref="categories">分类标签</button>
+                    </div>
+                    <div class="form-error" id="farming-ref-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead id="farming-ref-head"></thead>
+                            <tbody id="farming-ref-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="farming-ref-empty">
+                        <i class="fas fa-inbox"></i><div>暂无数据</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ 病虫害知识（T14） ============ -->
+            <div class="page" id="page-pest">
+                <div class="card">
+                    <div class="section-header">
+                        <h3>病虫害条目</h3>
+                        <button class="btn btn-primary" id="pest-entry-new"><i class="fas fa-plus"></i> 新建条目</button>
+                    </div>
+                    <div class="toolbar">
+                        <select id="pest-entry-crop"></select>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem">
+                            <input type="checkbox" id="pest-entry-overdue" style="width:auto">
+                            只看该重新核的（超 183 天或从未复核）
+                        </label>
+                        <button class="btn btn-outline" id="pest-entry-refresh"><i class="fas fa-rotate-right"></i> 刷新</button>
+                    </div>
+                    <div class="form-error" id="pest-entry-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>作物</th><th>名称</th><th>类型</th><th>复核</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="pest-entry-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="pest-entry-empty">
+                        <i class="fas fa-inbox"></i><div>没有符合条件的条目</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>速查作物与来源</h3>
+                    <div class="tabs" id="pest-ref-tabs">
+                        <button class="tab active" data-ref="crops">作物</button>
+                        <button class="tab" data-ref="sources">来源登记</button>
+                    </div>
+                    <div class="form-error" id="pest-ref-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead id="pest-ref-head"></thead>
+                            <tbody id="pest-ref-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="pest-ref-empty">
+                        <i class="fas fa-inbox"></i><div>暂无数据</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 以下四页由 T15 落地，接口就绪前只占位。 -->
             <div class="page" id="page-crafts"><div class="operator-todo">手工技艺维护：T15 落地。</div></div>
             <div class="page" id="page-dialects"><div class="operator-todo">方言知识维护：T15 落地。</div></div>
             <div class="page" id="page-recruitments"><div class="operator-todo">招募公告维护：T15 落地。</div></div>
@@ -86,20 +206,611 @@
         </div>
     </div>
 </div>
+
+<!-- 通用编辑弹层：农时与病虫害两块共用，字段由各块的 schema 描述 -->
+<div class="modal-overlay is-hidden" id="operator-modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="operator-modal-title">编辑</h3>
+            <button class="modal-close" id="operator-modal-close" aria-label="关闭">&times;</button>
+        </div>
+        <div class="form-error" id="operator-modal-error"></div>
+        <form id="operator-modal-form"></form>
+    </div>
+</div>
+
 <script>window.APP_CONFIG = { apiBaseUrl: '' };</script>
 <script src="js/core.js"></script>
 <script src="portal.js"></script>
 <script>
+/* ============================================================
+   粤乡智匠 — 运营工作台 (operator.html)
+   T14：农时日历与病虫害两块的内容维护。
+
+   三条口径：
+
+   1. 改完立即生效：所有写操作都打 /api/operator/*，写完刷新本页列表；
+      前台接口读的是同一个库，没有缓存可失效，所以「重启」这件事不存在。
+   2. 表单校验与前台一致：日期必须是 MM-DD 且月份与任务月份相同、
+      分类与优先级走白名单、来源 key 必须已登记。这些规则后端也逐条校验，
+      前端先拦一道只是少一次往返，不是安全边界。
+   3. 复核留痕：「标记已复核」把 verified_by / verified_at 交给后端写
+      （取当前登录用户），前端不自己拼时间戳 —— 那样复核时间就是浏览器时钟。
+   ============================================================ */
+
+var OP = window.OP || {};
+
+OP.state = {
+    farming: { products: [], categories: [], sources: [], tasks: [], refTab: 'phenophases' },
+    pest: { crops: [], sources: [], entries: [] },
+    refTab: 'phenophases',
+    pestRefTab: 'crops',
+    editing: null
+};
+
+// 任务分类与优先级的可选值。与 backend/domains/operator/farming.py 的白名单一致；
+// 后台改白名单时这里跟着改，两侧不一致会被接口的 400 兜住。
+OP.CATEGORIES = ['fertilize', 'harvest', 'manage', 'pest', 'water'];
+OP.CATEGORY_LABELS = { fertilize: '施肥', harvest: '采收', manage: '管理', pest: '植保', water: '水分' };
+OP.PRIORITIES = [
+    { value: 'high', label: '高' },
+    { value: 'medium', label: '中' },
+    { value: 'low', label: '低' }
+];
+// 复核过期阈值（天）。与后端 farming.REVIEW_STALE_DAYS / pest.REVIEW_STALE_DAYS 同值，
+// 只用于文案提示，真正的筛选在后端做。
+OP.REVIEW_STALE_DAYS = 183;
+
+function opEsc(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function opShowError(elId, message) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    if (message) { el.textContent = message; el.classList.add('show'); }
+    else { el.textContent = ''; el.classList.remove('show'); }
+}
+
+function opRequest(method, path, body) {
+    var options = { method: method, headers: { 'Content-Type': 'application/json' } };
+    if (AppState.sessionId) options.headers['X-Session-Id'] = AppState.sessionId;
+    if (body !== undefined) options.body = JSON.stringify(body);
+    return fetch((window.APP_CONFIG && window.APP_CONFIG.apiBaseUrl || '') + path, options)
+        .then(function(resp) {
+            return resp.json().then(function(data) {
+                if (!resp.ok || data.success !== true) {
+                    throw new Error((data && data.message) || ('HTTP ' + resp.status));
+                }
+                return data;
+            });
+        });
+}
+
+function opGet(path) { return opRequest('GET', path); }
+
+// ---- 农时：任务 ----
+
+function opLoadFarmingTasks() {
+    var params = [];
+    var product = document.getElementById('farming-task-product').value;
+    var month = document.getElementById('farming-task-month').value;
+    if (product) params.push('product_id=' + encodeURIComponent(product));
+    if (month) params.push('month=' + encodeURIComponent(month));
+    if (document.getElementById('farming-task-overdue').checked) params.push('overdue=1');
+    var query = params.length ? '?' + params.join('&') : '';
+    opShowError('farming-task-error', '');
+    return opGet('/api/operator/farming/tasks' + query).then(function(data) {
+        OP.state.farming.tasks = data.tasks || [];
+        opRenderFarmingTasks();
+    }).catch(function(err) {
+        opShowError('farming-task-error', err.message);
+    });
+}
+
+function opRenderFarmingTasks() {
+    var rows = OP.state.farming.tasks;
+    var body = document.getElementById('farming-task-rows');
+    var empty = document.getElementById('farming-task-empty');
+    if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    body.innerHTML = rows.map(function(t) {
+        var verified = t.is_verified
+            ? '<span class="badge badge-green">已复核</span> <span class="muted">' + opEsc(t.verified_by) + ' ' + opEsc(t.verified_at) + '</span>'
+            : '<span class="badge badge-yellow">待复核</span>';
+        return '<tr>' +
+            '<td>' + opEsc(t.task_md || ('（' + t.month + '月内）')) + '</td>' +
+            '<td>' + opEsc(t.title) + '</td>' +
+            '<td>' + opEsc(OP.CATEGORY_LABELS[t.category] || t.category) + '</td>' +
+            '<td>' + opEsc(t.priority) + '</td>' +
+            '<td class="verified-cell">' + verified + '</td>' +
+            '<td class="row-actions">' +
+                (t.is_verified ? '' : '<button class="btn btn-sm btn-success" data-op="verify" data-id="' + t.id + '">标记已复核</button>') +
+                '<button class="btn btn-sm btn-outline" data-op="edit" data-id="' + t.id + '">编辑</button>' +
+                '<button class="btn btn-sm btn-danger" data-op="del" data-id="' + t.id + '">删除</button>' +
+            '</td></tr>';
+    }).join('');
+}
+
+function opOpenTaskForm(task) {
+    var isNew = !task;
+    var fields = [
+        { key: 'product_id', label: '作物', type: 'select', required: true,
+          options: OP.state.farming.products.map(function(p) {
+              return { value: p.id, label: p.name + (p.is_active ? '' : '（已停用）') };
+          }) },
+        { key: 'phase_id', label: '物候期', type: 'select', required: false, dynamic: 'phases' },
+        { key: 'title', label: '标题', type: 'text', required: true, maxlength: 60 },
+        { key: 'category', label: '分类', type: 'select', required: true,
+          options: OP.CATEGORIES.map(function(c) { return { value: c, label: OP.CATEGORY_LABELS[c] }; }) },
+        { key: 'month', label: '月份（1-12）', type: 'number', required: true, min: 1, max: 12 },
+        { key: 'task_md', label: '日期 MM-DD（可留空表示本月内）', type: 'text', placeholder: '03-15' },
+        { key: 'priority', label: '优先级', type: 'select', required: true, options: OP.PRIORITIES },
+        { key: 'icon', label: '图标', type: 'text', placeholder: 'tasks' },
+        { key: 'source_key', label: '来源 key', type: 'select', required: false, dynamic: 'sources' },
+        { key: 'description', label: '描述', type: 'textarea' },
+        { key: 'tip', label: '提示', type: 'textarea' },
+        { key: 'date_basis', label: '日期依据', type: 'textarea' },
+        { key: 'is_active', label: '启用', type: 'checkbox' }
+    ];
+    opOpenModal(isNew ? '新建农事任务' : '编辑农事任务', fields, task || {}, function(values) {
+        var payload = {
+            product_id: values.product_id,
+            title: values.title,
+            category: values.category,
+            month: values.month,
+            task_md: values.task_md,
+            priority: values.priority,
+            icon: values.icon,
+            description: values.description,
+            tip: values.tip,
+            date_basis: values.date_basis,
+            source_key: values.source_key,
+            phase_id: values.phase_id,
+            is_active: values.is_active
+        };
+        var path = isNew ? '/api/operator/farming/tasks' : '/api/operator/farming/tasks/' + task.id;
+        return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
+            opCloseModal();
+            return opLoadFarmingTasks();
+        });
+    }, function(values) {
+        // 提交前的前置校验：与后端同一口径，先拦一道少一次往返
+        if (values.task_md && !/^\d{2}-\d{2}$/.test(values.task_md)) {
+            return '日期格式应为 MM-DD，例如 03-15';
+        }
+        if (values.task_md) {
+            var parts = values.task_md.split('-');
+            var mm = parseInt(parts[0], 10), dd = parseInt(parts[1], 10);
+            if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return '日期超出范围：月份 1-12，日期 1-31';
+            if (parseInt(values.month, 10) !== mm) {
+                return '日期所属月份（' + parts[0] + '）与任务的月份（' + values.month + '）不一致';
+            }
+        }
+        return null;
+    }, function() {
+        // 物候期选项随作物联动
+        return opGet('/api/operator/farming/phenophases?product_id=' +
+                     encodeURIComponent(document.getElementById('op-field-product_id').value))
+            .then(function(data) {
+                var select = document.getElementById('op-field-phase_id');
+                if (!select) return;
+                var current = select.value;
+                select.innerHTML = '<option value="">不指定</option>' +
+                    (data.phenophases || []).map(function(p) {
+                        return '<option value="' + p.id + '">' + opEsc(p.name) + '</option>';
+                    }).join('');
+                select.value = current;
+            }).catch(function() { /* 物候期取不到不阻塞表单 */ });
+    });
+}
+
+// ---- 农时：物候期 / 来源 / 分类 ----
+
+function opLoadFarmingRef() {
+    var tab = OP.state.farming.refTab;
+    var path = '/api/operator/farming/' + tab;
+    opShowError('farming-ref-error', '');
+    return opGet(path).then(function(data) {
+        var rows = data[tab] || [];
+        var head = document.getElementById('farming-ref-head');
+        var body = document.getElementById('farming-ref-rows');
+        var empty = document.getElementById('farming-ref-empty');
+        var heads = {
+            phenophases: ['作物', '名称', '起', '止', '操作'],
+            sources: ['key', '名称', '机构', '文号', '操作'],
+            categories: ['key', '标签', '操作']
+        };
+        head.innerHTML = '<tr>' + heads[tab].map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+        if (!rows.length) {
+            body.innerHTML = '';
+            empty.classList.remove('is-hidden');
+            return;
+        }
+        empty.classList.add('is-hidden');
+        var nameOf = {};
+        OP.state.farming.products.forEach(function(p) { nameOf[p.id] = p.name; });
+        body.innerHTML = rows.map(function(r) {
+            var cells;
+            if (tab === 'phenophases') {
+                cells = [opEsc(nameOf[r.product_id] || r.product_id), opEsc(r.name),
+                         r.start_month + '月', r.end_month + '月'];
+            } else if (tab === 'sources') {
+                cells = [opEsc(r.key), opEsc(r.name), opEsc(r.org || ''), opEsc(r.doc_no || '')];
+            } else {
+                cells = [opEsc(r.key), opEsc(r.label)];
+            }
+            var idKey = tab === 'phenophases' ? r.id : r.key;
+            return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') +
+                '<td class="row-actions">' +
+                '<button class="btn btn-sm btn-danger" data-op="del-ref" data-id="' + opEsc(idKey) + '">删除</button>' +
+                '</td></tr>';
+        }).join('');
+    }).catch(function(err) {
+        opShowError('farming-ref-error', err.message);
+    });
+}
+
+function opLoadFarmingBasics() {
+    return Promise.all([
+        opGet('/api/operator/farming/products'),
+        opGet('/api/operator/farming/sources'),
+        opGet('/api/operator/farming/categories')
+    ]).then(function(results) {
+        OP.state.farming.products = results[0].products || [];
+        OP.state.farming.sources = results[1].sources || [];
+        OP.state.farming.categories = results[2].categories || [];
+        opFillProductSelect('farming-task-product', true);
+        opFillMonthSelect();
+    }).catch(function(err) {
+        opShowError('farming-task-error', err.message);
+    });
+}
+
+function opFillProductSelect(elId, withAll) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    var options = withAll ? ['<option value="">全部作物</option>'] : [];
+    options = options.concat(OP.state.farming.products.map(function(p) {
+        return '<option value="' + opEsc(p.id) + '">' + opEsc(p.name) + '</option>';
+    }));
+    el.innerHTML = options.join('');
+}
+
+function opFillMonthSelect() {
+    var el = document.getElementById('farming-task-month');
+    var html = '<option value="">全部月份</option>';
+    for (var m = 1; m <= 12; m++) {
+        html += '<option value="' + m + '">' + m + ' 月</option>';
+    }
+    el.innerHTML = html;
+}
+
+function opOpenEntryForm(entry) {
+    var isNew = !entry;
+    var fields = [
+        { key: 'crop_id', label: '作物', type: 'select', required: true,
+          options: OP.state.pest.crops.map(function(c) { return { value: c.id, label: c.name }; }) },
+        { key: 'disease', label: '名称', type: 'text', required: true, maxlength: 60 },
+        { key: 'kind', label: '类型', type: 'select', required: true,
+          options: [{ value: 'disease', label: '病害' }, { value: 'pest', label: '虫害' }] },
+        { key: 'alias', label: '别名', type: 'text' },
+        { key: 'pathogen', label: '病原', type: 'text' },
+        { key: 'part', label: '受害部位', type: 'text' },
+        { key: 'severity', label: '危害程度', type: 'text' },
+        { key: 'occurrence', label: '发生规律', type: 'textarea' },
+        { key: 'safety_note', label: '安全提示', type: 'textarea' }
+    ];
+    opOpenModal(isNew ? '新建病虫害条目' : '编辑病虫害条目', fields, entry || {}, function(values) {
+        var payload = {
+            crop_id: values.crop_id,
+            disease: values.disease,
+            kind: values.kind,
+            alias: values.alias,
+            pathogen: values.pathogen,
+            part: values.part,
+            severity: values.severity,
+            occurrence: values.occurrence,
+            safety_note: values.safety_note
+        };
+        if (!isNew) {
+            // 编辑只传改动的字段：后端对 PUT 做局部更新，没传的一律不动。
+            // 症状与防治等多值字段在本页只读展示，编辑入口留给 T15 的富表单。
+            payload = { crop_id: values.crop_id, disease: values.disease, kind: values.kind };
+        }
+        var path = isNew ? '/api/operator/pest/entries'
+                         : '/api/operator/pest/entries/' + encodeURIComponent(entry.id);
+        return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
+            opCloseModal();
+            return opLoadPestEntries();
+        });
+    }, function(values) {
+        if (!values.disease) return '病害名称不能为空';
+        if (values.kind && values.kind !== 'disease' && values.kind !== 'pest') {
+            return '类型只能是 disease 或 pest';
+        }
+        return null;
+    });
+}
+// ---- 病虫害：条目 ----
+
+function opLoadPestEntries() {
+    var params = [];
+    var crop = document.getElementById('pest-entry-crop').value;
+    if (crop) params.push('crop_id=' + encodeURIComponent(crop));
+    if (document.getElementById('pest-entry-overdue').checked) params.push('overdue=1');
+    var query = params.length ? '?' + params.join('&') : '';
+    opShowError('pest-entry-error', '');
+    return opGet('/api/operator/pest/entries' + query).then(function(data) {
+        OP.state.pest.entries = data.entries || [];
+        opRenderPestEntries();
+    }).catch(function(err) {
+        opShowError('pest-entry-error', err.message);
+    });
+}
+
+function opRenderPestEntries() {
+    var rows = OP.state.pest.entries;
+    var body = document.getElementById('pest-entry-rows');
+    var empty = document.getElementById('pest-entry-empty');
+    if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    body.innerHTML = rows.map(function(e) {
+        var verified = e.is_verified
+            ? '<span class="badge badge-green">已复核</span> <span class="muted">' + opEsc(e.verified_by) + ' ' + opEsc(e.verified_at) + '</span>'
+            : '<span class="badge badge-yellow">待复核</span>';
+        return '<tr>' +
+            '<td>' + opEsc(e.crop_name) + '</td>' +
+            '<td>' + opEsc(e.disease) + '</td>' +
+            '<td>' + opEsc(e.kind === 'pest' ? '虫害' : '病害') + '</td>' +
+            '<td class="verified-cell">' + verified + '</td>' +
+            '<td class="row-actions">' +
+                (e.is_verified ? '' : '<button class="btn btn-sm btn-success" data-op="pest-verify" data-id="' + opEsc(e.id) + '">标记已复核</button>') +
+                '<button class="btn btn-sm btn-danger" data-op="pest-del" data-id="' + opEsc(e.id) + '">删除</button>' +
+            '</td></tr>';
+    }).join('');
+}
+
+function opLoadPestBasics() {
+    return Promise.all([
+        opGet('/api/operator/pest/crops'),
+        opGet('/api/operator/pest/sources')
+    ]).then(function(results) {
+        OP.state.pest.crops = results[0].crops || [];
+        OP.state.pest.sources = results[1].sources || [];
+        var select = document.getElementById('pest-entry-crop');
+        select.innerHTML = '<option value="">全部作物</option>' + OP.state.pest.crops.map(function(c) {
+            return '<option value="' + opEsc(c.id) + '">' + opEsc(c.name) + '</option>';
+        }).join('');
+    }).catch(function(err) {
+        opShowError('pest-entry-error', err.message);
+    });
+}
+
+function opLoadPestRef() {
+    var tab = OP.state.pestRefTab;
+    opShowError('pest-ref-error', '');
+    return opGet('/api/operator/pest/' + tab).then(function(data) {
+        var rows = data[tab] || [];
+        var head = document.getElementById('pest-ref-head');
+        var body = document.getElementById('pest-ref-rows');
+        var empty = document.getElementById('pest-ref-empty');
+        var heads = tab === 'crops' ? ['id', '名称', '摘要', '操作'] : ['key', '名称', '机构', '操作'];
+        head.innerHTML = '<tr>' + heads.map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+        if (!rows.length) {
+            body.innerHTML = '';
+            empty.classList.remove('is-hidden');
+            return;
+        }
+        empty.classList.add('is-hidden');
+        body.innerHTML = rows.map(function(r) {
+            var cells = tab === 'crops'
+                ? [opEsc(r.id), opEsc(r.name), opEsc(r.summary || '')]
+                : [opEsc(r.key), opEsc(r.name), opEsc(r.org || '')];
+            return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') +
+                '<td class="row-actions">' +
+                '<button class="btn btn-sm btn-danger" data-op="del-pest-ref" data-id="' + opEsc(r.id || r.key) + '">删除</button>' +
+                '</td></tr>';
+        }).join('');
+    }).catch(function(err) {
+        opShowError('pest-ref-error', err.message);
+    });
+}
+
+// ---- 总览 ----
+
+function opLoadOverview() {
+    return Promise.all([
+        opGet('/api/operator/farming/tasks').catch(function() { return { tasks: [] }; }),
+        opGet('/api/operator/farming/tasks?overdue=1').catch(function() { return { tasks: [] }; }),
+        opGet('/api/operator/pest/entries').catch(function() { return { entries: [] }; }),
+        opGet('/api/operator/pest/entries?overdue=1').catch(function() { return { entries: [] }; })
+    ]).then(function(results) {
+        document.getElementById('ov-tasks').textContent = results[0].tasks.length;
+        document.getElementById('ov-overdue-tasks').textContent = results[1].tasks.length;
+        document.getElementById('ov-entries').textContent = results[2].entries.length;
+        document.getElementById('ov-overdue-entries').textContent = results[3].entries.length;
+    });
+}
+
+// ---- 通用编辑弹层 ----
+// 农时与病虫害两块共用：字段描述决定表单形状，提交回调决定打哪个接口。
+// 用一个弹层而不是每块一个，是因为两块的字段类型完全同构
+// （文本 / 数字 / 下拉 / 多行 / 勾选），分两套只会得到两份同样的渲染代码。
+
+function opOpenModal(title, fields, values, onSubmit, onValidate, onFieldChange) {
+    var modal = document.getElementById('operator-modal');
+    var form = document.getElementById('operator-modal-form');
+    document.getElementById('operator-modal-title').textContent = title;
+    opShowError('operator-modal-error', '');
+
+    form.innerHTML = fields.map(function(field) {
+        var value = values[field.key];
+        var control;
+        if (field.type === 'select') {
+            var options = (field.options || []).map(function(opt) {
+                var selected = String(value) === String(opt.value) ? ' selected' : '';
+                return '<option value="' + opEsc(opt.value) + '"' + selected + '>' +
+                       opEsc(opt.label) + '</option>';
+            }).join('');
+            control = '<select id="op-field-' + field.key + '" data-key="' + field.key + '">' +
+                      '<option value="">不指定</option>' + options + '</select>';
+        } else if (field.type === 'textarea') {
+            control = '<textarea id="op-field-' + field.key + '" data-key="' + field.key +
+                      '" rows="3">' + opEsc(value || '') + '</textarea>';
+        } else if (field.type === 'checkbox') {
+            control = '<input type="checkbox" id="op-field-' + field.key + '" data-key="' + field.key +
+                      '" style="width:auto"' + (value ? ' checked' : '') + '>';
+        } else {
+            control = '<input type="' + field.type + '" id="op-field-' + field.key +
+                      '" data-key="' + field.key + '" value="' + opEsc(value == null ? '' : value) + '"' +
+                      (field.placeholder ? ' placeholder="' + opEsc(field.placeholder) + '"' : '') +
+                      (field.maxlength ? ' maxlength="' + field.maxlength + '"' : '') +
+                      (field.min != null ? ' min="' + field.min + '"' : '') +
+                      (field.max != null ? ' max="' + field.max + '"' : '') + '>';
+        }
+        return '<div class="field"><label>' + opEsc(field.label) +
+               (field.required ? ' *' : '') + '</label>' + control + '</div>';
+    }).join('') +
+        '<div class="row-actions" style="margin-top:8px">' +
+        '<button type="submit" class="btn btn-primary">保存</button>' +
+        '<button type="button" class="btn btn-outline" id="op-modal-cancel">取消</button>' +
+        '</div>';
+
+    modal.classList.remove('is-hidden');
+    document.getElementById('op-modal-cancel').onclick = opCloseModal;
+
+    form.onsubmit = function(event) {
+        event.preventDefault();
+        var collected = {};
+        fields.forEach(function(field) {
+            var el = document.getElementById('op-field-' + field.key);
+            collected[field.key] = field.type === 'checkbox' ? el.checked : el.value;
+        });
+        if (onValidate) {
+            var message = onValidate(collected);
+            if (message) { opShowError('operator-modal-error', message); return; }
+        }
+        Promise.resolve(onSubmit(collected)).catch(function(err) {
+            opShowError('operator-modal-error', err.message);
+        });
+    };
+
+    if (onFieldChange) {
+        var trigger = document.getElementById('op-field-product_id');
+        if (trigger) trigger.addEventListener('change', onFieldChange);
+    }
+}
+
+function opCloseModal() {
+    document.getElementById('operator-modal').classList.add('is-hidden');
+    document.getElementById('operator-modal-form').innerHTML = '';
+    opShowError('operator-modal-error', '');
+}
+
+// ---- 事件绑定 ----
+
+function opBindEvents() {
+    document.getElementById('operator-modal-close').onclick = opCloseModal;
+    document.getElementById('operator-modal').addEventListener('click', function(e) {
+        if (e.target === this) opCloseModal();
+    });
+
+    ['farming-task-product', 'farming-task-month', 'farming-task-overdue'].forEach(function(id) {
+        document.getElementById(id).addEventListener('change', opLoadFarmingTasks);
+    });
+    document.getElementById('farming-task-refresh').onclick = opLoadFarmingTasks;
+    document.getElementById('farming-task-new').onclick = function() { opOpenTaskForm(null); };
+
+    document.getElementById('pest-entry-crop').addEventListener('change', opLoadPestEntries);
+    document.getElementById('pest-entry-overdue').addEventListener('change', opLoadPestEntries);
+    document.getElementById('pest-entry-refresh').onclick = opLoadPestEntries;
+    document.getElementById('pest-entry-new').onclick = function() { opOpenEntryForm(null); };
+
+    document.getElementById('farming-ref-tabs').addEventListener('click', function(e) {
+        var tab = e.target.closest ? e.target.closest('.tab') : null;
+        if (!tab) return;
+        this.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        OP.state.farming.refTab = tab.getAttribute('data-ref');
+        opLoadFarmingRef();
+    });
+    document.getElementById('pest-ref-tabs').addEventListener('click', function(e) {
+        var tab = e.target.closest ? e.target.closest('.tab') : null;
+        if (!tab) return;
+        this.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        OP.state.pestRefTab = tab.getAttribute('data-ref');
+        opLoadPestRef();
+    });
+
+    // 事件委托：列表重绘后不需要重新绑定
+    document.addEventListener('click', function(e) {
+        var btn = e.target.closest ? e.target.closest('[data-op]') : null;
+        if (!btn) return;
+        var op = btn.getAttribute('data-op');
+        var id = btn.getAttribute('data-id');
+        if (op === 'verify') {
+            opRequest('POST', '/api/operator/farming/tasks/' + id + '/verify', {}).then(opLoadFarmingTasks);
+        } else if (op === 'edit') {
+            var task = OP.state.farming.tasks.filter(function(t) { return String(t.id) === id; })[0];
+            if (task) opOpenTaskForm(task);
+        } else if (op === 'del') {
+            if (window.confirm('删除后不可恢复，确认删除这条任务？')) {
+                opRequest('DELETE', '/api/operator/farming/tasks/' + id).then(opLoadFarmingTasks);
+            }
+        } else if (op === 'del-ref') {
+            if (window.confirm('确认删除？')) {
+                var tab = OP.state.farming.refTab;
+                opRequest('DELETE', '/api/operator/farming/' + tab + '/' +
+                          encodeURIComponent(id)).then(function() {
+                    return Promise.all([opLoadFarmingRef(), opLoadFarmingBasics()]);
+                });
+            }
+        } else if (op === 'pest-verify') {
+            opRequest('POST', '/api/operator/pest/entries/' + encodeURIComponent(id) + '/verify', {})
+                .then(opLoadPestEntries);
+        } else if (op === 'pest-del') {
+            if (window.confirm('删除后不可恢复，确认删除这条条目？')) {
+                opRequest('DELETE', '/api/operator/pest/entries/' + encodeURIComponent(id))
+                    .then(opLoadPestEntries);
+            }
+        } else if (op === 'del-pest-ref') {
+            if (window.confirm('确认删除？')) {
+                opRequest('DELETE', '/api/operator/pest/' + OP.state.pestRefTab + '/' +
+                          encodeURIComponent(id)).then(function() {
+                    return Promise.all([opLoadPestRef(), opLoadPestBasics()]);
+                });
+            }
+        }
+    });
+}
+
 // 会话初始化。白名单只放 operator：这是运营专属门户，其余角色进 admin.html。
-// 导航项按 data-capability 显隐，能力清单由后端随登录下发，本页不复制能力表。
 PORTAL.init(['operator'], 'sidebar-name', function() {
     var user = AppState.user || {};
     var avatar = document.getElementById('sidebar-avatar');
     if (avatar) avatar.textContent = (user.name || '运')[0];
+    opBindEvents();
+    opLoadOverview();
+    opLoadFarmingBasics().then(opLoadFarmingTasks);
+    opLoadPestBasics().then(opLoadPestEntries);
 });
 
 PORTAL.onPageChange(function(page) {
-    // T14/T15 在这里按 page 名加载各内容块的数据。
+    if (page === 'farming') { opLoadFarmingBasics().then(opLoadFarmingTasks); }
+    if (page === 'pest') { opLoadPestBasics().then(opLoadPestEntries); }
+    if (page === 'overview') { opLoadOverview(); }
 });
 </script>
 </body>

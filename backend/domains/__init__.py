@@ -33,6 +33,10 @@ tools/check_architecture.py 正是用这条线来判定违规的（见 T01 与 T
 不同领域（spec 的切分单位一节把两者单列），因此是两个蓝图对象而不是一个。
 两域之间**没有** import 边：它们唯一共享的「是否已有简历」判断放在共享层
 shared.resume_state，两边都从那里取同一份口径。
+
+运营域（domains.operator）导出蓝图 operator_bp：运营后台的内容维护接口，
+挂在 `/api/operator/*` 下。它与被维护的内容域（agriculture / pest）是**两个**领域：
+前台读内容，运营改内容，读写分离。T14 先落农时与病虫害两块，T15 补其余四块。
 """
 from domains.agriculture import agriculture_bp
 from domains.auth import auth_bp
@@ -47,6 +51,7 @@ from domains.government import government_bp
 from domains.live_training import live_training_bp
 from domains.messages import messages_bp
 from domains.notifications import notifications_bp
+from domains.operator import operator_bp
 from domains.pest import pest_bp
 from domains.public import public_bp
 from domains.resources import resources_bp
@@ -60,6 +65,7 @@ __all__ = ['agriculture_bp', 'auth_bp', 'community_bp', 'crafts_bp',
            'admin_bp', 'enterprise_bp', 'government_bp',
            'live_training_bp', 'pest_bp', 'public_bp',
            'messages_bp', 'notifications_bp',
+           'operator_bp',
            'resources_bp', 'static_bp',
            'teaching_support_bp', 'teacher_bp',
            'user_profile_bp']

@@ -85,6 +85,7 @@ def _register_blueprints(app):
         live_training_bp,
         messages_bp,
         notifications_bp,
+        operator_bp,
         pest_bp,
         public_bp,
         resources_bp,
@@ -107,6 +108,7 @@ def _register_blueprints(app):
     app.register_blueprint(live_training_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(notifications_bp)
+    app.register_blueprint(operator_bp)
     app.register_blueprint(pest_bp)
     app.register_blueprint(public_bp)
     app.register_blueprint(resources_bp)

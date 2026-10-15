@@ -91,7 +91,18 @@ DOMAIN_SYMBOLS = {
                    'get_farming_subscriptions', 'get_farming_task_by_id',
                    'get_farming_tasks', 'has_farming_reminder_sent', 'is_farming_subscribed',
                    'mark_farming_reminder_sent', 'month_in_phase',
-                   'set_farming_subscription'),
+                   'set_farming_subscription',
+                   # T14 运营后台写侧
+                   'REVIEW_STALE_DAYS', 'create_farming_category',
+                   'delete_farming_category', 'update_farming_category',
+                   'create_farming_phenophase', 'update_farming_phenophase',
+                   'delete_farming_phenophase', 'get_farming_phenophase_by_id',
+                   'create_farming_product', 'update_farming_product',
+                   'delete_farming_product', 'create_farming_source',
+                   'update_farming_source', 'delete_farming_source',
+                   'get_farming_source_by_key', 'create_farming_task',
+                   'update_farming_task', 'delete_farming_task', 'verify_farming_task',
+                   'get_farming_overdue_tasks'),
     'messages.py': ('count_unread_conversations', 'get_inbox', 'get_messages',
                     'get_unread_count', 'mark_all_messages_read', 'mark_messages_read',
                     'send_message'),
@@ -134,7 +145,13 @@ DOMAIN_SYMBOLS = {
     'dialects.py': ('get_dialect_info', 'get_dialects'),
     'pest.py': ('get_pest_crop', 'get_pest_crop_ids', 'get_pest_crops',
                 'get_pest_entries', 'get_pest_entry', 'get_pest_source_map',
-                'get_pest_stats'),
+                'get_pest_stats',
+                # T14 运营后台写侧
+                'REVIEW_STALE_DAYS', 'create_pest_entry', 'update_pest_entry',
+                'delete_pest_entry', 'verify_pest_entry', 'get_overdue_pest_entries',
+                'set_pest_image', 'delete_pest_image', 'create_pest_crop',
+                'update_pest_crop', 'delete_pest_crop', 'create_pest_source',
+                'update_pest_source', 'delete_pest_source'),
 }
 
 # 基础设施侧必须对外暴露的名字。
