@@ -353,13 +353,17 @@
                 <a href="resources.html"><i class="fas fa-book-open"></i><span>本土资源</span></a>
                 <a href="employment.html"><i class="fas fa-briefcase"></i><span>就业对接</span></a>
             </div>
+            <!-- 侧栏按能力显隐（data-capability）：portal.js 的 PORTAL.applyCapabilities 读后端
+                 下发的能力清单后隐藏不持有的项。不按角色名写死 —— 运营角色（operator）持内容管理权、
+                 不持用户管理与审核权，它看到的是这张表的一个子集，而「子集是哪几项」只在
+                 backend/core/permissions.py 一处定义。仪表盘对所有能进本页的角色开放，故不标。 -->
             <nav class="admin-nav" aria-label="后台导航">
                 <div class="admin-group-label">系统管理</div>
                 <a href="#" class="active" data-page="dashboard" data-tip="仪表盘"><i class="fas fa-tachometer-alt"></i><span>仪表盘</span></a>
-                <a href="#" data-page="users" data-tip="用户管理"><i class="fas fa-users"></i><span>用户管理</span></a>
-                <a href="#" data-page="reviews" data-tip="内容审核"><i class="fas fa-check-circle"></i><span>内容审核</span></a>
-                <a href="#" data-page="announcements" data-tip="系统公告"><i class="fas fa-bullhorn"></i><span>系统公告</span></a>
-                <a href="#" data-page="content" data-tip="内容监管"><i class="fas fa-shield"></i><span>内容监管</span></a>
+                <a href="#" data-page="users" data-tip="用户管理" data-capability="user.manage"><i class="fas fa-users"></i><span>用户管理</span></a>
+                <a href="#" data-page="reviews" data-tip="内容审核" data-capability="review.moderate"><i class="fas fa-check-circle"></i><span>内容审核</span></a>
+                <a href="#" data-page="announcements" data-tip="系统公告" data-capability="announcement.manage"><i class="fas fa-bullhorn"></i><span>系统公告</span></a>
+                <a href="#" data-page="content" data-tip="内容监管" data-capability="community.manage"><i class="fas fa-shield"></i><span>内容监管</span></a>
             </nav>
         </aside>
         <div class="portal-main">
@@ -629,7 +633,7 @@ var showNotification = showAdminNotification;
 })();
 
 // 第二个参数原本指向侧栏底部的用户名节点，侧栏底部徽标已删，改为顶栏账号区
-PORTAL.init('super_admin', 'admin-user-name', function () {
+PORTAL.init(['super_admin'], 'admin-user-name', function () {
     var user = AppState.user || {};
     var name = user.name || '系统管理员';
     var nameEl = document.getElementById('admin-user-name');

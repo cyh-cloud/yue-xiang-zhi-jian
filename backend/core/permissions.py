@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """能力表与能力鉴权：全站唯一的「角色到能力」映射。
 
-为什么按能力判定而不是按角色名：平台有五个角色，第六个（operator）即将由 T13 落地。
-按角色名写守卫（`user['role'] != 'super_admin'`）会把同一件事在二十个路由文件里各写
-一遍，加角色时漏一处就是一个权限漏洞，而且机械检查无从判起。改成按能力判定后，
-角色与能力的对应只收在本文件的一张表里，加角色或调整边界都只改这一处。
+为什么按能力判定而不是按角色名：平台有六个角色，其中 operator（运营）是 super_admin
+的子集，拿内容管理权、不拿用户管理与审核权。按角色名写守卫（`user['role'] !=
+'super_admin'`）会把同一件事在二十个路由文件里各写一遍，加角色时漏一处就是一个权限
+漏洞，而且机械检查无从判起。改成按能力判定后，角色与能力的对应只收在本文件的一张
+表里，加角色或调整边界都只改这一处。
 
 能力命名 `<域>.read` / `<域>.manage`，空元组表示公开（不需要登录）。
 
@@ -17,9 +18,13 @@ from functools import wraps
 
 from flask import jsonify
 
-# 当前已注册的角色。operator 由 T13 落地为真实角色，届时把它加进这个元组与
-# 登录/注册白名单即可，上面的能力表已经为它留好了位置。
-ROLES = ('student', 'teacher', 'enterprise', 'government', 'super_admin')
+# 当前已注册的角色。operator 与 super_admin 的差别只在能力表里：表是唯一真相源，
+# 「运营不能管用户、不能审核」是 CAPABILITIES 里显式的两条，不是「十处都没写它」。
+ROLES = ('student', 'teacher', 'enterprise', 'government', 'operator', 'super_admin')
+
+# 运营角色的字面量。除本模块与 core/session.py（require_role 的实现）之外，
+# 其它文件不再出现角色名比较，一律走 can() / require_capability()。
+OPERATOR = 'operator'
 
 # 学员角色的字面量。除本模块与 core/session.py（require_role 的实现）之外，
 # 其它文件不再出现角色名比较，一律走 can() / require_capability()。
@@ -91,6 +96,21 @@ def can(role, capability):
     return not allowed or role in allowed
 
 
+def capabilities_for_role(role):
+    """role 持有的全部能力名，按能力名的字典序排列。
+
+    给前端的「这个角色能做什么」清单，让导航与按钮按能力显隐，不必在前端复制
+    一份能力表（那会是第二份真相，改一处漏一处）。未登录或未知角色返回空列表。
+
+    只列 manage 侧的能力：`.read` 大多是公开元组（空 = 谁都能读），把它下发给
+    前端只会让「显隐」退化成「全部显示」，没有判断价值。
+    """
+    return sorted(
+        capability for capability, holders in CAPABILITIES.items()
+        if capability.endswith('.manage') and role in holders
+    )
+
+
 def is_student(role):
     """该角色是不是学员。名册只能关联学员账号（db_domains.students.set_student_account）。"""
     return role == STUDENT
@@ -130,6 +150,6 @@ def require_capability(capability, anonymous=403):
 
 
 __all__ = [
-    'ROLES', 'STUDENT', 'TEACHER', 'CAPABILITIES', 'can', 'is_student',
-    'require_capability',
+    'ROLES', 'OPERATOR', 'STUDENT', 'TEACHER', 'CAPABILITIES', 'can',
+    'capabilities_for_role', 'is_student', 'require_capability',
 ]

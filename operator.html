@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>运营工作台 - 粤乡智匠</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="portal.css">
+    <link href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root { --portal-accent: #2f6b4f; --portal-accent-hover: #1f5e43; }
+        /* 骨架占位：T14/T15 落地各内容块的表单与列表后，这里的说明文字随之替换。 */
+        .operator-todo {
+            max-width: 640px;
+            margin: 8px auto 0;
+            padding: 20px 24px;
+            background: var(--portal-card-bg, #fff);
+            border: 1px solid var(--portal-card-border, #e2e8f0);
+            border-radius: var(--portal-radius, 10px);
+            line-height: 1.8;
+            color: var(--portal-text-muted, #64748b);
+            font-size: 0.9rem;
+        }
+        .operator-todo h3 { margin: 0 0 10px; font-size: 1rem; color: var(--portal-text, #1f2937); }
+        .operator-todo ul { margin: 8px 0 0; padding-left: 20px; }
+        .operator-todo li { margin: 4px 0; }
+        .operator-todo code {
+            background: rgba(47, 107, 79, 0.1);
+            color: var(--portal-accent);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 0.82rem;
+        }
+    </style>
+</head>
+<body>
+<div class="portal">
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+    <aside class="portal-sidebar" id="portal-sidebar">
+        <div class="logo"><i class="fas fa-sliders"></i>运营工作台</div>
+        <nav>
+            <!-- 六块内容管理，能力与 backend/core/permissions.py 的 manage 能力一一对应。
+                 T14 落农时与病虫害，T15 落技艺 / 方言 / 招募 / 案例；接口就绪前这些页只占位。 -->
+            <a href="#" class="active" data-page="overview"><i class="fas fa-tachometer-alt"></i>总览</a>
+            <a href="#" data-page="farming" data-capability="farming.manage"><i class="fas fa-seedling"></i>农时日历</a>
+            <a href="#" data-page="pest" data-capability="pest.manage"><i class="fas fa-bug"></i>病虫害知识</a>
+            <a href="#" data-page="crafts" data-capability="craft.manage"><i class="fas fa-paint-brush"></i>手工技艺</a>
+            <a href="#" data-page="dialects" data-capability="dialect.manage"><i class="fas fa-comments"></i>方言知识</a>
+            <a href="#" data-page="recruitments" data-capability="recruit.manage"><i class="fas fa-bullhorn"></i>招募公告</a>
+            <a href="#" data-page="cases" data-capability="case.manage"><i class="fas fa-trophy"></i>成功案例</a>
+        </nav>
+        <div class="user-badge"><div class="avatar" id="sidebar-avatar">运</div><span id="sidebar-name">运营</span></div>
+    </aside>
+    <div class="portal-main">
+        <div class="portal-topbar">
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="hamburger-portal" id="hamburger-portal" aria-label="菜单"><span></span><span></span><span></span></button>
+                <h2 id="page-title">总览</h2>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px">
+                <button class="btn btn-outline" onclick="PORTAL.logout()"><i class="fas fa-sign-out-alt"></i> 退出</button>
+            </div>
+        </div>
+        <div class="portal-content">
+            <div class="page active" id="page-overview">
+                <div class="operator-todo">
+                    <h3>运营工作台</h3>
+                    <p>这里维护平台的教学内容：农时日历、病虫害知识、手工技艺、方言知识、招募公告与成功案例。
+                       改动经接口写入后前台立即生效，不需要重启服务。</p>
+                    <p>用户管理与内容审核不归运营：那是超级管理员的职责，本工作台不提供这两个入口。</p>
+                    <ul>
+                        <li>农时日历、病虫害知识：T14 落地</li>
+                        <li>手工技艺、方言知识、招募公告、成功案例：T15 落地</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 以下六页是骨架，T14/T15 填入表单与列表。提前建容器是为了让
+                 侧栏跳转与 PORTAL.onPageChange 的形状先定下来。 -->
+            <div class="page" id="page-farming"><div class="operator-todo">农时日历维护：T14 落地。</div></div>
+            <div class="page" id="page-pest"><div class="operator-todo">病虫害知识维护：T14 落地。</div></div>
+            <div class="page" id="page-crafts"><div class="operator-todo">手工技艺维护：T15 落地。</div></div>
+            <div class="page" id="page-dialects"><div class="operator-todo">方言知识维护：T15 落地。</div></div>
+            <div class="page" id="page-recruitments"><div class="operator-todo">招募公告维护：T15 落地。</div></div>
+            <div class="page" id="page-cases"><div class="operator-todo">成功案例维护：T15 落地。</div></div>
+        </div>
+    </div>
+</div>
+<script>window.APP_CONFIG = { apiBaseUrl: '' };</script>
+<script src="js/core.js"></script>
+<script src="portal.js"></script>
+<script>
+// 会话初始化。白名单只放 operator：这是运营专属门户，其余角色进 admin.html。
+// 导航项按 data-capability 显隐，能力清单由后端随登录下发，本页不复制能力表。
+PORTAL.init(['operator'], 'sidebar-name', function() {
+    var user = AppState.user || {};
+    var avatar = document.getElementById('sidebar-avatar');
+    if (avatar) avatar.textContent = (user.name || '运')[0];
+});
+
+PORTAL.onPageChange(function(page) {
+    // T14/T15 在这里按 page 名加载各内容块的数据。
+});
+</script>
+</body>
+</html>

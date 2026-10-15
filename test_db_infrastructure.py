@@ -145,8 +145,9 @@ class SeedOrchestrationTest(IsolatedDatabaseTest):
 
     def test_init_db_seeds_queryable_data(self):
         counts = self.probe('seed_counts')
-        self.assertEqual(counts['users'], 5)
-        self.assertEqual(counts['points'], 5)
+        # 六个演示账号对应六种角色：超管 / 政府 / 企业 / 教师 / 运营（T13）/ 学员
+        self.assertEqual(counts['users'], 6)
+        self.assertEqual(counts['points'], 6)
         self.assertEqual(counts['students'], 2)
         self.assertEqual(counts['certificates'], 6)
         self.assertEqual(counts['policies'], counts['policies_total'])
