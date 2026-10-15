@@ -1,0 +1,68 @@
+{
+  "/api/agriculture/pest-knowledge": {
+    "bytes": 164038,
+    "sha256": "13e2619711d0e76a70dd51fea5daf3facbeb530a6efcabda3fcdf69f16f5e3b4",
+    "status": 200
+  },
+  "/api/agriculture/pest-knowledge?crop=lychee": {
+    "bytes": 23974,
+    "sha256": "7f3687cc566e744a0f08956961d5545ad88ccb3e6d4770ad1fddd92b283aa875",
+    "status": 200
+  },
+  "/api/agriculture/pest-knowledge?crop=no-such-crop": {
+    "bytes": 143,
+    "sha256": "ef1c7d402e739fb0973f8a5616964877e3932f308da4394e59fe07b91d077110",
+    "status": 400
+  },
+  "/api/agriculture/pest-knowledge?kind=pest": {
+    "bytes": 75145,
+    "sha256": "de6af67a57a1b7fe06f95dc49e8e34524d164513e8740db5ef8ff6ade1bfef5a",
+    "status": 200
+  },
+  "/api/agriculture/pest-knowledge?kind=virus": {
+    "bytes": 114,
+    "sha256": "4076e74e1765bc15373857bd08409186c9ebec0ed3ebe62d1ca10671e52a37f4",
+    "status": 400
+  },
+  "/api/agriculture/pest-knowledge?q=炭疽": {
+    "bytes": 18838,
+    "sha256": "bf14c506424f3aa90b808e30ffd086ef318b460b21316d275f9d23e257029390",
+    "status": 200
+  },
+  "POST /api/agriculture/diagnose (fallback)": {
+    "body": {
+      "diagnosis": {
+        "crop": "荔枝",
+        "crop_icon": "🍎",
+        "disease": "荔枝炭疽病",
+        "note": "建议结合当地农技站指导进行防治",
+        "prevention": [
+          "避免偏施氮肥，增施有机肥增强树势",
+          "雨后及时排水，降低园内湿度",
+          "新梢期与幼果期喷药保护",
+          "冬季清园，剪除并处理病枝病叶"
+        ],
+        "severity": "中度",
+        "source": "knowledge_base",
+        "source_label": "本地知识库匹配",
+        "source_note": "AI 服务当前不可用，本条结论由平台内置知识库按关键词匹配得出，未必与你描述的症状完全对应，仅供参考，请以当地农技站指导为准。",
+        "symptoms": [
+          "叶片出现圆形或不规则褐色斑点，边缘深褐色、中央灰白色",
+          "病斑后期生出黑色小点（分生孢子盘），常呈轮纹状排列",
+          "严重时叶片枯萎脱落，嫩梢变褐枯死",
+          "果实受害产生褐色凹陷病斑，影响商品价值"
+        ],
+        "timing": "发病初期为最佳防治期",
+        "treatment": [
+          "剪除病枝病叶并集中烧毁，减少菌源",
+          "发病初期开始喷药，可选用苯醚甲环唑、咪鲜胺、腈菌唑、氟菌·肟菌酯等",
+          "重点喷施果实和叶片，注意轮换用药"
+        ]
+      },
+      "success": true
+    },
+    "bytes": 2092,
+    "sha256": "dbadcbfec75fc95ac407961d038076607c686320231518943f080c7ae78f0668",
+    "status": 200
+  }
+}

@@ -23,7 +23,7 @@ from flask import jsonify, request
 import ai.client
 from ai.client import AI_REASONING_TOKEN_RESERVE
 from core.session import client_key, rate_limited
-from domain_data.pest_diagnosis.pest_data import PEST_KNOWLEDGE
+from db_domains import pest
 from shared.agri_dosage import CHEM_DOSE_NOTICE, has_chem_dosage
 
 logger = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ def parse_diag_request():
 
     # 未知作物此前会被静默当成荔枝处理，用户无从察觉，改为明确拒绝。
     crop = str(data.get('crop') or '').strip() or 'lychee'
-    if crop not in PEST_KNOWLEDGE:
+    if crop not in pest.get_pest_crop_ids():
         return None, (jsonify({
             "success": False, "code": "unknown_crop",
             "message": "暂不支持该作物，请从列表中选择"
@@ -299,7 +299,7 @@ def kb_overlap_ratio(user_bigrams, text):
     return len(user_bigrams & ref) / float(len(ref))
 
 
-def match_kb_disease(crop_data, user_symptoms):
+def match_kb_disease(crop_id, user_symptoms):
     """知识库匹配。返回 (病害条目或 None, 得分)。
 
     对所有条目的「病名 + 各条典型症状的重合度」取最高分，而不是首个命中即返回 ——
@@ -313,8 +313,9 @@ def match_kb_disease(crop_data, user_symptoms):
     if not user_bigrams:
         return None, 0.0
 
+    # with_details=False：降级只用病名与症状，不取来源与实拍图
     best, best_score = None, 0.0
-    for d in crop_data['common_diseases']:
+    for d in pest.get_pest_entries(crop_id=crop_id, with_details=False):
         # 用户直接报病名是最强的信号，与各条症状描述的重合度一起取最大值
         score = kb_overlap_ratio(user_bigrams, d.get('disease'))
         for symptom in d.get('symptoms') or []:
@@ -339,7 +340,7 @@ def run_diagnosis(payload):
     crop = payload['crop']
     user_symptoms = payload['symptoms']
     images = payload['images']
-    crop_data = PEST_KNOWLEDGE[crop]
+    crop_data = pest.get_pest_crop(crop) or {}
     has_image = bool(images)
 
     if has_image:
@@ -381,7 +382,7 @@ def run_diagnosis(payload):
         }), 503
 
     # 纯文字：降级知识库，来源如实标注
-    matched, match_score = match_kb_disease(crop_data, user_symptoms)
+    matched, match_score = match_kb_disease(crop, user_symptoms)
     if matched is None:
         logger.info('知识库未匹配到病害(crop=%s, score=%.3f)', crop, match_score)
         return jsonify({
