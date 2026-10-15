@@ -77,10 +77,10 @@ class TestYueXiangApp(unittest.TestCase):
         标题 / 媒体 / 链接。禁止出现无出处的编造案例。
 
         注意：接口只下发**超级管理员审核通过**的案例（见 database._seed_case_reviews），
-        所以「内容完整性」对 domain_data.resources.cases_data 全量校验，「可见性」对接口返回校验。
+        所以「内容完整性」对库里的全部案例校验，「可见性」对接口返回校验。
         """
-        from domain_data.resources import cases_data
-        all_cases = cases_data.get_cases()
+        from db_domains import content
+        all_cases = content.get_cases()
         self.assertGreater(len(all_cases), 0)
 
         for case in all_cases:
@@ -144,7 +144,7 @@ class TestYueXiangApp(unittest.TestCase):
         旧断言只看 `jobs` 是否非空，而演示岗位（`JOBS_DATA`）已被整体移除，
         学员端的企业岗位改为「企业发布 → 管理员审核通过」才可见（fail-closed），
         因此 `jobs` 在无已审企业岗位时为 0 属预期。
-        真实内容在 `recruitments`（公开招聘公告，来自 jobs_data.py 策展模块），
+        真实内容在 `recruitments`（公开招聘公告，由运营在后台维护），
         断言改为「两者合计 > 0」，并单独校验公告侧字段与来源口径完整。
         """
         response = self.client.get('/api/employment/jobs')
@@ -255,8 +255,8 @@ class TestYueXiangApp(unittest.TestCase):
           ③ 分类必须落在 CATEGORY_LIST 内，否则前端会出现「筛了永远是 0 条」的死筛选项。
         """
         import datetime
-        from domain_data.employment import jobs_data
-        items = jobs_data.get_recruitment_list(today=datetime.date.today())
+        from db_domains import recruitments
+        items = recruitments.get_recruitments(today=datetime.date.today())
 
         actionable = [r for r in items if r['status'] in ('open', 'upcoming')]
         self.assertGreaterEqual(
@@ -264,7 +264,7 @@ class TestYueXiangApp(unittest.TestCase):
 
         for r in items:
             self.assertTrue(r.get('deadline'), '公告 %s 缺少报名截止日期' % r.get('key'))
-            self.assertIn(r.get('category'), jobs_data.CATEGORY_LIST,
+            self.assertIn(r.get('category'), recruitments.RECRUIT_CATEGORIES,
                           '公告 %s 的分类不在 CATEGORY_LIST 内' % r.get('key'))
             self.assertTrue(r.get('signup_way'), '公告 %s 缺少报名方式' % r.get('key'))
             edu = r.get('education') or ''
@@ -272,7 +272,7 @@ class TestYueXiangApp(unittest.TestCase):
             self.assertNotIn('硕士', edu, '公告 %s 设了硕士门槛，与平台定位不符' % r.get('key'))
 
         # 分类白名单里不该再有「科研辅助」这类与定位无关的分类
-        self.assertNotIn('科研辅助', jobs_data.CATEGORY_LIST)
+        self.assertNotIn('科研辅助', recruitments.RECRUIT_CATEGORIES)
 
     def test_resume_profile_and_ai_guardrails(self):
         """简历链路：能力档案取自真实数据、字段不可越权改写、AI 失败必须可见
@@ -381,7 +381,6 @@ class TestYueXiangApp(unittest.TestCase):
         所以它走 job_intents 这条独立通道；接口文案必须声明「平台不代办报名」，
         避免学员误以为登记意向 = 已报名。
         """
-        from domain_data.employment import jobs_data
         sid = None
         try:
             r = self.client.post('/api/auth/login', data=json.dumps({
@@ -390,7 +389,7 @@ class TestYueXiangApp(unittest.TestCase):
             sid = json.loads(r.data)['session_id']
             headers = {'X-Session-Id': sid}
 
-            key = jobs_data.get_recruitment_list()[0]['key']
+            key = json.loads(self.client.get('/api/employment/jobs').data)['recruitments'][0]['key']
 
             # 未登录不可登记
             self.assertEqual(

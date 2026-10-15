@@ -18,53 +18,51 @@ from db_domains import farming
 
 logger = logging.getLogger(__name__)
 
-# 农业知识库
-AGRICULTURE_KNOWLEDGE = {
-    "lychee": {
-        "name": "荔枝",
-        "seasons": {
-            "spring": {
-                "tasks": ["促花肥施用", "病虫害预防", "修剪整形"],
-                "tips": "春季是荔枝开花关键期，注意防治霜疫霉病"
-            },
-            "summer": {
-                "tasks": ["果实采收", "采后修剪", "恢复肥施用"],
-                "tips": "及时采收成熟果实，采后及时补充营养"
-            },
-            "autumn": {
-                "tasks": ["秋梢管理", "病虫害防治", "水分管理"],
-                "tips": "培养健壮秋梢，为来年结果打基础"
-            },
-            "winter": {
-                "tasks": ["冬季清园", "树干涂白", "深翻改土"],
-                "tips": "做好防寒措施，减少越冬病虫源"
-            }
-        },
-        "diseases": [
-            {"name": "霜疫霉病", "symptoms": "果实表面出现褐色病斑", "treatment": "喷施甲霜灵·锰锌"},
-            {"name": "炭疽病", "symptoms": "叶片出现圆形病斑", "treatment": "喷施咪鲜胺"},
-            {"name": "蒂蛀虫", "symptoms": "果实被蛀食", "treatment": "喷施高效氯氰菊酯"}
-        ]
-    },
-    "longan": {
-        "name": "龙眼",
-        "seasons": {
-            "spring": {"tasks": ["促花肥", "疏花"], "tips": "控制花量，提高坐果率"},
-            "summer": {"tasks": ["壮果肥", "水分管理"], "tips": "保持土壤湿润"},
-            "autumn": {"tasks": ["采收", "采后管理"], "tips": "适时采收"},
-            "winter": {"tasks": ["冬季修剪", "清园"], "tips": "做好防寒"}
-        }
-    },
-    "aquatic": {
-        "name": "水产养殖",
-        "basics": [
-            "水质管理是关键",
-            "合理投喂饲料",
-            "定期消毒防病",
-            "保持溶氧充足"
-        ]
-    }
-}
+# 作物名解析不到时的文案。刻意不给具体作物名：那会把「这个作物在平台上不存在」
+# 这件事藏起来，生成的 system_prompt 装作认识这个作物。上游的 _parse_agri_request
+# 已经用 supported_products() 把未知作物挡在 400，走到这里只剩空 product 一种情形。
+UNKNOWN_PRODUCT_FALLBACK = u'广东特色农产品'
+
+# 作物中文名的进程内缓存。读的是 farming_products 表，一次会话里不会变，
+# 但每条问答都要拼 system_prompt，不值得每条都打一次库。
+_agri_name_cache = {}
+_agri_name_cache_lock = threading.Lock()
+
+
+def _supported_product_names():
+    """从 farming_products 目录表读「作物 id -> 中文名」。
+
+    这是全站唯一的作物名真相源（REFACTOR-PLAN 4.2 删掉了代码里四份副本：
+    AGRICULTURE_KNOWLEDGE、_AGRI_PRODUCT_NAME_FALLBACK、前端 PRODUCT_NAMES 之外的
+    农时目录）。运营在后台改作物名，问答的专家身份跟着变，不需要发版。
+    读表失败时返回空字典：宁可退化成泛泛称呼，也不拿一份会过期的硬编码表顶上。
+    """
+    try:
+        return {p['id']: (p.get('name') or '').strip()
+                for p in farming.get_farming_products() if p.get('name')}
+    except Exception as e:
+        logger.debug('读取作物目录失败: %s', e)
+        return {}
+
+
+def _agriculture_product_name(product):
+    """取作物的中文名，用于拼装 AI 专家身份与提示文案。
+
+    取值顺序只有一级：farming_products 目录表。取不到就明说「广东特色农产品」，
+    不再退回内置兜底表 —— 那正是本次要删的第五份作物名副本。
+    """
+    if not product:
+        return UNKNOWN_PRODUCT_FALLBACK
+
+    cached = _agri_name_cache.get(product)
+    if cached is not None:
+        return cached
+
+    name = _supported_product_names().get(product, '')
+    if name:
+        with _agri_name_cache_lock:
+            _agri_name_cache[product] = name
+    return name or UNKNOWN_PRODUCT_FALLBACK
 
 # ---- 用药数值：模型可以给，但必须能说出出处；服务端再强制补一条免责声明 ----
 #
@@ -75,69 +73,6 @@ AGRICULTURE_KNOWLEDGE = {
 #   ① 提示词要求模型给出处、拿不准就不给数字（见上方 _agri_system_prompt 与 _CHEM_DOSE_RULE）；
 #   ② 服务端检测正文里出现用药数值时，强制在答案末尾补一条免责声明。
 #      —— 不依赖模型自觉：模型漏了，服务端补上。这是「强制」二字的落点。
-
-
-# 作物 id → 中文名的内置兜底表。
-# 历史缺陷：专家身份此前只从 AGRICULTURE_KNOWLEDGE 取名，而该字典仅覆盖
-# 荔枝/龙眼/水产养殖 3 个作物，导致选水稻/茶叶/蔬菜提问时 system_prompt
-# 静默退化为「专注于广东特色农产品领域」，专家身份实际失效。
-_AGRI_PRODUCT_NAME_FALLBACK = {
-    'lychee': '荔枝',
-    'longan': '龙眼',
-    # v3 新增（A3）：柑橘、香蕉此前只存在于诊断库与速查，问答取不到名字会退化为
-    # 「广东特色农产品」，专家身份实际失效。此处补齐，与 farming_data.FARMING_PRODUCTS 一致。
-    'citrus': '柑橘',
-    'banana': '香蕉',
-    'aquatic': '水产养殖',
-    'rice': '水稻',
-    'tea': '茶叶',
-    'vegetable': '蔬菜',
-}
-
-
-# 问答接口接受的作物集合（缺陷 A5）。
-# 直接取内置名表：这张表是问答路径上「能不能给模型一个真实作物名」的最后一道底线 ——
-# 取不到名字就会退化成「广东特色农产品」，生成的 system_prompt 丢掉作物针对性。
-# 此前 /api/agriculture/ask 对任意 product 都返回 200 并静默退化，属「能力虚化」。
-#
-# ⚠️ 这张表必须与下面几处保持同一套 8 个作物（本项目历史上就吃过「三套口径」的亏）：
-#   · farming_data.FARMING_PRODUCTS（农时日历，DB 播种）  · index.html 的顶部 .product-card
-#   · script.js 的 getProductName()                        · pest_data.PEST_CROP_ORDER（诊断/速查）
-_AGRI_SUPPORTED_PRODUCTS = frozenset(_AGRI_PRODUCT_NAME_FALLBACK)
-_agri_name_cache = {}
-_agri_name_cache_lock = threading.Lock()
-
-
-def _agriculture_product_name(product):
-    """取作物的中文名，用于拼装 AI 专家身份与提示文案。
-
-    取值顺序：farming_products 目录（可随种子数据扩充）→ AGRICULTURE_KNOWLEDGE
-    → 内置兜底表。三级回退确保任何已知作物都能拿到准确名称。
-    """
-    if not product:
-        return '广东特色农产品'
-
-    cached = _agri_name_cache.get(product)
-    if cached:
-        return cached
-
-    name = ''
-    try:
-        row = farming.get_farming_product(product)
-        if row and row.get('name'):
-            name = str(row['name']).strip()
-    except Exception as e:
-        logger.debug('读取农产品名称失败(%s)，改用内置表: %s', product, e)
-
-    if not name:
-        name = str((AGRICULTURE_KNOWLEDGE.get(product) or {}).get('name') or '').strip()
-    if not name:
-        name = _AGRI_PRODUCT_NAME_FALLBACK.get(product, '')
-
-    if name:
-        with _agri_name_cache_lock:
-            _agri_name_cache[product] = name
-    return name or '广东特色农产品'
 
 
 def _agri_system_prompt(product):
@@ -166,11 +101,16 @@ def agri_system_prompt(product):
 
 
 def supported_products():
-    """公开出口：问答接口接受的作物集合（未知 product 明确拒绝，不静默退化）。"""
-    return _AGRI_SUPPORTED_PRODUCTS
+    """公开出口：问答接口接受的作物集合（未知 product 明确拒绝，不静默退化）。
+
+    集合直接来自 farming_products 目录表：平台上有哪些作物由运营定，问答能问哪些
+    作物就跟着定。此前这里是一份写死的 8 个 id，与目录表、前端卡片、病虫害作物层
+    四处口径要手工对齐（本项目历史上就吃过「三套口径」的亏）。
+    """
+    return frozenset(_supported_product_names())
 
 
 __all__ = [
-    'AGRICULTURE_KNOWLEDGE', 'CHEM_DOSE_NOTICE', 'CHEM_DOSE_NOTICE_BLOCK',
+    'CHEM_DOSE_NOTICE', 'CHEM_DOSE_NOTICE_BLOCK', 'UNKNOWN_PRODUCT_FALLBACK',
     'agriculture_product_name', 'agri_system_prompt', 'supported_products',
 ]

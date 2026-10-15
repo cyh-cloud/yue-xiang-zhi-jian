@@ -58,7 +58,6 @@ class JobListTest(EmploymentDomainTestBase):
     """岗位列表：两类数据源合并下发 + 分类下拉 + 薪资筛选口径。"""
 
     def test_jobs_list_merges_enterprise_jobs_and_recruitments(self):
-        from domain_data.employment import jobs_data
         data = json.loads(self.client.get('/api/employment/jobs').data)
         self.assertTrue(data['success'])
         self.assertIn('jobs', data)
@@ -85,7 +84,8 @@ class JobListTest(EmploymentDomainTestBase):
         self.assertIn('enterprise', options)
         self.assertIn('recruit', options)
         recruit_values = [o['value'] for o in options['recruit']]
-        for name in jobs_data.CATEGORY_LIST:
+        from db_domains.recruitments import RECRUIT_CATEGORIES
+        for name in RECRUIT_CATEGORIES:
             self.assertIn(name, recruit_values)
         enterprise_values = [o['value'] for o in options['enterprise']]
         for name in employment.ENTERPRISE_JOB_CATEGORIES:
@@ -97,18 +97,18 @@ class JobListTest(EmploymentDomainTestBase):
                          len(data['jobs']))
 
     def test_keyword_and_location_filter_recruitments(self):
-        from domain_data.employment import jobs_data
-        first = jobs_data.get_recruitment_list()[0]
+        plain = json.loads(self.client.get('/api/employment/jobs').data)
+        first = plain['recruitments'][0]
         data = json.loads(self.client.get(
             '/api/employment/jobs?keyword=%s' % first['org']).data)
         self.assertTrue(all(first['org'] in (r.get('org') or '')
                             for r in data['recruitments']))
         # 命中的公告条数必须真的少于全量（否则筛选没生效，用例失去意义）
-        self.assertLess(len(data['recruitments']), len(jobs_data.get_recruitment_list()))
+        self.assertLess(len(data['recruitments']), len(plain['recruitments']))
 
     def test_category_filter_applies_to_both_sources(self):
-        from domain_data.employment import jobs_data
-        category = jobs_data.CATEGORY_LIST[0]
+        data = json.loads(self.client.get('/api/employment/jobs').data)
+        category = data['recruitments'][0]['category']
         data = json.loads(self.client.get(
             '/api/employment/jobs?category=%s' % category).data)
         for r in data['recruitments']:
@@ -558,8 +558,8 @@ class JobIntentTest(EmploymentDomainTestBase):
     """求职意向：登记幂等、不存在的公告 404、取消、聚合下发。"""
 
     def _recruit_key(self):
-        from domain_data.employment import jobs_data
-        return jobs_data.get_recruitment_list()[0]['key']
+        data = json.loads(self.client.get('/api/employment/jobs').data)
+        return data['recruitments'][0]['key']
 
     def test_intent_lifecycle(self):
         self.addCleanup(self._cleanup)

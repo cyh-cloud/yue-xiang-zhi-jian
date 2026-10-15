@@ -181,14 +181,6 @@ SCHEMA_SQL = """
             extra TEXT NOT NULL DEFAULT '{}'
         );
 
-        -- 通用"内容签名"元数据表（预置内容变更后自动重灌，见 _refresh_policies / _seed_farming）
-        CREATE TABLE IF NOT EXISTS seed_meta (
-            key        TEXT PRIMARY KEY,
-            value      TEXT NOT NULL,
-            updated_at TEXT DEFAULT (datetime('now','localtime')),
-            extra TEXT NOT NULL DEFAULT '{}'
-        );
-
         -- 迁移记录表。migrations/0001_content_to_db.py 靠它判断「这库跑没跑过」，
         -- 否则重复执行会把运营改过的内容按代码再刷一遍。记录与建表同住：表定义
         -- 全仓库只有这一份，脚本不另建表。version 是脚本文件名里的序号，
@@ -466,16 +458,7 @@ SCHEMA_SQL = """
             UNIQUE(user_id, product_id, period)
         );
 
-        -- ⑥ 种子数据元信息（内容签名，用于判断是否需要重灌种植日历数据）
-        --    仅比行数无法发现"条数不变但内容变了"（如 task_md 补日期），故改用内容签名
-        CREATE TABLE IF NOT EXISTS farming_seed_meta (
-            key         TEXT PRIMARY KEY,
-            value       TEXT NOT NULL,
-            updated_at  TEXT DEFAULT (datetime('now','localtime')),
-            extra TEXT NOT NULL DEFAULT '{}'
-        );
-
-        -- ⑦ 数据来源登记表（来源方向 = 机构 + 文件类型）
+        -- ⑥ 数据来源登记表（来源方向 = 机构 + 文件类型）
         --    doc_no 一律先落「待核」：具体标准号/文号须由农技人员核实后补填，
         --    代码侧不得凭空编造标准号，故本表只做"来源方向"登记。
         CREATE TABLE IF NOT EXISTS farming_sources (
@@ -496,7 +479,8 @@ SCHEMA_SQL = """
         CREATE INDEX IF NOT EXISTS idx_farming_log_lookup     ON farming_reminder_log(user_id, product_id, period);
 
         -- ==================== 内容落库（ADR 0002）====================
-        -- 以下 20 张表承接原 domain_data/ 与 domains/ 里的内容常量。命名沿用既有风格：
+        -- 以下 20 张表承接原代码里的六份内容数据模块与六份路由内内容常量（ADR 0002
+        -- 已把那些模块整体删除）。命名沿用既有风格：
         -- snake_case 复数、is_ 前缀布尔、_at 后缀时间、JSON 数组存 TEXT。
         -- 每张表同样带 extra 预留列，不建索引。
 

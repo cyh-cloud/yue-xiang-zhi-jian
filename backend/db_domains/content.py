@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """本土资源域的**内容**读取：成功案例与政策口径。
 
-T09 把成功案例与政策的内容从 domain_data.resources 切到读库（ADR 0002），并把
+T09 把成功案例与政策的内容从代码常量切到读库（ADR 0002），并把
 db_domains/resources.py 里「读内容」的那半边搬到这里，两个模块的职责从此分开：
 
   - content.py（本模块）持有**内容**：案例正文（五张表组装）与案例 / 政策的口径文案。
@@ -47,6 +47,18 @@ POLICY_SOURCE_NOTE = (
     u'具体标准与办理时限以当年度当地主管部门正式文件为准。'
 )
 POLICY_DISCLAIMER = u'本平台仅作政策索引与解读，不替代官方文件，不代办任何申报。'
+
+# 平台预置政策的标题白名单。政府端工作概览据此把「本级发布」与「平台预置」分开统计：
+# 预置行与 gov_demo 自己发布的行 author_id 相同（都是 gov_demo），只按作者分不开。
+# 白名单取代了原先 db_seed_policies.POLICIES_DATA 里那份由代码播种推导出来的清单，
+# 内容播种删除后（ADR 0002），这里是唯一真相源。
+PRESET_POLICY_TITLES = frozenset((
+    u'农业补贴申请指南',
+    u'农村电商扶持政策',
+    u'非遗传承人认定办法',
+    u'农业技术培训补贴',
+    u'农产品质量安全认证',
+))
 
 
 def _case_from_row(row, conn):

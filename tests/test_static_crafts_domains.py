@@ -213,12 +213,15 @@ class CraftsDomainTest(unittest.TestCase):
         self.assertEqual(data, {"success": False, "message": u"未找到该手工艺信息"})
 
     def test_crafts_knowledge_is_the_domain_single_source(self):
-        from domains.crafts.routes import CRAFTS_KNOWLEDGE
-        self.assertEqual(set(CRAFTS_KNOWLEDGE),
+        """技艺目录只有一处真相源：crafts 表，代码里不再有 CRAFTS_KNOWLEDGE 副本。"""
+        import domains.crafts.routes as routes_module
+        self.assertFalse(hasattr(routes_module, 'CRAFTS_KNOWLEDGE'),
+                         'routes.py 仍持有 CRAFTS_KNOWLEDGE 副本')
+        body = json.loads(self.client.get('/api/crafts/list').data)
+        self.assertEqual({c['id'] for c in body['crafts']},
                          {'embroidery', 'woodcarving', 'ceramics', 'lacquer'})
-        for craft_id, entry in CRAFTS_KNOWLEDGE.items():
-            self.assertTrue(entry.get('name'), craft_id)
-            self.assertTrue(entry.get('history'), craft_id)
+        for craft in body['crafts']:
+            self.assertTrue(craft['name'], craft['id'])
 
 
 if __name__ == '__main__':

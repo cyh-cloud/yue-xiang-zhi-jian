@@ -20,7 +20,6 @@ from flask import jsonify, request
 
 
 from core.session import get_session_user
-from domains.agriculture.calendar_data import _DEFAULT_AGRICULTURE_PRODUCTS
 from domains.agriculture.routes import agriculture_bp
 from shared.solar_terms import solar_terms_of_month
 from db_domains import farming, notifications
@@ -28,33 +27,28 @@ from db_domains import farming, notifications
 # 声明，让 tools/check_architecture.py 有据可判，也让「谁在给全员发通知」可查。
 CAPABILITIES_USED = ('farming.read', 'notification.read')
 
-# T06：_month_in_phase 与 _farming_task_brief 两个纯函数已随农时内容一并移入
-# db_domains.farming（按 REFACTOR-PLAN 4.2）。这里按域 import 后经 farming 取用，
-# 不再从 domains.agriculture.calendar_data 取——纯函数跟着数据走，读侧只认一处。
-
 logger = logging.getLogger(__name__)
 
 
 @agriculture_bp.route('/api/agriculture/products', methods=['GET'])
 def get_products():
-    """农产品目录：优先读 farming_products 表（is_active=1，按 sort_order 排序）。
+    """农产品目录：读 farming_products 表（is_active=1，按 sort_order 排序）。
 
-    返回结构与旧版保持一致（desc 由 summary 映射），表为空时回退硬编码列表。
+    返回结构与内容落库前保持一致（desc 由 summary 映射）。表读空就是空列表，
+    不再回退硬编码目录（REFACTOR-PLAN 4.2）：退回半份数据会让「平台只有 8 个作物」
+    这件事在界面上看不出来，而运营看不到的目录等于不存在。
     """
     try:
         rows = farming.get_farming_products()
     except Exception as e:
-        logger.warning('读取农产品目录失败，回退硬编码: %s', e)
+        logger.warning('读取农产品目录失败: %s', e)
         rows = []
-    if rows:
-        products = [{
-            "id": r["id"],
-            "name": r["name"],
-            "icon": r.get("icon") or "seedling",
-            "desc": r.get("summary") or "",
-        } for r in rows]
-    else:
-        products = [dict(p) for p in _DEFAULT_AGRICULTURE_PRODUCTS]
+    products = [{
+        "id": r["id"],
+        "name": r["name"],
+        "icon": r.get("icon") or "seedling",
+        "desc": r.get("summary") or "",
+    } for r in rows]
     return jsonify({"success": True, "products": products})
 
 

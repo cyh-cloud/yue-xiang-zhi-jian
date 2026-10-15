@@ -54,13 +54,13 @@ EXPECTED_TABLES = {
     'announcements', 'assignment_submissions', 'assignments', 'carousels',
     'certificates', 'comments', 'content_reviews', 'course_materials', 'courses',
     'discussions', 'farming_categories', 'farming_phenophases',
-    'farming_products', 'farming_reminder_log', 'farming_seed_meta',
+    'farming_products', 'farming_reminder_log',
     'farming_sources', 'farming_subscriptions', 'farming_tasks',
     'government_policies', 'job_applications', 'job_intents', 'job_listings',
     'messages', 'models_3d', 'news_articles', 'notification_reads',
     'notifications', 'pest_crops', 'pest_entries', 'pest_entry_sources',
     'pest_images', 'pest_sources', 'points', 'policies', 'procurements',
-    'recruitment_sources', 'recruitments', 'resumes', 'saved_jobs', 'seed_meta',
+    'recruitment_sources', 'recruitments', 'resumes', 'saved_jobs',
     'students', 'success_cases', 'system_announcements', 'user_sessions', 'users',
     'case_stats', 'case_milestones', 'case_sources', 'case_lessons',
     'dialects', 'dialect_phrases', 'dialect_quick_questions', 'crafts',
@@ -71,8 +71,9 @@ EXPECTED_TABLES = {
 }
 # 36 张既有表 + 21 张新表。spec 4.4 写作「36 -> 56」，那是按
 # 「pest_entries 已存在、只补列」算的；实测现库里并没有 pest_entries
-# （病虫害内容此前只在 domain_data 里，从未落库），所以实际新建 21 张。
-EXPECTED_TABLE_COUNT = 58
+# （病虫害内容此前只在代码常量里，从未落库），所以实际新建 21 张。
+# T10 删掉两张内容签名表（seed_meta / farming_seed_meta），故 58 - 2 = 56。
+EXPECTED_TABLE_COUNT = 56
 
 EXPECTED_VIEWS = {
     'v_enterprise_applications', 'v_enterprise_job_stats', 'v_home_stats',

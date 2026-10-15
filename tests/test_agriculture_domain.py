@@ -14,12 +14,16 @@ import json
 import os
 import sys
 import unittest
-from db_connection import get_connection
-from db_domains import farming
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_BACKEND_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
+REPO_ROOT = _BACKEND_DIR
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
+from db_connection import get_connection  # noqa: E402
+from db_domains import farming  # noqa: E402
 
 
 
@@ -56,7 +60,11 @@ class ProductCatalogTest(AgricultureDomainTestBase):
                 self.assertIn(key, product)
 
     def test_products_falls_back_to_the_builtin_catalog_when_table_is_empty(self):
-        """表读空时回退硬编码目录：六种作物的 id/name/icon/desc 与拆分前逐字一致。"""
+        """表读空就是空列表，不回退硬编码目录（REFACTOR-PLAN 4.2）。
+
+        退回半份数据会让「平台只有 8 个作物」这件事在界面上看不出来，
+        而运营看不到的目录等于不存在。
+        """
         original = farming.get_farming_products
         try:
             farming.get_farming_products = lambda: []
@@ -66,15 +74,10 @@ class ProductCatalogTest(AgricultureDomainTestBase):
         self.assertEqual(response.status_code, 200)
         body = json.loads(response.data)
         self.assertTrue(body['success'])
-        self.assertEqual([p['id'] for p in body['products']],
-                         ['lychee', 'longan', 'aquatic', 'rice', 'tea', 'vegetable'])
-        self.assertEqual([p['name'] for p in body['products']],
-                         [u'荔枝', u'龙眼', u'水产养殖', u'水稻', u'茶叶', u'蔬菜'])
-        self.assertEqual([p['icon'] for p in body['products']],
-                         ['apple-alt', 'circle', 'fish', 'seedling', 'mug-hot', 'carrot'])
+        self.assertEqual(body['products'], [])
 
     def test_products_survives_a_database_failure(self):
-        """读表异常时同样回退内置目录，不外抛 500。"""
+        """读表异常时同样给空列表，不外抛 500。"""
         original = farming.get_farming_products
 
         def boom():
@@ -88,7 +91,7 @@ class ProductCatalogTest(AgricultureDomainTestBase):
         self.assertEqual(response.status_code, 200)
         body = json.loads(response.data)
         self.assertTrue(body['success'])
-        self.assertEqual(len(body['products']), 6)
+        self.assertEqual(body['products'], [])
 
 
 class FarmingCalendarTest(AgricultureDomainTestBase):
@@ -508,7 +511,7 @@ class AgriAskTest(AgricultureDomainTestBase):
 
 
 class AgriSuggestionsTest(AgricultureDomainTestBase):
-    """追问建议：任何失败都退化为静态建议，对前端始终 success=True。"""
+    """追问建议：任何失败都返回空列表，对前端始终 success=True。"""
 
     def _suggestions(self, product=None):
         url = '/api/agriculture/suggestions'
@@ -524,8 +527,14 @@ class AgriSuggestionsTest(AgricultureDomainTestBase):
         self.assertTrue(self._suggestions('lychee'))
 
     def test_suggestions_unknown_product_falls_back_to_lychee(self):
-        """未知作物不报错：作物名解析有内置兜底表，取不到就退化成泛泛提问。"""
-        self.assertTrue(self._suggestions('no-such'))
+        """未知作物不报错：问答路径对未知作物明确拒绝（400），建议栏则返回空列表。"""
+        import ai.client as ai_client
+        original = ai_client.ai_configured
+        try:
+            ai_client.ai_configured = lambda: False
+            self.assertEqual(self._suggestions('no-such'), [])
+        finally:
+            ai_client.ai_configured = original
 
     def test_suggestions_default_product_is_lychee(self):
         """缺省按荔枝处理，与问答接口的 product 缺省同一口径。"""
@@ -535,7 +544,12 @@ class AgriSuggestionsTest(AgricultureDomainTestBase):
         self.assertEqual(self._suggestions('rice'), self._suggestions('rice'))
 
     def test_static_fallback_used_when_upstream_is_not_configured(self):
-        """上游未配置时退到静态建议：仍是 200 + success=True + 四条内置问题。"""
+        """上游未配置时明确不给建议：仍是 200 + success=True，但建议列表为空。
+
+        不再退到写死在代码里的六作物静态问题清单（REFACTOR-PLAN 4.2）：那份清单
+        覆盖不到全部 8 个作物，也会让人误以为平台在回答。前端拿不到建议时按当前
+        作物渲染通用问句，那才是「AI 不可用」的如实呈现。
+        """
         import ai.client as ai_client
         original = ai_client.ai_configured
         try:
@@ -543,9 +557,7 @@ class AgriSuggestionsTest(AgricultureDomainTestBase):
             suggestions = self._suggestions('lychee')
         finally:
             ai_client.ai_configured = original
-        self.assertEqual(suggestions, [
-            u'荔枝花期如何管理？', u'如何防治荔枝霜疫霉病？',
-            u'荔枝采后怎样恢复树势？', u'荔枝膨大期施什么肥？'])
+        self.assertEqual(suggestions, [])
 
 
 class AgriDosageNoticeTest(AgricultureDomainTestBase):

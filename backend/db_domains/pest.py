@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """病虫害域的数据访问层：作物、条目、来源、条目与来源多对多、实拍图。
 
-T07 把读取从 domain_data/pest_diagnosis/ 切到 T04 建的五张 pest 表。内容由
+T07 把读取从代码常量切到 T04 建的五张 pest 表。内容由
 migrations/0001_content_to_db.py 灌入，本模块只负责读，不写。
 
 两条硬约定由这个模块兜住，不靠路由自觉：
@@ -11,7 +11,7 @@ migrations/0001_content_to_db.py 灌入，本模块只负责读，不写。
   2. 无授权图不冒充：pest_images 里没有行的条目，image 就是 None。没有任何
      「找不到图就给个示意图 URL」的分支。
 
-输出形状与切换前的 domain_data 视图逐字段一致，这是路由层能零改动的前提：
+输出形状与切换前的代码常量视图逐字段一致，这是路由层能零改动的前提：
   · 条目 dict 的键、类型、空值表示（'' 与 None）与旧 entry 相同；
   · sources 展开成带全部来源字段的 dict，顺序按 pest_entry_sources.sort_order
     （迁移脚本按 entry['sources'] 的列表顺序写入，故与旧版逐项一致）；
@@ -240,7 +240,7 @@ def get_pest_entry(entry_id):
 def get_pest_stats():
     """统计作物数、条目数、有授权图条目数、已复核条目数。
 
-    口径与切换前 domain_data.pest_data.get_pest_stats() 一致：crops 数
+    口径与切换前 pest_data.get_pest_stats() 一致：crops 数
     pest_crops、entries 数 pest_entries、with_image 数 pest_images 里有 file 的行、
     verified 数 is_verified 非零的条目。
     """

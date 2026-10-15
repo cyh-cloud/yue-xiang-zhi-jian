@@ -40,10 +40,6 @@ from ai.client import (
     stream_chat_completion,
 )
 from core.session import client_key, rate_limited
-from domains.agriculture.calendar_data import (
-    _STATIC_AGRI_SUGGESTIONS,
-    _static_agri_suggestions,
-)
 from domains.agriculture.prompts import (
     CHEM_DOSE_NOTICE_BLOCK,
     agri_system_prompt,
@@ -303,8 +299,13 @@ def ask_agriculture_stream():
 def get_agriculture_suggestions():
     """获取指定农产品的常见问题建议。
 
-    建议栏属于「锦上添花」的辅助内容：任何失败都退化为静态建议，
+    建议栏属于「锦上添花」的辅助内容：任何失败都返回空列表，
     对前端始终返回 success=True，不把错误抛给用户。
+
+    AI 不可用时明确不给建议（空列表），不再退到一份静态问题清单
+    （REFACTOR-PLAN 4.2）：那六条问题是写死在代码里的内容，既覆盖不到全部
+    8 个作物，也会让人误以为平台在回答。前端拿不到建议时按当前作物渲染
+    通用问句（script.js 的 QA_GENERIC_QUESTIONS），这才是「不可用」的如实呈现。
     """
     product = request.args.get('product', 'lychee')
     now = time.time()
@@ -314,10 +315,10 @@ def get_agriculture_suggestions():
         return jsonify({"success": True, "suggestions": _suggestions_cache[product]})
 
     if rate_limited('suggest:' + client_key(), AGRI_RATE_SUGGEST_LIMIT):
-        return jsonify({"success": True, "suggestions": _static_agri_suggestions(product)})
+        return jsonify({"success": True, "suggestions": []})
 
     if not ai.client.ai_configured():
-        return jsonify({"success": True, "suggestions": _static_agri_suggestions(product)})
+        return jsonify({"success": True, "suggestions": []})
 
     product_name = agriculture_product_name(product)
     try:
@@ -336,7 +337,7 @@ def get_agriculture_suggestions():
         return jsonify({"success": True, "suggestions": suggestions})
     except Exception as e:
         logger.error("生成建议问题失败: %s", e)
-        return jsonify({"success": True, "suggestions": _static_agri_suggestions(product)})
+        return jsonify({"success": True, "suggestions": []})
 
 
-__all__ = ['agriculture_bp', '_STATIC_AGRI_SUGGESTIONS', 'SUGGESTIONS_CACHE_TTL']
+__all__ = ['agriculture_bp', 'SUGGESTIONS_CACHE_TTL']

@@ -228,12 +228,13 @@ class SchemaDefinitionTest(IsolatedDatabaseTest):
         self.assertEqual(before, after)
 
     def test_legacy_demo_jobs_are_cleaned_on_existing_databases(self):
-        self.assertEqual(self.probe('legacy_cleaned'), 0,
-                         '既有库里的历史预置岗位没有被清掉')
+        """历史遗留的空 enterprise_id 预置岗位不再由启动路径清理（T10 删掉了那段种子逻辑）。"""
+        self.assertEqual(self.probe('legacy_cleaned'), 1,
+                         'init_db() 不应再删既有库里的任何 job_listings 行')
 
 
 class SeedOrchestrationTest(IsolatedDatabaseTest):
-    """首次建表并播种；重复执行幂等；既有结论不被种子逻辑覆盖。"""
+    """首次建表并灌演示账号；重复执行幂等；不写任何内容行。"""
 
     def test_init_db_seeds_queryable_data(self):
         counts = self.probe('seed_counts')
@@ -242,30 +243,20 @@ class SeedOrchestrationTest(IsolatedDatabaseTest):
         self.assertEqual(counts['points'], 6)
         self.assertEqual(counts['students'], 2)
         self.assertEqual(counts['certificates'], 6)
-        self.assertEqual(counts['policies'], counts['policies_total'])
-        self.assertEqual(counts['government_policies'], counts['policies_total'])
-        self.assertEqual(counts['carousels'], 3)
-        self.assertEqual(counts['system_announcements'], 1)
-        self.assertEqual(counts['discussions'], 2)
-        self.assertGreater(counts['farming_products'], 0)
-        self.assertGreater(counts['farming_tasks'], 0)
-        self.assertEqual(counts['job_listings'], counts['demo_jobs'])
-
-    def test_demo_jobs_carry_review_records(self):
-        self.assertEqual(self.probe('job_reviews'), 2)
+        # 内容一律不播种（ADR 0002）：内容由基线库交付，启动路径只建表补列
+        for table in ('policies', 'government_policies', 'carousels',
+                      'system_announcements', 'discussions', 'farming_products',
+                      'farming_tasks', 'pest_entries', 'recruitments',
+                      'success_cases', 'crafts', 'dialects'):
+            self.assertEqual(counts[table], 0,
+                             'init_db() 往 %s 里写了行，启动路径不得写内容' % table)
+        # job_listings 同属内容侧：演示岗位也由基线库交付，不再由种子逻辑灌
+        self.assertEqual(counts['job_listings'], 0)
 
     def test_init_db_is_idempotent(self):
         first, second = self.probe('seed_idempotent')
         self.assertEqual(first, second)
 
-    def test_second_init_keeps_review_conclusions_and_real_enterprise_jobs(self):
-        result = self.probe('review_survives')
-        self.assertEqual(result['demo_status'], 'rejected',
-                         '种子重灌把管理员的审核结论覆盖掉了')
-        self.assertEqual(result['real_status'], 'approved',
-                         '真实企业岗位的审核结论不得被改写')
-        self.assertEqual(sorted(result['demo_ids']), [1, 2],
-                         '演示岗位必须按标题就地更新（id 不变），不得删后重建')
 
 
 class DomainSymbolSurfaceTest(unittest.TestCase):

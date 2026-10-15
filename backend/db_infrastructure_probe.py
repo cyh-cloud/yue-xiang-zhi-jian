@@ -16,8 +16,6 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from db_connection import get_connection
 from db_init import init_db
-from db_seed_demo_jobs import DEMO_JOBS
-from db_seed_policies import POLICIES_DATA
 
 
 def table_names(conn):
@@ -59,13 +57,13 @@ def probe_seed_counts():
     init_db()
     conn = get_connection()
     out = {
-        'policies_total': len(POLICIES_DATA),
-        'demo_jobs': len(DEMO_JOBS),
+        'demo_accounts': 6,
     }
     for name in ('users', 'points', 'students', 'certificates', 'policies',
                  'government_policies', 'carousels', 'system_announcements',
                  'discussions', 'farming_products', 'farming_tasks',
-                 'job_listings'):
+                 'job_listings', 'pest_entries', 'recruitments', 'success_cases',
+                 'crafts', 'dialects'):
         out[name] = conn.execute('SELECT COUNT(*) FROM %s' % name).fetchone()[0]
     conn.close()
     print(json.dumps(out))
@@ -87,60 +85,12 @@ def probe_seed_idempotent():
     init_db()
     conn = get_connection()
     before = table_counts(conn)
-    before['demo_job_ids'] = sorted(
-        r[0] for r in conn.execute(
-            'SELECT id FROM job_listings WHERE is_demo = 1').fetchall())
-    before['demo_job_status'] = sorted(
-        (r[0], r[1]) for r in conn.execute(
-            'SELECT id, review_status FROM job_listings WHERE is_demo = 1'
-        ).fetchall())
     conn.close()
     init_db()
     conn = get_connection()
     after = table_counts(conn)
-    after['demo_job_ids'] = sorted(
-        r[0] for r in conn.execute(
-            'SELECT id FROM job_listings WHERE is_demo = 1').fetchall())
-    after['demo_job_status'] = sorted(
-        (r[0], r[1]) for r in conn.execute(
-            'SELECT id, review_status FROM job_listings WHERE is_demo = 1'
-        ).fetchall())
     conn.close()
     print(json.dumps([before, after]))
-
-
-def probe_review_conclusions_survive_rerun():
-    init_db()
-    conn = get_connection()
-    demo_id = conn.execute(
-        'SELECT id FROM job_listings WHERE is_demo = 1 ORDER BY id LIMIT 1'
-    ).fetchone()[0]
-    conn.execute('UPDATE job_listings SET review_status = ? WHERE id = ?',
-                 ('rejected', demo_id))
-    conn.execute(
-        'INSERT INTO job_listings '
-        '(title, company, salary, requirements, description, location, '
-        ' category, enterprise_id, review_status, is_demo) '
-        "VALUES ('__t04真实岗位__', '真实公司', '9K', '[]', '真实描述', "
-        "'广州', '电商运营', 'enterprise_demo', 'approved', 0)")
-    conn.commit()
-    real_id = conn.execute(
-        "SELECT id FROM job_listings WHERE title = '__t04真实岗位__'").fetchone()[0]
-    conn.close()
-
-    init_db()
-    conn = get_connection()
-    print(json.dumps({
-        'demo_status': conn.execute(
-            'SELECT review_status FROM job_listings WHERE id = ?',
-            (demo_id,)).fetchone()[0],
-        'real_status': conn.execute(
-            'SELECT review_status FROM job_listings WHERE id = ?',
-            (real_id,)).fetchone()[0],
-        'demo_ids': [r[0] for r in conn.execute(
-            'SELECT id FROM job_listings WHERE is_demo = 1').fetchall()],
-    }))
-    conn.close()
 
 
 def probe_legacy_demo_jobs_cleaned():
@@ -157,15 +107,6 @@ def probe_legacy_demo_jobs_cleaned():
     conn.close()
 
 
-def probe_demo_job_review_records():
-    init_db()
-    conn = get_connection()
-    print(json.dumps(conn.execute(
-        "SELECT COUNT(*) FROM content_reviews WHERE content_type = 'job'"
-    ).fetchone()[0]))
-    conn.close()
-
-
 def probe_override_creates_db():
     conn = get_connection()
     conn.close()
@@ -178,9 +119,7 @@ PROBES = {
     'seed_counts': probe_seed_counts,
     'schema_stable': probe_schema_stable_across_rerun,
     'seed_idempotent': probe_seed_idempotent,
-    'review_survives': probe_review_conclusions_survive_rerun,
     'legacy_cleaned': probe_legacy_demo_jobs_cleaned,
-    'job_reviews': probe_demo_job_review_records,
     'override_db': probe_override_creates_db,
 }
 

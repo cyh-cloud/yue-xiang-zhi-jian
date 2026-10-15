@@ -9,7 +9,7 @@
 
 ## 结构
 
-- `serve.py`：每次启动删旧库、`init_db()` 种子、起 Flask。库路径由环境变量 `YUEXIANG_DB` 指定（见根 `database.py` 的开关，默认行为不变）。
+- `serve.py`：每次启动删旧库、从 `data/baseline.db` 复制一份、再跑 `init_db()` 补演示账号，最后起 Flask。库路径由环境变量 `YUEXIANG_DB` 指定（见 `backend/db_connection.py` 的开关）。T10 起 `init_db()` 只建表补列加灌演示账号，不写内容行，所以基线库是 e2e 拿到内容的唯一途径。
 - `playwright.config.js`：用 webServer 拉起 `serve.py` 并等 `/api/health`；把 `AI_API_KEY` 置空，使 AI 接口返 503，便于稳定断言。
 - `specs/`：
   - `ownership.spec.js` 越权矩阵（各端点 × 各登录态）

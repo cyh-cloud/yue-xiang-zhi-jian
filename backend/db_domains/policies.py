@@ -13,8 +13,7 @@ from db_connection import get_connection
 # 本模块，谁就必须持 policy.manage（读操作受 policy.read 管）。
 CAPABILITY = 'policy'
 
-# 预置政策的标题白名单与政策来源辅助，与播种同住政策域
-from db_seed_policies import POLICIES_DATA
+from db_domains.content import PRESET_POLICY_TITLES
 from db_domains.resources import (
     _attach_policy_sources,
     default_policy_summary,
@@ -133,15 +132,15 @@ def get_government_overview():
     """政府端工作概览：政策发布情况 + 本地成功案例。
 
     ⚠️ 政策必须区分「本级发布」与「平台预置」：
-      预置政策是用 `gov_demo` 这个账号身份灌进去的（见 `_refresh_policies`），
-      只按 author_id 分不开 —— 若直接 COUNT，平台预置的 5 条会被算成本级发布的政绩。
-      这里复用与 `_refresh_policies` 相同的**预置标题白名单**（POLICIES_DATA）做区分。
+      预置政策与 gov_demo 自己发布的行 author_id 相同，只按 author_id 分不开 ——
+      若直接 COUNT，平台预置的 5 条会被算成本级发布的政绩。
+      这里用**预置标题白名单**（db_domains.content.PRESET_POLICY_TITLES）做区分。
 
     案例口径与学员端一致：只统计 `content_reviews` 中 status='approved' 的
     （未通过审核的案例，政府端同样不应看到）。
     """
     conn = get_connection()
-    preset_titles = {p[0] for p in POLICIES_DATA}
+    preset_titles = PRESET_POLICY_TITLES
     rows = conn.execute(
         "SELECT title, category, is_published FROM government_policies"
     ).fetchall()

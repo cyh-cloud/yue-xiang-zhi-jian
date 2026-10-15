@@ -268,9 +268,6 @@ class PolicyTest(ResourcesDomainTestBase):
 
     def test_policies_are_empty_after_the_government_unpublishes_everything(self):
         """政府端全部下架后，学员端必须真实为空，绝不回退到旧 policies 表。"""
-        from domain_data.resources import policies_data
-        # 先确认旧数据源里有内容：回退逻辑一旦复活，这个用例就会抓到它
-        self.assertGreater(len(policies_data.get_policies()), 0)
         try:
             self._set_all_published(0)
             response = self.client.get('/api/resources/policies')

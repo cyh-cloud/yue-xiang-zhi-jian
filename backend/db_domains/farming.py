@@ -4,8 +4,8 @@
 
 T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分前逐字节一致。
 T06 把分类标签与两个纯函数收进本模块：分类标签改读 farming_categories 表
-（原 get_farming_category_labels 从 domain_data.agriculture.farming_data 现取，
-是当时唯一的 domain_data 残留），_month_in_phase 与 _farming_task_brief 从
+（原 get_farming_category_labels 从代码常量现取，
+是当时唯一的代码常量残留），_month_in_phase 与 _farming_task_brief 从
 domains/agriculture/calendar_data.py 移入，一并列在 __all__ 里。
 """
 

@@ -103,7 +103,7 @@ _TABLE_RE = re.compile(
 ALL_TABLES = set()
 for _tables in OWNED_TABLES.values():
     ALL_TABLES |= _tables
-ALL_TABLES |= {'policies', 'seed_meta', 'carousels', 'farming_seed_meta', 'users'}
+ALL_TABLES |= {'policies', 'carousels', 'users'}
 
 
 def tables_in_sql(sql):
@@ -223,9 +223,9 @@ class SharedDbHygieneTest(unittest.TestCase):
 
     def test_approved_case_count_matches_the_content_source(self):
         """approved 计数必须等于内容源里的案例数，多出来就是被测试撑爆的。"""
-        from domain_data.resources import cases_data
+        from db_domains import content
         stats = resources.get_case_review_stats()['case_review']
-        total_cases = len(cases_data.get_cases())
+        total_cases = len(content.get_cases())
         self.assertEqual(stats['total'], total_cases,
                          '审核记录覆盖的内容数与内容源不一致')
         self.assertLessEqual(stats['approved'], total_cases,

@@ -19,13 +19,13 @@ from flask import Blueprint, jsonify, request
 from core.permissions import require_capability
 from core.session import get_session_user
 from db_connection import get_connection
-from db_domains import announcements, community, courses, employment
+from db_domains import announcements, community, content, courses, employment
 from db_domains import users as users_db
 from db_domains import reviews as reviews_db
 
 
 # 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
-CAPABILITIES_USED = ('user.read', 'review.read', 'course.read')
+CAPABILITIES_USED = ('user.read', 'review.read', 'course.read', 'case.read')
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -39,15 +39,15 @@ def admin_dashboard():
        恒 403，统计区长期空白。这里给 admin 自己的口径。
     ⚠️ 只输出真实可算的项：在线人数 / 日活 / 增长趋势 / 平均审核时长一律不下发 ——
        没有在线状态表、没有埋点、没有访问日志，凑出来的数字就是编造。
-        成功案例正文不落库，条数从 domain_data.resources.cases_data 取（与审核详情同一来源）。
+        成功案例正文在库（success_cases 五张表，T09 起改读库），条数从 content 域取。
     """
     user = get_session_user()
     # 鉴权由 @require_capability('review.moderate') 承担；这里仍取一次会话用户，
     # 是为了让「谁在看仪表盘」在后续埋点或审计里有据可查（当前仅用于 cases 计数兜底）。
     ov = users_db.get_admin_overview()
     try:
-        from domain_data.resources import cases_data
-        ov['content']['cases'] = len(cases_data.get_cases())
+        from db_domains import content
+        ov['content']['cases'] = len(content.get_cases())
     except Exception:
         # 案例模块取不到就置 None，前端该卡不渲染，绝不补 0
         ov['content']['cases'] = None
@@ -222,9 +222,8 @@ def admin_get_reviews():
             conn.close()
             rd['detail'] = dict(row) if row else None
         elif ctype == 'success_case':
-            # 案例正文不落库（内容在 domain_data.resources.cases_data），详情直接取数据模块
-            from domain_data.resources import cases_data
-            rd['detail'] = cases_data.get_case(cid)
+            # 案例正文在库（T09 起读 content 域的五张表），详情直接取数据模块
+            rd['detail'] = content.get_case(cid)
         # 「自提自审」如实标注：提交者与审核人是同一个人时，这条审核记录
         # 不含任何第三方把关，界面必须标出来，不能被当成「已审核」背书。
         # （平台预置内容的 5 条 success_case 就是这种情况，数据本身是真实的，

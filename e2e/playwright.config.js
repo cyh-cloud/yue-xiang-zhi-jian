@@ -4,7 +4,10 @@ import path from "node:path";
 
 const E2E_DIR = path.join(os.tmpdir(), "yuexiang-e2e");
 const DB_PATH = path.join(E2E_DIR, "yuexiang.db");
-const PORT = 5057;
+// 端口可用 E2E_PORT 覆盖：Windows Hyper-V 会保留一段动态端口区间，5057 有时落在
+// 保留段里导致 bind 失败（症状是「以一种访问权限不允许的方式做了一个访问套接字的尝试」）。
+// 换一个端口跑即可，语义不变。
+const PORT = Number(process.env.E2E_PORT || 5057);
 const BASE = `http://127.0.0.1:${PORT}`;
 const ROOT = path.resolve(import.meta.dirname, "..");
 
@@ -35,7 +38,7 @@ export default defineConfig({
       PYTHONUTF8: "1",
       PYTHONIOENCODING: "utf-8",
     },
-    reuseExistingServer: false,
+    reuseExistingServer: Boolean(process.env.E2E_REUSE_SERVER),
     timeout: 90_000,
     stdout: "pipe",
     stderr: "pipe",

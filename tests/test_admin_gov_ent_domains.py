@@ -399,9 +399,9 @@ class SuperAdminReviewTest(_DbCleanupMixin):
         目标表窄接口 —— 分派表里没有 success_case 一行，审核状态本身就是开关。
         这里自造一条 pending 记录来验证，不依赖演示库里恰好有待审案例。
         """
-        from domain_data.resources import cases_data
-        cases = cases_data.get_cases()
-        self.assertTrue(cases, 'cases_data 为空，无法验证案例审核门禁')
+        from db_domains import content
+        cases = content.get_cases()
+        self.assertTrue(cases, 'success_cases 表为空，无法验证案例审核门禁')
         case_id = cases[0]['id']
         conn = get_connection()
         # 记下原始状态，cleanup 按原样恢复（不是无条件全置 approved）：

@@ -14,11 +14,11 @@ T17 从 app.py 的「政府人员 API」区块整体迁出，URL、请求响应�
 
 - 会话取用户与角色判定只用共享层 core.session；角色把关沿用拆分前的函数内 inline
   403 写法，不改成装饰器 —— 改写判定形式就是改行为；
-- 数据访问一律走 database 契约层。政策发布/更新的三条口径
+- 数据访问一律走 db_domains 各域模块。政策发布/更新的三条口径
   （policy_sources_to_json、default_policy_summary、normalize_policy_category）
-  都在 db_domains/resources.py，经 database 访问，本域不复制第二份；
-- 政策的**内容**事实源是 domain_data.resources.policies_data，同样经 database
-  契约层读取。
+  都在 db_domains/resources.py，本域不复制第二份；
+- 政策正文的事实源是 government_policies 表（政府端自行发布与下架），
+  学员端只读其中 is_published=1 的行，不回退旧 policies 表。
 """
 
 

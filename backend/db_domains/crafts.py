@@ -22,8 +22,7 @@ from db_connection import get_connection
 CAPABILITY = 'craft'
 
 # 详情响应下发的键，顺序与切库前的 CRAFTS_KNOWLEDGE[cid] 一致。
-# videos 与 level 不进这个列表：它们在库里没有对应列（T05 灌库时未迁，
-# 见 migrations/0001_content_to_db.py），由路由层按固定口径补齐。
+# videos 不在这个列表里：库里没有视频表，运营补上之前详情不下发这个键。
 _DETAIL_FIELDS = ('name', 'origin', 'history')
 
 
@@ -37,17 +36,18 @@ _LIST_ORIGIN = {
 
 
 def get_crafts():
-    """技艺列表：id / name / origin 三列，顺序与切库前一致。
+    """技艺列表：id / name / origin / level，顺序与切库前一致。
 
-    origin 取列表层口径（见 _LIST_ORIGIN）；难度分级 level 不在库里
-    （crafts.level 全是空串，T05 未迁），由路由层补，这里不造默认值。
+    origin 取列表层口径（见 _LIST_ORIGIN）；level 直接取库里的 crafts.level，
+    该列目前是空串（T05 灌库时未迁该值），运营在后台补等级后这里立即生效。
     """
     conn = get_connection()
     rows = conn.execute(
-        "SELECT id, name, origin FROM crafts ORDER BY sort_order, id").fetchall()
+        "SELECT id, name, origin, level FROM crafts ORDER BY sort_order, id").fetchall()
     conn.close()
     return [{'id': r['id'], 'name': r['name'],
-             'origin': _LIST_ORIGIN.get(r['id'], r['origin'])} for r in rows]
+             'origin': _LIST_ORIGIN.get(r['id'], r['origin']),
+             'level': r['level'] or ''} for r in rows]
 
 
 def get_craft_detail(craft_id):

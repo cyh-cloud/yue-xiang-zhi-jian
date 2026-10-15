@@ -22,7 +22,7 @@ domain_data 那条路产出的响应」是否一致。把库 mock 掉就退化�
 
 suggestions 两条为什么不在字节比对里：它们的内容由上游模型生成，每次调用的
 措辞都不同（本项目 .env 里配了 AI_API_KEY），与 farming 内容无关。它的静态
-兜底路径由 test_static_suggestions_fallback_unchanged 单独守，用 ai_configured
+上游不可用这条路返回空列表，由 test_static_suggestions_fallback_unchanged 单独守，用 ai_configured
 关掉上游后比对字节，与 T28 的 pest 降级路径同一手法。
 """
 
@@ -145,15 +145,26 @@ class FarmingSwitchSnapshotTest(unittest.TestCase):
                     '%s 的响应字段与切换前不一致' % key)
 
     def test_static_suggestions_fallback_unchanged(self):
-        """追问建议的静态兜底：关掉上游后逐字节与切换前一致。
+        """上游不可用这条路返回空建议，且 success 仍为 True。
 
         suggestions 的内容由上游模型生成，措辞每次不同，没法做跨进程字节比对。
-        但「上游不可用」这条路是纯静态的，切换前后都必须一字不差。
+        而「上游不可用」这条路切换后退化成空列表（T10 删掉了写死在代码里的静态
+        问题清单），这里锁住 200 + success=True + 空列表这个形状。
+
+        限流分支与未配置分支必须给同一个形状：都是「不给建议但接口不报错」。
         """
         import ai.client as ai_client
+        from domains.agriculture import routes as agri_routes
         original = ai_client.ai_configured
+        original_limited = agri_routes.rate_limited
+        # 缓存里可能留着别的用例刚问过的作物：先清掉再测。否则命中的是上一次
+        # 打真上游的结果，这条用例测的就不是降级路径了。
+        original_cache = dict(agri_routes._suggestions_cache)
+        agri_routes._suggestions_cache.clear()
+        agri_routes._suggestions_cache_time.clear()
         try:
             ai_client.ai_configured = lambda: False
+            agri_routes.rate_limited = lambda *a, **kw: True
             for product in ('lychee', 'rice', 'no-such'):
                 with self.subTest(product):
                     response = self.client.get(
@@ -161,9 +172,12 @@ class FarmingSwitchSnapshotTest(unittest.TestCase):
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(
                         json.loads(response.data.decode('utf-8'))['success'], True)
-                    self.assertTrue(json.loads(response.data.decode('utf-8'))['suggestions'])
+                    self.assertEqual(json.loads(response.data.decode('utf-8'))['suggestions'], [])
         finally:
             ai_client.ai_configured = original
+            agri_routes.rate_limited = original_limited
+            agri_routes._suggestions_cache.clear()
+            agri_routes._suggestions_cache.update(original_cache)
 
     def test_the_content_tables_actually_have_rows(self):
         """快照有意义的前提：四张 farming 内容表里真的有内容，不是空库碰巧一致。

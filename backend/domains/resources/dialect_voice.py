@@ -1,9 +1,11 @@
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""本土资源域的方言知识库与方言语音问答。
+"""本土资源域的方言降级话术库与用药免责口径。
 
-方言知识库是零领域状态的纯数据：三种方言的问候、短语与快捷问题，原先内联在入口
-文件里。它只服务本域的两条读路由与语音问答，没有第二个消费方，因此放本域而不进
-共享层（放共享层意味着每个领域都能改方言内容）。
+方言知识已落库（ADR 0002）：dialects / dialect_phrases / dialect_quick_questions
+三张表，由 db_domains.dialects 读出。原先内联在本文件的 DIALECTS_DATA（三种方言的
+问候、短语与快捷问题）随之删除，本文件只留上游不可用时的降级话术库 —— 它写得出
+具体用量（「每棵大树施20-30斤」），与知识内容是两回事，故仍住本域。
 
 农技口径（用药数值判定 + 免责声明）取共享层 shared.agri_dosage：判定函数被农业
 培训域、病虫害诊断域与本域共用，只能有一处。上游不可用时降到本文件的方言话术库，
@@ -28,83 +30,6 @@ def _chem_dose_notice_for(text):
     这类具体用量，等于同一个平台三处出口两处免责、一处免责缺失。
     """
     return CHEM_DOSE_NOTICE if has_chem_dosage(text) else ''
-
-
-# 方言知识库（零领域状态的纯数据：三种方言的问候、短语与快捷问题）
-DIALECTS_DATA = {
-    "cantonese": {
-        "id": "cantonese", "name": u"粤语", "region": u"广州话", "emoji": u"🗣️",
-        "areas": u"广州、佛山、深圳、东莞、中山、珠海、江门",
-        "speakers": u"约7000万使用者",
-        "greeting": u"你好！食咗饭未？",
-        "greeting_meaning": u"你好！吃饭了吗？",
-        "features": [u"九声六调", u"保留古汉语词汇", u"大量外来语借词"],
-        "phrases": [
-            {"dialect": u"你好", "mandarin": u"你好", "pinyin": "nei5 hou2"},
-            {"dialect": u"多谢", "mandarin": u"谢谢", "pinyin": "do1 ze6"},
-            {"dialect": u"几多钱？", "mandarin": u"多少钱？", "pinyin": "gei2 do1 cin2"},
-            {"dialect": u"好食", "mandarin": u"好吃", "pinyin": "hou2 sik6"},
-            {"dialect": u"唔该", "mandarin": u"麻烦/请", "pinyin": "m4 goi1"},
-            {"dialect": u"点解？", "mandarin": u"为什么？", "pinyin": "dim2 gaai2"},
-            {"dialect": u"边度", "mandarin": u"哪里", "pinyin": "bin1 dou6"},
-            {"dialect": u"靓", "mandarin": u"漂亮/好", "pinyin": "leng3"}
-        ],
-        "quick_questions": [
-            u"荔枝点样施肥最好？",
-            u"龙眼几时可以摘？",
-            u"香蕉点样防虫？",
-            u"柑橘落叶点处理？"
-        ]
-    },
-    "hakka": {
-        "id": "hakka", "name": u"客家话", "region": u"梅州话", "emoji": u"🏔️",
-        "areas": u"梅州、惠州、河源、韶关、深圳(部分)",
-        "speakers": u"约4500万使用者",
-        "greeting": u"你好！食咗饭无？",
-        "greeting_meaning": u"你好！吃饭了吗？",
-        "features": [u"六声调", u"保留入声", u"古汉语活化石"],
-        "phrases": [
-            {"dialect": u"你好", "mandarin": u"你好", "pinyin": "ngi2 hau3"},
-            {"dialect": u"多谢", "mandarin": u"谢谢", "pinyin": "do1 cia5"},
-            {"dialect": u"几多钱？", "mandarin": u"多少钱？", "pinyin": "gi1 do1 qian2"},
-            {"dialect": u"好食", "mandarin": u"好吃", "pinyin": "hau3 siid6"},
-            {"dialect": u"对唔住", "mandarin": u"对不起", "pinyin": "dui4 m4 cu5"},
-            {"dialect": u"做麻个？", "mandarin": u"做什么？", "pinyin": "zo4 ma2 ge4"},
-            {"dialect": u"奈里", "mandarin": u"哪里", "pinyin": "nai4 li1"},
-            {"dialect": u"靓", "mandarin": u"漂亮", "pinyin": "liang4"}
-        ],
-        "quick_questions": [
-            u"荔枝样般施肥做得好？",
-            u"龙眼几时可以摘？",
-            u"香蕉样般防虫？",
-            u"柑橘落叶样般处理？"
-        ]
-    },
-    "teochew": {
-        "id": "teochew", "name": u"潮汕话", "region": u"汕头话", "emoji": u"🌊",
-        "areas": u"汕头、潮州、揭阳、汕尾",
-        "speakers": u"约1500万使用者",
-        "greeting": u"你好！食未？",
-        "greeting_meaning": u"你好！吃了吗？",
-        "features": [u"八声调", u"保留古汉语入声", u"文白异读丰富"],
-        "phrases": [
-            {"dialect": u"你好", "mandarin": u"你好", "pinyin": "le2 ho2"},
-            {"dialect": u"多谢", "mandarin": u"谢谢", "pinyin": "do1 sia7"},
-            {"dialect": u"若挤？", "mandarin": u"多少钱？", "pinyin": "rioh8 zoi6"},
-            {"dialect": u"好食", "mandarin": u"好吃", "pinyin": "ho2 ziah8"},
-            {"dialect": u"对唔住", "mandarin": u"对不起", "pinyin": "dui3 m6 zu6"},
-            {"dialect": u"做呢？", "mandarin": u"为什么？", "pinyin": "zo3 ni1"},
-            {"dialect": u"地块", "mandarin": u"哪里", "pinyin": "de7 kau3"},
-            {"dialect": u"雅", "mandarin": u"漂亮", "pinyin": "ngia2"}
-        ],
-        "quick_questions": [
-            u"荔枝怎生施肥正好？",
-            u"龙眼时阵好摘？",
-            u"香蕉怎生防虫？",
-            u"柑橘落叶怎生处理？"
-        ]
-    }
-}
 
 
 def dialect_fallback_answer(text, dialect):
@@ -383,4 +308,4 @@ def dialect_fallback_answer(text, dialect):
     return answer, suggestions
 
 
-__all__ = ['DIALECTS_DATA', 'dialect_fallback_answer', '_chem_dose_notice_for']
+__all__ = ['dialect_fallback_answer', '_chem_dose_notice_for']

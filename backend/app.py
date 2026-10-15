@@ -8,7 +8,7 @@ Flask后端应用
 import repo_paths
 
 # 后端代码整体迁入 backend/ 后，本文件与它 import 的 core / ai / shared /
-# db_domains / domain_data / domains / db_init 都同在 backend/ 下。把 backend/
+# db_domains / domains / db_init 都同在 backend/ 下。把 backend/
 # 放进 sys.path，这些 import 才能继续用顶层包名解析，不必把每一处都改成
 # backend.xxx 的限位导入。放在 repo_paths 之后、其它 import 之前。
 import os as _os
@@ -81,8 +81,8 @@ _ALLOWED_STATIC_DIRS = static_allowlist_dirs
 # ---- 农业培训域：农技问答（含流式）、追问建议、农事日历、作物订阅与到期提醒 ----
 # 已整体迁至 domains.agriculture（蓝图 agriculture_bp，由 core.app_factory 注册）。
 # 本域专属的 helper 与缓存（_parse_agri_request / _build_agri_messages /
-# _generate_suggestions / _static_agri_suggestions / _suggestions_cache /
-# _month_in_phase / _farming_task_brief / _DEFAULT_AGRICULTURE_PRODUCTS）随路由一起搬走。
+# _generate_suggestions / _suggestions_cache / _month_in_phase /
+# _farming_task_brief）随路由一起搬走。
 # 农技问答的系统提示词在 domains.agriculture.prompts，农技口径的判定函数
 # has_chem_dosage 在共享层 shared.agri_dosage。
 
