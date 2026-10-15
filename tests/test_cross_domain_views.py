@@ -222,8 +222,13 @@ class SingleEntryForContentReviewsDeletionTest(unittest.TestCase):
         self.assertEqual(len(offenders), 2,
                          "reviews 域只应有两条删除出口（按类型+id、按 id）：%s" % offenders)
 
-    def test_five_call_sites_go_through_delete_reviews_for(self):
-        """五个调用点都调 reviews 域的删除入口，而不是自己写 SQL。"""
+    def test_every_content_domain_deletes_reviews_through_one_entry(self):
+        """每个要删审核记录的内容域都调 reviews 域的删除入口，而不是自己写 SQL。
+
+        T15 补上案例（content.py 的 delete_case），因为案例要过审才对学员端可见
+        （db_domains.resources.get_success_cases），删正文时必须一并清掉审核记录，
+        否则审核列表里留下看不到内容的孤儿卡片。
+        """
         callers = []
         for dirpath, dirnames, filenames in os.walk(os.path.join(REPO, "backend")):
             dirnames[:] = [d for d in dirnames if d != "__pycache__"]
@@ -243,13 +248,13 @@ class SingleEntryForContentReviewsDeletionTest(unittest.TestCase):
         # 按文件聚合：行号会随注释增减漂移，钉死它只会制造无意义的重跑。
         self.assertEqual(
             sorted(set(o.split(":")[0] for o in callers)),
-            ["backend/db_domains/courses.py",
+            ["backend/db_domains/content.py",
+             "backend/db_domains/courses.py",
              "backend/db_domains/procurements.py",
              "backend/domains/enterprise/routes.py"],
             "delete_reviews_for 的调用点变了：%s" % sorted(callers))
-        self.assertEqual(len(callers), 4,
-                         "课程删两处 + 求购删一处 + 企业删岗位一处，共四个调用点：%s"
-                         % sorted(callers))
+        self.assertEqual(len(callers), 5,
+                         "课程删两处 + 求购删一处 + 企业删岗位一处 + 案例删一处，共五个调用点：%s" % sorted(callers))
 
 
 class DomainRoutesNeverTouchTheConnectionFactoryTest(unittest.TestCase):

@@ -70,16 +70,24 @@ def run_write(action, *args, **kwargs):
 
 
 def register_routes():
-    """把各内容块的路由挂到蓝图。由包门面（__init__.py）在全部模块导入后调用。
+    """把六个内容块的路由挂到蓝图。由包门面（__init__.py）在全部模块导入后调用。
 
     不在本模块导入时自动调用的理由：那样会成环 —— farming.py 要用本模块的
     json_body / run_write，而本模块又要 import farming 去注册它的路由。
     改成由门面在最后显式调用，导入顺序即注册顺序，环也消失。
     """
+    from domains.operator.cases import register_cases_routes
+    from domains.operator.crafts import register_crafts_routes
+    from domains.operator.dialects import register_dialects_routes
     from domains.operator.farming import register_farming_routes
     from domains.operator.pest import register_pest_routes
+    from domains.operator.recruitments import register_recruitments_routes
+    register_cases_routes(operator_bp)
+    register_crafts_routes(operator_bp)
+    register_dialects_routes(operator_bp)
     register_farming_routes(operator_bp)
     register_pest_routes(operator_bp)
+    register_recruitments_routes(operator_bp)
 
 
 __all__ = ['operator_bp', 'CAPABILITIES_USED', 'json_body', 'current_username',

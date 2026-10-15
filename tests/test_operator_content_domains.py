@@ -728,10 +728,18 @@ class OperatorPageTest(OperatorContentTestBase):
         self.assertIn('id="pest-entry-rows"', body)
 
     def test_operator_page_keeps_the_placeholder_for_the_t15_blocks(self):
-        """T15 的四块仍是占位：本票不越界去填别人的文件区域。"""
+        """T15 的四块页面容器仍在，且不再是占位文案。
+
+        T14 写这条时四块还是「T15 落地」占位；T15 落地后改守同一批容器
+        已经填实（挂上了列表容器与新建按钮），占位样式 operator-todo 一并退役。
+        """
         body = self.client.get('/operator.html').data.decode('utf-8')
         for page in ('crafts', 'dialects', 'recruitments', 'cases'):
             self.assertIn('id="page-%s"' % page, body)
+        self.assertNotIn('operator-todo', body, 'T15 落地后占位样式应当退役')
+        for container in ('craft-rows', 'dialect-rows', 'recruit-rows', 'case-rows'):
+            self.assertIn('id="%s"' % container, body,
+                          '%s 没有挂上，那一块的前台列表无处渲染' % container)
 
 
 class OperatorAuthorizationTest(OperatorContentTestBase):

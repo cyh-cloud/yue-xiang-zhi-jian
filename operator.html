@@ -35,18 +35,6 @@
         .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
         .toolbar select, .toolbar input { width: auto; }
         .toolbar .grow { flex: 1; min-width: 160px; }
-        /* T15 未落地的四块占位。样式与 T13 骨架一致，避免换一页就换一副面孔。 */
-        .operator-todo {
-            max-width: 640px;
-            margin: 8px auto 0;
-            padding: 20px 24px;
-            background: var(--portal-card-bg, #fff);
-            border: 1px solid var(--portal-card-border, #e2e8f0);
-            border-radius: var(--portal-radius, 10px);
-            line-height: 1.8;
-            color: var(--portal-text-muted, #64748b);
-            font-size: 0.9rem;
-        }
     </style>
 </head>
 <body>
@@ -88,7 +76,7 @@
                 <div class="card">
                     <h3>这里维护什么</h3>
                     <p style="line-height:1.8;color:var(--portal-text-muted)">
-                        农时日历、病虫害知识两块内容已在维护中；手工技艺、方言知识、招募公告与成功案例随后上线。
+                        农时日历、病虫害知识、手工技艺、方言知识、招募公告、成功案例六块内容均可维护。
                         所有改动经接口写入后前台立即生效，不需要重启服务。
                     </p>
                     <p style="line-height:1.8;color:var(--portal-text-muted)">
@@ -198,11 +186,212 @@
                 </div>
             </div>
 
-            <!-- 以下四页由 T15 落地，接口就绪前只占位。 -->
-            <div class="page" id="page-crafts"><div class="operator-todo">手工技艺维护：T15 落地。</div></div>
-            <div class="page" id="page-dialects"><div class="operator-todo">方言知识维护：T15 落地。</div></div>
-            <div class="page" id="page-recruitments"><div class="operator-todo">招募公告维护：T15 落地。</div></div>
-            <div class="page" id="page-cases"><div class="operator-todo">成功案例维护：T15 落地。</div></div>
+            <!-- ============ 手工技艺（T15） ============ -->
+            <!-- 采购指南在库里是四张平表，页面上按「分类 -> 条目 -> 预算」三层摆，
+                 与前台 purchase_guide 的嵌套形状一一对应：运营看到的层级就是
+                 学员看到的层级，不需要在脑子里做一次拆平再还原。 -->
+            <div class="page" id="page-crafts">
+                <div class="card">
+                    <div class="section-header">
+                        <h3>技艺</h3>
+                        <button class="btn btn-primary" id="craft-new"><i class="fas fa-plus"></i> 新建技艺</button>
+                    </div>
+                    <div class="form-error" id="craft-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>名称</th><th>产地</th><th>等级</th>
+                                <th>步骤</th><th>采购条目</th><th>预算</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="craft-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="craft-empty">
+                        <i class="fas fa-inbox"></i><div>还没有技艺</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3 id="craft-detail-title">技艺内容</h3>
+                        <div class="row-actions">
+                            <button class="btn btn-outline" id="craft-step-new"><i class="fas fa-plus"></i> 步骤</button>
+                            <button class="btn btn-outline" id="craft-category-new"><i class="fas fa-plus"></i> 采购分类</button>
+                            <button class="btn btn-outline" id="craft-item-new"><i class="fas fa-plus"></i> 采购条目</button>
+                            <button class="btn btn-outline" id="craft-budget-edit"><i class="fas fa-coins"></i> 预算</button>
+                        </div>
+                    </div>
+                    <div class="tabs" id="craft-detail-tabs">
+                        <button class="tab active" data-tab="steps">步骤</button>
+                        <button class="tab" data-tab="categories">采购分类</button>
+                        <button class="tab" data-tab="items">采购条目</button>
+                    </div>
+                    <div class="form-error" id="craft-detail-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead id="craft-detail-head"></thead>
+                            <tbody id="craft-detail-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="craft-detail-empty">
+                        <i class="fas fa-inbox"></i><div>先在上面选一门技艺</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ 方言知识（T15） ============ -->
+            <div class="page" id="page-dialects">
+                <div class="card">
+                    <div class="section-header">
+                        <h3>方言</h3>
+                        <button class="btn btn-primary" id="dialect-new"><i class="fas fa-plus"></i> 新建方言</button>
+                    </div>
+                    <div class="form-error" id="dialect-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>名称</th><th>地区</th><th>问候语</th>
+                                <th>特色</th><th>短语</th><th>快问</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="dialect-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="dialect-empty">
+                        <i class="fas fa-inbox"></i><div>还没有方言</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3 id="dialect-detail-title">方言内容</h3>
+                        <div class="row-actions">
+                            <button class="btn btn-outline" id="dialect-phrase-new"><i class="fas fa-plus"></i> 短语</button>
+                            <button class="btn btn-outline" id="dialect-question-new"><i class="fas fa-plus"></i> 快捷问题</button>
+                        </div>
+                    </div>
+                    <div class="tabs" id="dialect-detail-tabs">
+                        <button class="tab active" data-tab="phrases">短语</button>
+                        <button class="tab" data-tab="questions">快捷问题</button>
+                    </div>
+                    <div class="form-error" id="dialect-detail-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead id="dialect-detail-head"></thead>
+                            <tbody id="dialect-detail-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="dialect-detail-empty">
+                        <i class="fas fa-inbox"></i><div>先在上面选一种方言</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ 招募公告（T15） ============ -->
+            <div class="page" id="page-recruitments">
+                <div class="card">
+                    <div class="section-header">
+                        <h3>公告</h3>
+                        <button class="btn btn-primary" id="recruit-new"><i class="fas fa-plus"></i> 新建公告</button>
+                    </div>
+                    <!-- 报名状态由后端按当天日期算，页面只展示不编辑：
+                         改起止日期才是改报名状态的正确入口。 -->
+                    <div class="toolbar">
+                        <select id="recruit-filter-category">
+                            <option value="">全部类别</option>
+                        </select>
+                        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem">
+                            <input type="checkbox" id="recruit-filter-open" style="width:auto">
+                            只看仍在报名期的
+                        </label>
+                        <button class="btn btn-outline" id="recruit-refresh"><i class="fas fa-rotate-right"></i> 刷新</button>
+                    </div>
+                    <div class="form-error" id="recruit-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>标题</th><th>单位</th><th>类别</th>
+                                <th>报名期</th><th>来源</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="recruit-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="recruit-empty">
+                        <i class="fas fa-inbox"></i><div>没有符合条件的公告</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3 id="recruit-source-title">公告来源</h3>
+                        <button class="btn btn-outline" id="recruit-source-new"><i class="fas fa-plus"></i> 新建来源</button>
+                    </div>
+                    <div class="form-error" id="recruit-source-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>标题</th><th>媒体</th><th>日期</th><th>操作</th></tr></thead>
+                            <tbody id="recruit-source-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="recruit-source-empty">
+                        <i class="fas fa-inbox"></i><div>先在上面选一条公告</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ 成功案例（T15） ============ -->
+            <div class="page" id="page-cases">
+                <div class="card">
+                    <div class="section-header">
+                        <h3>案例</h3>
+                        <button class="btn btn-primary" id="case-new"><i class="fas fa-plus"></i> 新建案例</button>
+                    </div>
+                    <div class="form-error" id="case-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr>
+                                <th>标题</th><th>地区</th>
+                                <th>指标</th><th>里程碑</th><th>来源</th><th>借鉴点</th><th>操作</th>
+                            </tr></thead>
+                            <tbody id="case-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="case-empty">
+                        <i class="fas fa-inbox"></i><div>还没有案例</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="section-header">
+                        <h3 id="case-detail-title">案例内容</h3>
+                        <div class="row-actions">
+                            <button class="btn btn-outline" id="case-stat-new"><i class="fas fa-plus"></i> 指标</button>
+                            <button class="btn btn-outline" id="case-milestone-new"><i class="fas fa-plus"></i> 里程碑</button>
+                            <button class="btn btn-outline" id="case-source-new"><i class="fas fa-plus"></i> 来源</button>
+                            <button class="btn btn-outline" id="case-lesson-new"><i class="fas fa-plus"></i> 借鉴点</button>
+                        </div>
+                    </div>
+                    <!-- 新案例要先过审才对学员端可见，页面如实说明，别让人以为发出去就能看到 -->
+                    <p style="font-size:0.8rem;color:var(--portal-text-muted);margin-bottom:12px">
+                        新建的案例先进入审核队列，超级管理员通过后学员端才看得到。
+                    </p>
+                    <div class="tabs" id="case-detail-tabs">
+                        <button class="tab active" data-tab="stats">数据指标</button>
+                        <button class="tab" data-tab="milestones">里程碑</button>
+                        <button class="tab" data-tab="sources">来源</button>
+                        <button class="tab" data-tab="lessons">借鉴点</button>
+                    </div>
+                    <div class="form-error" id="case-detail-error"></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead id="case-detail-head"></thead>
+                            <tbody id="case-detail-rows"></tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state is-hidden" id="case-detail-empty">
+                        <i class="fas fa-inbox"></i><div>先在上面选一条案例</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -243,6 +432,12 @@ var OP = window.OP || {};
 OP.state = {
     farming: { products: [], categories: [], sources: [], tasks: [], refTab: 'phenophases' },
     pest: { crops: [], sources: [], entries: [] },
+    // T15 四块。craft / dialect / case 各有一个「当前选中项」：
+    // 子表挂在父项下，页面形态与库里的层级一致。
+    crafts: { crafts: [], current: null, detailTab: 'steps' },
+    dialects: { dialects: [], current: null, detailTab: 'phrases' },
+    recruitments: { recruitments: [], current: null, openOnly: false },
+    cases: { cases: [], current: null, detailTab: 'stats' },
     refTab: 'phenophases',
     pestRefTab: 'crops',
     editing: null
@@ -260,6 +455,10 @@ OP.PRIORITIES = [
 // 复核过期阈值（天）。与后端 farming.REVIEW_STALE_DAYS / pest.REVIEW_STALE_DAYS 同值，
 // 只用于文案提示，真正的筛选在后端做。
 OP.REVIEW_STALE_DAYS = 183;
+
+// 招募公告的岗位类别。与后端 recruitments.RECRUIT_CATEGORIES 一致，
+// 后台改白名单时这里跟着改，两侧不一致会被接口的 400 兜住。
+OP.RECRUIT_CATEGORIES = ['农业技术', '基层服务', '乡村治理'];
 
 function opEsc(value) {
     return String(value == null ? '' : value)
@@ -627,6 +826,758 @@ function opLoadPestRef() {
     });
 }
 
+// ---- 手工技艺 ----
+// 页面分两层：上面是技艺列表，下面是选中技艺的步骤 / 采购分类 / 采购条目。
+// 采购指南在库里是四张平表，这里按前台 purchase_guide 的嵌套形状分三个页签摆，
+// 运营看到的层级就是学员看到的层级。预算一门技艺一份，所以是一个按钮而不是列表。
+
+function opLoadCrafts() {
+    opShowError('craft-error', '');
+    return opGet('/api/operator/crafts').then(function(data) {
+        OP.state.crafts.crafts = data.crafts || [];
+        opRenderCrafts();
+    }).catch(function(err) {
+        opShowError('craft-error', err.message);
+    });
+}
+
+function opRenderCrafts() {
+    var rows = OP.state.crafts.crafts;
+    var body = document.getElementById('craft-rows');
+    var empty = document.getElementById('craft-empty');
+    if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    body.innerHTML = rows.map(function(c) {
+        var active = OP.state.crafts.current === c.id ? ' btn-primary' : ' btn-outline';
+        return '<tr>' +
+            '<td>' + opEsc(c.name) + '</td>' +
+            '<td>' + opEsc(c.origin || '') + '</td>' +
+            '<td>' + opEsc(c.level || '') + '</td>' +
+            '<td>' + (c.step_count || 0) + '</td>' +
+            '<td>' + (c.item_count || 0) + '</td>' +
+            '<td>' + (c.has_budget ? '<span class="badge badge-green">已填</span>'
+                                   : '<span class="badge badge-yellow">待填</span>') + '</td>' +
+            '<td class="row-actions">' +
+                '<button class="btn btn-sm' + active + '" data-op="craft-pick" data-id="' +
+                    opEsc(c.id) + '">查看内容</button>' +
+                '<button class="btn btn-sm btn-danger" data-op="craft-del" data-id="' +
+                    opEsc(c.id) + '">删除</button>' +
+            '</td></tr>';
+    }).join('');
+}
+
+function opLoadCraftDetail() {
+    var craft = OP.state.crafts.current;
+    var title = document.getElementById('craft-detail-title');
+    var head = document.getElementById('craft-detail-head');
+    var body = document.getElementById('craft-detail-rows');
+    var empty = document.getElementById('craft-detail-empty');
+    if (!craft) {
+        title.textContent = '技艺内容';
+        head.innerHTML = '';
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return Promise.resolve();
+    }
+    var name = craft;
+    var row = OP.state.crafts.crafts.filter(function(c) { return c.id === craft; })[0];
+    if (row) name = row.name;
+    title.textContent = '「' + name + '」的内容';
+
+    var tab = OP.state.crafts.detailTab;
+    var heads = {
+        steps: ['标题', '说明', '提示', '操作'],
+        categories: ['key', '标签', '说明', '操作'],
+        items: ['分类', '物品', '价格', '操作']
+    };
+    head.innerHTML = '<tr>' + heads[tab].map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+    opShowError('craft-detail-error', '');
+    var path = tab === 'steps' ? '/steps'
+             : tab === 'categories' ? '/purchase-categories' : '/purchase-items';
+    return opGet('/api/operator/crafts/' + encodeURIComponent(craft) + path)
+        .then(function(data) {
+            var rows = data[tab] || [];
+            if (!rows.length) {
+                body.innerHTML = '';
+                empty.classList.remove('is-hidden');
+                return;
+            }
+            empty.classList.add('is-hidden');
+            body.innerHTML = rows.map(function(r) {
+                var cells;
+                if (tab === 'steps') {
+                    cells = [opEsc(r.title), opEsc(r.desc || ''), opEsc(r.tips || '')];
+                } else if (tab === 'categories') {
+                    cells = [opEsc(r.key), opEsc(r.label || ''), opEsc(r.desc || '')];
+                } else {
+                    cells = [opEsc(r.category_key), opEsc(r.name), opEsc(r.price || '')];
+                }
+                var path2 = tab === 'steps' ? 'steps'
+                           : tab === 'categories' ? 'purchase-categories' : 'purchase-items';
+                var idAttr = tab === 'categories'
+                    ? ' data-craft="' + opEsc(craft) + '" data-key="' + opEsc(r.key) + '"'
+                    : ' data-id="' + r.id + '"';
+                return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') +
+                    '<td class="row-actions">' +
+                    '<button class="btn btn-sm btn-danger" data-op="craft-detail-del" ' +
+                        'data-kind="' + path2 + '"' + idAttr + '>删除</button>' +
+                    '</td></tr>';
+            }).join('');
+        }).catch(function(err) {
+            opShowError('craft-detail-error', err.message);
+        });
+}
+
+function opOpenCraftForm(craft) {
+    var isNew = !craft;
+    var fields = [
+        { key: 'id', label: 'id', type: 'text', required: !isNew,
+          placeholder: '小写英文，如 ceramics' },
+        { key: 'name', label: '名称', type: 'text', required: true, maxlength: 60 },
+        { key: 'origin', label: '产地', type: 'text' },
+        { key: 'level', label: '等级', type: 'text', maxlength: 20,
+          placeholder: '入门 / 进阶 / 精通' },
+        { key: 'history', label: '历史沿革', type: 'textarea' }
+    ];
+    opOpenModal(isNew ? '新建技艺' : '编辑技艺', fields, craft || {}, function(values) {
+        var payload = {
+            name: values.name, origin: values.origin,
+            level: values.level, history: values.history
+        };
+        var path = isNew ? '/api/operator/crafts' : '/api/operator/crafts/' + craft.id;
+        if (isNew) payload.id = values.id;
+        return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
+            opCloseModal();
+            return opLoadCrafts().then(opLoadCraftDetail);
+        });
+    }, function(values) {
+        if (!values.name) return '技艺名称不能为空';
+        if (isNew && !values.id) return '技艺 id 不能为空';
+        return null;
+    });
+}
+
+function opOpenCraftStepForm() {
+    var craft = OP.state.crafts.current;
+    if (!craft) return;
+    var fields = [
+        { key: 'title', label: '标题', type: 'text', required: true, maxlength: 60 },
+        { key: 'desc', label: '说明', type: 'textarea' },
+        { key: 'tips', label: '提示', type: 'textarea' }
+    ];
+    opOpenModal('新建步骤', fields, {}, function(values) {
+        return opRequest('POST',
+            '/api/operator/crafts/' + encodeURIComponent(craft) + '/steps',
+            { title: values.title, desc: values.desc, tips: values.tips }
+        ).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadCrafts(), opLoadCraftDetail()]);
+        });
+    }, function(values) {
+        if (!values.title) return '步骤标题不能为空';
+        return null;
+    });
+}
+
+function opOpenCraftCategoryForm() {
+    var craft = OP.state.crafts.current;
+    if (!craft) return;
+    var fields = [
+        { key: 'key', label: 'key', type: 'text', required: true, maxlength: 60,
+          placeholder: '小写英文，如 essential' },
+        { key: 'label', label: '标签', type: 'text' },
+        { key: 'desc', label: '说明', type: 'textarea' }
+    ];
+    opOpenModal('新建采购分类', fields, {}, function(values) {
+        return opRequest('POST',
+            '/api/operator/crafts/' + encodeURIComponent(craft) + '/purchase-categories',
+            { key: values.key, label: values.label, desc: values.desc }
+        ).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadCrafts(), opLoadCraftDetail()]);
+        });
+    }, function(values) {
+        if (!values.key) return '分类 key 不能为空';
+        return null;
+    });
+}
+
+function opOpenCraftItemForm() {
+    var craft = OP.state.crafts.current;
+    if (!craft) return;
+    var fields = [
+        { key: 'category_key', label: '所属分类', type: 'text', required: true, maxlength: 60,
+          placeholder: '必填，且必须是上面已建好的分类 key' },
+        { key: 'name', label: '物品', type: 'text', required: true, maxlength: 60 },
+        { key: 'price', label: '价格', type: 'text' },
+        { key: 'spec', label: '规格', type: 'text' },
+        { key: 'tip', label: '提示', type: 'text' },
+        { key: 'where', label: '购买渠道', type: 'text' }
+    ];
+    opOpenModal('新建采购条目', fields, {}, function(values) {
+        return opRequest('POST',
+            '/api/operator/crafts/' + encodeURIComponent(craft) + '/purchase-items',
+            { category_key: values.category_key, name: values.name, price: values.price,
+              spec: values.spec, tip: values.tip, where: values.where }
+        ).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadCrafts(), opLoadCraftDetail()]);
+        });
+    }, function(values) {
+        if (!values.category_key) return '请选择采购分类';
+        if (!values.name) return '物品名称不能为空';
+        return null;
+    });
+}
+
+function opOpenCraftBudgetForm() {
+    var craft = OP.state.crafts.current;
+    if (!craft) return;
+    // 预算可能还没填，取不到时按空表打开：PUT 是「写入 / 覆盖」，不需要先有行
+    opGet('/api/operator/crafts/' + encodeURIComponent(craft) + '/budget')
+        .catch(function() { return { budget: {} }; })
+        .then(function(data) {
+            var budget = data.budget || {};
+            var fields = [
+                { key: 'starter', label: '入门档预算', type: 'text' },
+                { key: 'advanced', label: '进阶档预算', type: 'text' },
+                { key: 'buying_tips', label: '采购建议', type: 'textarea' }
+            ];
+            opOpenModal('采购预算', fields, budget, function(values) {
+                return opRequest('PUT',
+                    '/api/operator/crafts/' + encodeURIComponent(craft) + '/budget',
+                    { starter: values.starter, advanced: values.advanced,
+                      buying_tips: values.buying_tips }
+                ).then(function() {
+                    opCloseModal();
+                    return opLoadCrafts();
+                });
+            });
+        });
+}
+
+// ---- 方言知识 ----
+
+function opLoadDialects() {
+    opShowError('dialect-error', '');
+    return opGet('/api/operator/dialects').then(function(data) {
+        OP.state.dialects.dialects = data.dialects || [];
+        opRenderDialects();
+    }).catch(function(err) {
+        opShowError('dialect-error', err.message);
+    });
+}
+
+function opRenderDialects() {
+    var rows = OP.state.dialects.dialects;
+    var body = document.getElementById('dialect-rows');
+    var empty = document.getElementById('dialect-empty');
+    if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    body.innerHTML = rows.map(function(d) {
+        var active = OP.state.dialects.current === d.id ? ' btn-primary' : ' btn-outline';
+        return '<tr>' +
+            '<td>' + opEsc(d.name) + '</td>' +
+            '<td>' + opEsc(d.region || '') + '</td>' +
+            '<td>' + opEsc(d.greeting || '') + '</td>' +
+            '<td>' + (d.feature_count || 0) + '</td>' +
+            '<td>' + (d.phrase_count || 0) + '</td>' +
+            '<td>' + (d.question_count || 0) + '</td>' +
+            '<td class="row-actions">' +
+                '<button class="btn btn-sm' + active + '" data-op="dialect-pick" data-id="' +
+                    opEsc(d.id) + '">查看内容</button>' +
+                '<button class="btn btn-sm btn-danger" data-op="dialect-del" data-id="' +
+                    opEsc(d.id) + '">删除</button>' +
+            '</td></tr>';
+    }).join('');
+}
+
+function opLoadDialectDetail() {
+    var dialect = OP.state.dialects.current;
+    var title = document.getElementById('dialect-detail-title');
+    var head = document.getElementById('dialect-detail-head');
+    var body = document.getElementById('dialect-detail-rows');
+    var empty = document.getElementById('dialect-detail-empty');
+    if (!dialect) {
+        title.textContent = '方言内容';
+        head.innerHTML = '';
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return Promise.resolve();
+    }
+    var name = dialect;
+    var row = OP.state.dialects.dialects.filter(function(d) { return d.id === dialect; })[0];
+    if (row) name = row.name;
+    title.textContent = '「' + name + '」的内容';
+
+    var tab = OP.state.dialects.detailTab;
+    var heads = {
+        phrases: ['方言说法', '普通话', '拼音', '操作'],
+        questions: ['快捷问题', '操作']
+    };
+    head.innerHTML = '<tr>' + heads[tab].map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+    opShowError('dialect-detail-error', '');
+    var path = tab === 'phrases' ? '/phrases' : '/quick-questions';
+    return opGet('/api/operator/dialects/' + encodeURIComponent(dialect) + path)
+        .then(function(data) {
+            var rows = tab === 'phrases' ? (data.phrases || []) : (data.questions || []);
+            if (!rows.length) {
+                body.innerHTML = '';
+                empty.classList.remove('is-hidden');
+                return;
+            }
+            empty.classList.add('is-hidden');
+            body.innerHTML = rows.map(function(r) {
+                var cells = tab === 'phrases'
+                    ? [opEsc(r.dialect || ''), opEsc(r.mandarin), opEsc(r.pinyin || '')]
+                    : [opEsc(r.question)];
+                var kind = tab === 'phrases' ? 'phrases' : 'quick-questions';
+                return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') +
+                    '<td class="row-actions">' +
+                    '<button class="btn btn-sm btn-danger" data-op="dialect-detail-del" ' +
+                        'data-kind="' + kind + '" data-id="' + r.id + '">删除</button>' +
+                    '</td></tr>';
+            }).join('');
+        }).catch(function(err) {
+            opShowError('dialect-detail-error', err.message);
+        });
+}
+
+function opOpenDialectForm(dialect) {
+    var isNew = !dialect;
+    var fields = [
+        { key: 'id', label: 'id', type: 'text', required: !isNew,
+          placeholder: '小写英文，如 hakka' },
+        { key: 'name', label: '名称', type: 'text', required: true, maxlength: 60 },
+        { key: 'region', label: '地区', type: 'text' },
+        { key: 'emoji', label: '图标', type: 'text', maxlength: 8 },
+        { key: 'areas', label: '使用范围', type: 'text' },
+        { key: 'speakers', label: '使用人数', type: 'text' },
+        { key: 'greeting', label: '问候语', type: 'text' },
+        { key: 'greeting_meaning', label: '问候语意思', type: 'text' },
+        { key: 'features', label: '特色标签', type: 'textarea',
+          placeholder: '一行一个特色' }
+    ];
+    var values = dialect ? Object.assign({}, dialect) : {};
+    if (values.features && values.features.length) {
+        values.features = values.features.join('\n');
+    }
+    opOpenModal(isNew ? '新建方言' : '编辑方言', fields, values, function(collected) {
+        var payload = {
+            name: collected.name, region: collected.region, emoji: collected.emoji,
+            areas: collected.areas, speakers: collected.speakers,
+            greeting: collected.greeting, greeting_meaning: collected.greeting_meaning,
+            features: collected.features.split('\n').map(function(s) { return s.trim(); })
+                .filter(function(s) { return s; })
+        };
+        var path = isNew ? '/api/operator/dialects'
+                         : '/api/operator/dialects/' + dialect.id;
+        if (isNew) payload.id = collected.id;
+        return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadDialects(), opLoadDialectDetail()]);
+        });
+    }, function(values) {
+        if (!values.name) return '方言名称不能为空';
+        if (isNew && !values.id) return '方言 id 不能为空';
+        return null;
+    });
+}
+
+function opOpenDialectPhraseForm() {
+    var dialect = OP.state.dialects.current;
+    if (!dialect) return;
+    var fields = [
+        { key: 'dialect', label: '方言说法', type: 'text', maxlength: 60 },
+        { key: 'mandarin', label: '普通话', type: 'text', required: true, maxlength: 60 },
+        { key: 'pinyin', label: '拼音', type: 'text', maxlength: 60 }
+    ];
+    opOpenModal('新建短语', fields, {}, function(values) {
+        return opRequest('POST',
+            '/api/operator/dialects/' + encodeURIComponent(dialect) + '/phrases',
+            { dialect: values.dialect, mandarin: values.mandarin, pinyin: values.pinyin }
+        ).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadDialects(), opLoadDialectDetail()]);
+        });
+    }, function(values) {
+        if (!values.mandarin) return '普通话说法不能为空';
+        return null;
+    });
+}
+
+function opOpenDialectQuestionForm() {
+    var dialect = OP.state.dialects.current;
+    if (!dialect) return;
+    var fields = [
+        { key: 'question', label: '快捷问题', type: 'text', required: true }
+    ];
+    opOpenModal('新建快捷问题', fields, {}, function(values) {
+        return opRequest('POST',
+            '/api/operator/dialects/' + encodeURIComponent(dialect) + '/quick-questions',
+            { question: values.question }
+        ).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadDialects(), opLoadDialectDetail()]);
+        });
+    }, function(values) {
+        if (!values.question) return '快捷问题不能为空';
+        return null;
+    });
+}
+
+// ---- 招募公告 ----
+
+function opLoadRecruitments() {
+    opShowError('recruit-error', '');
+    var category = document.getElementById('recruit-filter-category').value;
+    var openOnly = document.getElementById('recruit-filter-open').checked;
+    return opGet('/api/operator/recruitments').then(function(data) {
+        var rows = data.recruitments || [];
+        if (category) {
+            rows = rows.filter(function(r) { return r.category === category; });
+        }
+        // 「只看仍在报名期的」按前端现筛：接口下发的是可编辑列，
+        // 报名状态由前台接口按当天日期算，后台这里借前台口径筛一遍。
+        if (openOnly) {
+            rows = rows.filter(function(r) { return opRecruitIsOpen(r); });
+        }
+        OP.state.recruitments.recruitments = rows;
+        opRenderRecruitments();
+    }).catch(function(err) {
+        opShowError('recruit-error', err.message);
+    });
+}
+
+function opRecruitIsOpen(row) {
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var end = row.deadline ? new Date(row.deadline + 'T00:00:00') : null;
+    var start = row.signup_start ? new Date(row.signup_start + 'T00:00:00') : null;
+    if (!end) return false;
+    if (today > end) return false;
+    if (start && today < start) return false;
+    return true;
+}
+
+function opRenderRecruitments() {
+    var rows = OP.state.recruitments.recruitments;
+    var body = document.getElementById('recruit-rows');
+    var empty = document.getElementById('recruit-empty');
+    if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    body.innerHTML = rows.map(function(r) {
+        var active = OP.state.recruitments.current === r.key ? ' btn-primary' : ' btn-outline';
+        var window = [r.signup_start || '?', r.deadline || '?'].join(' ~ ');
+        return '<tr>' +
+            '<td>' + opEsc(r.title) + '</td>' +
+            '<td>' + opEsc(r.org || '') + '</td>' +
+            '<td>' + opEsc(r.category || '') + '</td>' +
+            '<td>' + opEsc(window) + '</td>' +
+            '<td>' + (r.source_count || 0) + '</td>' +
+            '<td class="row-actions">' +
+                '<button class="btn btn-sm' + active + '" data-op="recruit-pick" data-id="' +
+                    opEsc(r.key) + '">来源</button>' +
+                '<button class="btn btn-sm btn-danger" data-op="recruit-del" data-id="' +
+                    opEsc(r.key) + '">删除</button>' +
+            '</td></tr>';
+    }).join('');
+}
+
+function opLoadRecruitSources() {
+    var key = OP.state.recruitments.current;
+    var title = document.getElementById('recruit-source-title');
+    var body = document.getElementById('recruit-source-rows');
+    var empty = document.getElementById('recruit-source-empty');
+    if (!key) {
+        title.textContent = '公告来源';
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return Promise.resolve();
+    }
+    title.textContent = '「' + key + '」的来源';
+    opShowError('recruit-source-error', '');
+    return opGet('/api/operator/recruitments/' + encodeURIComponent(key) + '/sources')
+        .then(function(data) {
+            var rows = data.sources || [];
+            if (!rows.length) {
+                body.innerHTML = '';
+                empty.classList.remove('is-hidden');
+                return;
+            }
+            empty.classList.add('is-hidden');
+            body.innerHTML = rows.map(function(s) {
+                return '<tr>' +
+                    '<td>' + opEsc(s.title) + '</td>' +
+                    '<td>' + opEsc(s.media || '') + '</td>' +
+                    '<td>' + opEsc(s.date || '') + '</td>' +
+                    '<td class="row-actions">' +
+                    '<button class="btn btn-sm btn-danger" data-op="recruit-source-del" ' +
+                        'data-id="' + s.id + '">删除</button>' +
+                    '</td></tr>';
+            }).join('');
+        }).catch(function(err) {
+            opShowError('recruit-source-error', err.message);
+        });
+}
+
+function opOpenRecruitForm(recruit) {
+    var isNew = !recruit;
+    var fields = [
+        { key: 'key', label: 'key', type: 'text', required: !isNew,
+          placeholder: '小写英文与数字，如 gz-gy-2026-5' },
+        { key: 'title', label: '标题', type: 'text', required: true, maxlength: 60 },
+        { key: 'org', label: '发布单位', type: 'text' },
+        { key: 'region', label: '地区', type: 'text' },
+        { key: 'category', label: '岗位类别', type: 'select', required: true,
+          options: OP.RECRUIT_CATEGORIES.map(function(c) { return { value: c, label: c }; }) },
+        { key: 'job_type', label: '岗位类型', type: 'text' },
+        { key: 'headcount', label: '人数', type: 'text' },
+        { key: 'education', label: '学历', type: 'text' },
+        { key: 'experience', label: '经验', type: 'text' },
+        { key: 'salary', label: '待遇', type: 'text' },
+        { key: 'description', label: '描述', type: 'textarea' },
+        { key: 'publish_date', label: '发布日期', type: 'text',
+          placeholder: 'YYYY-MM-DD' },
+        { key: 'signup_start', label: '报名开始', type: 'text',
+          placeholder: 'YYYY-MM-DD' },
+        { key: 'deadline', label: '报名截止', type: 'text', required: true,
+          placeholder: 'YYYY-MM-DD' },
+        { key: 'signup_way', label: '报名方式', type: 'textarea' },
+        { key: 'contact', label: '联系方式', type: 'text' }
+    ];
+    opOpenModal(isNew ? '新建公告' : '编辑公告', fields, recruit || {}, function(values) {
+        var payload = {};
+        ['title', 'org', 'region', 'category', 'job_type', 'headcount', 'education',
+         'experience', 'salary', 'description', 'publish_date', 'signup_start',
+         'deadline', 'signup_way', 'contact'].forEach(function(k) { payload[k] = values[k]; });
+        var path = isNew ? '/api/operator/recruitments'
+                         : '/api/operator/recruitments/' + recruit.key;
+        if (isNew) payload.key = values.key;
+        return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadRecruitments(), opLoadRecruitSources()]);
+        });
+    }, function(values) {
+        if (!values.title) return '公告标题不能为空';
+        if (isNew && !values.key) return '公告 key 不能为空';
+        if (values.category && OP.RECRUIT_CATEGORIES.indexOf(values.category) < 0) {
+            return '岗位类别不在可选范围内';
+        }
+        return null;
+    });
+}
+
+function opOpenRecruitSourceForm() {
+    var key = OP.state.recruitments.current;
+    if (!key) return;
+    var fields = [
+        { key: 'title', label: '来源标题', type: 'text', required: true, maxlength: 60 },
+        { key: 'media', label: '媒体 / 发布单位', type: 'text' },
+        { key: 'date', label: '日期', type: 'text', placeholder: 'YYYY-MM-DD' },
+        { key: 'url', label: '链接', type: 'text', placeholder: 'https://' }
+    ];
+    opOpenModal('新建公告来源', fields, {}, function(values) {
+        return opRequest('POST',
+            '/api/operator/recruitments/' + encodeURIComponent(key) + '/sources',
+            { title: values.title, media: values.media, date: values.date, url: values.url }
+        ).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadRecruitments(), opLoadRecruitSources()]);
+        });
+    }, function(values) {
+        if (!values.title) return '来源标题不能为空';
+        return null;
+    });
+}
+
+// ---- 成功案例 ----
+
+function opLoadCases() {
+    opShowError('case-error', '');
+    return opGet('/api/operator/cases').then(function(data) {
+        OP.state.cases.cases = data.cases || [];
+        opRenderCases();
+    }).catch(function(err) {
+        opShowError('case-error', err.message);
+    });
+}
+
+function opRenderCases() {
+    var rows = OP.state.cases.cases;
+    var body = document.getElementById('case-rows');
+    var empty = document.getElementById('case-empty');
+    if (!rows.length) {
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return;
+    }
+    empty.classList.add('is-hidden');
+    body.innerHTML = rows.map(function(c) {
+        var active = OP.state.cases.current === c.id ? ' btn-primary' : ' btn-outline';
+        return '<tr>' +
+            '<td>' + opEsc(c.title) + '</td>' +
+            '<td>' + opEsc(c.region || '') + '</td>' +
+            '<td>' + (c.stat_count || 0) + '</td>' +
+            '<td>' + (c.milestone_count || 0) + '</td>' +
+            '<td>' + (c.source_count || 0) + '</td>' +
+            '<td>' + (c.lesson_count || 0) + '</td>' +
+            '<td class="row-actions">' +
+                '<button class="btn btn-sm' + active + '" data-op="case-pick" data-id="' +
+                    c.id + '">查看内容</button>' +
+                '<button class="btn btn-sm btn-danger" data-op="case-del" data-id="' +
+                    c.id + '">删除</button>' +
+            '</td></tr>';
+    }).join('');
+}
+
+function opLoadCaseDetail() {
+    var caseId = OP.state.cases.current;
+    var title = document.getElementById('case-detail-title');
+    var head = document.getElementById('case-detail-head');
+    var body = document.getElementById('case-detail-rows');
+    var empty = document.getElementById('case-detail-empty');
+    if (!caseId) {
+        title.textContent = '案例内容';
+        head.innerHTML = '';
+        body.innerHTML = '';
+        empty.classList.remove('is-hidden');
+        return Promise.resolve();
+    }
+    var name = '#' + caseId;
+    var row = OP.state.cases.cases.filter(function(c) { return c.id === caseId; })[0];
+    if (row) name = row.title;
+    title.textContent = '「' + name + '」的内容';
+
+    var tab = OP.state.cases.detailTab;
+    var heads = {
+        stats: ['指标', '数值', '图标', '操作'],
+        milestones: ['时期', '标题', '说明', '操作'],
+        sources: ['标题', '媒体', '日期', '操作'],
+        lessons: ['借鉴点', '操作']
+    };
+    head.innerHTML = '<tr>' + heads[tab].map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+    opShowError('case-detail-error', '');
+    return opGet('/api/operator/cases/' + caseId + '/' + tab)
+        .then(function(data) {
+            var rows = data[tab] || [];
+            if (!rows.length) {
+                body.innerHTML = '';
+                empty.classList.remove('is-hidden');
+                return;
+            }
+            empty.classList.add('is-hidden');
+            body.innerHTML = rows.map(function(r) {
+                var cells;
+                if (tab === 'stats') {
+                    cells = [opEsc(r.label), opEsc(r.value || ''), opEsc(r.icon || '')];
+                } else if (tab === 'milestones') {
+                    cells = [opEsc(r.period || ''), opEsc(r.title), opEsc(r.desc || '')];
+                } else if (tab === 'sources') {
+                    cells = [opEsc(r.title), opEsc(r.media || ''), opEsc(r.date || '')];
+                } else {
+                    cells = [opEsc(r.text)];
+                }
+                return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') +
+                    '<td class="row-actions">' +
+                    '<button class="btn btn-sm btn-danger" data-op="case-detail-del" ' +
+                        'data-kind="' + tab + '" data-id="' + r.id + '">删除</button>' +
+                    '</td></tr>';
+            }).join('');
+        }).catch(function(err) {
+            opShowError('case-detail-error', err.message);
+        });
+}
+
+function opOpenCaseForm(testCase) {
+    var isNew = !testCase;
+    var fields = [
+        { key: 'title', label: '标题', type: 'text', required: true, maxlength: 60 },
+        { key: 'region', label: '地区', type: 'text' },
+        { key: 'location', label: '地点', type: 'text' },
+        { key: 'background', label: '背景', type: 'textarea' },
+        { key: 'description', label: '描述', type: 'textarea' },
+        { key: 'quote', label: '引语', type: 'textarea' },
+        { key: 'quote_author', label: '受访者', type: 'text' }
+    ];
+    opOpenModal(isNew ? '新建案例' : '编辑案例', fields, testCase || {}, function(values) {
+        var path = isNew ? '/api/operator/cases' : '/api/operator/cases/' + testCase.id;
+        return opRequest(isNew ? 'POST' : 'PUT', path, values).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadCases(), opLoadCaseDetail()]);
+        });
+    }, function(values) {
+        if (!values.title) return '案例标题不能为空';
+        return null;
+    });
+}
+
+function opOpenCaseChildForm(kind) {
+    var caseId = OP.state.cases.current;
+    if (!caseId) return;
+    var specs = {
+        stats: {
+            title: '新建数据指标',
+            fields: [
+                { key: 'label', label: '指标名称', type: 'text', required: true, maxlength: 60 },
+                { key: 'value', label: '数值', type: 'text', maxlength: 60 },
+                { key: 'icon', label: '图标', type: 'text', maxlength: 40,
+                  placeholder: 'fa-leaf' }
+            ],
+            payload: function(v) {
+                return { label: v.label, value: v.value, icon: v.icon };
+            },
+            validate: function(v) { return v.label ? null : '指标名称不能为空'; }
+        },
+        milestones: {
+            title: '新建里程碑',
+            fields: [
+                { key: 'period', label: '时期', type: 'text', maxlength: 60 },
+                { key: 'title', label: '标题', type: 'text', required: true, maxlength: 60 },
+                { key: 'desc', label: '说明', type: 'textarea' }
+            ],
+            payload: function(v) { return { period: v.period, title: v.title, desc: v.desc }; },
+            validate: function(v) { return v.title ? null : '里程碑标题不能为空'; }
+        },
+        sources: {
+            title: '新建来源',
+            fields: [
+                { key: 'title', label: '来源标题', type: 'text', required: true, maxlength: 60 },
+                { key: 'media', label: '媒体', type: 'text' },
+                { key: 'date', label: '日期', type: 'text', placeholder: 'YYYY-MM-DD' },
+                { key: 'url', label: '链接', type: 'text', placeholder: 'https://' }
+            ],
+            payload: function(v) { return { title: v.title, media: v.media, date: v.date, url: v.url }; },
+            validate: function(v) { return v.title ? null : '来源标题不能为空'; }
+        },
+        lessons: {
+            title: '新建借鉴点',
+            fields: [{ key: 'text', label: '借鉴点', type: 'textarea', required: true }],
+            payload: function(v) { return { text: v.text }; },
+            validate: function(v) { return v.text ? null : '借鉴点不能为空'; }
+        }
+    };
+    var spec = specs[kind];
+    opOpenModal(spec.title, spec.fields, {}, function(values) {
+        return opRequest('POST', '/api/operator/cases/' + caseId + '/' + kind,
+                         spec.payload(values)).then(function() {
+            opCloseModal();
+            return Promise.all([opLoadCases(), opLoadCaseDetail()]);
+        });
+    }, spec.validate);
+}
+
 // ---- 总览 ----
 
 function opLoadOverview() {
@@ -754,6 +1705,54 @@ function opBindEvents() {
         opLoadPestRef();
     });
 
+    // ---- T15 四块 ----
+
+    document.getElementById('craft-new').onclick = function() { opOpenCraftForm(null); };
+    document.getElementById('craft-step-new').onclick = opOpenCraftStepForm;
+    document.getElementById('craft-category-new').onclick = opOpenCraftCategoryForm;
+    document.getElementById('craft-item-new').onclick = opOpenCraftItemForm;
+    document.getElementById('craft-budget-edit').onclick = opOpenCraftBudgetForm;
+    document.getElementById('craft-detail-tabs').addEventListener('click', function(e) {
+        var tab = e.target.closest ? e.target.closest('.tab') : null;
+        if (!tab) return;
+        this.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        OP.state.crafts.detailTab = tab.getAttribute('data-tab');
+        opLoadCraftDetail();
+    });
+
+    document.getElementById('dialect-new').onclick = function() { opOpenDialectForm(null); };
+    document.getElementById('dialect-phrase-new').onclick = opOpenDialectPhraseForm;
+    document.getElementById('dialect-question-new').onclick = opOpenDialectQuestionForm;
+    document.getElementById('dialect-detail-tabs').addEventListener('click', function(e) {
+        var tab = e.target.closest ? e.target.closest('.tab') : null;
+        if (!tab) return;
+        this.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        OP.state.dialects.detailTab = tab.getAttribute('data-tab');
+        opLoadDialectDetail();
+    });
+
+    document.getElementById('recruit-new').onclick = function() { opOpenRecruitForm(null); };
+    document.getElementById('recruit-source-new').onclick = opOpenRecruitSourceForm;
+    document.getElementById('recruit-refresh').onclick = opLoadRecruitments;
+    document.getElementById('recruit-filter-category').addEventListener('change', opLoadRecruitments);
+    document.getElementById('recruit-filter-open').addEventListener('change', opLoadRecruitments);
+
+    document.getElementById('case-new').onclick = function() { opOpenCaseForm(null); };
+    document.getElementById('case-stat-new').onclick = function() { opOpenCaseChildForm('stats'); };
+    document.getElementById('case-milestone-new').onclick = function() { opOpenCaseChildForm('milestones'); };
+    document.getElementById('case-source-new').onclick = function() { opOpenCaseChildForm('sources'); };
+    document.getElementById('case-lesson-new').onclick = function() { opOpenCaseChildForm('lessons'); };
+    document.getElementById('case-detail-tabs').addEventListener('click', function(e) {
+        var tab = e.target.closest ? e.target.closest('.tab') : null;
+        if (!tab) return;
+        this.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        OP.state.cases.detailTab = tab.getAttribute('data-tab');
+        opLoadCaseDetail();
+    });
+
     // 事件委托：列表重绘后不需要重新绑定
     document.addEventListener('click', function(e) {
         var btn = e.target.closest ? e.target.closest('[data-op]') : null;
@@ -792,7 +1791,127 @@ function opBindEvents() {
                     return Promise.all([opLoadPestRef(), opLoadPestBasics()]);
                 });
             }
+        } else if (op === 'craft-pick') {
+            // 选中一门技艺：下面两层切到它的内容，页签回到第一页
+            OP.state.crafts.current = id;
+            OP.state.crafts.detailTab = 'steps';
+            opSyncCraftTabs();
+            opRenderCrafts();
+            opLoadCraftDetail();
+        } else if (op === 'craft-del') {
+            if (window.confirm('删除后不可恢复，确认删除这门技艺？步骤与采购指南会一起删掉。')) {
+                opRequest('DELETE', '/api/operator/crafts/' + encodeURIComponent(id))
+                    .then(function() {
+                        if (OP.state.crafts.current === id) OP.state.crafts.current = null;
+                        return Promise.all([opLoadCrafts(), opLoadCraftDetail()]);
+                    });
+            }
+        } else if (op === 'craft-detail-del') {
+            if (window.confirm('确认删除？')) {
+                var kind = btn.getAttribute('data-kind');
+                var craft = btn.getAttribute('data-craft');
+                var key = btn.getAttribute('data-key');
+                var path = kind === 'steps'
+                    ? '/api/operator/crafts/steps/' + id
+                    : kind === 'purchase-categories'
+                        ? '/api/operator/crafts/' + encodeURIComponent(craft) +
+                          '/purchase-categories/' + encodeURIComponent(key)
+                        : '/api/operator/crafts/purchase-items/' + id;
+                opRequest('DELETE', path).then(function() {
+                    return Promise.all([opLoadCrafts(), opLoadCraftDetail()]);
+                });
+            }
+        } else if (op === 'dialect-pick') {
+            OP.state.dialects.current = id;
+            OP.state.dialects.detailTab = 'phrases';
+            opSyncDialectTabs();
+            opRenderDialects();
+            opLoadDialectDetail();
+        } else if (op === 'dialect-del') {
+            if (window.confirm('删除后不可恢复，确认删除这种方言？短语与快捷问题会一起删掉。')) {
+                opRequest('DELETE', '/api/operator/dialects/' + encodeURIComponent(id))
+                    .then(function() {
+                        if (OP.state.dialects.current === id) OP.state.dialects.current = null;
+                        return Promise.all([opLoadDialects(), opLoadDialectDetail()]);
+                    });
+            }
+        } else if (op === 'dialect-detail-del') {
+            if (window.confirm('确认删除？')) {
+                var kind2 = btn.getAttribute('data-kind');
+                var path2 = kind2 === 'phrases'
+                    ? '/api/operator/dialects/phrases/' + id
+                    : '/api/operator/dialects/quick-questions/' + id;
+                opRequest('DELETE', path2).then(function() {
+                    return Promise.all([opLoadDialects(), opLoadDialectDetail()]);
+                });
+            }
+        } else if (op === 'recruit-pick') {
+            OP.state.recruitments.current = id;
+            opRenderRecruitments();
+            opLoadRecruitSources();
+        } else if (op === 'recruit-del') {
+            if (window.confirm('删除后不可恢复，确认删除这条公告？它的来源会一起删掉。')) {
+                opRequest('DELETE', '/api/operator/recruitments/' + encodeURIComponent(id))
+                    .then(function() {
+                        if (OP.state.recruitments.current === id) {
+                            OP.state.recruitments.current = null;
+                        }
+                        return Promise.all([opLoadRecruitments(), opLoadRecruitSources()]);
+                    });
+            }
+        } else if (op === 'recruit-source-del') {
+            if (window.confirm('确认删除？')) {
+                opRequest('DELETE', '/api/operator/recruitments/sources/' + id)
+                    .then(function() {
+                        return Promise.all([opLoadRecruitments(), opLoadRecruitSources()]);
+                    });
+            }
+        } else if (op === 'case-pick') {
+            OP.state.cases.current = Number(id);
+            OP.state.cases.detailTab = 'stats';
+            opSyncCaseTabs();
+            opRenderCases();
+            opLoadCaseDetail();
+        } else if (op === 'case-del') {
+            if (window.confirm('删除后不可恢复，确认删除这条案例？四个子表与审核记录会一起删掉。')) {
+                opRequest('DELETE', '/api/operator/cases/' + id).then(function() {
+                    if (OP.state.cases.current === Number(id)) OP.state.cases.current = null;
+                    return Promise.all([opLoadCases(), opLoadCaseDetail()]);
+                });
+            }
+        } else if (op === 'case-detail-del') {
+            if (window.confirm('确认删除？')) {
+                var kind3 = btn.getAttribute('data-kind');
+                opRequest('DELETE', '/api/operator/cases/' + kind3 + '/' + id).then(function() {
+                    return Promise.all([opLoadCases(), opLoadCaseDetail()]);
+                });
+            }
         }
+    });
+}
+
+// 页签高亮与 state 同步：选中父项后页签回到第一页，只改 DOM 不改数据
+function opSyncCraftTabs() {
+    var tabs = document.getElementById('craft-detail-tabs');
+    if (!tabs) return;
+    tabs.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === OP.state.crafts.detailTab);
+    });
+}
+
+function opSyncDialectTabs() {
+    var tabs = document.getElementById('dialect-detail-tabs');
+    if (!tabs) return;
+    tabs.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === OP.state.dialects.detailTab);
+    });
+}
+
+function opSyncCaseTabs() {
+    var tabs = document.getElementById('case-detail-tabs');
+    if (!tabs) return;
+    tabs.querySelectorAll('.tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-tab') === OP.state.cases.detailTab);
     });
 }
 
@@ -802,6 +1921,7 @@ PORTAL.init(['operator'], 'sidebar-name', function() {
     var avatar = document.getElementById('sidebar-avatar');
     if (avatar) avatar.textContent = (user.name || '运')[0];
     opBindEvents();
+    opFillRecruitCategoryFilter();
     opLoadOverview();
     opLoadFarmingBasics().then(opLoadFarmingTasks);
     opLoadPestBasics().then(opLoadPestEntries);
@@ -811,7 +1931,23 @@ PORTAL.onPageChange(function(page) {
     if (page === 'farming') { opLoadFarmingBasics().then(opLoadFarmingTasks); }
     if (page === 'pest') { opLoadPestBasics().then(opLoadPestEntries); }
     if (page === 'overview') { opLoadOverview(); }
+    if (page === 'crafts') { opLoadCrafts().then(opLoadCraftDetail); }
+    if (page === 'dialects') { opLoadDialects().then(opLoadDialectDetail); }
+    if (page === 'recruitments') {
+        opLoadRecruitments().then(opLoadRecruitSources);
+    }
+    if (page === 'cases') { opLoadCases().then(opLoadCaseDetail); }
 });
+
+// 招募类别筛选下拉。值来自 OP.RECRUIT_CATEGORIES，与后端白名单一致；
+// 类别是内容，不是这里能改的东西，所以只做筛选、不做新建。
+function opFillRecruitCategoryFilter() {
+    var el = document.getElementById('recruit-filter-category');
+    if (!el) return;
+    el.innerHTML = '<option value="">全部类别</option>' + OP.RECRUIT_CATEGORIES.map(function(c) {
+        return '<option value="' + opEsc(c) + '">' + opEsc(c) + '</option>';
+    }).join('');
+}
 </script>
 </body>
 </html>

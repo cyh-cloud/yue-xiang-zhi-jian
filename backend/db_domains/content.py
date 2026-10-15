@@ -128,6 +128,375 @@ def get_case_notes():
     return {'source_note': CASE_SOURCE_NOTE, 'lessons_note': LESSONS_NOTE}
 
 
+# ==================== 运营维护（写侧，T15） ====================
+# 列名白名单、校验归路由层两条口径与其它域一致。跨域删除不同：案例要过审才对
+# 学员端可见（见 db_domains.resources.get_success_cases），所以删案例时必须
+# 一并清掉它在 content_reviews 里的审核记录，否则留下「内容已删、审核卡片还在」
+# 的孤儿项。清理只走 reviews 域的 delete_reviews_for 一个入口（T11 收敛的）。
+#
+# ⚠️ 调用顺序：本连接 commit + close **之后**才调 delete_reviews_for。
+#    两个连接在同一线程上同时持写锁会互相等待，直接死锁（T11 实测踩到，
+#    courses.py / procurements.py 已按同一形状加注释）。
+
+CASE_FIELDS_WRITABLE = ('title', 'region', 'location', 'background', 'description',
+                        'quote', 'quote_author', 'sort_order')
+STAT_FIELDS = ('label', 'value', 'icon', 'sort_order')
+MILESTONE_FIELDS = ('period', 'title', 'desc', 'sort_order')
+SOURCE_FIELDS = ('title', 'media', 'date', 'url', 'sort_order')
+LESSON_FIELDS = ('text', 'sort_order')
+
+
+def _pick(fields, allowed):
+    """按白名单挑出要写的列。None 表示「不碰这一列」，与「置空」是两件事。"""
+    return {k: v for k, v in fields.items() if k in allowed and v is not None}
+
+
+def _strip(value):
+    return (value or '').strip() if isinstance(value, str) else str(value or '')
+
+
+def _require_case(conn, case_id):
+    row = conn.execute("SELECT id FROM success_cases WHERE id = ?",
+                       (case_id,)).fetchone()
+    if row is None:
+        raise ValueError(u'案例不存在：%s' % case_id)
+
+
+def create_case(title, **fields):
+    """新增一条成功案例，返回自增 id。"""
+    title = _strip(title)
+    if not title:
+        raise ValueError(u'案例标题不能为空')
+    values = _pick(fields, CASE_FIELDS_WRITABLE)
+    values.update({'title': title})
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼会语法错误
+    columns = ', '.join('"%s"' % column for column in values)
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO success_cases (%s) VALUES (%s)"
+            % (columns, ', '.join('?' * len(values))), list(values.values()))
+        case_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return case_id
+
+
+def update_case(case_id, **fields):
+    """按白名单改一条案例。字段全是 None 时不动库，返回是否真的改了。"""
+    updates = _pick(fields, CASE_FIELDS_WRITABLE)
+    if 'title' in updates:
+        updates['title'] = _strip(updates['title'])
+    if 'title' in updates and not updates['title']:
+        raise ValueError(u'案例标题不能为空')
+    if not updates:
+        return False
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼进 SET 子句会语法错误
+    set_clause = ', '.join('"%s"=?' % column for column in updates)
+    conn = get_connection()
+    try:
+        cur = conn.execute("UPDATE success_cases SET %s WHERE id=?" % set_clause,
+                           list(updates.values()) + [case_id])
+        changed = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return changed > 0
+
+
+def delete_case(case_id):
+    """删除一条案例。四个子表由外键级联删除，审核记录走 reviews 域的入口。
+
+    返回是否真的删掉了行。审核记录的清理放在本连接关闭之后，理由见模块 docstring。
+    """
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM success_cases WHERE id = ?", (case_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    if not deleted:
+        return False
+    from db_domains.reviews import delete_reviews_for
+    delete_reviews_for('success_case', case_id)
+    return True
+
+
+# ---- 案例数据指标 ----
+
+def create_case_stat(case_id, label, **fields):
+    label = _strip(label)
+    if not label:
+        raise ValueError(u'指标名称不能为空')
+    values = _pick(fields, STAT_FIELDS)
+    values.update({'case_id': case_id, 'label': label})
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼会语法错误
+    columns = ', '.join('"%s"' % column for column in values)
+    conn = get_connection()
+    try:
+        _require_case(conn, case_id)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO case_stats (%s) VALUES (%s)"
+            % (columns, ', '.join('?' * len(values))), list(values.values()))
+        stat_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return stat_id
+
+
+def update_case_stat(stat_id, **fields):
+    updates = _pick(fields, STAT_FIELDS)
+    if 'label' in updates:
+        updates['label'] = _strip(updates['label'])
+    if 'label' in updates and not updates['label']:
+        raise ValueError(u'指标名称不能为空')
+    if not updates:
+        return False
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼进 SET 子句会语法错误
+    set_clause = ', '.join('"%s"=?' % column for column in updates)
+    conn = get_connection()
+    try:
+        cur = conn.execute("UPDATE case_stats SET %s WHERE rowid=?" % set_clause,
+                           list(updates.values()) + [stat_id])
+        changed = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return changed > 0
+
+
+def delete_case_stat(stat_id):
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM case_stats WHERE rowid = ?", (stat_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted > 0
+
+
+def get_case_stats(case_id):
+    """一条案例的数据指标，带 id（后台编辑用）。顺序与前台一致。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT rowid AS id, label, value, icon, sort_order FROM case_stats '
+            'WHERE case_id = ? ORDER BY sort_order, id', (case_id,)).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---- 案例里程碑 ----
+
+def create_case_milestone(case_id, title, **fields):
+    title = _strip(title)
+    if not title:
+        raise ValueError(u'里程碑标题不能为空')
+    values = _pick(fields, MILESTONE_FIELDS)
+    values.update({'case_id': case_id, 'title': title})
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼会语法错误
+    columns = ', '.join('"%s"' % column for column in values)
+    conn = get_connection()
+    try:
+        _require_case(conn, case_id)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO case_milestones (%s) VALUES (%s)"
+            % (columns, ', '.join('?' * len(values))), list(values.values()))
+        milestone_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return milestone_id
+
+
+def update_case_milestone(milestone_id, **fields):
+    updates = _pick(fields, MILESTONE_FIELDS)
+    if 'title' in updates:
+        updates['title'] = _strip(updates['title'])
+    if 'title' in updates and not updates['title']:
+        raise ValueError(u'里程碑标题不能为空')
+    if not updates:
+        return False
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼进 SET 子句会语法错误
+    set_clause = ', '.join('"%s"=?' % column for column in updates)
+    conn = get_connection()
+    try:
+        cur = conn.execute("UPDATE case_milestones SET %s WHERE rowid=?" % set_clause,
+                           list(updates.values()) + [milestone_id])
+        changed = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return changed > 0
+
+
+def delete_case_milestone(milestone_id):
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM case_milestones WHERE rowid = ?", (milestone_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted > 0
+
+
+def get_case_milestones(case_id):
+    """一条案例的里程碑，带 id（后台编辑用）。顺序与前台一致。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT rowid AS id, period, title, "desc", sort_order FROM case_milestones '
+            'WHERE case_id = ? ORDER BY sort_order, id', (case_id,)).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---- 案例来源 ----
+
+def create_case_source(case_id, title, **fields):
+    title = _strip(title)
+    if not title:
+        raise ValueError(u'来源标题不能为空')
+    values = _pick(fields, SOURCE_FIELDS)
+    values.update({'case_id': case_id, 'title': title})
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼会语法错误
+    columns = ', '.join('"%s"' % column for column in values)
+    conn = get_connection()
+    try:
+        _require_case(conn, case_id)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO case_sources (%s) VALUES (%s)"
+            % (columns, ', '.join('?' * len(values))), list(values.values()))
+        source_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return source_id
+
+
+def update_case_source(source_id, **fields):
+    updates = _pick(fields, SOURCE_FIELDS)
+    if 'title' in updates:
+        updates['title'] = _strip(updates['title'])
+    if 'title' in updates and not updates['title']:
+        raise ValueError(u'来源标题不能为空')
+    if not updates:
+        return False
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼进 SET 子句会语法错误
+    set_clause = ', '.join('"%s"=?' % column for column in updates)
+    conn = get_connection()
+    try:
+        cur = conn.execute("UPDATE case_sources SET %s WHERE rowid=?" % set_clause,
+                           list(updates.values()) + [source_id])
+        changed = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return changed > 0
+
+
+def delete_case_source(source_id):
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM case_sources WHERE rowid = ?", (source_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted > 0
+
+
+def get_case_sources(case_id):
+    """一条案例的来源，带 id（后台编辑用）。顺序与前台一致。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT rowid AS id, title, media, date, url, sort_order FROM case_sources '
+            'WHERE case_id = ? ORDER BY sort_order, id', (case_id,)).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+# ---- 案例借鉴点 ----
+
+def create_case_lesson(case_id, text, **fields):
+    text = _strip(text)
+    if not text:
+        raise ValueError(u'借鉴点不能为空')
+    values = _pick(fields, LESSON_FIELDS)
+    values.update({'case_id': case_id, 'text': text})
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼会语法错误
+    columns = ', '.join('"%s"' % column for column in values)
+    conn = get_connection()
+    try:
+        _require_case(conn, case_id)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO case_lessons (%s) VALUES (%s)"
+            % (columns, ', '.join('?' * len(values))), list(values.values()))
+        lesson_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return lesson_id
+
+
+def update_case_lesson(lesson_id, **fields):
+    updates = _pick(fields, LESSON_FIELDS)
+    if 'text' in updates:
+        updates['text'] = _strip(updates['text'])
+    if 'text' in updates and not updates['text']:
+        raise ValueError(u'借鉴点不能为空')
+    if not updates:
+        return False
+    # 列名走双引号：desc / where 是 SQL 关键字，裸拼进 SET 子句会语法错误
+    set_clause = ', '.join('"%s"=?' % column for column in updates)
+    conn = get_connection()
+    try:
+        cur = conn.execute("UPDATE case_lessons SET %s WHERE rowid=?" % set_clause,
+                           list(updates.values()) + [lesson_id])
+        changed = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return changed > 0
+
+
+def delete_case_lesson(lesson_id):
+    conn = get_connection()
+    try:
+        cur = conn.execute("DELETE FROM case_lessons WHERE rowid = ?", (lesson_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted > 0
+
+
+def get_case_lessons(case_id):
+    """一条案例的借鉴点，带 id（后台编辑用）。顺序与前台一致。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT rowid AS id, text, sort_order FROM case_lessons '
+            'WHERE case_id = ? ORDER BY sort_order, id', (case_id,)).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
 def get_policy_notes():
     """政策页口径说明文案（来源说明 + 免责声明）。"""
     return {'source_note': POLICY_SOURCE_NOTE, 'disclaimer': POLICY_DISCLAIMER}

@@ -75,6 +75,25 @@ def get_case_notes():
     """案例页口径说明文案（与内容同源，避免前端硬编码漂移）。"""
     return content.get_case_notes()
 
+
+def create_case_review(case_id, submitter_id):
+    """为一条新案例开审核记录（T15：运营后台新增案例时调）。
+
+    案例要过审才对学员端可见（见 get_success_cases），所以新建案例必须同时
+    落一条 pending 记录，否则这条案例永远不进审核队列，运营以为发了、
+    学员永远看不到 —— 一个不会报错的静默失败。
+
+    走 reviews 域的 create_content_review，不自己写 INSERT：content_reviews
+    是共享表，属主是 reviews 域（T11 收敛的口径，与 courses / procurements
+    创建时调 create_content_review 同一条路）。
+
+    延迟导入的理由同 courses.py：reviews 反过来 import 本模块（它的分派表
+    要读 success_case 的可见性），顶层导入会成环。
+    """
+    from db_domains.reviews import create_content_review
+    create_content_review(CASE_REVIEW_TYPE, case_id, submitter_id)
+    return case_id
+
 def get_policy_notes():
     """政策页口径说明文案（来源说明 + 免责声明，与内容同源）。"""
     return content.get_policy_notes()
