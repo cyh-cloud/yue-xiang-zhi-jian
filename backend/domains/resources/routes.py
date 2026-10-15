@@ -28,12 +28,11 @@ from ai.client import (
     chat_model,
 )
 from core.session import client_key, rate_limited
-from db_domains import resources
+from db_domains import dialects as dialects_db, resources
 from db_domains import policies as policies_db
 
 from domains.resources.dialect_voice import (
     _chem_dose_notice_for,
-    DIALECTS_DATA,
     dialect_fallback_answer,
 )
 
@@ -51,9 +50,7 @@ VOICE_RATE_LIMIT = int(os.getenv('VOICE_RATE_LIMIT', '60'))   # 每窗口内语�
 
 @resources_bp.route('/api/resources/dialects', methods=['GET'])
 def get_dialects():
-    dialects = [{"id": v["id"], "name": v["name"], "region": v["region"],
-                 "emoji": v["emoji"], "areas": v["areas"], "speakers": v["speakers"]}
-                for v in DIALECTS_DATA.values()]
+    dialects = dialects_db.get_dialects()
     return jsonify({"success": True, "dialects": dialects})
 
 
@@ -61,7 +58,10 @@ def get_dialects():
 def get_dialect_info():
     """获取方言详细信息（问候、短语、快捷问题）"""
     dialect_id = request.args.get('dialect', 'cantonese')
-    d = DIALECTS_DATA.get(dialect_id, DIALECTS_DATA['cantonese'])
+    d = dialects_db.get_dialect_info(dialect_id)
+    if d is None:
+        # 未知方言 id 退回粤语，与切库前一致
+        d = dialects_db.get_dialect_info('cantonese')
     return jsonify({"success": True, "info": {
         "id": d["id"], "name": d["name"], "region": d["region"],
         "emoji": d["emoji"], "areas": d["areas"], "speakers": d["speakers"],
@@ -128,7 +128,9 @@ def process_voice():
             "message": "提问过于频繁，请稍后再试"
         }), 429
 
-    d = DIALECTS_DATA.get(dialect, DIALECTS_DATA['cantonese'])
+    d = dialects_db.get_dialect_info(dialect)
+    if d is None:
+        d = dialects_db.get_dialect_info('cantonese')
     dialect_name = d['name']
     areas = d['areas']
 

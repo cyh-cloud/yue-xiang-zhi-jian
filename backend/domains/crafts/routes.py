@@ -11,7 +11,25 @@ CRAFTS_KNOWLEDGE 是纯数据（四种技艺的步骤与采购指南），原先
 
 from flask import Blueprint, jsonify
 
+from db_domains import crafts as crafts_db
+
 crafts_bp = Blueprint('crafts', __name__)
+
+
+# T08 切库时**仍留在代码里**的两份口径，T10 才随常量一起删：
+#
+# 1) 列表项的难度分级 level：库里 crafts.level 全是空串（T05 灌库时未迁该列的值），
+#    而学员端列表卡一直显示「入门级 / 进阶级 / 中级 / 高级」。等级是「谁能改」的
+#    内容（运营改技艺时该能改它），现在既没进库、也没有后台入口，只能在这里兜住，
+#    否则列表角标会整排消失。缺 id 时给空串，不编造等级。
+# 2) 详情响应的 videos：库里没有视频表，前端 script.js 的视频教学区直接读它。
+#    这两项都在 T10 的删除清单之外（T10 删的是常量本身），届时视频要单独建表。
+CRAFT_LEVELS = {
+    "embroidery": u"入门级",
+    "woodcarving": u"进阶级",
+    "ceramics": u"中级",
+    "lacquer": u"高级",
+}
 
 
 # 手工艺知识
@@ -324,16 +342,18 @@ CRAFTS_KNOWLEDGE = {
 @crafts_bp.route('/api/crafts/list', methods=['GET'])
 def get_crafts_list():
     crafts = [
-        {"id": "embroidery", "name": "广绣", "level": "入门级", "origin": "广州"},
-        {"id": "woodcarving", "name": "潮汕木雕", "level": "进阶级", "origin": "潮汕"},
-        {"id": "ceramics", "name": "石湾陶艺", "level": "中级", "origin": "佛山"},
-        {"id": "lacquer", "name": "阳江漆器", "level": "高级", "origin": "阳江"}
+        {"id": c["id"], "name": c["name"], "origin": c["origin"],
+         "level": CRAFT_LEVELS.get(c["id"], "")}
+        for c in crafts_db.get_crafts()
     ]
     return jsonify({"success": True, "crafts": crafts})
 
 
 @crafts_bp.route('/api/crafts/<craft_id>', methods=['GET'])
 def get_craft_detail(craft_id):
-    if craft_id in CRAFTS_KNOWLEDGE:
-        return jsonify({"success": True, "data": CRAFTS_KNOWLEDGE[craft_id]})
+    craft = crafts_db.get_craft_detail(craft_id)
+    if craft is not None:
+        # videos 未进库（库里没有视频表），由常量补上，形状与切库前一致
+        craft["videos"] = CRAFTS_KNOWLEDGE[craft_id]["videos"]
+        return jsonify({"success": True, "data": craft})
     return jsonify({"success": False, "message": "未找到该手工艺信息"})
