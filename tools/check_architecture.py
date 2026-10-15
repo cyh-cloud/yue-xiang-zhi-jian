@@ -2,11 +2,19 @@
 # -*- coding: utf-8 -*-
 """后端领域拆分的机械检查。只读代码，不修改任何文件。
 
-一条命令判定三件事：
+一条命令判定四件事：
 
-1. 领域路由模块之间没有 import 边；
+1. 领域路由模块之间没有 import 边（一律禁止，与能力无关）；
+2. 领域路由模块 import 数据层模块（db_domains/）按能力表判权：该能力域的 read
+   公开，或调用方所在域声明了它的 manage 能力，否则报 violation；
 2. 共享层模块不 import 领域路由模块；
 3. 单个领域路由文件不超过 600 行。
+
+第 2 条的判据是 backend/core/permissions.py 的 CAPABILITIES 表，本文件不复制第二份：
+能力表改了，判定结果跟着改，检查器不用动。调用方「声明了某个能力」的判据是它的代码里
+出现了 @require_capability('<域>.manage')；被调方「属于哪个能力域」的判据是它模块级的
+CAPABILITY = '<域>'。ADR 0002 把 ADR 0001 的「领域之间不得互相 import」修为「不得访问
+不具有该角色权限的数据」，这里就是那条修订的机械形式。
 
 规则全部由扫描目录自动发现，仓库里没有内置的文件清单，新建领域目录后自动纳入检查：
 
@@ -49,6 +57,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1] / "backend"
 
 DEFAULT_MAX_LINES = 600
 DEFAULT_SHARED_NAMES = ("shared", "core", "ai")
+
+# 数据层模块所在的目录。判权只对「领域路由模块 -> 这里的模块」这条边生效。
+DATA_MODULE_PREFIX = "db_domains/"
 
 EXCLUDED_DIRS = frozenset(
     {
@@ -221,6 +232,120 @@ def imported_targets(info):
     return targets
 
 
+def declared_capabilities(info):
+    """本模块源码里出现的 require_capability('x.manage') 装饰器，即它声明的能力集。
+
+    只认 `@require_capability('...')` 这一种写法（含 core.permissions.require_capability
+    前缀），与 permissions.require_capability 的签名逐字对应。写角色名比较的文件
+    一声明都没有，判权时视为不持有任何能力，于是它 import 任何受管数据模块都会报违规，
+    这正是 T13 之前 20 个路由文件的现状：它们正在逐个切到能力表。
+    """
+    if info.tree is None:
+        return frozenset()
+    names = set()
+    for node in ast.walk(info.tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if callee_name(node.func).rsplit(".", 1)[-1] != "require_capability":
+            continue
+        if len(node.args) != 1 or not isinstance(node.args[0], ast.Constant):
+            continue
+        if isinstance(node.args[0].value, str):
+            names.add(node.args[0].value)
+    return frozenset(names)
+
+
+def load_capabilities():
+    """能力表：backend/core/permissions.py 的 CAPABILITIES。
+
+    判定所依据的表只有这一份，本模块不复制。导入失败（例如只给了 --root 指向的
+    临时目录）时返回空表，此时一切受管数据模块都判为越界，宁可误报也不放过。
+    """
+    import importlib.util
+
+    path = REPO_ROOT / "core" / "permissions.py"
+    spec = importlib.util.spec_from_file_location("_arch_permissions", path)
+    if spec is None or spec.loader is None:
+        return {}
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (ImportError, OSError, SyntaxError):
+        return {}
+    table = getattr(module, "CAPABILITIES", None)
+    return dict(table) if isinstance(table, dict) else {}
+
+
+def capability_of_module(target):
+    """数据层模块声明的 CAPABILITY，空串表示它不拥有任何能力域。"""
+    if target.tree is None:
+        return ""
+    for node in target.tree.body:
+        if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+            continue
+        target_name = node.targets[0]
+        if not (isinstance(target_name, ast.Name) and target_name.id == "CAPABILITY"):
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return node.value.value
+    return ""
+
+
+def capability_verdict(domain, target, capabilities):
+    """领域路由模块 import 数据层模块是否越界。返回 (是否越界, 说明文字)。
+
+    判据（ADR 0002 / spec 5.1）：
+    1. 数据层模块不声明 CAPABILITY：无法判定它属于哪个能力域，一律报违规；
+    2. CAPABILITY 为空串：取数窄接口（profile_sources），不拥有能力域，放行；
+    3. 该能力域的 read 能力是空元组（公开）：放行；
+    4. 调用方所在域声明了它的 manage 能力：放行；
+    5. 其余报违规。
+    """
+    capability = capability_of_module(target)
+    if capability == "":
+        if _declares_capability_constant(target):
+            # 取数窄接口：它刻意不拥有任何能力域，数据来自多个域，由拼装方负责权限。
+            return False, ""
+        return (
+            True,
+            "%s 没有声明 CAPABILITY，无法判定它属于哪个能力域" % target.relative,
+        )
+    read_holders = capabilities.get(capability + ".read")
+    if read_holders is not None and not read_holders:
+        # 空元组 = 公开：任何身份（含未登录）都能读，谁 import 都不算越界。
+        return False, ""
+    needed = capability + ".manage"
+    if needed in domain_capabilities(domain):
+        return False, ""
+    # read 不在表里或非空元组，都按「读不公开」处理：只能靠 manage 放行。
+    # 拼错能力名时 read 与 manage 双双缺席，没人能声明 manage，于是必然判越界，
+    # 不会因为默认放行而开出一个暗门。
+    return True, "读 %s 的数据需要 %s，%s 没有持有它" % (capability, needed, domain.name)
+
+
+def _declares_capability_constant(target):
+    """模块顶层是否写了 CAPABILITY = <字面量>（值可以不是字符串）。"""
+    return any(
+        isinstance(node, ast.Assign)
+        and any(
+            isinstance(t, ast.Name) and t.id == "CAPABILITY" for t in node.targets
+        )
+        for node in (target.tree.body if target.tree else [])
+    )
+
+
+def domain_capabilities(domain):
+    """调用方所在域声明的能力集：域内任一模块声明的都算。
+
+    按域聚合而不是按模块，因为同一个域里常常是 routes.py 挂装饰器、别的文件取数，
+    「能力声明在哪个文件」是实现细节，边界按域画才抓得住越界。
+    """
+    names = set()
+    for module in domain.modules:
+        names.update(declared_capabilities(module))
+    return frozenset(names)
+
+
 class Layout:
     """仓库的领域路由目录、共享层模块与模块名到文件的映射。"""
 
@@ -300,6 +425,10 @@ class Layout:
     def is_domain(self, relative):
         return self._domain_key.get(relative) is not None
 
+    def is_data_module(self, relative):
+        """是不是数据层模块（db_domains/ 下的 .py）。"""
+        return relative.startswith(DATA_MODULE_PREFIX)
+
     def domain_key(self, relative):
         return self._domain_key.get(relative)
 
@@ -317,9 +446,12 @@ class Layout:
         return self._by_module.get(name)
 
 
-def check(root=None, max_lines=DEFAULT_MAX_LINES, shared_names=DEFAULT_SHARED_NAMES):
+def check(root=None, max_lines=DEFAULT_MAX_LINES, shared_names=DEFAULT_SHARED_NAMES,
+          capabilities=None):
     root = Path(root).resolve() if root else REPO_ROOT
     layout = Layout(root, shared_names)
+    if capabilities is None:
+        capabilities = load_capabilities()
     violations = []
     seen = set()
 
@@ -354,6 +486,19 @@ def check(root=None, max_lines=DEFAULT_MAX_LINES, shared_names=DEFAULT_SHARED_NA
             for line, candidate in imported_targets(info):
                 target = layout.resolve(candidate)
                 if target is None or not layout.is_domain(target.relative):
+                    if target is None or not layout.is_data_module(target.relative):
+                        continue
+                    # 领域路由模块 -> 数据层模块：按能力表判权，不再一律禁止。
+                    crossed, reason = capability_verdict(domain, target, capabilities)
+                    if crossed:
+                        add(
+                            KIND_CROSS_DOMAIN,
+                            info.relative,
+                            "领域间越界 import：%s:%d import 了 %s（%s）"
+                            % (info.relative, line, target.relative, reason),
+                            line=line,
+                            target=target.relative,
+                        )
                     continue
                 if layout.domain_key(target.relative) == domain.key:
                     continue

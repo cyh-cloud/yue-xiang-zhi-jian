@@ -50,6 +50,218 @@ class CheckArchitectureTest(unittest.TestCase):
     def kinds(self, report):
         return [violation.kind for violation in report.violations]
 
+    # ---- 按能力表判权（T02）----
+
+    # 一份最小的能力表，形状与 backend/core/permissions.py 的 CAPABILITIES 一致。
+    # 测试各自改这一份，用来验证「能力表变了判定就跟着变」。
+    CAPABILITY_TABLE = {
+        'farming.read': (),
+        'farming.manage': ('operator', 'super_admin'),
+        'policy.read': (),
+        'policy.manage': ('government',),
+        'teaching.read': ('teacher', 'super_admin'),
+        'teaching.manage': ('teacher', 'super_admin'),
+        'user.read': ('super_admin',),
+        'user.manage': ('super_admin',),
+    }
+
+    def capabilities_table(self, changes=None):
+        table = dict(self.CAPABILITY_TABLE)
+        if changes:
+            table.update(changes)
+        return table
+
+    def build_content_domain(self, name='pest'):
+        self.write("domains/%s/__init__.py" % name, "from .routes import bp\n")
+        self.write("domains/%s/routes.py" % name, blueprint_module(name))
+
+    def test_domain_importing_public_data_module_is_allowed(self):
+        self.build_content_domain()
+        self.write("db_domains/farming.py", "CAPABILITY = 'farming'\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest") + "\nfrom db_domains.farming import get_farming_products\n",
+        )
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertTrue(report.ok, checker.format_report(report))
+
+    def test_domain_importing_guarded_data_module_is_reported(self):
+        self.build_content_domain()
+        self.write("db_domains/users.py", "CAPABILITY = 'user'\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest") + "\nfrom db_domains.users import delete_user_by_admin\n",
+        )
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertEqual(self.kinds(report), [checker.KIND_CROSS_DOMAIN])
+        violation = report.violations[0]
+        self.assertEqual(violation.source, "domains/pest/routes.py")
+        self.assertEqual(violation.target, "db_domains/users.py")
+        self.assertIn("user.manage", violation.message)
+        text = checker.format_report(report)
+        self.assertIn("domains/pest/routes.py", text)
+        self.assertIn("db_domains/users.py", text)
+
+    def test_domain_holding_the_capability_may_import_its_data_module(self):
+        self.write(
+            "domains/government/routes.py",
+            blueprint_module("government")
+            + "\nfrom core.permissions import require_capability\n"
+            + "\n@require_capability('policy.manage')\n"
+            + "def publish():\n"
+            + "    return 'ok'\n"
+            + "\nfrom db_domains.policies import list_policies\n",
+        )
+        self.write("db_domains/policies.py", "CAPABILITY = 'policy'\n")
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertTrue(report.ok, checker.format_report(report))
+
+    def test_capability_declared_in_one_module_covers_the_whole_domain(self):
+        self.write("domains/teaching_support/__init__.py", "from .routes import bp\n")
+        self.write(
+            "domains/teaching_support/routes.py",
+            blueprint_module("teaching_support")
+            + "\nfrom core.permissions import require_capability\n"
+            + "\n@require_capability('teaching.manage')\n"
+            + "def grade():\n"
+            + "    return 'ok'\n",
+        )
+        self.write(
+            "domains/teaching_support/queries.py",
+            "from db_domains.teaching import list_submissions\n",
+        )
+        self.write("db_domains/teaching.py", "CAPABILITY = 'teaching'\n")
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertTrue(report.ok, checker.format_report(report))
+
+    def test_route_importing_route_is_still_reported(self):
+        self.build_content_domain('pest')
+        self.build_content_domain('crafts')
+        self.write("db_domains/farming.py", "CAPABILITY = 'farming'\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest")
+            + "\nfrom domains.crafts.routes import crafts_bp\n"
+            + "\nfrom db_domains.farming import get_farming_products\n",
+        )
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertEqual(self.kinds(report), [checker.KIND_CROSS_DOMAIN])
+        violation = report.violations[0]
+        self.assertEqual(violation.source, "domains/pest/routes.py")
+        self.assertEqual(violation.target, "domains/crafts/routes.py")
+
+    def test_data_module_without_capability_declaration_is_reported(self):
+        self.build_content_domain()
+        self.write("db_domains/mystery.py", "def read_all():\n    return []\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest") + "\nfrom db_domains.mystery import read_all\n",
+        )
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertEqual(self.kinds(report), [checker.KIND_CROSS_DOMAIN])
+        violation = report.violations[0]
+        self.assertEqual(violation.target, "db_domains/mystery.py")
+        self.assertIn("CAPABILITY", violation.message)
+
+    def test_narrow_interface_owning_no_capability_is_allowed(self):
+        self.build_content_domain('employment_profile')
+        self.write("db_domains/profile_sources.py", "CAPABILITY = ''\n")
+        self.write(
+            "domains/employment_profile/routes.py",
+            blueprint_module("employment_profile")
+            + "\nfrom db_domains.profile_sources import get_profile_basic\n",
+        )
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertTrue(report.ok, checker.format_report(report))
+
+    def test_capability_table_change_flips_the_verdict(self):
+        self.build_content_domain()
+        self.write("db_domains/farming.py", "CAPABILITY = 'farming'\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest") + "\nfrom db_domains.farming import get_farming_products\n",
+        )
+
+        public = self.check(capabilities=self.capabilities_table())
+        self.assertTrue(public.ok, checker.format_report(public))
+
+        guarded = self.check(
+            capabilities=self.capabilities_table({'farming.read': ('super_admin',)})
+        )
+        self.assertEqual(self.kinds(guarded), [checker.KIND_CROSS_DOMAIN])
+        self.assertIn("farming.manage", guarded.violations[0].message)
+
+    def test_capability_domain_absent_from_the_table_is_reported(self):
+        """能力域整条不在表里时判越界，不默认放行。
+
+        拼错能力名（db_domains 写 'farm'、表里写 'farming'）不能变成暗门，
+        所以这里 fail-closed：read 与 manage 双双缺席，没人声明得了 manage。
+        """
+        self.build_content_domain()
+        self.write("db_domains/farming.py", "CAPABILITY = 'farm'\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest") + "\nfrom db_domains.farming import get_farming_products\n",
+        )
+
+        report = self.check(capabilities=self.capabilities_table())
+
+        self.assertEqual(self.kinds(report), [checker.KIND_CROSS_DOMAIN])
+        violation = report.violations[0]
+        self.assertEqual(violation.target, "db_domains/farming.py")
+        self.assertIn("farm.manage", violation.message)
+
+    def test_route_importing_its_own_data_module_is_allowed(self):
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest")
+            + "\nfrom core.permissions import require_capability\n"
+            + "\n@require_capability('pest.manage')\n"
+            + "def create():\n"
+            + "    return 'ok'\n"
+            + "\nfrom db_domains.pest import list_pests\n",
+        )
+        self.write("db_domains/pest.py", "CAPABILITY = 'pest'\n")
+
+        report = self.check(capabilities=self.capabilities_table(
+            {'pest.read': ('operator', 'super_admin'), 'pest.manage': ('super_admin',)}
+        ))
+
+        self.assertTrue(report.ok, checker.format_report(report))
+
+    def test_default_capabilities_come_from_the_real_permissions_module(self):
+        backend = str(REPO_ROOT / 'backend')
+        if backend not in sys.path:
+            sys.path.insert(0, backend)
+        from core.permissions import CAPABILITIES
+
+        self.assertEqual(checker.load_capabilities(), CAPABILITIES)
+
+        self.build_content_domain()
+        self.write("db_domains/users.py", "CAPABILITY = 'user'\n")
+        self.write(
+            "domains/pest/routes.py",
+            blueprint_module("pest") + "\nfrom db_domains.users import delete_user_by_admin\n",
+        )
+
+        report = self.check()
+
+        self.assertEqual(self.kinds(report), [checker.KIND_CROSS_DOMAIN])
+
     def build_agriculture_domain(self):
         self.write("domains/agriculture/__init__.py", "from .routes import bp\n")
         self.write("domains/agriculture/routes.py", blueprint_module("agriculture"))
