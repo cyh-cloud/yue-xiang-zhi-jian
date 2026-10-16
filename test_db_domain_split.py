@@ -54,9 +54,33 @@ class ReviewDispatchTest(unittest.TestCase):
                              headers={'X-Session-Id': teacher})
         self.assertEqual(r.status_code, 200, r.data)
         course_id = json.loads(r.data)['id']
+        self.addCleanup(self._delete_course, course_id)
         review = reviews.get_review_by_content('course', course_id)
         self.assertIsNotNone(review, '创建课程必须同时生成审核记录')
         return course_id, review['id']
+
+    def _delete_course(self, course_id):
+        """删掉用例自己造的课程行，连同它的审核记录。
+
+        审核记录的 SQL 全仓库只许出现在 reviews 域，所以走它的删除入口；并且
+        必须等本连接关闭之后再删，两个连接同时持写锁会互等。
+        """
+        conn = get_connection()
+        conn.execute("DELETE FROM course_materials WHERE course_id = ?", (course_id,))
+        conn.execute("DELETE FROM courses WHERE id = ?", (course_id,))
+        conn.commit()
+        conn.close()
+        reviews.delete_reviews_for('course', course_id)
+
+    def _delete_job(self, job_id):
+        """删掉用例自己造的岗位行，连同它的投递、收藏与审核记录。"""
+        conn = get_connection()
+        conn.execute("DELETE FROM job_applications WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM saved_jobs WHERE job_id = ?", (job_id,))
+        conn.execute("DELETE FROM job_listings WHERE id = ?", (job_id,))
+        conn.commit()
+        conn.close()
+        reviews.delete_reviews_for('job', job_id)
 
     def _review_status_of(self, table, row_id):
         conn = get_connection()
@@ -113,6 +137,7 @@ class ReviewDispatchTest(unittest.TestCase):
                              headers={'X-Session-Id': enterprise})
         self.assertEqual(r.status_code, 200, r.data)
         job_id = json.loads(r.data)['id']
+        self.addCleanup(self._delete_job, job_id)
         review = reviews.get_review_by_content('job', job_id)
         self.assertIsNotNone(review)
         reviews.reject_review(review['id'], 'admin_demo', '信息不完整')

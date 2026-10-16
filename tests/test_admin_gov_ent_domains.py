@@ -64,16 +64,41 @@ class AdminGovEntTestBase(unittest.TestCase):
 
 class _DbCleanupMixin(AdminGovEntTestBase):
     def _cleanup(self):
+        """清掉本文件造出来的每一行。
+
+        清单必须和用例造的数据对齐：漏掉哪张表，那张表就会随着每次跑测试长大
+        （课程、3D 模型、帖子、会话、审核记录都漏过）。审核记录归 reviews 域，
+        走它的删除入口，并且要等本连接关闭之后再删 —— 两个连接同时持写锁会互等。
+        """
         conn = get_connection()
         conn.execute("DELETE FROM job_applications WHERE user_id = 'student_demo'")
         conn.execute("DELETE FROM resumes WHERE user_id = 'student_demo'")
+        # id 要在删行之前取出来，审核记录随后按这些 id 删
+        job_ids = [r[0] for r in conn.execute(
+            "SELECT id FROM job_listings WHERE title LIKE '__T17%'")]
+        course_ids = [r[0] for r in conn.execute(
+            "SELECT id FROM courses WHERE title LIKE '__T17%'")]
+        model_ids = [r[0] for r in conn.execute(
+            "SELECT id FROM models_3d WHERE title LIKE '__T17%'")]
+        conn.execute("DELETE FROM course_materials WHERE course_id IN "
+                     "(SELECT id FROM courses WHERE title LIKE '__T17%')")
+        conn.execute("DELETE FROM comments WHERE target_type = 'discussion' AND "
+                     "target_id IN (SELECT id FROM discussions WHERE title LIKE '__T17%')")
+        conn.execute("DELETE FROM courses WHERE title LIKE '__T17%'")
+        conn.execute("DELETE FROM models_3d WHERE title LIKE '__T17%'")
+        conn.execute("DELETE FROM discussions WHERE title LIKE '__T17%'")
         conn.execute("DELETE FROM job_listings WHERE title LIKE '__T17%'")
         conn.execute("DELETE FROM government_policies WHERE title LIKE '__T17%'")
         conn.execute("DELETE FROM system_announcements WHERE title LIKE '__T17%'")
+        conn.execute("DELETE FROM user_sessions WHERE user_id LIKE '__t17%'")
         conn.execute("DELETE FROM users WHERE username LIKE '__t17%'")
         conn.execute("DELETE FROM students WHERE name LIKE '__T17%'")
         conn.commit()
         conn.close()
+        for content_type, ids in (('job', job_ids), ('course', course_ids),
+                                  ('model_3d', model_ids)):
+            for content_id in ids:
+                reviews.delete_reviews_for(content_type, content_id)
 
 
 class SuperAdminUserManagementTest(_DbCleanupMixin):

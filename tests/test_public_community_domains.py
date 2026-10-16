@@ -15,11 +15,17 @@ import json
 import os
 import sys
 import unittest
-from db_connection import get_connection
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+# backend/ 也要在路径上：本文件在顶部就 import db_connection，靠「前面某个模块
+# 碰巧补过路径」是隐式顺序依赖，单独跑这个文件就会炸。
+for _path in (REPO_ROOT, os.path.join(REPO_ROOT, 'backend')):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from db_connection import get_connection
+from db_domains import courses as courses_db
+from db_domains import reviews
 
 
 
@@ -86,15 +92,30 @@ class PublicDomainTest(_CommunityCase):
             self.assertNotEqual(course.get('is_published'), 0)
 
     def test_public_course_detail_returns_course_and_materials(self):
+        # 课程自己造并过审，不依赖库里恰好残留着别的用例造出来的公开课程
+        course_id = self._published_course()
         listed = json.loads(self.client.get('/api/teacher/public-courses').data)['courses']
-        self.assertTrue(listed, '公开课程列表为空，无法验证详情')
-        course_id = listed[0]['id']
+        self.assertIn(course_id, [c['id'] for c in listed],
+                      '已发布课程必须出现在公开列表里')
         response = self.client.get('/api/teacher/public-courses/%d' % course_id)
         self.assertEqual(response.status_code, 200)
         body = json.loads(response.data)
         self.assertTrue(body['success'])
         self.assertEqual(body['course']['id'], course_id)
         self.assertIsInstance(body['materials'], list)
+
+    def _published_course(self):
+        """造一门已发布课程，返回它的 id（用完由 addCleanup 删干净）。"""
+        sid = self._login('teacher_demo')
+        created = self.client.post(
+            '/api/teacher/courses',
+            data=json.dumps({'title': '__T09公开课程__', 'description': 'public'}),
+            content_type='application/json', headers={'X-Session-Id': sid})
+        course_id = json.loads(created.data)['id']
+        self.addCleanup(courses_db.delete_course, course_id)
+        review = reviews.get_review_by_content('course', course_id)
+        reviews.approve_review(review['id'], 'admin_demo')
+        return course_id
 
     def test_public_course_detail_unknown_id_is_404(self):
         """未知课程 id：404 + success=False，与拆分前一致。"""

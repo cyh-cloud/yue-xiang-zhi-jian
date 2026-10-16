@@ -660,10 +660,18 @@ class CourseCrudTest(TeacherDomainTestBase):
         self.assertEqual(r.status_code, 403)
 
     def test_materials_get_is_public_but_write_needs_teacher(self):
-        conn = get_connection()
-        course_id = conn.execute("SELECT id FROM courses WHERE teacher_id='teacher_demo' "
-                                 "LIMIT 1").fetchone()['id']
-        conn.close()
+        """素材读写：读公开、写要课程教师。
+
+        课程由本用例自己造，不再去库里挑一门现成的。内容落库之后课程是教师产生的、
+        没有演示数据，挑现成的会让用例依赖「库里恰好残留着别处造的数据」。
+        """
+        sid = self._login('teacher_demo')
+        created = self._json('POST', '/api/teacher/courses',
+                             {'title': '__T16素材课程__', 'description': 'materials'},
+                             session_id=sid)
+        course_id = json.loads(created.data)['id']
+        # courses 域的删除入口会一并删素材与审核记录，不留半成品
+        self.addCleanup(courses_db.delete_course, course_id)
 
         r = self.client.get('/api/teacher/courses/%d/materials' % course_id)
         self.assertEqual(r.status_code, 200)
