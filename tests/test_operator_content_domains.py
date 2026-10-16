@@ -342,6 +342,27 @@ class OperatorFarmingWriteTest(OperatorContentTestBase):
         finally:
             self._cleanup_sessions(sid)
 
+    def test_task_list_without_a_product_returns_every_crop(self):
+        """不传 product_id = 下拉选了「全部作物」，必须返回全部作物的任务。
+
+        交付时这条路径是坏的：数据层强制按 product_id 过滤，选「全部作物」只会得到
+        一张空表，运营打开农时页看到「暂无数据」，以为平台没有任务。
+        """
+        sid = self._login()
+        try:
+            all_tasks = json.loads(self.client.get(
+                '/api/operator/farming/tasks', headers=self._headers(sid)).data)['tasks']
+            self.assertTrue(all_tasks, '「全部作物」应当返回任务，不是空表')
+            self.assertGreater(len({t['product_id'] for t in all_tasks}), 1,
+                               '「全部作物」应当跨多个作物，而不是只剩一个')
+            # 与某个具体作物的结果对照：单作物结果是全量的真子集
+            one = json.loads(self.client.get(
+                '/api/operator/farming/tasks?product_id=lychee',
+                headers=self._headers(sid)).data)['tasks']
+            self.assertTrue(set(t['id'] for t in one) <= set(t['id'] for t in all_tasks))
+        finally:
+            self._cleanup_sessions(sid)
+
     def test_overdue_filter_ignores_the_month_filter(self):
         """超期筛选只看复核时间：再按月份收窄会把「该重新核了」漏掉。"""
         sid = self._login()

@@ -9,6 +9,7 @@ export const ACCOUNTS = {
   gov: { username: "gov_demo", password: "123456" },
   teacher: { username: "teacher_demo", password: "123456" },
   student: { username: "student_demo", password: "123456" },
+  operator: { username: "operator_demo", password: "123456" },
 };
 
 export async function login(request, account) {

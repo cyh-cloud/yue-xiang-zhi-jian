@@ -123,13 +123,21 @@ def get_farming_phenophases(product_id=None):
     return out
 
 def get_farming_tasks(product_id, month=None):
-    """返回某产品的农事任务（可按月过滤）。phase 以名称形式一并返回，便于前端直接渲染。"""
+    """返回某产品的农事任务（可按月过滤）。phase 以名称形式一并返回，便于前端直接渲染。
+
+    product_id 传空（None 或空串）表示「全部作物」：运营后台的作物下拉第一项就是
+    「全部作物」，此前这里强制按 product_id 过滤，选它只会得到一张空表。前台两个
+    调用方都传具体作物，行为不变。
+    """
     conn = get_connection()
     sql = """SELECT t.*, p.name AS phase_name, p.color AS phase_color
              FROM farming_tasks t
              LEFT JOIN farming_phenophases p ON p.id = t.phase_id
-             WHERE t.product_id = ? AND t.is_active = 1"""
-    params = [product_id]
+             WHERE t.is_active = 1"""
+    params = []
+    if product_id:
+        sql += " AND t.product_id = ?"
+        params.append(product_id)
     if month is not None:
         sql += " AND t.month = ?"
         params.append(int(month))

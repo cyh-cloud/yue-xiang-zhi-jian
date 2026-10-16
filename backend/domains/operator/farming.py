@@ -190,7 +190,8 @@ def register_farming_routes(bp):
         if overdue == '1':
             rows = farming_db.get_farming_overdue_tasks(product_id=product_id or None)
         else:
-            rows = farming_db.get_farming_tasks(product_id, month=month)
+            # 空 product_id = 运营选了「全部作物」，交给数据层按全量返回
+            rows = farming_db.get_farming_tasks(product_id or None, month=month)
         # month 只对非超期筛选生效：超期列表本来就是按复核时间挑出来的一小批，
         # 再按月份收窄会把「该重新核了」漏掉，而运营要看的就是全部待复核项。
         product_name = ''
