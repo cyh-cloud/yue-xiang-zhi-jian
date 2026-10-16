@@ -124,8 +124,11 @@ test("技艺详情的视频页签能看到库里的视频", async ({ page, reque
   // 选中第一门技艺，再切到视频页签
   await page.locator("#craft-rows tr").first().locator('[data-op="craft-pick"]').click();
   await page.click('#craft-detail-tabs [data-tab="videos"]');
-  await expect(page.locator("#craft-detail-rows tr").first()).toBeVisible();
-  const firstBvid = (await page.locator("#craft-detail-rows tr td").first().textContent()).trim();
+  // 表格是异步重绘的：切页签前一个页签的行还在 DOM 里，所以不能只等「有行」，
+  // 要等第一格真的变成 bvid（否则会读到上一页签的步骤标题）。
+  const firstCell = page.locator("#craft-detail-rows tr td").first();
+  await expect(firstCell).toHaveText(/^BV/, { timeout: 15_000 });
+  const firstBvid = (await firstCell.textContent()).trim();
   expect(firstBvid, "视频页签第一行应当是一个 bvid").toMatch(/^BV/);
 
   record("operator-craft-videos.json", {
