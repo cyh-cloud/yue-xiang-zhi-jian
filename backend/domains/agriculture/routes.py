@@ -61,9 +61,6 @@ AGRI_RATE_WINDOW = 300               # 限流窗口（秒）
 AGRI_RATE_ASK_LIMIT = int(os.getenv('AGRI_RATE_ASK_LIMIT', '60'))          # 每窗口内问答请求上限
 AGRI_RATE_SUGGEST_LIMIT = int(os.getenv('AGRI_RATE_SUGGEST_LIMIT', '120'))  # 每窗口内建议请求上限
 
-# 问答接口接受的作物集合：缺陷 A5 的未知作物拒绝表（prompts 里的内置兜底名表）。
-_AGRI_SUPPORTED_PRODUCTS = supported_products()
-
 # 下发前端的文案不暴露部署细节（匿名访客同样能看到这条消息）；
 # 具体排查指引只写进服务端日志。
 AI_NOT_CONFIGURED_MSG = (
@@ -109,8 +106,12 @@ def _parse_agri_request():
 
     # A5：未知 product 明确拒绝，不再退化成一个跟作物无关的泛泛回答。
     # 缺省（未传/空串）与诊断接口保持一致的宽容度：按荔枝处理，避免生成无作物针对性的提示词。
+    #
+    # 集合每次请求现读 farming_products 目录表，不在 import 时算好冻住：那会让
+    # 「先起后端、再灌内容」的顺序下合法作物被回 400，运营在后台新增作物也得重启
+    # 进程才生效。目录表只有几行，这次多读的代价远小于问答本身。
     product = str(data.get('product', '') or '').strip() or 'lychee'
-    if product not in _AGRI_SUPPORTED_PRODUCTS:
+    if product not in supported_products():
         return None, (jsonify({
             "success": False, "code": "unknown_product",
             "message": "暂不支持该农产品，请从列表中选择"

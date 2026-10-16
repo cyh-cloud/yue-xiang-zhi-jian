@@ -10,7 +10,6 @@
 """
 
 import logging
-import threading
 
 
 from shared.agri_dosage import CHEM_DOSE_NOTICE, CHEM_DOSE_NOTICE_BLOCK
@@ -22,12 +21,6 @@ logger = logging.getLogger(__name__)
 # 这件事藏起来，生成的 system_prompt 装作认识这个作物。上游的 _parse_agri_request
 # 已经用 supported_products() 把未知作物挡在 400，走到这里只剩空 product 一种情形。
 UNKNOWN_PRODUCT_FALLBACK = u'广东特色农产品'
-
-# 作物中文名的进程内缓存。读的是 farming_products 表，一次会话里不会变，
-# 但每条问答都要拼 system_prompt，不值得每条都打一次库。
-_agri_name_cache = {}
-_agri_name_cache_lock = threading.Lock()
-
 
 def _supported_product_names():
     """从 farming_products 目录表读「作物 id -> 中文名」。
@@ -50,18 +43,15 @@ def _agriculture_product_name(product):
 
     取值顺序只有一级：farming_products 目录表。取不到就明说「广东特色农产品」，
     不再退回内置兜底表 —— 那正是本次要删的第五份作物名副本。
+
+    这里**不做进程内缓存**：目录表是运营可以随时改的内容，缓存住会让「改完立即
+    生效」变成「重启才生效」，与其它内容域的口径不一致。表只有几行，每次读一次
+    的代价可以忽略。
     """
     if not product:
         return UNKNOWN_PRODUCT_FALLBACK
 
-    cached = _agri_name_cache.get(product)
-    if cached is not None:
-        return cached
-
     name = _supported_product_names().get(product, '')
-    if name:
-        with _agri_name_cache_lock:
-            _agri_name_cache[product] = name
     return name or UNKNOWN_PRODUCT_FALLBACK
 
 # ---- 用药数值：模型可以给，但必须能说出出处；服务端再强制补一条免责声明 ----

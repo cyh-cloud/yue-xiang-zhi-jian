@@ -459,6 +459,37 @@ class AgriAskTest(AgricultureDomainTestBase):
         finally:
             self._cleanup_sessions(sid)
 
+    def test_new_crop_is_accepted_without_restarting_the_process(self):
+        """运营新增作物后，问答接口立刻接受它。
+
+        以前「支持哪些作物」这份集合在 import 时算好就冻住了：先起后端再灌内容，
+        或者在运营后台新增一个作物，都得重启进程，否则合法作物被回 400。
+        这里把目录表换成含新作物的样子，验证接口是现读的。
+        """
+        import ai.client as ai_client
+        import domains.agriculture.prompts as prompts
+        sid = self._login()
+        original_names = prompts._supported_product_names
+        original_configured = ai_client.ai_configured
+        try:
+            prompts._supported_product_names = lambda: {
+                'lychee': '荔枝', '__brand_new_crop__': '新作物'}
+            ai_client.ai_configured = lambda: False
+            accepted = self._ask({'question': '新作物怎么种', 'product': '__brand_new_crop__'}, sid)
+            rejected = self._ask({'question': '新作物怎么种', 'product': 'no-such'}, sid)
+        finally:
+            prompts._supported_product_names = original_names
+            ai_client.ai_configured = original_configured
+            self._cleanup_sessions(sid)
+
+        # 上游没配置，走到 503 就说明它已经通过了作物校验（400 才是被拒）
+        self.assertEqual(json.loads(accepted.data).get('code'), 'ai_not_configured',
+                         '目录表里新增的作物被当成未知作物拒了：这份集合又在 import 时冻住了')
+        self.assertEqual(accepted.status_code, 503)
+        # 反向对照：真的不存在的作物仍然要被拒
+        self.assertEqual(rejected.status_code, 400)
+        self.assertEqual(json.loads(rejected.data).get('code'), 'unknown_product')
+
     def test_ask_without_upstream_is_503_ai_not_configured(self):
         """上游未配置时明确失败，绝不返回伪装成正常回答的兜底文案。"""
         import ai.client as ai_client
