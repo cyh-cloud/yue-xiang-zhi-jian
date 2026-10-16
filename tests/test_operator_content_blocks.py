@@ -148,6 +148,47 @@ class OperatorCraftsWriteTest(OperatorBlocksTestBase):
             self._sql("DELETE FROM crafts WHERE id = ?", (craft_id,))
             self._cleanup_sessions(sid)
 
+    def test_craft_videos_can_be_created_updated_and_deleted(self):
+        """视频教学增删改闭环，前台详情（videos 键）立即跟着变。
+
+        视频原先借代码常量下发，T10 删常量后详情不再带 videos 键，前端的视频教学区
+        整块收起。这条锁住「内容在库里、运营改完前台立刻能看到」。
+        """
+        sid = self._login()
+        bvid = '__probe_bvid__'
+        try:
+            created = self._post('/api/operator/crafts/embroidery/videos', {
+                'bvid': bvid, 'title': u'单测视频', 'author': u'单测UP主',
+                'duration': 120, 'view_count': 5, 'danmaku': 1, 'like_count': 2,
+            }, sid)
+            self.assertEqual(created.status_code, 200, created.data)
+            video_id = json.loads(created.data)['result']
+
+            detail = json.loads(self.client.get(
+                '/api/crafts/embroidery').data)['data']
+            mine = [v for v in detail['videos'] if v['bvid'] == bvid]
+            self.assertEqual(len(mine), 1, '新视频没有出现在前台详情里')
+            self.assertEqual(mine[0]['title'], u'单测视频')
+            self.assertEqual(mine[0]['view'], 5, '库里的 view_count 要按前台契约映射成 view')
+            self.assertEqual(mine[0]['like'], 2)
+
+            updated = self._put('/api/operator/crafts/videos/%d' % video_id,
+                                {'title': u'单测视频改'}, sid)
+            self.assertEqual(updated.status_code, 200, updated.data)
+            detail = json.loads(self.client.get(
+                '/api/crafts/embroidery').data)['data']
+            mine = [v for v in detail['videos'] if v['bvid'] == bvid]
+            self.assertEqual(mine[0]['title'], u'单测视频改')
+
+            self.assertEqual(
+                self._delete('/api/operator/crafts/videos/%d' % video_id, sid).status_code, 200)
+            detail = json.loads(self.client.get(
+                '/api/crafts/embroidery').data)['data']
+            self.assertNotIn(bvid, [v['bvid'] for v in detail['videos']])
+        finally:
+            self._sql("DELETE FROM craft_videos WHERE bvid = ?", (bvid,))
+            self._cleanup_sessions(sid)
+
     def test_craft_requires_a_name(self):
         """缺名称不落库：列表卡片直接渲染 name，空名就是一张白卡片。"""
         sid = self._login()

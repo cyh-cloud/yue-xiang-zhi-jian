@@ -818,6 +818,18 @@ class OperatorPageTest(OperatorContentTestBase):
         self.assertIn('id="farming-task-rows"', body)
         self.assertIn('id="pest-entry-rows"', body)
 
+    def test_craft_detail_exposes_the_videos_tab(self):
+        """技艺详情要有视频页签与编辑入口。
+
+        视频教学的内容已经落在 craft_videos 里（migrations/0002），运营得能在后台
+        维护它，否则又要回到「改内容找开发」。
+        """
+        body = self.client.get('/operator.html').data.decode('utf-8')
+        self.assertIn('data-tab="videos"', body)
+        self.assertIn("opOpenCraftVideoForm", body)
+        self.assertIn('data-op="craft-video-edit"', body)
+        self.assertIn("op === 'craft-video-edit'", body)
+
     def test_pest_form_exposes_the_multi_value_fields(self):
         """病虫害条目的五个多值字段都能在页面上编辑。
 

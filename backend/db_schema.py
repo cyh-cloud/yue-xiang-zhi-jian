@@ -752,6 +752,24 @@ SCHEMA_SQL = """
             FOREIGN KEY (craft_id) REFERENCES crafts(id) ON DELETE CASCADE
         );
 
+        -- 视频教学（替代 craft['videos']，T08 时借常量下发、T10 删常量后一度消失）
+        CREATE TABLE IF NOT EXISTS craft_videos (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            craft_id   TEXT NOT NULL,
+            bvid       TEXT DEFAULT '',
+            title      TEXT DEFAULT '',
+            author     TEXT DEFAULT '',
+            duration   INTEGER DEFAULT 0,
+            view_count INTEGER DEFAULT 0,
+            danmaku    INTEGER DEFAULT 0,
+            like_count INTEGER DEFAULT 0,
+            pubdate    INTEGER DEFAULT 0,
+            cover      TEXT DEFAULT '',
+            sort_order INTEGER DEFAULT 0,
+            extra TEXT NOT NULL DEFAULT '{}',
+            FOREIGN KEY (craft_id) REFERENCES crafts(id) ON DELETE CASCADE
+        );
+
         -- ==================== 跨域读取视图（ADR 0002）====================
         -- 域路由只 SELECT * FROM v_xxx，域间 Python import 边为零。定义与建表同住一处。
         -- 本票据只建视图，查询方在 T11 切换；此处保证「视图可查且与直连 SQL 等价」。

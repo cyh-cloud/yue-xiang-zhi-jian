@@ -40,6 +40,12 @@ CAPABILITIES_USED = ('craft.manage',)
 _MAX_TEXT = 500
 _MAX_TITLE = 60
 
+# 视频教学的入参分成两类：文本列与整数列（时长 / 播放 / 弹幕 / 点赞 / 发布日）。
+# sort_order 也在这里，它决定详情里 videos 的顺序。
+_VIDEO_TEXT_FIELDS = ('bvid', 'title', 'author', 'cover')
+_VIDEO_INT_FIELDS = ('duration', 'view_count', 'danmaku', 'like_count',
+                     'pubdate', 'sort_order')
+
 
 def _text(value, limit=_MAX_TEXT):
     if value is None:
@@ -251,6 +257,42 @@ def register_crafts_routes(bp):
         fields = _fields(data, ('starter', 'advanced', 'buying_tips'))
         return run_write(crafts_db.set_craft_budget, craft_id, **fields)
 
+    # ---- 视频教学 ----
+
+    @bp.route('/api/operator/crafts/<craft_id>/videos', methods=['GET'])
+    @require_capability('craft.manage')
+    def operator_craft_videos(craft_id):
+        return ok(videos=crafts_db.get_craft_videos(craft_id))
+
+    @bp.route('/api/operator/crafts/<craft_id>/videos', methods=['POST'])
+    @require_capability('craft.manage')
+    def operator_craft_video_create(craft_id):
+        data = json_body()
+        bvid = _text(data.get('bvid'), _MAX_TITLE)
+        if not bvid:
+            return fail(u'视频 bvid 不能为空', 400)
+        fields = _fields(data, _VIDEO_TEXT_FIELDS)
+        for key in _VIDEO_INT_FIELDS:
+            if key in data:
+                fields[key] = _optional_int(data.get(key)) or 0
+        fields.pop('bvid', None)
+        return run_write(crafts_db.create_craft_video, craft_id, bvid, **fields)
+
+    @bp.route('/api/operator/crafts/videos/<int:video_id>', methods=['PUT'])
+    @require_capability('craft.manage')
+    def operator_craft_video_update(video_id):
+        data = json_body()
+        fields = _fields(data, _VIDEO_TEXT_FIELDS)
+        for key in _VIDEO_INT_FIELDS:
+            if key in data:
+                fields[key] = _optional_int(data.get(key)) or 0
+        return run_write(crafts_db.update_craft_video, video_id, **fields)
+
+    @bp.route('/api/operator/crafts/videos/<int:video_id>', methods=['DELETE'])
+    @require_capability('craft.manage')
+    def operator_craft_video_delete(video_id):
+        return run_write(crafts_db.delete_craft_video, video_id)
+
 
 OPERATOR_CRAFTS_ROUTES = (
     ('/api/operator/crafts', 'GET'),
@@ -271,6 +313,10 @@ OPERATOR_CRAFTS_ROUTES = (
     ('/api/operator/crafts/purchase-items/<int:item_id>', 'DELETE'),
     ('/api/operator/crafts/<craft_id>/budget', 'GET'),
     ('/api/operator/crafts/<craft_id>/budget', 'PUT'),
+    ('/api/operator/crafts/<craft_id>/videos', 'GET'),
+    ('/api/operator/crafts/<craft_id>/videos', 'POST'),
+    ('/api/operator/crafts/videos/<int:video_id>', 'PUT'),
+    ('/api/operator/crafts/videos/<int:video_id>', 'DELETE'),
 )
 
 __all__ = ['register_crafts_routes', 'OPERATOR_CRAFTS_ROUTES', 'CAPABILITIES_USED']

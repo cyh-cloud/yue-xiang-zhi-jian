@@ -156,8 +156,11 @@ class ContentShapeTest(unittest.TestCase):
 
         detail = self._get('/api/crafts/embroidery')
         craft = detail['data']
+        # videos 是 2026-10-16 补回来的：T10 删内容常量时它没有对应的表，详情一度
+        # 只剩这五个键，前端的视频教学区整块收起。内容现在在 craft_videos 里。
         self.assertEqual(sorted(craft), ['history', 'name', 'origin',
-                                         'purchase_guide', 'steps'])
+                                         'purchase_guide', 'steps', 'videos'])
+        self.assertTrue(craft['videos'], '广绣应有视频教学')
         self.assertTrue(craft['steps'], '广绣应有步骤')
         guide = craft['purchase_guide']
         self.assertEqual(sorted(guide), ['budget', 'buying_tips', 'categories'])

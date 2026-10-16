@@ -219,12 +219,14 @@
                             <button class="btn btn-outline" id="craft-category-new"><i class="fas fa-plus"></i> 采购分类</button>
                             <button class="btn btn-outline" id="craft-item-new"><i class="fas fa-plus"></i> 采购条目</button>
                             <button class="btn btn-outline" id="craft-budget-edit"><i class="fas fa-coins"></i> 预算</button>
+                            <button class="btn btn-outline" id="craft-video-new"><i class="fas fa-video"></i> 视频</button>
                         </div>
                     </div>
                     <div class="tabs" id="craft-detail-tabs">
                         <button class="tab active" data-tab="steps">步骤</button>
                         <button class="tab" data-tab="categories">采购分类</button>
                         <button class="tab" data-tab="items">采购条目</button>
+                        <button class="tab" data-tab="videos">视频</button>
                     </div>
                     <div class="form-error" id="craft-detail-error"></div>
                     <div class="table-wrap">
@@ -891,15 +893,19 @@ function opLoadCraftDetail() {
     var heads = {
         steps: ['标题', '说明', '提示', '操作'],
         categories: ['key', '标签', '说明', '操作'],
-        items: ['分类', '物品', '价格', '操作']
+        items: ['分类', '物品', '价格', '操作'],
+        videos: ['bvid', '标题', 'UP 主', '时长(秒)', '操作']
     };
     head.innerHTML = '<tr>' + heads[tab].map(function(h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
     opShowError('craft-detail-error', '');
     var path = tab === 'steps' ? '/steps'
-             : tab === 'categories' ? '/purchase-categories' : '/purchase-items';
+             : tab === 'categories' ? '/purchase-categories'
+             : tab === 'videos' ? '/videos' : '/purchase-items';
     return opGet('/api/operator/crafts/' + encodeURIComponent(craft) + path)
         .then(function(data) {
             var rows = data[tab] || [];
+            // 留一份给「编辑」用：列表里已经带齐了视频的全部字段，不必再取一次
+            OP.state.crafts.detailRows = rows;
             if (!rows.length) {
                 body.innerHTML = '';
                 empty.classList.remove('is-hidden');
@@ -912,16 +918,24 @@ function opLoadCraftDetail() {
                     cells = [opEsc(r.title), opEsc(r.desc || ''), opEsc(r.tips || '')];
                 } else if (tab === 'categories') {
                     cells = [opEsc(r.key), opEsc(r.label || ''), opEsc(r.desc || '')];
+                } else if (tab === 'videos') {
+                    cells = [opEsc(r.bvid), opEsc(r.title || ''), opEsc(r.author || ''),
+                             opEsc(r.duration || 0)];
                 } else {
                     cells = [opEsc(r.category_key), opEsc(r.name), opEsc(r.price || '')];
                 }
                 var path2 = tab === 'steps' ? 'steps'
-                           : tab === 'categories' ? 'purchase-categories' : 'purchase-items';
+                           : tab === 'categories' ? 'purchase-categories'
+                           : tab === 'videos' ? 'videos' : 'purchase-items';
                 var idAttr = tab === 'categories'
                     ? ' data-craft="' + opEsc(craft) + '" data-key="' + opEsc(r.key) + '"'
                     : ' data-id="' + r.id + '"';
                 return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') +
                     '<td class="row-actions">' +
+                    (tab === 'videos'
+                        ? '<button class="btn btn-sm btn-outline" data-op="craft-video-edit" ' +
+                          'data-id="' + r.id + '">编辑</button>'
+                        : '') +
                     '<button class="btn btn-sm btn-danger" data-op="craft-detail-del" ' +
                         'data-kind="' + path2 + '"' + idAttr + '>删除</button>' +
                     '</td></tr>';
@@ -1057,6 +1071,42 @@ function opOpenCraftBudgetForm() {
                 });
             });
         });
+}
+
+function opOpenCraftVideoForm(video) {
+    var isNew = !video;
+    var craft = OP.state.crafts.current;
+    if (!craft) {
+        opShowError('craft-detail-error', '先在上面选一门技艺');
+        return;
+    }
+    var fields = [
+        { key: 'bvid', label: 'bvid', type: 'text', required: true,
+          placeholder: '如 BV1REKq6jEmp' },
+        { key: 'title', label: '标题', type: 'text', maxlength: 120 },
+        { key: 'author', label: 'UP 主', type: 'text', maxlength: 60 },
+        { key: 'cover', label: '封面图地址', type: 'text' },
+        { key: 'duration', label: '时长（秒）', type: 'number', min: 0 },
+        { key: 'view_count', label: '播放量', type: 'number', min: 0 },
+        { key: 'danmaku', label: '弹幕数', type: 'number', min: 0 },
+        { key: 'like_count', label: '点赞数', type: 'number', min: 0 },
+        { key: 'pubdate', label: '发布日期（unix 秒）', type: 'number', min: 0 },
+        { key: 'sort_order', label: '排序', type: 'number', min: 0 }
+    ];
+    opOpenModal(isNew ? '新增视频' : '编辑视频', fields, video || {}, function(values) {
+        var payload = {};
+        fields.forEach(function(field) { payload[field.key] = values[field.key]; });
+        var path = isNew
+            ? '/api/operator/crafts/' + encodeURIComponent(craft) + '/videos'
+            : '/api/operator/crafts/videos/' + encodeURIComponent(video.id);
+        return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
+            opCloseModal();
+            return opLoadCraftDetail();
+        });
+    }, function(values) {
+        if (!String(values.bvid || '').trim()) return 'bvid 不能为空';
+        return null;
+    });
 }
 
 // ---- 方言知识 ----
@@ -1755,6 +1805,9 @@ function opBindEvents() {
     document.getElementById('craft-category-new').onclick = opOpenCraftCategoryForm;
     document.getElementById('craft-item-new').onclick = opOpenCraftItemForm;
     document.getElementById('craft-budget-edit').onclick = opOpenCraftBudgetForm;
+    document.getElementById('craft-video-new').onclick = function() {
+        opOpenCraftVideoForm(null);
+    };
     document.getElementById('craft-detail-tabs').addEventListener('click', function(e) {
         var tab = e.target.closest ? e.target.closest('.tab') : null;
         if (!tab) return;
@@ -1848,6 +1901,11 @@ function opBindEvents() {
             opSyncCraftTabs();
             opRenderCrafts();
             opLoadCraftDetail();
+        } else if (op === 'craft-video-edit') {
+            var videoRow = (OP.state.crafts.detailRows || []).filter(function(v) {
+                return String(v.id) === String(id);
+            })[0];
+            if (videoRow) opOpenCraftVideoForm(videoRow);
         } else if (op === 'craft-del') {
             if (window.confirm('删除后不可恢复，确认删除这门技艺？步骤与采购指南会一起删掉。')) {
                 opRequest('DELETE', '/api/operator/crafts/' + encodeURIComponent(id))
@@ -1859,14 +1917,19 @@ function opBindEvents() {
         } else if (op === 'craft-detail-del') {
             if (window.confirm('确认删除？')) {
                 var kind = btn.getAttribute('data-kind');
-                var craft = btn.getAttribute('data-craft');
-                var key = btn.getAttribute('data-key');
-                var path = kind === 'steps'
-                    ? '/api/operator/crafts/steps/' + id
-                    : kind === 'purchase-categories'
-                        ? '/api/operator/crafts/' + encodeURIComponent(craft) +
-                          '/purchase-categories/' + encodeURIComponent(key)
-                        : '/api/operator/crafts/purchase-items/' + id;
+                var path;
+                if (kind === 'steps') {
+                    path = '/api/operator/crafts/steps/' + id;
+                } else if (kind === 'videos') {
+                    path = '/api/operator/crafts/videos/' + id;
+                } else if (kind === 'purchase-categories') {
+                    path = '/api/operator/crafts/' +
+                           encodeURIComponent(btn.getAttribute('data-craft')) +
+                           '/purchase-categories/' +
+                           encodeURIComponent(btn.getAttribute('data-key'));
+                } else {
+                    path = '/api/operator/crafts/purchase-items/' + id;
+                }
                 opRequest('DELETE', path).then(function() {
                     return Promise.all([opLoadCrafts(), opLoadCraftDetail()]);
                 });

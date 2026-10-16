@@ -107,3 +107,29 @@ test("病虫害条目的多值字段可以编辑、保存并回填", async ({ pa
 
   expect(problems, "病虫害编辑流程前端问题:\n" + problems.join("\n")).toEqual([]);
 });
+
+// 视频教学：内容原先借代码常量下发，T10 删常量后详情不再带 videos 键，前台的视频区
+// 整块消失。现在内容在 craft_videos 里，运营后台要有对应的页签能看到它。
+test("技艺详情的视频页签能看到库里的视频", async ({ page, request }) => {
+  const session = await login(request, ACCOUNTS.operator);
+  expect(session.sessionId, "operator 登录失败").toBeTruthy();
+  await page.addInitScript(([sid, user]) => {
+    localStorage.setItem("yuexiang_session", JSON.stringify({ sessionId: sid, user }));
+  }, [session.sessionId, session.user]);
+
+  await page.goto("/operator.html", { waitUntil: "load" });
+  await page.click('[data-page="crafts"]');
+  await expect(page.locator("#craft-rows tr").first()).toBeVisible();
+
+  // 选中第一门技艺，再切到视频页签
+  await page.locator("#craft-rows tr").first().locator('[data-op="craft-pick"]').click();
+  await page.click('#craft-detail-tabs [data-tab="videos"]');
+  await expect(page.locator("#craft-detail-rows tr").first()).toBeVisible();
+  const firstBvid = (await page.locator("#craft-detail-rows tr td").first().textContent()).trim();
+  expect(firstBvid, "视频页签第一行应当是一个 bvid").toMatch(/^BV/);
+
+  record("operator-craft-videos.json", {
+    rows: await page.locator("#craft-detail-rows tr").count(),
+    firstBvid,
+  });
+});

@@ -45,7 +45,7 @@ NEW_TABLES = (
     'success_cases', 'case_stats', 'case_milestones', 'case_sources',
     'case_lessons', 'dialects', 'dialect_phrases', 'dialect_quick_questions',
     'crafts', 'craft_steps', 'craft_purchase_categories', 'craft_purchase_items',
-    'craft_budgets',
+    'craft_budgets', 'craft_videos',
 )
 
 # init_db() 建出的全部表。sqlite_sequence 是 SQLite 在出现第一张 AUTOINCREMENT 表时
@@ -65,15 +65,16 @@ EXPECTED_TABLES = {
     'case_stats', 'case_milestones', 'case_sources', 'case_lessons',
     'dialects', 'dialect_phrases', 'dialect_quick_questions', 'crafts',
     'craft_steps', 'craft_purchase_categories', 'craft_purchase_items',
-    'craft_budgets',
+    'craft_budgets', 'craft_videos',
     # 迁移记录表（T05）：migrations/0001_content_to_db.py 靠它防重入
     'schema_migrations',
 }
 # 36 张既有表 + 21 张新表。spec 4.4 写作「36 -> 56」，那是按
 # 「pest_entries 已存在、只补列」算的；实测现库里并没有 pest_entries
 # （病虫害内容此前只在代码常量里，从未落库），所以实际新建 21 张。
-# T10 删掉两张内容签名表（seed_meta / farming_seed_meta），故 58 - 2 = 56。
-EXPECTED_TABLE_COUNT = 56
+# T10 删掉两张内容签名表（seed_meta / farming_seed_meta），故 58 - 2 = 56；
+# 再补上 craft_videos（技艺视频教学，migrations/0002_craft_videos.py），56 + 1 = 57。
+EXPECTED_TABLE_COUNT = 57
 
 EXPECTED_VIEWS = {
     'v_enterprise_applications', 'v_enterprise_job_stats', 'v_home_stats',

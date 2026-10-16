@@ -27,7 +27,7 @@ from db_connection import get_connection
 CAPABILITY = 'craft'
 
 # 详情响应下发的键，顺序与切库前的 CRAFTS_KNOWLEDGE[cid] 一致。
-# videos 不在这个列表里：库里没有视频表，运营补上之前详情不下发这个键。
+# videos 由 craft_videos 表单独组装（见 _video_dict），与正文同级下发。
 _DETAIL_FIELDS = ('name', 'origin', 'history')
 
 
@@ -47,6 +47,10 @@ STEP_FIELDS = ('title', 'desc', 'tips', 'sort_order')
 CATEGORY_FIELDS = ('label', 'desc', 'sort_order')
 ITEM_FIELDS = ('name', 'price', 'spec', 'tip', 'where', 'sort_order')
 BUDGET_FIELDS = ('starter', 'advanced', 'buying_tips')
+# 视频教学的列。view_count / like_count 是库里的列名（view / like 是 SQL 关键字），
+# 读侧按前台契约映射回 view / like。
+VIDEO_FIELDS = ('bvid', 'title', 'author', 'duration', 'view_count', 'danmaku',
+                'like_count', 'pubdate', 'cover', 'sort_order')
 
 
 def _pick(fields, allowed):
@@ -109,6 +113,8 @@ def get_craft_detail(craft_id):
         return None
 
     craft = {field: row[field] for field in _DETAIL_FIELDS}
+    # 键顺序对齐切库前的 CRAFTS_KNOWLEDGE：name / origin / history / videos / steps / ...
+    craft['videos'] = _craft_videos(conn, craft_id)
     craft['steps'] = [dict(r) for r in conn.execute(
         'SELECT title, "desc", tips FROM craft_steps '
         'WHERE craft_id = ? ORDER BY sort_order', (craft_id,)).fetchall()]
@@ -528,6 +534,96 @@ def delete_craft_budget(craft_id):
     conn = get_connection()
     try:
         cur = conn.execute("DELETE FROM craft_budgets WHERE craft_id = ?", (craft_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted > 0
+
+
+# ---- 视频教学 ----
+# 详情里的 videos 是哔哩哔哩卡片数据（bvid / 标题 / UP 主 / 时长 / 播放 / 弹幕 /
+# 点赞 / 发布日 / 封面）。库里的列名 view_count / like_count 是为了避开 SQL 关键字，
+# 读侧按前台契约映射回 view / like。
+_VIDEO_SELECT = ('SELECT id, bvid, title, author, duration, view_count, danmaku, '
+                 'like_count, pubdate, cover FROM craft_videos')
+
+
+def _video_dict(row):
+    return {
+        'id': row['id'],
+        'bvid': row['bvid'] or '',
+        'title': row['title'] or '',
+        'author': row['author'] or '',
+        'duration': row['duration'] or 0,
+        'view': row['view_count'] or 0,
+        'danmaku': row['danmaku'] or 0,
+        'like': row['like_count'] or 0,
+        'pubdate': row['pubdate'] or 0,
+        'cover': row['cover'] or '',
+    }
+
+
+def _craft_videos(conn, craft_id):
+    """一门技艺的视频列表，按 sort_order 排。"""
+    rows = conn.execute(
+        _VIDEO_SELECT + ' WHERE craft_id = ? ORDER BY sort_order, id',
+        (craft_id,)).fetchall()
+    return [_video_dict(row) for row in rows]
+
+
+def get_craft_videos(craft_id):
+    """一门技艺的视频列表。"""
+    conn = get_connection()
+    try:
+        return _craft_videos(conn, craft_id)
+    finally:
+        conn.close()
+
+
+def create_craft_video(craft_id, bvid, **fields):
+    """新增一条视频，返回新 id。"""
+    craft_id = (craft_id or '').strip()
+    bvid = _require_text(bvid, u'视频 bvid')
+    values = _pick(fields, VIDEO_FIELDS)
+    values.update({'craft_id': craft_id, 'bvid': bvid})
+    columns = ', '.join('"%s"' % column for column in values)
+    conn = get_connection()
+    try:
+        _require_craft(conn, craft_id)
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO craft_videos (%s) VALUES (%s)"
+            % (columns, ', '.join('?' * len(values))), list(values.values()))
+        video_id = cursor.lastrowid
+        conn.commit()
+    finally:
+        conn.close()
+    return video_id
+
+
+def update_craft_video(video_id, **fields):
+    """改一条视频。返回是否命中。"""
+    updates = _pick(fields, VIDEO_FIELDS)
+    if not updates:
+        return False
+    assignments = ', '.join('"%s" = ?' % column for column in updates)
+    conn = get_connection()
+    try:
+        cur = conn.execute('UPDATE craft_videos SET %s WHERE id = ?' % assignments,
+                           list(updates.values()) + [video_id])
+        changed = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return changed > 0
+
+
+def delete_craft_video(video_id):
+    """删一条视频。返回是否真的删掉了行。"""
+    conn = get_connection()
+    try:
+        cur = conn.execute('DELETE FROM craft_videos WHERE id = ?', (video_id,))
         deleted = cur.rowcount
         conn.commit()
     finally:
