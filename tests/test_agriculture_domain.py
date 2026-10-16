@@ -11,6 +11,7 @@ domains/agriculture/ 之后，外部契约必须一字不变：URL、请求响�
 """
 
 import json
+import contextlib
 import os
 import sys
 import unittest
@@ -523,8 +524,41 @@ class AgriSuggestionsTest(AgricultureDomainTestBase):
         self.assertTrue(body['success'])
         return body['suggestions']
 
+    @staticmethod
+    def _clear_suggestions_cache():
+        """清掉建议缓存。缓存是模块级状态，跨用例会互相影响。"""
+        import domains.agriculture.routes as agri_routes
+        agri_routes._suggestions_cache.clear()
+        agri_routes._suggestions_cache_time.clear()
+
+    @contextlib.contextmanager
+    def _fake_upstream(self, *lines):
+        """把 AI 上游换成固定返回的桩，返回本次桩被调用的参数列表。
+
+        建议栏这几条用例原本直接打真实上游：上游偶发失败时，第一次返回空列表、
+        第二次成功，两次结果自然不等（2026-10-16 全量跑实测到一次）。测缓存与
+        解析就只该测这两件事，不该把网络的抖动算进来。
+        """
+        import ai.client as ai_client
+        import domains.agriculture.routes as agri_routes
+        calls = []
+        original_call = agri_routes.call_ai_service
+        original_configured = ai_client.ai_configured
+        self._clear_suggestions_cache()
+        agri_routes.call_ai_service = (
+            lambda **kwargs: (calls.append(kwargs), '\n'.join(lines))[1])
+        ai_client.ai_configured = lambda: True
+        try:
+            yield calls
+        finally:
+            agri_routes.call_ai_service = original_call
+            ai_client.ai_configured = original_configured
+            self._clear_suggestions_cache()
+
     def test_suggestions_return_four_questions_for_a_known_product(self):
-        self.assertTrue(self._suggestions('lychee'))
+        with self._fake_upstream('问题一', '问题二', '问题三', '问题四'):
+            self.assertEqual(self._suggestions('lychee'),
+                             ['问题一', '问题二', '问题三', '问题四'])
 
     def test_suggestions_unknown_product_falls_back_to_lychee(self):
         """未知作物不报错：问答路径对未知作物明确拒绝（400），建议栏则返回空列表。"""
@@ -538,10 +572,17 @@ class AgriSuggestionsTest(AgricultureDomainTestBase):
 
     def test_suggestions_default_product_is_lychee(self):
         """缺省按荔枝处理，与问答接口的 product 缺省同一口径。"""
-        self.assertEqual(self._suggestions(), self._suggestions('lychee'))
+        with self._fake_upstream('问题一'):
+            self.assertEqual(self._suggestions(), self._suggestions('lychee'))
 
     def test_suggestions_are_stable_within_the_cache_ttl(self):
-        self.assertEqual(self._suggestions('rice'), self._suggestions('rice'))
+        """缓存期内两次请求返回同一份建议，且上游只被打一次。"""
+        with self._fake_upstream('问题一', '问题二', '问题三') as calls:
+            first = self._suggestions('rice')
+            second = self._suggestions('rice')
+        self.assertEqual(first, ['问题一', '问题二', '问题三'])
+        self.assertEqual(first, second)
+        self.assertEqual(len(calls), 1, '缓存期内第二次请求不该再打上游')
 
     def test_static_fallback_used_when_upstream_is_not_configured(self):
         """上游未配置时明确不给建议：仍是 200 + success=True，但建议列表为空。
