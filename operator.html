@@ -460,6 +460,10 @@ OP.REVIEW_STALE_DAYS = 183;
 // 后台改白名单时这里跟着改，两侧不一致会被接口的 400 兜住。
 OP.RECRUIT_CATEGORIES = ['农业技术', '基层服务', '乡村治理'];
 
+// 用药参考表的列顺序。编辑界面按「一行一条、列用 | 分隔」摆，与这里一一对应；
+// 后端 _CHEM_FIELDS 是同一组字段名，前台 pestChemTableHTML 也按它们取值。
+OP.CHEM_FIELDS = ['agent', 'dose', 'interval_days', 'max_times'];
+
 function opEsc(value) {
     return String(value == null ? '' : value)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -704,25 +708,19 @@ function opOpenEntryForm(entry) {
         { key: 'part', label: '受害部位', type: 'text' },
         { key: 'severity', label: '危害程度', type: 'text' },
         { key: 'occurrence', label: '发生规律', type: 'textarea' },
-        { key: 'safety_note', label: '安全提示', type: 'textarea' }
+        { key: 'safety_note', label: '安全提示', type: 'textarea' },
+        { key: 'symptoms', label: '症状', type: 'list', rows: 5, hint: '一行一条' },
+        { key: 'treatment', label: '防治方法', type: 'list', rows: 5, hint: '一行一条' },
+        { key: 'prevention', label: '预防措施', type: 'list', rows: 5, hint: '一行一条' },
+        { key: 'registered', label: '登记药剂', type: 'list', rows: 4, hint: '一行一种药剂' },
+        { key: 'chem_table', label: '用药参考表', type: 'chem', rows: 4,
+          hint: '一行一条，用 | 分隔：药剂 | 参考用量 | 安全间隔期 | 每季最多使用' }
     ];
     opOpenModal(isNew ? '新建病虫害条目' : '编辑病虫害条目', fields, entry || {}, function(values) {
-        var payload = {
-            crop_id: values.crop_id,
-            disease: values.disease,
-            kind: values.kind,
-            alias: values.alias,
-            pathogen: values.pathogen,
-            part: values.part,
-            severity: values.severity,
-            occurrence: values.occurrence,
-            safety_note: values.safety_note
-        };
-        if (!isNew) {
-            // 编辑只传改动的字段：后端对 PUT 做局部更新，没传的一律不动。
-            // 症状与防治等多值字段在本页只读展示，编辑入口留给 T15 的富表单。
-            payload = { crop_id: values.crop_id, disease: values.disease, kind: values.kind };
-        }
+        // 整份提交：弹层里能看到的字段就是这一条的全部内容，多值字段（症状 / 防治 /
+        // 预防 / 登记药剂 / 用药参考表）也在这里编辑，后端按 400 兜住非法形状。
+        var payload = {};
+        fields.forEach(function(field) { payload[field.key] = values[field.key]; });
         var path = isNew ? '/api/operator/pest/entries'
                          : '/api/operator/pest/entries/' + encodeURIComponent(entry.id);
         return opRequest(isNew ? 'POST' : 'PUT', path, payload).then(function() {
@@ -775,6 +773,7 @@ function opRenderPestEntries() {
             '<td class="verified-cell">' + verified + '</td>' +
             '<td class="row-actions">' +
                 (e.is_verified ? '' : '<button class="btn btn-sm btn-success" data-op="pest-verify" data-id="' + opEsc(e.id) + '">标记已复核</button>') +
+                '<button class="btn btn-sm btn-outline" data-op="pest-edit" data-id="' + opEsc(e.id) + '">编辑</button>' +
                 '<button class="btn btn-sm btn-danger" data-op="pest-del" data-id="' + opEsc(e.id) + '">删除</button>' +
             '</td></tr>';
     }).join('');
@@ -1599,6 +1598,37 @@ function opLoadOverview() {
 // 用一个弹层而不是每块一个，是因为两块的字段类型完全同构
 // （文本 / 数字 / 下拉 / 多行 / 勾选），分两套只会得到两份同样的渲染代码。
 
+// ---- 多值字段：界面上「一行一项」 ----
+// 病虫害条目的症状 / 防治 / 预防 / 登记药剂是字符串数组，用药参考表是对象数组。
+// 两者都用多行文本编辑：前者一行一条，后者一行一条、列用 | 分隔。空行忽略。
+function opFieldLines(type, value) {
+    if (type === 'chem') {
+        if (!Array.isArray(value)) return value ? String(value) : '';
+        return value.map(function(row) {
+            return OP.CHEM_FIELDS.map(function(key) {
+                return row && row[key] != null ? String(row[key]) : '';
+            }).join(' | ');
+        }).join('\n');
+    }
+    if (!Array.isArray(value)) return value ? String(value) : '';
+    return value.join('\n');
+}
+
+function opSplitLines(text) {
+    return String(text || '').split('\n')
+        .map(function(line) { return line.trim(); })
+        .filter(function(line) { return !!line; });
+}
+
+function opSplitChemLines(text) {
+    return opSplitLines(text).map(function(line) {
+        var parts = line.split('|').map(function(part) { return part.trim(); });
+        var row = {};
+        OP.CHEM_FIELDS.forEach(function(key, index) { row[key] = parts[index] || ''; });
+        return row;
+    });
+}
+
 function opOpenModal(title, fields, values, onSubmit, onValidate, onFieldChange) {
     var modal = document.getElementById('operator-modal');
     var form = document.getElementById('operator-modal-form');
@@ -1619,6 +1649,11 @@ function opOpenModal(title, fields, values, onSubmit, onValidate, onFieldChange)
         } else if (field.type === 'textarea') {
             control = '<textarea id="op-field-' + field.key + '" data-key="' + field.key +
                       '" rows="3">' + opEsc(value || '') + '</textarea>';
+        } else if (field.type === 'list' || field.type === 'chem') {
+            control = '<textarea id="op-field-' + field.key + '" data-key="' + field.key +
+                      '" rows="' + (field.rows || 4) + '">' +
+                      opEsc(opFieldLines(field.type, value)) + '</textarea>' +
+                      (field.hint ? '<div class="hint">' + opEsc(field.hint) + '</div>' : '');
         } else if (field.type === 'checkbox') {
             control = '<input type="checkbox" id="op-field-' + field.key + '" data-key="' + field.key +
                       '" style="width:auto"' + (value ? ' checked' : '') + '>';
@@ -1646,7 +1681,15 @@ function opOpenModal(title, fields, values, onSubmit, onValidate, onFieldChange)
         var collected = {};
         fields.forEach(function(field) {
             var el = document.getElementById('op-field-' + field.key);
-            collected[field.key] = field.type === 'checkbox' ? el.checked : el.value;
+            if (field.type === 'checkbox') {
+                collected[field.key] = el.checked;
+            } else if (field.type === 'list') {
+                collected[field.key] = opSplitLines(el.value);
+            } else if (field.type === 'chem') {
+                collected[field.key] = opSplitChemLines(el.value);
+            } else {
+                collected[field.key] = el.value;
+            }
         });
         if (onValidate) {
             var message = onValidate(collected);
@@ -1779,6 +1822,13 @@ function opBindEvents() {
         } else if (op === 'pest-verify') {
             opRequest('POST', '/api/operator/pest/entries/' + encodeURIComponent(id) + '/verify', {})
                 .then(opLoadPestEntries);
+        } else if (op === 'pest-edit') {
+            // 列表只下发摘要，多值字段按 id 现取一条完整的再回填弹层
+            opGet('/api/operator/pest/entries/' + encodeURIComponent(id)).then(function(data) {
+                opOpenEntryForm(data.entry);
+            }).catch(function(err) {
+                opShowError('pest-entry-error', err.message);
+            });
         } else if (op === 'pest-del') {
             if (window.confirm('删除后不可恢复，确认删除这条条目？')) {
                 opRequest('DELETE', '/api/operator/pest/entries/' + encodeURIComponent(id))

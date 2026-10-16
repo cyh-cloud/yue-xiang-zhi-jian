@@ -34,8 +34,14 @@ CAPABILITIES_USED = ('pest.manage',)
 # （knowledge.py 的 `kind not in ('disease', 'pest')` 会 400）。
 _KINDS = ('disease', 'pest')
 
-# 五个 JSON 列。入参必须是数组，写侧按原样序列化回库。
-_JSON_COLUMNS = ('symptoms', 'treatment', 'prevention', 'registered', 'chem_table')
+# JSON 列分两类，形状不同，不能共用一个归一化函数：
+#   · 字符串数组列：一行一句话；
+#   · 用药参考表列：一行一个对象，字段固定这四项（前台 pestChemTableHTML 按它们取值）。
+# 此前两者共用「逐项转字符串」的写法，chem_table 的每个对象会被 str() 成
+# "{'agent': ...}" 这样的文本存进库，前台按对象取值只会拿到空表。
+_STRING_LIST_COLUMNS = ('symptoms', 'treatment', 'prevention', 'registered')
+_CHEM_COLUMNS = ('chem_table',)
+_CHEM_FIELDS = ('agent', 'dose', 'interval_days', 'max_times')
 
 # 文本字段长度上限，与前台表单的 maxlength 同一口径。
 _MAX_DISEASE = 60
@@ -58,8 +64,8 @@ def _optional_int(value):
         return None
 
 
-def _json_field(data, key):
-    """取一个 JSON 列。返回 (值, 错误消息)。空值与缺省都给 []。"""
+def _text_list(data, key):
+    """取一个字符串数组列。返回 (值, 错误消息)。空值与缺省都给 []。"""
     raw = data.get(key)
     if raw is None:
         return [], None
@@ -67,7 +73,35 @@ def _json_field(data, key):
         raw = list(raw)
     if not isinstance(raw, list):
         return None, u'%s 需要是数组' % key
-    return [_text(item, _MAX_TEXT) for item in raw], None
+    items = []
+    for item in raw:
+        if isinstance(item, (dict, list)):
+            return None, u'%s 的每一项都要是文本' % key
+        text = _text(item, _MAX_TEXT)
+        if text:
+            items.append(text)
+    return items, None
+
+
+def _chem_table(data, key):
+    """取用药参考表列：数组，每项是对象。
+
+    只保留前台会读的四个字段，其余键丢掉：库里这份表是给学员看的用药参考，
+    混进无关键只会让下次读回来的人猜哪个是真的。
+    """
+    raw = data.get(key)
+    if raw is None:
+        return [], None
+    if not isinstance(raw, list):
+        return None, u'%s 需要是数组' % key
+    rows = []
+    for item in raw:
+        if not isinstance(item, dict):
+            return None, u'%s 的每一项都要是对象（药剂 / 用量 / 安全间隔期 / 每季最多使用）' % key
+        row = {field: _text(item.get(field), _MAX_TEXT) for field in _CHEM_FIELDS}
+        if any(row.values()):
+            rows.append(row)
+    return rows, None
 
 
 def _entry_payload(data):
@@ -92,9 +126,15 @@ def _entry_payload(data):
     if 'kind' in fields and fields['kind'] and fields['kind'] not in _KINDS:
         return None, u'类型只能是 disease 或 pest'
 
-    for column in _JSON_COLUMNS:
+    for column in _STRING_LIST_COLUMNS:
         if column in data:
-            value, error = _json_field(data, column)
+            value, error = _text_list(data, column)
+            if error:
+                return None, error
+            fields[column] = value
+    for column in _CHEM_COLUMNS:
+        if column in data:
+            value, error = _chem_table(data, column)
             if error:
                 return None, error
             fields[column] = value
@@ -146,6 +186,24 @@ def register_pest_routes(bp):
             } for row in pest_db.get_pest_entries(
                     crop_id=crop_id or None, with_details=False)]
         return ok(entries=items)
+
+    @bp.route('/api/operator/pest/entries/<entry_id>', methods=['GET'])
+    @require_capability('pest.manage')
+    def operator_pest_entry(entry_id):
+        """单条条目的完整内容，供编辑弹层回填。
+
+        列表接口只下发摘要（作物 / 名称 / 类型 / 复核状态）：多值字段拼起来体积不小，
+        几十条的列表不该为此变重。编辑时才按 id 取一条完整的。
+        """
+        entry = pest_db.get_pest_entry(entry_id)
+        if not entry:
+            return fail(u'条目不存在', 404)
+        # 数据层那份视图沿用前台的键名（作物叫 crop），而写侧入参叫 crop_id。
+        # 编辑弹层按入参形状回填，所以这里补一个 crop_id，免得回填时作物为空、
+        # 保存又被 400 挡回来。
+        payload = dict(entry)
+        payload['crop_id'] = entry.get('crop') or ''
+        return ok(entry=payload)
 
     @bp.route('/api/operator/pest/entries', methods=['POST'])
     @require_capability('pest.manage')
@@ -286,6 +344,7 @@ def register_pest_routes(bp):
 OPERATOR_PEST_ROUTES = (
     ('/api/operator/pest/entries', 'GET'),
     ('/api/operator/pest/entries', 'POST'),
+    ('/api/operator/pest/entries/<entry_id>', 'GET'),
     ('/api/operator/pest/entries/<entry_id>', 'PUT'),
     ('/api/operator/pest/entries/<entry_id>', 'DELETE'),
     ('/api/operator/pest/entries/<entry_id>/verify', 'POST'),

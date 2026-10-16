@@ -515,6 +515,76 @@ class OperatorPestWriteTest(OperatorContentTestBase):
             conn.close()
             self._cleanup_sessions(sid)
 
+    def test_single_entry_endpoint_returns_the_full_content(self):
+        """按 id 取单条必须带上五个多值字段：编辑弹层靠它回填。"""
+        sid = self._login()
+        entry_id = 't14_entry_detail'
+        try:
+            self._post('/api/operator/pest/entries', {
+                'id': entry_id, 'crop_id': 'lychee', 'disease': u'单测详情',
+                'kind': 'disease', 'symptoms': [u'症状一'],
+                'treatment': [u'防治一'], 'prevention': [u'预防一'],
+                'registered': [u'嘧菌酯'],
+                'chem_table': [{'agent': u'某药剂', 'dose': u'1000倍液',
+                                'interval_days': '7', 'max_times': '3'}],
+            }, sid)
+            response = self.client.get('/api/operator/pest/entries/%s' % entry_id,
+                                       headers=self._headers(sid))
+            self.assertEqual(response.status_code, 200, response.data)
+            entry = json.loads(response.data)['entry']
+            self.assertEqual(entry['symptoms'], [u'症状一'])
+            self.assertEqual(entry['treatment'], [u'防治一'])
+            self.assertEqual(entry['prevention'], [u'预防一'])
+            self.assertEqual(entry['registered'], [u'嘧菌酯'])
+            self.assertEqual(entry['chem_table'][0]['agent'], u'某药剂')
+
+            missing = self.client.get('/api/operator/pest/entries/no_such_entry',
+                                      headers=self._headers(sid))
+            self.assertEqual(missing.status_code, 404, missing.data)
+        finally:
+            conn = get_connection()
+            conn.execute("DELETE FROM pest_entries WHERE id = ?", (entry_id,))
+            conn.commit()
+            conn.close()
+            self._cleanup_sessions(sid)
+
+    def test_chem_table_keeps_its_object_shape(self):
+        """用药参考表是对象数组，写进库再读回来必须还是对象。
+
+        此前写侧的归一化对每个数组项一律 str()：chem_table 的每个对象会被存成
+        "{'agent': '...'}" 这样的文本，前台 pestChemTableHTML 按对象取值只会渲染出
+        一张空表，而运营以为自己写进去了。
+        """
+        sid = self._login()
+        entry_id = 't14_chem_shape'
+        chem_rows = [{'agent': u'80%代森锰锌可湿性粉剂', 'dose': u'400~600倍液',
+                      'interval_days': '10', 'max_times': '3'}]
+        try:
+            created = self._post('/api/operator/pest/entries', {
+                'id': entry_id, 'crop_id': 'lychee', 'disease': u'单测药剂表',
+                'kind': 'disease', 'symptoms': [u'症状一', u'  ', u'症状二'],
+                'registered': [u'嘧菌酯'], 'chem_table': chem_rows,
+            }, sid)
+            self.assertEqual(created.status_code, 200, created.data)
+
+            front = json.loads(self.client.get(FRONT_PEST + '?crop=lychee').data)
+            view = next(e for e in front['entries'] if e['id'] == entry_id)
+            self.assertEqual(view['chem_table'], chem_rows,
+                             '用药参考表被写坏了：对象被压成了字符串')
+            self.assertEqual(view['symptoms'], [u'症状一', u'症状二'],
+                             '空行应当被丢掉')
+
+            # 形状不对时明确 400，而不是悄悄写进一条坏数据
+            bad = self._put('/api/operator/pest/entries/%s' % entry_id,
+                            {'chem_table': [u'只给一个字符串']}, sid)
+            self.assertEqual(bad.status_code, 400, bad.data)
+        finally:
+            conn = get_connection()
+            conn.execute("DELETE FROM pest_entries WHERE id = ?", (entry_id,))
+            conn.commit()
+            conn.close()
+            self._cleanup_sessions(sid)
+
     def test_entry_validation_rejects_bad_payloads(self):
         """验收「内容表单校验与前台一致」：作物、类型、来源 key、JSON 列逐条拒绝。"""
         sid = self._login()
@@ -747,6 +817,23 @@ class OperatorPageTest(OperatorContentTestBase):
         # 复核按钮的落点：两块的列表容器都要在，否则「标记已复核」没有挂载处
         self.assertIn('id="farming-task-rows"', body)
         self.assertIn('id="pest-entry-rows"', body)
+
+    def test_pest_form_exposes_the_multi_value_fields(self):
+        """病虫害条目的五个多值字段都能在页面上编辑。
+
+        后端一直是支持这五列的，但编辑弹层此前只提交作物 / 名称 / 类型，
+        多值字段只做只读展示，运营改不了症状、防治与用药参考表。
+        """
+        body = self.client.get('/operator.html').data.decode('utf-8')
+        for key in ('symptoms', 'treatment', 'prevention', 'registered', 'chem_table'):
+            self.assertIn("key: '%s'" % key, body, '编辑弹层缺少 %s 字段' % key)
+        # 两类多值控件的渲染与收集都要在
+        self.assertIn("field.type === 'list'", body)
+        self.assertIn("field.type === 'chem'", body)
+        # 编辑入口：列表行上的「编辑」按钮与它的点击处理
+        self.assertIn('data-op="pest-edit"', body)
+        self.assertIn("op === 'pest-edit'", body)
+        self.assertIn('/api/operator/pest/entries/', body)
 
     def test_operator_page_keeps_the_placeholder_for_the_t15_blocks(self):
         """T15 的四块页面容器仍在，且不再是占位文案。

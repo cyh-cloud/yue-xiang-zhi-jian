@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ACCOUNTS, record } from "./helpers.js";
+import { ACCOUNTS, login, record } from "./helpers.js";
 
 // 运营工作台（operator.html）此前只做过静态检查（内联 JS 语法、url_map 路径解析、
 // 页面挂载点断言），没有任何浏览器验证。这条补上：主站登录分流、六个内容块都能
@@ -60,4 +60,50 @@ test("运营主站登录进入工作台，六个内容块都能渲染", async ({
 
   // 3) 全程没有前端异常、没有 5xx
   expect(problems, "运营工作台前端问题:\n" + problems.join("\n")).toEqual([]);
+});
+
+// 病虫害条目的多值字段（症状 / 防治 / 预防 / 登记药剂 / 用药参考表）此前只做只读展示，
+// 列表上连「编辑」入口都没有。这条走真实浏览器：打开弹层 -> 回填 -> 改一行 -> 保存 ->
+// 重新打开确认落库。
+test("病虫害条目的多值字段可以编辑、保存并回填", async ({ page, request }) => {
+  const session = await login(request, ACCOUNTS.operator);
+  expect(session.sessionId, "operator 登录失败").toBeTruthy();
+  await page.addInitScript(([sid, user]) => {
+    localStorage.setItem("yuexiang_session", JSON.stringify({ sessionId: sid, user }));
+  }, [session.sessionId, session.user]);
+
+  const problems = [];
+  page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
+  page.on("response", (r) => {
+    if (r.url().includes("/api/") && r.status() >= 500 && r.status() !== 503) {
+      problems.push(`5xx: ${r.status()} ${r.url()}`);
+    }
+  });
+
+  await page.goto("/operator.html", { waitUntil: "load" });
+  await page.click('[data-page="pest"]');
+  await expect(page.locator("#pest-entry-rows tr").first()).toBeVisible();
+
+  const row = page.locator("#pest-entry-rows tr").first();
+  const disease = (await row.locator("td").nth(1).textContent()).trim();
+  await row.locator('[data-op="pest-edit"]').click();
+  await expect(page.locator("#operator-modal")).toBeVisible();
+
+  // 回填：症状是一行一条，不能是空的
+  const symptoms = page.locator("#op-field-symptoms");
+  await expect(symptoms).not.toHaveValue("");
+  const lines = (await symptoms.inputValue()).split("\n");
+  const marker = "（e2e已改）";
+  await symptoms.fill([lines[0] + marker, ...lines.slice(1)].join("\n"));
+  await page.click("#operator-modal-form button[type=submit]");
+  await expect(page.locator("#operator-modal")).toBeHidden();
+
+  // 重新打开同一条：改动必须落库
+  const again = page.locator("#pest-entry-rows tr").filter({ hasText: disease }).first();
+  await again.locator('[data-op="pest-edit"]').click();
+  await expect(page.locator("#op-field-symptoms")).toHaveValue(new RegExp(marker));
+  await page.click("#op-modal-cancel");
+  await expect(page.locator("#operator-modal")).toBeHidden();
+
+  expect(problems, "病虫害编辑流程前端问题:\n" + problems.join("\n")).toEqual([]);
 });
