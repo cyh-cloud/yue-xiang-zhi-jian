@@ -29,11 +29,13 @@
 - `backend/ai/`：上游模型调用的唯一出口。
 - `backend/shared/`：零领域状态的纯函数与纯配置（节气、朗读评分、文案评分、作物白名单、实训状态标签等）。
 - `backend/db_domains/`：按领域切分的数据访问层，一个领域一个模块。
-- `backend/db_connection.py` / `db_schema.py` / `db_seed_*.py`：数据层基础设施与播种。
+- `backend/db_connection.py` / `db_schema.py` / `db_seed_accounts.py`：数据层基础设施与演示账号播种。
+- `backend/db_init.py`：启动编排（建表、补列、清废弃表、空库灌演示账号）。内容不在这里播种。
 - `backend/domains/`：领域路由蓝图，一个领域一个目录。
 - `backend/core/permissions.py`：全站唯一的「角色到能力」映射，路由鉴权走它，不写角色名比较。
-- `backend/database.py`：数据层的转发与聚合面，正在按域拆散（ADR 0002），新代码直接 `from db_domains import <域>`。
 - `backend/repo_paths.py`：路径唯一基准，`REPO_ROOT` 指向**仓库根**（不是 backend/），因为 `data/`、`uploads/`、`.env` 都在仓库根。
+
+数据层转发层 `database.py` 已按 ADR 0002 删除，调用方一律 `from db_domains import <域>`。
 
 新增可审核内容类型、新增领域、或需要跨领域取数时，先读 ADR 0001 的裁决，不要凭空发明放法。
 
