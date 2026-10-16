@@ -234,7 +234,8 @@ const TAB_PAGES = {
     teacher: 'teacher-panel.html',
     admin: 'admin.html',
     government: 'government.html',
-    enterprise: 'enterprise.html'
+    enterprise: 'enterprise.html',
+    operator: 'operator.html'
 };
 
 // 当前所在页对应的板块；index.html（Hero 首页）返回 'index'，不属于任何板块
@@ -345,6 +346,7 @@ async function handleLogin() {
             if (_role === 'government') { location.href = 'government.html'; return; }
             if (_role === 'enterprise') { location.href = 'enterprise.html'; return; }
             if (_role === 'teacher') { location.href = 'teacher.html'; return; }
+            if (_role === 'operator') { location.href = 'operator.html'; return; }
             updateUserUI();
             showNotification(`欢迎回来，${data.user.name}！`, 'success');
             loadUserData();
@@ -10024,6 +10026,7 @@ function setupRegister() {
                 if (_r === 'government') { location.href = 'government.html'; return; }
                 if (_r === 'enterprise') { location.href = 'enterprise.html'; return; }
                 if (_r === 'teacher') { location.href = 'teacher.html'; return; }
+                if (_r === 'operator') { location.href = 'operator.html'; return; }
                 onLoginSuccess();
                 showNotification(resp.message || '注册成功', 'success');
             } else {
@@ -10047,17 +10050,18 @@ const ROLE_NAV = {
     teacher:     STUDENT_TABS.concat('teacher'),
     super_admin: STUDENT_TABS.concat('admin'),
     government:  STUDENT_TABS.concat('government'),
-    enterprise:  STUDENT_TABS.concat('enterprise')
+    enterprise:  STUDENT_TABS.concat('enterprise'),
+    operator:    STUDENT_TABS.slice()
 };
 
 const ROLE_DEFAULT = {
     student: 'agriculture', teacher: 'teacher', super_admin: 'admin',
-    government: 'government', enterprise: 'enterprise'
+    government: 'government', enterprise: 'enterprise', operator: 'operator'
 };
 
-// 这三个角色的工作台是独立门户页，主站没有对应面板（ROLE_DEFAULT 指向的
-// admin/government/enterprise tab 在 index.html 里并不存在）→ 登录主站会整页空白。
-// 2026-10-09：改为在主站给一张引导卡，把他们送到各自的门户页。
+// 这四个角色的工作台是独立门户页，主站没有对应面板（ROLE_DEFAULT 指向的
+// admin/government/enterprise/operator tab 在 index.html 里并不存在）→ 登录主站会
+// 整页空白。2026-10-09：改为在主站给一张引导卡，把他们送到各自的门户页。
 const ROLE_PORTAL = {
     super_admin: {
         title: '系统管理后台',
@@ -10073,6 +10077,11 @@ const ROLE_PORTAL = {
         title: '企业服务端',
         desc: '岗位发布、招聘管理与投递处理在企业服务端进行，主站不提供企业面板。',
         btn: '进入企业服务端', page: 'enterprise.html'
+    },
+    operator: {
+        title: '运营工作台',
+        desc: '农时日历、病虫害知识、手工技艺、方言知识、招募公告与成功案例都在运营工作台维护，主站不提供运营面板。',
+        btn: '进入运营工作台', page: 'operator.html'
     }
 };
 
@@ -10087,7 +10096,8 @@ function isTabAllowed(tabName, role) {
 // 角色中文名：用户卡片与个人设置共用，免得后台角色被一律显示成「学员」
 const ROLE_LABELS = {
     student: '学员', teacher: '教师',
-    super_admin: '超级管理员', government: '政府', enterprise: '企业'
+    super_admin: '超级管理员', government: '政府', enterprise: '企业',
+    operator: '运营'
 };
 
 function roleText(role) {
@@ -10099,7 +10109,8 @@ function roleText(role) {
 const ROLE_PORTAL_NAV = {
     super_admin: { tab: 'admin', label: '系统管理后台' },
     government:  { tab: 'government', label: '政府工作台' },
-    enterprise:  { tab: 'enterprise', label: '企业中心' }
+    enterprise:  { tab: 'enterprise', label: '企业中心' },
+    operator:    { tab: 'operator', label: '运营工作台' }
 };
 
 function applyRolePortalNavItem(role) {
