@@ -13,14 +13,19 @@ import json
 import os
 import re
 import sys
-import threading
 import unittest
-from db_connection import get_connection
 
-REPO_ROOT = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backend')
-if REPO_ROOT not in sys.path:
-    sys.path.insert(0, REPO_ROOT)
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(TESTS_DIR)
+# 仓库根（为了 tests.concurrency）与 backend/（为了 db_connection）都要在路径上。
+# 这两个插入必须排在被测模块的 import 之前：本文件按模块名被 discover 加载时
+# sys.path 未必已经垫好，靠「前面某个文件碰巧补过」是隐式顺序依赖。
+for _path in (REPO_ROOT, os.path.join(REPO_ROOT, 'backend')):
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
+
+from tests.concurrency import run_concurrently
+from db_connection import get_connection
 
 
 # 名册行的识别前缀。清理只删这个前缀的行，不碰库里任何既有数据。
@@ -78,28 +83,22 @@ class StudentIdRaceTest(StudentIdTestBase):
     def test_concurrent_add_student_never_conflicts(self):
         self.addCleanup(self._cleanup)
         session_id = self._login()
-        barrier = threading.Barrier(self.WORKERS)
-        outcomes = []
-        lock = threading.Lock()
 
-        def worker(index):
+        def create(index, attempt):
             # 每个线程一个 client：Flask 的 test_client 不保证跨线程共享安全。
             client = self.app.test_client()
-            for attempt in range(self.ROUNDS):
-                barrier.wait()
-                response = self._add_student(
-                    session_id, '%s%d_%d' % (NAME_PREFIX, index, attempt), client)
-                body = json.loads(response.data)
-                with lock:
-                    outcomes.append((response.status_code, body.get('student_id'),
-                                     body.get('message')))
+            response = self._add_student(
+                session_id, '%s%d_%d' % (NAME_PREFIX, index, attempt), client)
+            body = json.loads(response.data)
+            return (response.status_code, body.get('student_id'), body.get('message'))
 
-        threads = [threading.Thread(target=worker, args=(i,))
-                   for i in range(self.WORKERS)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
+        outcomes, errors, alive = run_concurrently(self.WORKERS, self.ROUNDS, create)
+
+        # 这三条必须排在其它断言前面。此前 worker 一旦抛异常，那个线程就死了，
+        # 其余线程永久等在 barrier 上，主线程也永远等 join，断言根本没有机会执行 ——
+        # 症状是整条用例（以及整个测试进程）不返回、也没有任何输出。
+        self.assertEqual(alive, [], '有 worker 线程没能收工：并发骨架又留了挂死的口子')
+        self.assertEqual(errors, [], '并发创建学员时有调用直接抛了异常（未返回响应）')
 
         expected_count = self.WORKERS * self.ROUNDS
         self.assertEqual(len(outcomes), expected_count)

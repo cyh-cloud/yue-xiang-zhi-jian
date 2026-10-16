@@ -25,18 +25,20 @@ def get_points(user_id):
     return {'balance': 0, 'history': []}
 
 # ---- 需要真事务的「多语句单连接」名单（REFACTOR-PLAN 3.4，T11 落成注释）----
-# 24 处「多语句单连接」里只有 6 处需要原子性，名单如下。当前 SQLite 默认行为
+# 24 处「多语句单连接」里只有 5 处需要原子性，名单如下。当前 SQLite 默认行为
 # （autocommit + 单连接）下它们已经是对的；写在这里是为了避免后续有人在中间
 # 插一条不相关语句，把「读余额后写」变成两步竞态。
 #   1. points.update_points（本函数）：先读余额，再按余额算新值后写回；
-#   2. students.add_student：先查最大学号，再插入（撞主键重试）；
-#   3. reviews.set_review_status：改自己的 content_reviews，再分派写别人的表；
-#   4. users.delete_user_by_admin：一次删三张表；
-#   5. users.register_user：写 users 后建积分行；
-#   6. employment.save_resume：upsert 两段（查存在性 → 插或改）。
-# 其余 18 处是「两条独立 write 恰好放在一个函数里」，不构成事务需求。
+#   2. reviews.set_review_status：改自己的 content_reviews，再分派写别人的表；
+#   3. users.delete_user_by_admin：一次删三张表；
+#   4. users.register_user：写 users 后建积分行；
+#   5. employment.save_resume：upsert 两段（查存在性 → 插或改）。
+# students.add_student 原先在本名单里（先查最大学号、再插入，撞主键重试）。
+# 它已改成一条 INSERT 内取号（见 students._INSERT_STUDENT_SQL），不再有
+# 「读改写」的两步竞态，故移出。
+# 其余多语句函数是「两条独立 write 恰好放在一个函数里」，不构成事务需求。
 TRANSACTION_CRITICAL = (
-    'update_points', 'add_student', 'set_review_status',
+    'update_points', 'set_review_status',
     'delete_user_by_admin', 'register_user', 'save_resume',
 )
 

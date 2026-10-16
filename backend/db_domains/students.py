@@ -6,6 +6,7 @@ T05 从 database.py 按领域切分抽出，SQL 语义与返回结构与拆分�
 """
 
 import sqlite3
+import time
 
 from db_connection import get_connection
 
@@ -18,23 +19,21 @@ from core.permissions import is_student
 CAPABILITY = 'student'
 
 
-def _next_student_id(conn):
-    """算出下一个可用学号：当前最大号 +1，撞了已占用的号就继续往后顺延。
-
-    students.id 是 TEXT 主键，所以「最大号」必须按数值比：字符串序下 STU1000
-    小于 STU999，直接 ORDER BY id DESC LIMIT 1 会把号取小，也会取到已存在的号。
-    """
-    row = conn.execute(
-        "SELECT MAX(CAST(SUBSTR(id, 4) AS INTEGER)) FROM students "
-        "WHERE id GLOB 'STU[0-9]*'").fetchone()
-    num = (row[0] if row and row[0] is not None else 0) + 1
-    sid = f"STU{num:03d}"
-    # 取到的号可能已被占用（手工插入的号、历史脏数据、删行后跳号…）。逐个顺延
-    # 到第一个空号；取号与插入之间被别人插走的极端情况由上层重试兜底。
-    while conn.execute("SELECT 1 FROM students WHERE id = ?", (sid,)).fetchone():
-        num += 1
-        sid = f"STU{num:03d}"
-    return sid
+# 学号在**同一条 INSERT 内**生成：'STU' + printf('%03d', MAX(数值后缀) + 1)。
+# 写语句一起步就持有写锁，那个取最大值的子查询在写锁内求值，所以并发调用不会
+# 算出同一个号。此前是「先 SELECT 最大号，再 INSERT」两步：8 路并发下所有调用
+# 算出的是同一个号，只有一条能插进去，其余靠撞主键重试；某个调用 5 次重试全撞就抛
+# RuntimeError —— 教师端看到 500，全量测试还会因为那个线程死掉而永久挂死
+# （成因与现场见 tests/concurrency.py 的说明）。
+# students.id 是 TEXT 主键，最大号必须按数值比：字符串序下 STU1000 小于 STU999。
+_INSERT_STUDENT_SQL = (
+    "INSERT INTO students (id, user_id, name, class_name, direction, progress, status) "
+    "VALUES (("
+    "    SELECT 'STU' || printf('%03d', "
+    "           COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) + 1) "
+    "      FROM students WHERE id GLOB 'STU[0-9]*'"
+    "), ?, ?, ?, ?, 0, 'active') RETURNING id"
+)
 
 
 def get_students(search=None):
@@ -63,32 +62,30 @@ def get_student(student_id):
 def add_student(name, class_name, direction, user_id=''):
     """添加学员（只写名册行）。
 
-    ⚠️ 需要真事务（见 db_domains/points.py 的 TRANSACTION_CRITICAL 名单）：
-       先查最大学号再插入，两步之间不得插入任何不相关语句。
-
     ⚠️ 名册行与平台账号是**两套数据**：不传 user_id 就只是一行名册记录，
        该学员无法登录、收不到通知、其证书也不会进入教师端统计。
-       调用方（app.add_student）负责在需要时关联/创建账号。
+       调用方（domains.teacher.routes.add_student）负责在需要时关联/创建账号。
 
-    ⚠️ 学号生成是「取最大号 → 查重顺延 → 插入」，撞了主键就重取。原先的写法是
-       `SELECT id ... ORDER BY id DESC LIMIT 1` 再 +1：字符串序下 STU1000 小于
-       STU999，号会取小；两个并发请求还会算出同一个号，后写入的撞 students.id
-       主键，IntegrityError 冒到前端就是 500。
+    学号生成的取号与插入都在 _INSERT_STUDENT_SQL 一条语句里（理由见那条 SQL
+    上方的注释），因此这里不再有「取号 → 插入」的两步竞态，也不需要上次那种
+    「撞主键就重取」的循环。保留一次针对写锁竞争的重试，是为了不把偶发争用
+    变成教师端的 500。
     """
-    for _ in range(5):
+    for attempt in range(3):
         conn = get_connection()
         try:
-            sid = _next_student_id(conn)
-            conn.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                         (sid, user_id or '', name, class_name, direction, 0, 'active'))
+            row = conn.execute(_INSERT_STUDENT_SQL,
+                               (user_id or '', name, class_name, direction)).fetchone()
             conn.commit()
-            return sid
-        except sqlite3.IntegrityError:
-            # 号在取号之后、插入之前被别人占走了，重取一次
+            return row['id']
+        except (sqlite3.IntegrityError, sqlite3.OperationalError):
+            # 取号已在语句内完成，正常情况下撞不到主键；这里兜的是写锁竞争
+            # （database is locked）与其它进程的意外占用。
             conn.rollback()
+            time.sleep(0.02 * (attempt + 1))
         finally:
             conn.close()
-    raise RuntimeError('学号生成失败：并发写入过多，请重试')
+    raise RuntimeError('学号生成失败：数据库写入繁忙，请重试')
 
 def get_roster_name_for(user_id):
     """学员域窄接口：单个账号在名册上的姓名，没有关联名册行返回 None。
