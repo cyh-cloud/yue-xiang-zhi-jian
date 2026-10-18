@@ -1,0 +1,2 @@
+User-agent: *
+Disallow:/P_ResumeView.aspx?*
