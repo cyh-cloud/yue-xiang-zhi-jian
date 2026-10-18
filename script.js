@@ -39,6 +39,8 @@ function initializeApp() {
         setupPestDiagnosisEntry, setupEventListeners, setupUserDropdown,
         setupCaseButtons, setupEmploymentTab, setupPolicySection,
         setupTeacherPanel, setup3DControls,
+        // 2026-10-18：电商文案 / 客服两项实训改为页面内默认展开的区块
+        setupCopywritingPanel, setupCustomerServicePanel,
         // 消息中心在 js/message-center.js（主站与后台共用），这里只负责在 DOM 就绪后接线
         function () { if (window.MessageCenter) MessageCenter.init(); },
         restoreSession, checkConnection, setupScrollReveal,
@@ -4257,24 +4259,13 @@ function pestSourcesHTML(entry) {
 // ==================== 电商模块 ====================
 
 function setupEventListeners() {
-    // 电商模块卡片
-    document.querySelectorAll('.module-card .btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const card = this.closest('.module-card');
-            const module = card.dataset.module;
-            if (module === 'live-stream') {
-                document.getElementById('live-simulation').classList.remove('is-hidden');
-                // 2026-10-05：商品标签改为下拉(#live-product)，打开时同步为当前全局作物
-                syncLiveProductSelect();
-                startLiveSimulation();
-            } else if (module === 'product-copy') {
-                openCopywritingPanel();
-            } else if (module === 'customer-service') {
-                openCustomerServicePanel();
-            }
-        });
-    });
-
+    // 2026-10-18 学员走查：电商三项实训的入口卡片已删除，区块默认展开（ecommerce.html）。
+    // 直播间改为「打开即开播」：不再需要点卡片触发，页面加载时同步商品下拉并起播。
+    if (document.getElementById('live-simulation')) {
+        // 2026-10-05：商品标签改为下拉(#live-product)，打开时同步为当前全局作物
+        syncLiveProductSelect();
+        startLiveSimulation();
+    }
     document.getElementById('close-simulation')?.addEventListener('click', () => {
         document.getElementById('live-simulation').classList.add('is-hidden');
         stopLiveSimulation();
@@ -5472,109 +5463,23 @@ const COPY_PRESETS = {
     aquatic: { name: '水产', points: '鲜活直发、肉质鲜美、冷链配送、干净无腥', audiences: ['海鲜爱好者', '家庭烹饪', '餐饮商家'] }
 };
 
-function openCopywritingPanel() {
+// 2026-10-18 学员走查：文案实训从「入口卡片 + 弹窗」改为页面内默认展开的区块
+// （ecommerce.html 的 #copywriting-section）。这里只做初始化接线，不再拼装 HTML。
+function setupCopywritingPanel() {
+    // 目标人群/核心卖点按当前作物回填（HTML 里是静态占位，避免双份维护口径）
     const preset = COPY_PRESETS[AppState.currentProduct] || COPY_PRESETS.lychee;
-    showDetailModal('商品文案创作', `
-        <div class="copywriting-panel">
-            <div class="copy-stepper" id="copy-stepper">
-                <div class="copy-step" data-step="1"><span class="copy-step-dot">1</span><span class="copy-step-label">配置</span></div>
-                <div class="copy-step-line"></div>
-                <div class="copy-step" data-step="2"><span class="copy-step-dot">2</span><span class="copy-step-label">生成</span></div>
-                <div class="copy-step-line"></div>
-                <div class="copy-step" data-step="3"><span class="copy-step-dot">3</span><span class="copy-step-label">改写</span></div>
-                <div class="copy-step-line"></div>
-                <div class="copy-step" data-step="4"><span class="copy-step-dot">4</span><span class="copy-step-label">评分提交</span></div>
-            </div>
-
-            <div class="copy-config">
-                <div class="copy-config-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-box"></i> 产品名称 <span class="hint">（限平台支持的农产品）</span></label>
-                        <input type="text" id="copy-product" placeholder="例如：荔枝（可选：龙眼/柑橘/香蕉/水稻/茶叶/蔬菜/水产养殖）" value="${preset.name}">
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-users"></i> 目标人群</label>
-                        <select id="copy-audience">
-                            <option value="">不限</option>
-                            ${preset.audiences.map(a => `<option value="${a}">${a}</option>`).join('')}
-                        </select>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label><i class="fas fa-star"></i> 核心卖点 <span class="hint">（用逗号分隔，留空自动生成）</span></label>
-                    <input type="text" id="copy-points" placeholder="例如：甜度高、果肉厚、核小" value="${preset.points}">
-                </div>
-            </div>
-
-            <div class="copy-formats">
-                <label class="form-label"><i class="fas fa-file-alt"></i> 选择文案格式</label>
-                <div class="format-tabs" id="format-tabs">
-                    <button class="format-tab active" data-format="详情页"><i class="fas fa-list-alt"></i> 详情页</button>
-                    <button class="format-tab" data-format="主图文案"><i class="fas fa-image"></i> 主图文案</button>
-                    <button class="format-tab" data-format="朋友圈"><i class="fab fa-weixin"></i> 朋友圈</button>
-                    <button class="format-tab" data-format="小红书"><i class="fas fa-book-open"></i> 小红书</button>
-                    <button class="format-tab" data-format="短视频脚本"><i class="fas fa-film"></i> 短视频</button>
-                </div>
-                <div class="format-desc" id="format-desc">电商商品详情页文案，层次分明，卖点突出</div>
-            </div>
-
-            <div class="copy-actions">
-                <button class="btn btn-primary" id="generate-copywriting-btn">
-                    <i class="fas fa-magic"></i> AI生成文案
-                </button>
-                <button class="btn btn-outline btn-sm" id="regenerate-copy-btn" style="display:none;">
-                    <i class="fas fa-redo"></i> 换一版
-                </button>
-            </div>
-
-            <div id="copywriting-result"></div>
-
-            <!-- 文案实训闭环（2026-10-05）：AI 只出初稿，学员改写后提交「我的稿」 -->
-            <div class="script-block copy-mine-block" style="margin-top:16px;" id="copy-mine-block">
-                <div class="script-block-title" id="copy-mine-head" style="cursor:pointer;">
-                    <i class="fas fa-pen"></i> 我的稿
-                    <span class="script-block-sub">（把 AI 初稿改写成你自己的版本后提交）</span>
-                    <span class="copy-stage-badge" id="copy-stage-badge">待生成</span>
-                    <span class="script-block-meta" id="copy-mine-count">0 字</span>
-                </div>
-                <div class="copy-mine-body" id="copy-mine-body">
-                <div class="copy-placeholder-bar" id="copy-placeholder-bar" style="display:none;">
-                    <i class="fas fa-flag"></i> 还有 <b id="copy-placeholder-count">0</b> 处【待填写】未补全
-                </div>
-                <textarea id="copy-mine" class="script-input" rows="8" maxlength="4000"
-                    placeholder="用「采用到我的稿」把 AI 初稿放进来，再补上【待填写】里的真实信息、换成你自己的语气……"></textarea>
-                <div class="script-block-note">
-                    认证、检测数据、价格、物流与赔付承诺不能靠 AI 编 —— 没有真实信息就保持占位或删除该句。
-                </div>
-                <div class="script-actions script-actions-submit">
-                    <button class="btn btn-outline btn-sm" id="adopt-copy"><i class="fas fa-arrow-down"></i> 采用到我的稿</button>
-                    <button class="btn btn-outline btn-sm" id="copy-score-btn"><i class="fas fa-chart-bar"></i> 评分</button>
-                    <button class="btn btn-primary btn-sm" id="submit-copy"><i class="fas fa-paper-plane"></i> 提交实训</button>
-                </div>
-                </div>
-                <div class="copy-feedback" id="copy-feedback" style="display:none;">
-                    <div class="copy-feedback-head">
-                        <span class="copy-feedback-overall" id="copy-feedback-overall">-</span>
-                        <span class="copy-feedback-label">文案评分（规则 · 可复现）</span>
-                    </div>
-                    <div class="copy-feedback-metrics" id="copy-feedback-metrics"></div>
-                    <div class="copy-feedback-suggestions" id="copy-feedback-suggestions"></div>
-                </div>
-                <div class="training-submit-info" id="copy-submit-info"></div>
-            </div>
-            <div class="live-records" id="copy-records" style="margin-top:12px;">
-                <div class="records-header">
-                    <h4><i class="fas fa-list"></i> 我的文案实训记录</h4>
-                </div>
-                <div class="records-body" id="copy-records-body">
-                    <p class="records-empty">登录后可保存并查看实训记录</p>
-                </div>
-            </div>
-        </div>
-    `);
-
+    const productEl = document.getElementById('copy-product');
+    if (productEl && !productEl.dataset.userEdited) productEl.value = preset.name;
+    const pointsEl = document.getElementById('copy-points');
+    if (pointsEl && !pointsEl.dataset.userEdited) pointsEl.value = preset.points;
+    const audienceSel = document.getElementById('copy-audience');
+    if (audienceSel) {
+        audienceSel.innerHTML = '<option value="">不限</option>' +
+            preset.audiences.map(a => `<option value="${a}">${a}</option>`).join('');
+    }
     // 文案实训：字数统计 + 采用 + 提交 + 记录（与直播实训同一套作业链路，kind=copy）
     const copyMineEl = document.getElementById('copy-mine');
+    if (!copyMineEl) return;   // 非电商页（其他板块也加载 script.js）
 
     // P2-4（2026-10-05 走查）：保存最近一次生成的原始 markdown 文本，
     // 「采用到我的稿」用它而非 innerText（innerText 会丢失 **加粗** 和列表符号）。
@@ -5926,138 +5831,13 @@ function openCopywritingPanel() {
 }
 
 
-function openCustomerServicePanel() {
-    const productName = getProductName(AppState.currentProduct);
-    showDetailModal('客户服务模拟', `
-        <div class="cs-panel">
-            <div class="cs-config">
-                <div class="cs-config-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-theater-masks"></i> 模拟场景</label>
-                        <select id="cs-scenario">
-                            <option value="售前咨询">售前咨询</option>
-                            <option value="售后处理">售后处理</option>
-                            <option value="投诉应对">投诉应对</option>
-                            <option value="议价谈判">议价谈判</option>
-                            <option value="产品推荐">产品推荐</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-user"></i> 客户性格</label>
-                        <select id="cs-personality">
-                            <option value="友善型">友善型 · 好说话</option>
-                            <option value="急躁型">急躁型 · 没耐心</option>
-                            <option value="犹豫型">犹豫型 · 反复比较</option>
-                            <option value="挑剔型">挑剔型 · 要求高</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label><i class="fas fa-signal"></i> 难度</label>
-                        <select id="cs-difficulty">
-                            <option value="新手">新手 · 简单</option>
-                            <option value="进阶" selected>进阶 · 适中</option>
-                            <option value="挑战">挑战 · 困难</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="cs-config-row">
-                    <div class="form-group">
-                        <label><i class="fas fa-box"></i> 产品</label>
-                        <input type="text" id="cs-product" value="${productName}">
-                    </div>
-                    <div class="form-group" style="flex:1;">
-                        <label><i class="fas fa-play-circle"></i> 操作</label>
-                        <div class="cs-actions">
-                            <button class="btn btn-primary btn-sm" id="cs-start-btn"><i class="fas fa-play"></i> 开始模拟</button>
-                            <button class="btn btn-outline btn-sm" id="cs-reset-btn"><i class="fas fa-redo"></i> 重置</button>
-                            <button class="btn btn-outline btn-sm" id="cs-hint-btn"><i class="fas fa-lightbulb"></i> 提示</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cs-chat-area">
-                <div class="cs-chat-main">
-                    <div class="cs-messages" id="cs-messages">
-                        <div class="cs-welcome">
-                            <i class="fas fa-headset"></i>
-                            <p>选择场景和客户性格，点击"开始模拟"进行客服训练</p>
-                            <div class="cs-mission-card" id="cs-mission-card" style="display:none;"></div>
-                        </div>
-                    </div>
-                    <div class="cs-input-bar">
-                        <input type="text" id="cs-input" placeholder="作为客服回复客户..." disabled>
-                        <button class="btn btn-primary" id="cs-send-btn" disabled><i class="fas fa-paper-plane"></i></button>
-                    </div>
-                    <!-- 体验优化③：内联参考话术 chip，点击填入输入框 -->
-                    <div class="cs-quick-chips" id="cs-quick-chips" style="display:none;"></div>
-                </div>
-                <div class="cs-sidebar">
-                    <div class="cs-score-card" id="cs-score-card">
-                        <h4><i class="fas fa-chart-radar"></i> 实时评分</h4>
-                        <div class="cs-score-note" id="cs-score-note">规则关键词评分 · 逐句分析，提交取整场均分</div>
-                        <div class="cs-score-overall" id="cs-score-overall">-</div>
-                        <div class="cs-score-label">综合得分</div>
-                        <div class="cs-score-bars" id="cs-score-bars">
-                            <div class="cs-score-bar" id="cs-bar-polite">
-                                <span>礼貌度</span>
-                                <div class="progress-bar"><div class="progress-fill" id="cs-polite" style="width:0%"></div></div>
-                                <em id="cs-polite-val">-</em>
-                            </div>
-                            <div class="cs-score-bar" id="cs-bar-pro">
-                                <span>专业度</span>
-                                <div class="progress-bar"><div class="progress-fill" id="cs-pro" style="width:0%"></div></div>
-                                <em id="cs-pro-val">-</em>
-                            </div>
-                            <div class="cs-score-bar" id="cs-bar-solve">
-                                <span>解决力</span>
-                                <div class="progress-bar"><div class="progress-fill" id="cs-solve" style="width:0%"></div></div>
-                                <em id="cs-solve-val">-</em>
-                            </div>
-                            <div class="cs-score-bar" id="cs-bar-empathy">
-                                <span>同理心</span>
-                                <div class="progress-bar"><div class="progress-fill" id="cs-empathy" style="width:0%"></div></div>
-                                <em id="cs-empathy-val">-</em>
-                            </div>
-                        </div>
-                        <!-- 体验优化②：最弱维度高亮 + 可行动建议 -->
-                        <div class="cs-weak-hint" id="cs-weak-hint" style="display:none;"></div>
-                    </div>
-                    <div class="cs-tips-card" id="cs-tips-card">
-                        <h4><i class="fas fa-lightbulb"></i> 实时建议</h4>
-                        <div class="cs-tips-list" id="cs-tips-list">
-                            <div class="cs-tip-item">开始对话后将显示建议</div>
-                        </div>
-                    </div>
-                    <!-- 体验优化⑥：客户情绪温度条（随每轮回复质量变化） -->
-                    <div class="cs-sentiment-card" id="cs-sentiment-card">
-                        <h4><i class="fas fa-smile"></i> 客户情绪</h4>
-                        <div class="cs-sentiment-label" id="cs-sentiment-label">待开始</div>
-                        <div class="cs-sentiment-track">
-                            <div class="cs-sentiment-fill" id="cs-sentiment-fill" style="width:60%;"></div>
-                        </div>
-                        <div class="cs-sentiment-scale"><span>不满</span><span>满意</span></div>
-                    </div>
-                    <div class="cs-history-card">
-                        <h4><i class="fas fa-history"></i> 对话轮次</h4>
-                        <div class="cs-round-count" id="cs-round-count">0 轮</div>
-                        <!-- 客服实训闭环（2026-10-05）：对话记录提交进作业链路，kind=cs -->
-                        <button class="btn btn-outline btn-sm" id="cs-submit-btn" style="margin-top:10px;">
-                            <i class="fas fa-paper-plane"></i> 提交实训
-                        </button>
-                        <div class="training-submit-info" id="cs-submit-info"></div>
-                    </div>
-                    <div class="cs-history-card">
-                        <h4><i class="fas fa-list"></i> 我的实训记录</h4>
-                        <div class="records-body" id="cs-records-body" style="max-height:220px;">
-                            <p class="records-empty">登录后可保存并查看实训记录</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `);
-
+// 2026-10-18 学员走查：客服实训同样从「入口卡片 + 弹窗」改为页面内默认展开的区块
+// （ecommerce.html 的 #customer-service-section）。
+function setupCustomerServicePanel() {
+    // 产品名跟随全局当前作物（HTML 里是静态占位「荔枝」）
+    const csProduct = document.getElementById('cs-product');
+    if (csProduct && !csProduct.dataset.userEdited) csProduct.value = getProductName(AppState.currentProduct);
+    if (!document.getElementById('cs-messages')) return;   // 非电商页
     const chatHistory = [];
     let isStarted = false;
     // P1-1（2026-10-06 走查）：提交分数改为「整场所有轮次的平均分」，而非最后一句。

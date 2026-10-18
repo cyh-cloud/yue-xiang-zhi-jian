@@ -277,3 +277,84 @@ function setupSelectionHandler(selector, activeClass, stateKey, callback) {
         });
     });
 }
+
+// ==================== 门户下滑转场 ====================
+// 2026-10-18 学员走查：门户页往下滑自动进入农业技能页，要平滑弹性过渡；
+// 五个板块页往上滑不回门户。规则只对 index.html（body[data-page="index"]）生效。
+//
+// 为什么用整页跳转而不是滚动劫持做「假滚动」：
+//   · 板块页是独立页面，正文远比一屏长，劫持滚轮会让用户无法正常阅读；
+//   · 门户 hero 本身就是满屏，下滑手势天然是「我要看下面的内容」。
+//
+// ⚠️ 必须监听 wheel/touch，**不能**监听 scroll：门户 hero 是 min-height:100vh 且
+//    页面没有溢出内容，scrollHeight === clientHeight，window.scrollY 恒为 0，
+//    scroll 事件一次都不触发（2026-10-18 实测）。
+// 转场由 CSS 动画（.scroll-nav-leaving/.scroll-nav-entering）承担，JS 只做判定与计时，
+// 动画时长写死在 TRANSITION_MS，两处必须一致（CSS 见 styles.css 末尾）。
+const SCROLL_NAV = {
+    TARGET: 'agriculture.html',
+    // 2026-10-18 第二轮走查：60px 太灵敏，鼠标轻碰/触控板一抖就跳走。
+    // 提到 220px（约一次明显的下滑幅度），并要求 500ms 内完成 —— 慢速滚动浏览
+    // 不会被中途劫走，快速下滑才视为「我要去下面的板块」。
+    THRESHOLD: 220,       // 累计下滑像素，低于此值视为误触/回弹
+    GESTURE_MS: 500,      // 手势时长上限：超过则视为在浏览，放弃本次触发
+    COOLDOWN_MS: 1200,    // 防止一次手势触发多次跳转
+    TRANSITION_MS: 420    // 与 styles.css 的 portalSwipeOut 时长对齐
+};
+
+function setupScrollNavigation() {
+    // 只在门户页启用：板块页需要正常滚动，绝不能被劫持
+    if (document.body.dataset.page !== 'index') return;
+    const hint = document.querySelector('.scroll-nav-hint');
+    let firedAt = 0;     // 上次触发时间，做冷却
+    let travel = 0;      // 本段手势累计下滑量（像素）
+    let startedAt = 0;   // 本段手势开始时间（用于区分「快滑」与「慢滚」）
+
+    const go = () => {
+        if (Date.now() - firedAt < SCROLL_NAV.COOLDOWN_MS) return;
+        firedAt = Date.now();
+        document.body.classList.add('scroll-nav-leaving');
+        setTimeout(() => { window.location.href = SCROLL_NAV.TARGET; }, SCROLL_NAV.TRANSITION_MS);
+    };
+
+    // dy > 0 表示向下。上滑（dy<0）立刻放弃本次手势，不允许「先上后下」凑够阈值。
+    const onMove = (dy) => {
+        if (dy < 0) { travel = 0; startedAt = 0; return; }
+        if (!startedAt) startedAt = Date.now();
+        travel += dy;
+        if (hint) document.body.classList.toggle('scroll-nav-hint-gone', travel > 20);
+        if (travel < SCROLL_NAV.THRESHOLD) return;
+        // 慢速滚动（浏览意图）不触发：只有短时间内的快速下滑才算「滑走」手势
+        if (Date.now() - startedAt > SCROLL_NAV.GESTURE_MS) { travel = 0; startedAt = 0; return; }
+        go();
+    };
+
+    // 触屏：下滑手势
+    let lastTouchY = null;
+    document.addEventListener('touchstart', (e) => {
+        lastTouchY = e.touches[0] ? e.touches[0].clientY : null;
+        travel = 0;
+        startedAt = 0;
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+        if (lastTouchY === null) return;
+        const y = e.touches[0] ? e.touches[0].clientY : lastTouchY;
+        onMove(lastTouchY - y);
+        lastTouchY = y;
+    }, { passive: true });
+    document.addEventListener('touchend', () => { lastTouchY = null; }, { passive: true });
+
+    // 桌面：滚轮向下（passive，不 preventDefault，不阻塞合成器线程）
+    let wheelArmed = false;
+    window.addEventListener('wheel', (e) => {
+        if (e.deltaY < 0) { travel = 0; wheelArmed = false; startedAt = 0; return; }
+        if (!wheelArmed) { wheelArmed = true; travel = 0; startedAt = 0; }
+        onMove(e.deltaY);
+    }, { passive: true });
+    window.addEventListener('wheelend', () => { wheelArmed = false; travel = 0; startedAt = 0; });
+
+    // 键盘也给同样待遇（无障碍：PageDown / 空格 / 下方向）
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'PageDown' || e.key === 'ArrowDown' || e.key === ' ') go();
+    });
+}
