@@ -9068,8 +9068,146 @@ html[data-large-text] .large-text-toggle { background: var(--brand-tint); color:
 }
 body.scroll-nav-hint-gone .scroll-nav-hint { opacity: 0; pointer-events: none; }
 
-@media (prefers-reduced-motion: reduce) {
+/* ==================== BewlyCat 风格左侧导航栏 ==================== */
+/* 2026-10-18 学员走查：板块页左侧要一个能快速定位的侧栏，样式对标 BewlyCat
+   （E:\Project\BewlyCat 的 src/components/SideBar/SideBar.vue）。
+   只在板块页显示；门户页（index.html）不注入 DOM，保持原样。
+
+   第二轮走查修正：
+   · 侧栏从 72px 导航栏下方开始，不再与顶栏重叠（padding-top 用 --navbar-h）；
+   · 顶栏左侧加开关（.bewly-nav-toggle，位置/图标对齐 admin.html 的
+     .admin-sidebar-toggle），纯手动收起/展开；
+   · 分组标签去掉（无信息量），图标项 = 页面真实存在的 card-section。
+   第三轮走查修正：
+   · 删掉底部「自动隐藏」开关（与顶栏按钮功能重叠，且 BewlyCat 的靠近自动
+     唤出依赖 Shadow DOM + Vue 过渡，本项目做不到，不做半成品）。 */
+.bewly-sidebar {
+    position: fixed;
+    top: var(--navbar-h, 72px);
+    bottom: 0;
+    left: 0;
+    width: 64px;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 0 16px;
+    gap: 6px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+    backdrop-filter: var(--bew-filter, blur(20px) saturate(180%));
+    -webkit-backdrop-filter: var(--bew-filter, blur(20px) saturate(180%));
+    background: var(--bew-surface, rgba(255, 255, 255, 0.72));
+    border-right: 1px solid var(--bew-hairline, rgba(0, 0, 0, 0.06));
+    transform: translateX(0);
+    transition: transform 0.3s var(--ease-out), opacity 0.3s var(--ease-out);
+}
+.bewly-sidebar::-webkit-scrollbar { display: none; }
+.bewly-sidebar.hide {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+}
+/* 板块锚点项：图标 + 悬停右侧滑出标签 */
+.bewly-nav-item {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-full);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+    text-decoration: none;
+    flex-shrink: 0;
+}
+.bewly-nav-item:hover { color: var(--text-primary); background: rgba(31, 94, 67, 0.08); }
+.bewly-nav-item.is-active {
+    color: #fff;
+    background: var(--gradient-main);
+    box-shadow: 0 2px 6px rgba(31, 94, 67, 0.18);
+}
+.bewly-nav-item i { font-size: 1rem; }
+.bewly-nav-tip {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%) translateX(-4px);
+    padding: 5px 10px;
+    border-radius: var(--radius-xs);
+    background: var(--bg-dark);
+    color: #fff;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+}
+.bewly-nav-item:hover .bewly-nav-tip {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+/* 锚点落点补偿：顶栏是 position:fixed 高 73px，scrollIntoView 把标题贴到
+   视口 top:0 会被导航栏盖住。给区块标题加 scroll-margin-top，浏览器平滑滚动
+   会自动让开这段距离，标题正好停在导航栏下沿。
+   ⚠️ 不能写成 .bewly-sidebar ~ * .card-section-title：侧栏是运行时 append 到
+   body 末尾，main-content 在它前面，兄弟选择器匹配不到。 */
+/* 直播间标题走 .panel-header h3（没有 .card-section-title 类），一并补上 */
+.card-section-title,
+.panel-header h3 { scroll-margin-top: 88px; }
+/* 顶栏左侧开关：位置与样式对齐 admin.html 的 .admin-sidebar-toggle。
+   ⚠️ 用 .bewly-nav-left 绝对定位包裹，而不是把按钮直接插到 .nav-container 首位：
+   前台 .nav-container 是 space-between，多一个直接子项会把徽标和导航项一起挤位。 */
+.bewly-nav-left {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.bewly-nav-toggle {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    transition: background .15s, color .15s;
+}
+.bewly-nav-toggle:hover { background: rgba(0, 0, 0, .05); color: var(--text-primary); }
+.bewly-nav-toggle i { transition: transform .2s ease-linear; }
+html[data-theme="dark"] .bewly-nav-toggle:hover { background: rgba(255, 255, 255, .08); }
+/* 深色模式 */
+[data-theme="dark"] .bewly-sidebar {
+    --bew-surface: rgba(27, 44, 37, 0.78);
+    --bew-hairline: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .bewly-nav-item:hover { background: rgba(255, 255, 255, 0.08); }
+[data-theme="dark"] .bewly-nav-tip { background: #040a07; }
+/* 给侧栏让位：板块页内容整体右移 64px */
+@media (min-width: 769px) {
+    body[data-page]:not([data-page="index"]) .main-content,
+    body[data-page]:not([data-page="index"]) .footer { margin-left: 64px; }
+}
+/* 小屏不显示固定侧栏，避免吃掉一屏宽度；移动端仍用汉堡菜单 */
+@media (max-width: 768px) {
+    .bewly-sidebar, .bewly-nav-toggle { display: none; }
+}@media (prefers-reduced-motion: reduce) {
     .scroll-nav-hint i { animation: none; }
     .scroll-nav-leaving .hero,
     .scroll-nav-entering .tab-content.active { animation-duration: 0.01ms; }
+    .bewly-sidebar { transition: none; }
 }
