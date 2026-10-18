@@ -42,6 +42,7 @@ desktop.ini
 .idea/
 
 # >>> magpie: library skills placed here (magpie adds and removes these lines) >>>
+/.agents/skills/anysearch
 /.agents/skills/archify
 /.agents/skills/ask-matt
 /.agents/skills/code-review
@@ -83,4 +84,6 @@ desktop.ini
 /.agents/skills/writing-for-agents
 /.agents/skills/writing-fragments
 /.agents/skills/writing-shape
+/.codex/config.toml
+/.mcp.json
 # <<< magpie <<<
