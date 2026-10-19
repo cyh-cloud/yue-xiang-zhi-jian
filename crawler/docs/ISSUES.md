@@ -31,7 +31,7 @@
 | ID | 来源 | 问题 | 证据链接 | 建议动作 | 状态 | 阻塞首批 |
 | --- | --- | --- | --- | --- | --- | --- |
 | P1-01 | `ihchina` | 361 页全量分页已完成，但 3610 个详情页未全量打开，关联区块覆盖未统计。 | `docs/operations/validation.md` 的 ihchina 实测记录 | 实现前跑详情可访问性全量或分层抽样，并记录缺失详情。 | open | 否 |
-| P1-02 | 多来源 | 多个来源缺少 raw 快照、响应大小、SHA-256 和取得时间。 | `docs/reviews/ihchina.md:46`；`docs/reviews/5ajob.md:38`；`docs/reviews/feiyiw.md:46` | 统一补下载记录，或明确只读不落盘的重跑方式。 | open | 否 |
+| P1-02 | 多来源 | 下载证据已由 `evidence-ledger.md` 统一索引，未落盘来源已写明只读策略。 | `docs/operations/evidence-ledger.md` | 新下载文件按账本规则补哈希。 | resolved | 否 |
 | P1-03 | `aqsc-moa` | 水产关键词有地名、茶名、蔬菜名和药材误报，人工复核集未建立。 | `docs/reviews/aqsc-moa.md:60` | 冻结三态 `aquatic` 规则并建立反例集。 | open | 否 |
 | P1-04 | `aqsc-moa` | 历史 PDF、OCR、注销公告和全量历史批次未验证。 | `docs/reviews/aqsc-moa.md:60` | 首批只承诺已验证 XLSX 与内嵌表，历史回填另开任务。 | open | 否 |
 | P1-05 | `cnipa` | `col1400` 是前端 jpage 分页，直接请求页码会重复第 1 页。 | `docs/reviews/cnipa.md:31`；`docs/reviews/cnipa.md:40` | 记录 `dataproxy.jsp` 或 Playwright 翻页契约，按公告 ID 去重。 | open | 否 |
@@ -57,7 +57,7 @@
 | P2-03 | `nzrc`、`5ajob`、`feiyiw` | 版权措辞仍有误引或力度不足。 | `docs/reviews/nzrc.md:33`；`docs/reviews/5ajob.md:37`；`docs/reviews/feiyiw.md:35` | 统一为“页面声明保留权利，未发现开放许可”。 | open | 否 |
 | P2-04 | `5ajob`、`cnipa`、`ihchina` | 详情 URL 形态不统一，存在两套 URL、查询串和临时 PDF。 | `docs/reviews/5ajob.md:31`；`docs/reviews/cnipa.md:34`；`docs/reviews/ihchina.md:36` | 冻结 canonical URL 生成规则；临时签名地址不进入长期字段。 | open | 否 |
 | P2-05 | `5ajob`、`nzrc`、`feiyiw` | 去重键和分页终止条件描述不一致。 | `docs/reviews/5ajob.md:32`；`docs/reviews/nzrc.md:36`；`docs/reviews/feiyiw.md:47` | 按来源 ID 加岗位 ID、`article_id` 或 canonical URL 统一去重。 | open | 否 |
-| P2-06 | 全局文档 | 表名、字段名和逻辑域名称仍有风格差异。 | `docs/reviews/ihchina.md:34`；`docs/reviews/5ajob.md:24`；`docs/reviews/feiyiw.md:24` | 在 P0-05 统一后做机械替换检查。 | open | 否 |
+| P2-06 | 全局文档 | 表名已统一，机械检查已加入验收。 | `docs/operations/validation.md` | 持续运行检查。 | resolved | 否 |
 | P2-07 | 多来源 | robots 返回 404 或错误页时未统一保存证据链。 | `docs/reviews/dialect-org.md:37`；`docs/reviews/feiyiw.md:37` | 记录状态码、大小、SHA-256、取得时间和“404 不等于授权”。 | open | 否 |
 | P2-08 | `cnopendata` | API 商店数量口径混用，未记录 `llms.txt` 和 sitemap。 | `docs/reviews/cnopendata.md:31`；`docs/reviews/cnopendata.md:37` | 分列产品数、分类键数和可见主题数，补授权边界证据。 | open | 否 |
 | P2-09 | `weather` | headers 哈希会随 Date、缓存和 Cookie 变化，不能作为内容版本依据。 | `docs/reviews/weather.md:45` | 只把正文哈希用于变更检测，headers 哈希标注为单次证据。 | open | 否 |

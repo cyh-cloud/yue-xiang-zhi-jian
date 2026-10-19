@@ -197,6 +197,7 @@
 | `company_url` | TEXT | 默认 `''` | 企业 URL |
 | `company_address` | TEXT | 默认 `''` | 公开企业地址 |
 | `region` | TEXT | 默认 `''` | 首个工作地区 |
+| `department` | TEXT | 默认 `''` | 来源部门原文 |
 | `location_raw` | TEXT | 默认 `''` | 地点原文 |
 | `province` | TEXT | 默认 `''` | 省份，来自 std 的规范化地点 |
 | `city` | TEXT | 默认 `''` | 城市，来自 std 的规范化地点 |
@@ -210,6 +211,7 @@
 | `age_requirement` | TEXT | 默认 `''` | 年龄要求 |
 | `major_requirement` | TEXT | 默认 `''` | 专业要求 |
 | `published_at` | TEXT | 默认 `''` | 发布日期 |
+| `listed_at` | TEXT | 默认 `''` | 列表页展示时间，仅作发现信号 |
 | `validity_days` | INTEGER | 可空 | 有效天数 |
 | `deadline_at` | TEXT | 默认 `''` | 截止日期 |
 | `description` | TEXT | 默认 `''` | 摘要或审核后正文 |

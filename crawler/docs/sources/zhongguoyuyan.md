@@ -74,19 +74,12 @@
 
 原因: `robots.txt` 明确禁止自动访问全站，不能为了凑样本而请求首页、正文或资源。没有从搜索结果、缓存或第三方转载中拼接伪造样本。
 
-### 样本 1
+### 受限记录
 
-- 详情 URL: 无
-- 抓取时间: 不适用
-- 关键字段: 无
-- 目标映射: 只保留候选模型，不形成记录
-
-### 样本 2
-
-- 详情 URL: 无
-- 抓取时间: 不适用
-- 关键字段: 无
-- 目标映射: 只保留候选模型，不形成记录
+- 详情 URL: 无，未访问站内详情
+- 抓取时间: `2026-10-19 01:10 Asia/Shanghai`
+- 证据: `https://zhongguoyuyan.cn/robots.txt` 返回 `User-agent: *` 与 `Disallow: /`
+- 目标映射: 不形成 stage 或 std 记录
 
 ## 字段映射
 
@@ -96,9 +89,9 @@
 
 | 预期来源字段 | crawler 表.字段 | 粤乡智匠建议表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| 方言点名称、地区 | `std_dialect_pointss.name`、`province`、`city`、`county` | `dialects.name`、`dialects.region`、`dialects.areas` | 需要人工确认自然键 |
-| 经纬度 | `std_dialect_pointss.longitude`、`latitude` | 建议新增 `dialects.longitude`、`latitude` | 只在授权且可验证时使用 |
-| 方言系属 | `std_dialect_pointss.dialect_group`、`subgroup` | `dialects.features` 或建议新增专列 | 保留站方术语 |
+| 方言点名称、地区 | `std_dialect_points.name`、`province`、`city`、`county` | `dialects.name`、`dialects.region`、`dialects.areas` | 需要人工确认自然键 |
+| 经纬度 | `std_dialect_points.longitude`、`latitude` | 建议新增 `dialects.longitude`、`latitude` | 只在授权且可验证时使用 |
+| 方言系属 | `std_dialect_points.dialect_group`、`subgroup` | `dialects.features` 或建议新增专列 | 保留站方术语 |
 | 词形 | `std_dialect_lexemes.lemma` | `dialect_phrases.dialect` | 需要人工确认词条含义 |
 | 普通话释义 | `std_dialect_lexemes.definition` | `dialect_phrases.mandarin` | 不得自动生成 |
 | 注音或拼音 | `std_dialect_lexemes.phonetic` | `dialect_phrases.pinyin` | 需要保留原始标音方案 |
