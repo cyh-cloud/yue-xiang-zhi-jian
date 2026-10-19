@@ -21,7 +21,7 @@
 | 详情页 URL | 通过 | 两套 canonical 详情 URL 的 3 条样本均返回 200，可直达同一岗位；`#rjobid` 与 URL 中的职位 ID 一致 |
 | JSON 字段或 DOM 选择器 | 通过 | 未发现列表/详情 JSON API；`tr[id^="compareColor"]`、`td.joblink a`、`#zhtitle`、`#jobdetail h1`、`#rjobid`、`#jobdetail tr` 均有非空结果。`#jobexpire` 纯 HTTP 为空，Playwright 执行页面脚本后返回有效期 |
 | 样本记录 | 通过 | 样本 1 `50506`、样本 2 `50688` 的岗位、公司、地点、行业、薪资、学历、专业及正文均可复现；样本 3 `50687` 为前台接待反例，详情仍可打开但应被农业主题过滤 |
-| 字段映射 | 有缺口 | 来源字段与业务字段大体齐全，但文档使用 `std.job_posting`、`std.job_source`、`job_posting_import`、`job_posting_source`、`region_raw` 等名称，与冻结的 `std_jobs`、`std_job_sources`、`recruitment_postings`、`recruitment_posting_sources`、`location_raw` 不一致；不能按文档直接实现 |
+| 字段映射 | 有缺口 | 来源字段与业务字段大体齐全，但文档使用 `std_jobs`、`std_job_sources`、`recruitment_postings`、`recruitment_posting_sources`、`region_raw` 等名称，与冻结的 `std_jobs`、`std_job_sources`、`recruitment_postings`、`recruitment_posting_sources`、`location_raw` 不一致；不能按文档直接实现 |
 | 访问限制 | 通过 | 列表和详情匿名可访问；投递、收藏、联系企业等登录后操作未纳入采集。文档明确排除简历和个人联系方式 |
 | 版权与用途 | 有缺口 | 首页实测明确写有“未经5ajob.com许可，不得转载本站之所有农业人才求职招聘信息及作品”，文档却写“未见明确内容授权或转载许可”。可保存必要字段、短摘要和回链，但不能把许可状态描述为未声明 |
 | 下载记录 | 有缺口 | 本次及文档均未发现需要下载的稳定附件；3 条样本详情正文和 robots 响应未记录响应体大小、SHA-256、取得时间及 raw 快照，不能通过下载校验和检查 |

@@ -57,12 +57,12 @@
 
 | 业务字段 | `dialect-org` | `cass-linguistics` | 其他来源 | crawler std 层 | 现有展示表落点 |
 | --- | --- | --- | --- | --- | --- |
-| 方言名 | 摘要或释义中的“粤语”“上海话”等，需复核 | 研究资源说明，待验证 | 待验证 | `std_dialect_point.dialect_name` | 人工映射后写 `dialects.name` |
-| 方言系属 | 未提供 | 研究资源可能提及，待验证 | 待验证 | `std_dialect_point.dialect_family` | 人工映射后写 `dialects.extra.dialect_family` |
-| 省份 | `region` 规范化 | 待验证 | 待验证 | `std_dialect_point.province` | `dialects.region` 的一部分 |
-| 城市 | `region` 规范化，如 `广东广州` | 待验证 | 待验证 | `std_dialect_point.city` | `dialects.region` |
-| 县区 | 样本未提供 | 待验证 | 待验证 | `std_dialect_point.county` | `dialects.extra.county` |
-| 经纬度 | 未提供 | 未提供 | 待验证 | `std_dialect_point.latitude`、`longitude` | 不建议写入现有表 |
+| 方言名 | 摘要或释义中的“粤语”“上海话”等，需复核 | 研究资源说明，待验证 | 待验证 | `std_dialect_points.dialect_name` | 人工映射后写 `dialects.name` |
+| 方言系属 | 未提供 | 研究资源可能提及，待验证 | 待验证 | `std_dialect_points.dialect_family` | 人工映射后写 `dialects.extra.dialect_family` |
+| 省份 | `region` 规范化 | 待验证 | 待验证 | `std_dialect_points.province` | `dialects.region` 的一部分 |
+| 城市 | `region` 规范化，如 `广东广州` | 待验证 | 待验证 | `std_dialect_points.city` | `dialects.region` |
+| 县区 | 样本未提供 | 待验证 | 待验证 | `std_dialect_points.county` | `dialects.extra.county` |
+| 经纬度 | 未提供 | 未提供 | 待验证 | `std_dialect_points.latitude`、`longitude` | 不建议写入现有表 |
 | 词条 | `name` / `.detail-word` | 不映射为词条 | 待验证 | `std_dialect_lexeme.lemma` | `dialect_phrases.dialect` |
 | 普通话释义 | 文化解读短段 | 不映射为词条 | 待验证 | `std_dialect_lexeme.mandarin_definition` | `dialect_phrases.mandarin` |
 | 拼音 | `phonetic` / `.detail-phonetic` | 不映射为词条 | 待验证 | `std_dialect_lexeme.pinyin` | `dialect_phrases.pinyin` |

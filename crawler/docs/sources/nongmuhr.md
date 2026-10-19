@@ -1,5 +1,7 @@
 # 农牧人才网
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `nongmuhr`
 
 状态: `approved-with-gaps`
@@ -153,35 +155,35 @@
 
 ### crawler std 层
 
-目标标准实体为 `std_recruitment_posting`。raw 层保存列表和详情 HTML；stage 层保留 `nongmuhr_job` 原始字段；std 层统一岗位字段。
+目标标准实体为 `std_jobs`。raw 层保存列表和详情 HTML；stage 层保留 `nongmuhr_job` 原始字段；std 层统一岗位字段。
 
 | 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| `EmployView.aspx?id={id}` 中的 `id` | `std_recruitment_posting.source_item_id` | `recruitment_postings.source_item_id` | 保留字符串 |
-| 详情 URL | `std_recruitment_posting.source_url` | `recruitment_postings.source_url` | 规范化为绝对 URL，作为来源内自然键 |
-| `来源 ID = nongmuhr` | `std_recruitment_posting.source_id` | `recruitment_posting_sources.source_id` | 固定 `nongmuhr` |
-| `.joblistonelf` | `std_recruitment_posting.title` | `recruitment_postings.title` | 清理空白 |
-| `#hlCompanyName` | `std_recruitment_posting.company_name` | `recruitment_postings.company_name` | 直接映射 |
-| `#hlCompanyName[href]` | `std_recruitment_posting.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
-| `工作性质` | `std_recruitment_posting.employment_type` | `recruitment_postings.employment_type` | 如 `全职` |
-| `部 门` | `std_recruitment_posting.department` | `recruitment_postings.department` | 直接映射 |
-| `招聘人数` | `std_recruitment_posting.headcount` | `recruitment_postings.headcount` | 转整数 |
-| `截止日期` | `std_recruitment_posting.deadline_at` | `recruitment_postings.deadline_at` | 解析为 ISO 日期 |
-| `工作经验` | `std_recruitment_posting.experience_raw` | `recruitment_postings.experience_raw` | 保留原文，可派生 `experience_min_years` |
-| `学 历` | `std_recruitment_posting.education_raw` | `recruitment_postings.education_raw` | 直接映射 |
-| `工作地点` | `std_recruitment_posting.location_raw` | `recruitment_postings.location_raw` | 保留 `|` 分隔的原文，拆首个到 `region` |
-| `性 别` | `std_recruitment_posting.gender_requirement` | `recruitment_postings.gender_requirement` | 直接映射 |
-| `年 龄` | `std_recruitment_posting.age_requirement` | `recruitment_postings.age_requirement` | 保留区间原文 |
-| `邮 件` | `std_recruitment_posting.contact_email` | `recruitment_postings.contact_email` | 识别 `{{EMAIL_*}}` 为模板占位，置 null |
-| `联系人` | `std_recruitment_posting.contact_name` | `recruitment_postings.contact_name` | 公开值可入库，默认不公开展示 |
-| `联系电话` | `std_recruitment_posting.contact_phone` | `recruitment_postings.contact_phone` | 公开值可入库，默认不公开展示 |
-| 职位描述 `td[style*="word-break"]` | `std_recruitment_posting.description_html` | `recruitment_postings.description` | 清洗 HTML，保留职责和要求 |
-| `发布时间` | `std_recruitment_posting.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期 |
-| 公司行业/规模/性质/地区 | `std_recruitment_posting.company_industry` 等 | `recruitment_postings.company_industry` 等 | 从 `#joblist1 td.y12x` 分段解析 |
-| 公司介绍 | `std_recruitment_posting.company_description` | `recruitment_postings.company_description` | 可截断为摘要，避免全文转载 |
-| 列表刷新时间 | `std_recruitment_posting.listed_relative_time` | `recruitment_postings.listed_relative_time` | 只作发现信号，不用于精确日期 |
-| 详情 HTML 正文 | `std_recruitment_posting.content_hash` | `recruitment_postings.content_hash` | 对规范化正文计算 SHA-256 |
-| 抓取时间 | `std_recruitment_posting.fetched_at` | `recruitment_postings.fetched_at` | 每次采集更新 |
+| `EmployView.aspx?id={id}` 中的 `id` | `std_jobs.source_item_id` | `recruitment_postings.source_item_id` | 保留字符串 |
+| 详情 URL | `std_jobs.source_url` | `recruitment_postings.source_url` | 规范化为绝对 URL，作为来源内自然键 |
+| `来源 ID = nongmuhr` | `std_jobs.source_id` | `recruitment_posting_sources.source_id` | 固定 `nongmuhr` |
+| `.joblistonelf` | `std_jobs.title` | `recruitment_postings.title` | 清理空白 |
+| `#hlCompanyName` | `std_jobs.company_name` | `recruitment_postings.company_name` | 直接映射 |
+| `#hlCompanyName[href]` | `std_jobs.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
+| `工作性质` | `std_jobs.employment_type` | `recruitment_postings.employment_type` | 如 `全职` |
+| `部 门` | `std_jobs.department` | `recruitment_postings.department` | 直接映射 |
+| `招聘人数` | `std_jobs.headcount` | `recruitment_postings.headcount` | 转整数 |
+| `截止日期` | `std_jobs.deadline_at` | `recruitment_postings.deadline_at` | 解析为 ISO 日期 |
+| `工作经验` | `std_jobs.experience_raw` | `recruitment_postings.experience_raw` | 保留原文，可派生 `experience_min_years` |
+| `学 历` | `std_jobs.education_raw` | `recruitment_postings.education_raw` | 直接映射 |
+| `工作地点` | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 保留 `|` 分隔的原文，拆首个到 `region` |
+| `性 别` | `std_jobs.gender_requirement` | `recruitment_postings.gender_requirement` | 直接映射 |
+| `年 龄` | `std_jobs.age_requirement` | `recruitment_postings.age_requirement` | 保留区间原文 |
+| `邮 件` | `std_jobs.contact_email` | `recruitment_postings.contact_email` | 识别 `{{EMAIL_*}}` 为模板占位，置 null |
+| `联系人` | `std_jobs.contact_name` | `recruitment_postings.contact_name` | 公开值可入库，默认不公开展示 |
+| `联系电话` | `std_jobs.contact_phone` | `recruitment_postings.contact_phone` | 公开值可入库，默认不公开展示 |
+| 职位描述 `td[style*="word-break"]` | `std_jobs.description_html` | `recruitment_postings.description` | 清洗 HTML，保留职责和要求 |
+| `发布时间` | `std_jobs.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期 |
+| 公司行业/规模/性质/地区 | `std_jobs.company_industry` 等 | `recruitment_postings.company_industry` 等 | 从 `#joblist1 td.y12x` 分段解析 |
+| 公司介绍 | `std_jobs.company_description` | `recruitment_postings.company_description` | 可截断为摘要，避免全文转载 |
+| 列表刷新时间 | `std_jobs.listed_relative_time` | `recruitment_postings.listed_relative_time` | 只作发现信号，不用于精确日期 |
+| 详情 HTML 正文 | `std_jobs.content_hash` | `recruitment_postings.content_hash` | 对规范化正文计算 SHA-256 |
+| 抓取时间 | `std_jobs.fetched_at` | `recruitment_postings.fetched_at` | 每次采集更新 |
 
 ### 粤乡智匠建议表
 

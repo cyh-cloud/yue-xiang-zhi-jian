@@ -21,7 +21,7 @@
 | 详情页 URL | 通过 | `/dialect/1` 至 `/dialect/15` 均返回 200；`/dialect/0`、`/dialect/16` 返回 404，ID 边界成立 |
 | JSON 字段或 DOM 选择器 | 通过 | `/api/search?q=你好` 返回 1 条，`q=食饭` 返回 2 条，空 `q` 返回 `[]`；`.detail-word`、`.detail-phonetic`、`.detail-header .card-tag` 和正文段落均能定位 |
 | 样本记录 | 通过 | 样本 1 `你好 / Nǐ hǎo / 北京`、样本 2 `食饭 / Sik6 faan6 / 广东广州`、样本 3 `食饭未 / Sik6 faan6 mei6 / 广州` 均可复现；15 条总数成立 |
-| 字段映射 | 有缺口 | 词条、读音、释义和地区映射主体成立，但文档使用 `std.dialect_point`、`std.dialect_lexeme`、`std.dialect_lexeme_source` 和 `source_record_id`，与冻结 schema 的 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources`、`source_item_id` 不一致；业务表名 `dialect_lexeme_sources` 可对齐，但字段名仍需修正 |
+| 字段映射 | 有缺口 | 词条、读音、释义和地区映射主体成立，但文档使用 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 和 `source_record_id`，与冻结 schema 的 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources`、`source_item_id` 不一致；业务表名 `dialect_lexeme_sources` 可对齐，但字段名仍需修正 |
 | 访问限制 | 通过 | 首页、详情和搜索无需登录；未发现需要登录的内容 |
 | 版权与用途 | 有缺口 | 页面只有“© 2026 中国方言语音库 | Powered by 造蓝科技基金 & AI测试俱乐部”，未发现开放许可或转载授权。文档写“只保存元数据、短释义和来源链接”是合理边界，但“未见许可”不能推导出可自由复制音频或大段正文 |
 | 下载记录 | 有缺口 | `/dialect/1` 的音频 URL 是占位字符串，浏览器实测 `MediaError code 4`、`networkState=3`，不能把音频算作可下载资源；8 条正文图片和 1 个占位音频均没有大小、SHA-256、取得时间和保存记录 |

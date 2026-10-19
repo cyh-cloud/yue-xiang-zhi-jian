@@ -1,5 +1,7 @@
 # 国家知识产权局地理标志
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `cnipa`
 
 状态: `approved-with-gaps`

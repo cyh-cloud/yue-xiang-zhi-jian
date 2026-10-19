@@ -1,8 +1,12 @@
 # 中国语言资源保护工程
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `zhongguoyuyan`
 
-状态: `robots-restricted`
+状态: `blocked`
+
+访问等级: `robots-restricted`
 
 验证时间: `2026-10-19 01:10 Asia/Shanghai`
 
@@ -92,9 +96,9 @@
 
 | 预期来源字段 | crawler 表.字段 | 粤乡智匠建议表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| 方言点名称、地区 | `std_dialect_points.name`、`province`、`city`、`county` | `dialects.name`、`dialects.region`、`dialects.areas` | 需要人工确认自然键 |
-| 经纬度 | `std_dialect_points.longitude`、`latitude` | 建议新增 `dialects.longitude`、`latitude` | 只在授权且可验证时使用 |
-| 方言系属 | `std_dialect_points.dialect_group`、`subgroup` | `dialects.features` 或建议新增专列 | 保留站方术语 |
+| 方言点名称、地区 | `std_dialect_pointss.name`、`province`、`city`、`county` | `dialects.name`、`dialects.region`、`dialects.areas` | 需要人工确认自然键 |
+| 经纬度 | `std_dialect_pointss.longitude`、`latitude` | 建议新增 `dialects.longitude`、`latitude` | 只在授权且可验证时使用 |
+| 方言系属 | `std_dialect_pointss.dialect_group`、`subgroup` | `dialects.features` 或建议新增专列 | 保留站方术语 |
 | 词形 | `std_dialect_lexemes.lemma` | `dialect_phrases.dialect` | 需要人工确认词条含义 |
 | 普通话释义 | `std_dialect_lexemes.definition` | `dialect_phrases.mandarin` | 不得自动生成 |
 | 注音或拼音 | `std_dialect_lexemes.phonetic` | `dialect_phrases.pinyin` | 需要保留原始标音方案 |

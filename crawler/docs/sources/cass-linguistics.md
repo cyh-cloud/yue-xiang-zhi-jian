@@ -1,5 +1,7 @@
 # 中国社会科学院语言研究所
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `cass-linguistics`
 
 状态: `approved-with-gaps`
@@ -111,7 +113,7 @@
 | 正文中“29 个方言点” | `std_research_resources.item_count` | `research_resources.item_count` | 仅作为研究资源说明，不生成词条 |
 | 外部平台 URL | `std_research_resources.external_url` | `research_resources.external_url` | `www.dialectgrammar.com` 需登录，标记 `login-required` |
 
-建议自然键: `(source_id='cass-linguistics', source_url)`；研究文章和研究资源分表，不能把资讯标题映射成方言词条。
+建议自然键: `(source_id='cass-linguistics', source_item_id)`，缺少来源 ID 时退回 `source_url`；研究文章和研究资源分表，不能把资讯标题映射成方言词条。三张研究实体均为建议新增、尚未冻结，冻结前不进入转换器输入。
 
 ## 数据量与更新
 

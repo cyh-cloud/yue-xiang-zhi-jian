@@ -26,22 +26,22 @@
 
 | 业务字段 | 来源字段 | crawler std 层 | 建议业务表.字段 | 说明 |
 | --- | --- | --- | --- | --- |
-| 来源站 | 来源 ID | `std_recruitment_posting.source_id` | `recruitment_postings.source_id` | `nzrc`、`nongmuhr` 或 `5ajob` |
-| 原始详情 URL | canonical 详情页 | `std_recruitment_posting.source_url` | `recruitment_postings.source_url` | 直接打开原岗位，不用列表页或公司首页 |
-| 岗位标题 | 详情标题 | `std_recruitment_posting.title` | `recruitment_postings.title` | 保留原岗位名；多岗位标题保留原文 |
-| 公司/机构 | 详情公司名 | `std_recruitment_posting.company_name` | `recruitment_postings.company_name` | 只取公开组织名 |
-| 公司 URL | 详情公司链接 | `std_recruitment_posting.company_url` | `recruitment_postings.company_url` | 可为空 |
-| 地区 | 工作地点原文 | `std_recruitment_posting.location_raw` | `recruitment_postings.location_raw` | 同时生成 `region`，不丢失原文 |
-| 地区规范化 | 省、市拆分结果 | `std_recruitment_posting.province`、`city` | `recruitment_postings.province`、`city` | 无法确认时 null |
-| 薪资 | 承诺月薪或薪资区间 | `std_recruitment_posting.salary_raw` | `recruitment_postings.salary_raw` | `面议` 原样保存，不推算金额 |
+| 来源站 | 来源 ID | `std_jobs.source_id` | `recruitment_postings.source_id` | `nzrc`、`nongmuhr` 或 `5ajob` |
+| 原始详情 URL | canonical 详情页 | `std_jobs.source_url` | `recruitment_postings.source_url` | 直接打开原岗位，不用列表页或公司首页 |
+| 岗位标题 | 详情标题 | `std_jobs.title` | `recruitment_postings.title` | 保留原岗位名；多岗位标题保留原文 |
+| 公司/机构 | 详情公司名 | `std_jobs.company_name` | `recruitment_postings.company_name` | 只取公开组织名 |
+| 公司 URL | 详情公司链接 | `std_jobs.company_url` | `recruitment_postings.company_url` | 可为空 |
+| 地区 | 工作地点原文 | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 同时生成 `region`，不丢失原文 |
+| 地区规范化 | 省、市拆分结果 | `std_jobs.province`、`city` | `recruitment_postings.province`、`city` | 无法确认时 null |
+| 薪资 | 承诺月薪或薪资区间 | `std_jobs.salary_raw` | `recruitment_postings.salary_raw` | `面议` 原样保存，不推算金额 |
 | 薪资数值 | 可解析区间 | `salary_min`、`salary_max`、`salary_period` | 同名 | 解析失败只保留原文 |
-| 学历 | 学历要求 | `std_recruitment_posting.education_raw` | `recruitment_postings.education_raw` | 保留 `大专`、`本科`、`不限` 等原文 |
-| 经验 | 工作经验 | `std_recruitment_posting.experience_raw` | `recruitment_postings.experience_raw` | 可派生 `experience_min_years` |
-| 岗位描述 | 岗位职责和任职要求 | `std_recruitment_posting.description`、`requirements` | 同名 | 采集库可存全文，业务库按授权展示摘要 |
-| 发布时间 | 详情发布日期 | `std_recruitment_posting.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期，解析失败保留原值 |
+| 学历 | 学历要求 | `std_jobs.education_raw` | `recruitment_postings.education_raw` | 保留 `大专`、`本科`、`不限` 等原文 |
+| 经验 | 工作经验 | `std_jobs.experience_raw` | `recruitment_postings.experience_raw` | 可派生 `experience_min_years` |
+| 岗位描述 | 岗位职责和任职要求 | `std_jobs.description`、`requirements` | 同名 | 采集库可存全文，业务库按授权展示摘要 |
+| 发布时间 | 详情发布日期 | `std_jobs.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期，解析失败保留原值 |
 | 截止时间 | 截止日期或有效期 | `deadline_at`、`deadline_raw` | 同名 | `nzrc` 的“有效时间 90 天”不能直接当截止日期，需结合发布日期 |
 | 联系方式 | 公开联系人、电话、邮箱 | `contact_name`、`contact_phone`、`contact_email` | 同名 | 默认不公开展示；登录后才能看的内容不采集 |
-| 原始类别 | 来源行业、职位类别或岗位类型 | `std_recruitment_posting.source_category` | `recruitment_postings.source_category` | 保留来源枚举，不映射成平台自创分类 |
+| 原始类别 | 来源行业、职位类别或岗位类型 | `std_jobs.source_category` | `recruitment_postings.source_category` | 保留来源枚举，不映射成平台自创分类 |
 | 农业相关性 | 标题、行业、专业和正文规则 | `is_agriculture_related` | `recruitment_postings.is_agriculture_related` | 反例：`前台接待` 不因公司涉农而自动纳入 |
 | 抓取时间 | 响应取得时间 | `fetched_at` | `recruitment_posting_sources.fetched_at` | 每次请求记录 |
 | 首次/最后发现 | 列表或详情出现时间 | `first_seen_at`、`last_seen_at` | `recruitment_postings.first_seen_at`、`last_seen_at` | 过期岗位不物理删除 |

@@ -1,6 +1,6 @@
 # 采集验收清单
 
-状态: draft
+状态: active
 
 日期: 2026-10-19
 
@@ -90,7 +90,7 @@
 ## 10. 转换与业务表
 
 - 转换器只读取 std 层。
-- 自然键和幂等 upsert 可复现。
+- 自然键和幂等 升级写入 可复现。
 - 同一自然键重复导入不产生重复业务记录。
 - 官方来源优先于聚合来源。
 - 冲突记录保留双方值、来源 URL、取得时间和原因。
@@ -125,8 +125,46 @@
 - 结论和未验证项。
 - 若为 `blocked`，写明解除条件。
 
+## 机械检查命令
+
+以下命令从仓库根运行，退出码非零即失败。
+
+```powershell
+python -c "import json,pathlib; r=pathlib.Path('crawler/docs'); d=json.loads((r/'sources.json').read_text(encoding='utf-8')); ids=[s['id'] for s in d['sources']]; assert len(ids)==len(set(ids)); assert all((r/s[k]).exists() for s in d['sources'] for k in ('document','review')); print('sources.json OK', len(ids))"
+```
+
+预期输出: `sources.json OK 12`。
+
+```powershell
+python -c "import pathlib; r=pathlib.Path('crawler/docs'); bad=[str(p) for p in r.rglob('*.md') if chr(0x2014) in p.read_text(encoding='utf-8')]; assert not bad, bad; print('no em-dash')"
+```
+
+预期输出: `no em-dash`。
+
+```powershell
+python -c "import pathlib; r=pathlib.Path('crawler/download'); fs=[p for p in r.rglob('*') if p.is_file()]; over=[str(p) for p in fs if p.stat().st_size>100*1024*1024]; print('files',len(fs),'bytes',sum(p.stat().st_size for p in fs),'over100',len(over)); assert not over"
+```
+
+预期输出包含 `over100 0`。
+
+```powershell
+python -c "import pathlib,re; r=pathlib.Path('crawler/docs'); bad=[]; pats=['std_'+'ich_project'+r'\b','std_'+'recruitment_posting'+r'\b','std_'+'dialect_point'+r'\b','std_weather'+'_candidate','std'+r'\.[a-z_]','crawler'+r'\.std\.','stage'+r'\.[a-z_]']; [bad.append((str(p),pat)) for p in r.rglob('*.md') for pat in pats if re.search(pat,p.read_text(encoding='utf-8'))]; assert not bad,bad; print('table names OK')"
+```
+
+预期输出: `table names OK`。
+
+## ihchina 3610 实测
+
+2026-10-19 用公开 JSON 接口 `limit=100` 遍历 37 页，累计 `total=3610`，唯一项目 ID 3610，重复 ID 0。实测输出:
+
+```json
+{"total": 3610, "pages": 37, "pages_fetched": 37, "rows": 3610, "unique_ids": 3610, "duplicates": 0}
+```
+
+详情页可访问性全量检查仍列为缺口。
+
 ## 待验证
 
-- `sources.json` 的自动检查脚本尚未实现。
-- 文档链接和哈希的自动巡检尚未实现。
-- 审核人身份和审核记录模板的最终字段。
+- 3610 个详情页未全量打开，仅完成分页总数和唯一 ID 校验。
+- 各来源真实调度频率和失败重试参数需在实现期确认。
+- 审核记录模板中审核人字段沿用 agent 标识，未建立人工账号映射。

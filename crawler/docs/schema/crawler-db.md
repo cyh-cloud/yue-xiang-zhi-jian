@@ -605,11 +605,13 @@ JSON 必须能被标准 JSON 解析器读取；空值用 `{}` 或 `[]`，不用�
 
 ## std 层
 
-`std` 是跨来源标准实体层。每个实体表必须有 `source_id` 或来源关联表，不得把来源信息藏在 JSON 中。以下字段类型均为建议类型，实际实现应使用 SQLite 参数化语句。
+`std` 是跨来源标准实体层。实体 interface、自然键、来源关系、发布状态和不变式以 `std-entities.md` 为准。本节只定义物理表、列、索引和外键，不重复实体语义。每个实体表必须有 `source_id` 或来源关联表，不得把来源信息藏在 JSON 中。以下字段类型均为建议类型，实际实现应使用 SQLite 参数化语句。
+
+天气不建立 std 表。实时天气只作为运行时 DTO 或短期缓存，见 `mapping/weather.md`，不进入转换批次。
 
 ### 非遗域
 
-#### std_ich_projects
+#### std_ich_projectss
 
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
@@ -668,7 +670,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
 | `id` | INTEGER | PK | 传承人标准 ID |
-| `project_id` | INTEGER | 可空 | 关联 `std_ich_projects.id` |
+| `project_id` | INTEGER | 可空 | 关联 `std_ich_projectss.id` |
 | `source_id` | TEXT | NOT NULL | 来源 ID |
 | `source_item_id` | TEXT | NOT NULL | 来源传承人 ID |
 | `source_url` | TEXT | NOT NULL | 传承人详情 URL |
@@ -690,7 +692,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(project_id)`、`(ich_code)`、`(name)`、`(source_id, source_item_id)`。
 
-外键：`project_id` 引用 `std_ich_projects.id`，删除项目时置空或级联由实现策略决定。
+外键：`project_id` 引用 `std_ich_projectss.id`，删除项目时置空或级联由实现策略决定。
 
 保留策略：人物资料按来源文档保留，业务发布须经审核。
 
@@ -716,7 +718,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(subject_project_id)`、`(related_project_id)`、`(relation_type)`。
 
-外键：`subject_project_id`、`related_project_id` 引用 `std_ich_projects.id`。
+外键：`subject_project_id`、`related_project_id` 引用 `std_ich_projectss.id`。
 
 #### std_ich_media_links
 
@@ -740,7 +742,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(project_id)`、`(media_type)`、`(availability)`。
 
-外键：`project_id` 引用 `std_ich_projects.id`。
+外键：`project_id` 引用 `std_ich_projectss.id`。
 
 保留策略：只保存链接和元数据，不把媒体文件复制进业务库。
 
@@ -754,7 +756,9 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 | `cert_type` | TEXT | NOT NULL | 名特优新、特质农品、地理标志 |
 | `product_name` | TEXT | NOT NULL | 规范产品名 |
 | `product_name_raw` | TEXT | 可空 | 来源原名 |
+| `normalized_name` | TEXT | NOT NULL | 去空白、统一全半角后的名称，用于自然键和匹配 |
 | `category` | TEXT | 可空 | 水果、蔬菜、水产等 |
+| `is_aquatic` | INTEGER | 可空 | 水产三态：`1` 是、`0` 否、`NULL` 证据不足 |
 | `province` | TEXT | 可空 | 省份 |
 | `city` | TEXT | 可空 | 地市 |
 | `county` | TEXT | 可空 | 区县 |
@@ -774,7 +778,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 | `last_seen_at` | TEXT | NOT NULL | 最近出现 |
 | `extra` | TEXT | 默认 `'{}'` | 附加字段 JSON |
 
-自然键：`(cert_type, normalized_name, province, region)` 唯一。缺少 `region` 时使用 `origin_scope` 的稳定摘要参与去重，并在 `extra` 中记录推导依据。
+自然键：`(cert_type, normalized_name, province, region)` 唯一。`region` 取来源地区展示值；缺少 `region` 时使用 `origin_scope` 规范化文本的稳定摘要，并在 `extra` 中记录推导依据。`region` 和 `origin_scope` 都为空时进入冲突，不与同省产品合并。`normalized_name` 的归一规则见 `std-entities.md`。
 
 索引：`(cert_type, province, city, county)`、`(category)`、`(normalized_name)`、`(publish_status)`。
 
@@ -921,7 +925,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 ### 方言域
 
-#### std_dialect_points
+#### std_dialect_pointss
 
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
@@ -968,7 +972,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(point_id, lemma)`、`(audio_status)`、`(publish_status)`。
 
-外键：`point_id` 引用 `std_dialect_points.id`。
+外键：`point_id` 引用 `std_dialect_pointss.id`。
 
 #### std_dialect_lexeme_sources
 

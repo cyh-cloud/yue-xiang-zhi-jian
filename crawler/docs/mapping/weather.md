@@ -18,9 +18,9 @@
 
 ## 候选字段
 
-| 业务字段 | 来源字段或位置 | crawler 临时实体 | 运行时 DTO | 说明 |
+| 业务字段 | 来源字段或位置 | 运行时 DTO 字段 | 运行时 DTO | 说明 |
 | --- | --- | --- | --- | --- |
-| 城市编码 | `city` | `std_weather_candidate.city_code` | `city_code` | 字符串，保留前导零 |
+| 城市编码 | `city` | `dto.city_code` | `city_code` | 字符串，保留前导零 |
 | 城市名 | `cityname` | `city_name` | `city_name` | 直接映射 |
 | 城市英文标识 | `nameen` | `city_slug` | 不展示 | 可作日志标识 |
 | 当前天气 | `weather`、`weathercode` | `condition_text`、`condition_code` | 同名 | 天气现象和代码分开 |
@@ -54,7 +54,7 @@
 
 - 不创建 `weather_history`、`weather_hourly` 或长期天气快照表。
 - raw 层可以保存短期响应用于排错，必须记录 `fetched_at` 和 TTL。
-- std 层只保留最近一次候选或运行时缓存，不作为历史事实。
+- 不建立 std 天气表；每次请求只在内存组装运行时 DTO。
 - 业务库不保存天气快照。
 
 ## 农时提示接入点

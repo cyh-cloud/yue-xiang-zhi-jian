@@ -1,5 +1,7 @@
 # 外研非遗网非遗资讯与项目文章
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `feiyiw`
 
 状态: `approved-with-gaps`
@@ -183,8 +185,8 @@
 
 建议使用或新增以下标准实体：
 
-- `std_ich_articles`: `source_id`、`source_record_id`、`source_url`、`category_id`、`category_name`、`title`、`published_at`、`body_text`、`content_hash`、`fetched_at`
-- `std_ich_projects`: 只有从正文抽出并经过官方核验的项目事实才写入。字段包括项目名称、类别、地区、级别、批准时间原文、保护单位、项目编号和来源 URL。
+- `std_ich_articles`（建议新增，尚未冻结）: `source_id`、`source_item_id`、`source_url`、`category_id`、`category_name`、`title`、`published_at`、`body_text`、`content_hash`、`retrieved_at`
+- `std_ich_projectss`: 只有从正文抽出并经过官方核验的项目事实才写入。字段包括项目名称、类别、地区、级别、批准时间原文、保护单位、项目编号和来源 URL。
 - `craft_evidence`: 用于把补充文章挂到经过人工确认的技艺实体，保留 `confidence`、`review_status` 和 `source_url`，避免补充来源直接覆盖官方事实。
 
 ### 粤乡智匠表

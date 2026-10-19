@@ -1,61 +1,37 @@
 # 本地任务图
 
-本文件代替远程 tracker，不创建 issue 或 PR。
+本文件代替远程 tracker，不创建 issue 或 PR。任务只记录依赖、产出和当前状态，问题明细指向 `ISSUES.md`。
 
 ## 已完成
 
-- `spec`: 规格冻结，见 `SPEC.md`。
-- `registry`: 来源 ID 和共享文件骨架冻结，见 `sources.json`。
+| 任务 | 产出 | 状态依据 |
+| --- | --- | --- |
+| `spec` | `SPEC.md` | 规格已冻结 |
+| `source-baseline` | 12 份来源文档 | 首轮实现已落盘 |
+| `review-baseline` | 12 份独立审核记录 | 首轮审核已落盘 |
+| `architecture-baseline` | `schema/`、`mapping/`、`operations/` | 设计文档已落盘 |
+| `registry-contract` | `sources.json`、`sources/CONTRACT.md`、`README.md` | 来源注册表和共享契约已建立 |
 
-## 第一波：来源契约
+## 待修复
 
 | 任务 | 依赖 | 产出 |
 | --- | --- | --- |
-| `source-ihchina` | `registry` | `sources/ihchina.md` |
-| `source-aqsc-moa` | `registry` | `sources/aqsc-moa.md` |
-| `source-cnipa` | `registry` | `sources/cnipa.md` |
-| `source-weather` | `registry` | `sources/weather.md` |
-| `source-nzrc` | `registry` | `sources/nzrc.md` |
-| `source-nongmuhr` | `registry` | `sources/nongmuhr.md` |
+| `source-contract-alignment` | `registry-contract` | 来源文档按 `sources/CONTRACT.md` 补齐差异字段、详情 URL 资格、下载记录和验证时间 |
+| `review-alignment` | `source-contract-alignment` | 审核记录重新核对 `sources.json` 的状态、访问边界和来源证据 |
+| `blockers-p0` | 无 | 按 `ISSUES.md` 的 P0 顺序关闭实现前决策门 |
+| `blockers-p1-p2` | `blockers-p0` | 按 `ISSUES.md` 分级关闭后续修复和改进项 |
 
-## 第二波：来源契约
+## 待复核
 
 | 任务 | 依赖 | 产出 |
 | --- | --- | --- |
-| `source-5ajob` | `registry` | `sources/5ajob.md` |
-| `source-dialect-org` | `registry` | `sources/dialect-org.md` |
-| `source-cass-linguistics` | `registry` | `sources/cass-linguistics.md` |
-| `source-cnopendata` | `registry` | `sources/cnopendata.md` |
-| `source-zhongguoyuyan` | `registry` | `sources/zhongguoyuyan.md` |
-| `source-feiyiw` | `registry` | `sources/feiyiw.md` |
+| `registry-contract-review` | `registry-contract` | 复核 JSON 合法性、ID 唯一性、状态一致性、路径存在性和契约语义 |
+| `source-detail-url-review` | `source-contract-alignment` | 复核每份来源的详情 URL 是否满足业务发布硬规则 |
+| `final-review` | 全部待修复和待复核任务 | 最终交付验收记录 |
 
-## 第三波：架构与映射
+## 阻塞
 
-| 任务 | 依赖 | 产出 |
+| 阻塞门 | 依赖 | 说明 |
 | --- | --- | --- |
-| `adr-crawler-db` | `spec` | `adr/0001-crawler-separate-database.md` |
-| `adr-source-access` | `spec` | `adr/0002-source-rights-and-access.md` |
-| `schema-crawler` | `spec` | `schema/crawler-db.md` |
-| `schema-yuexiang` | `spec` | `schema/yuexiang-target-db.md` |
-| `converter` | `schema-crawler` | `schema/converter.md` |
-| `mapping-content` | `spec` | `mapping/agri-products.md`, `mapping/ich-crafts.md`, `mapping/jobs.md`, `mapping/dialects.md`, `mapping/weather.md` |
-
-## 第四波：审核与汇总
-
-| 任务 | 依赖 | 产出 |
-| --- | --- | --- |
-| `review-p0` | 第一波 | `reviews/ihchina.md`, `reviews/aqsc-moa.md`, `reviews/cnipa.md` |
-| `review-p1` | 第一、二波 | 其余来源审核 |
-| `operations` | `spec` | `operations/collection-rules.md`, `operations/validation.md`, `operations/rollout.md` |
-| `final-review` | 全部 | 最终验收记录 |
-
-## 当前状态
-
-- 第一波和第二波的 12 个来源文档均已完成。
-- 12 个来源均有独立审核记录。
-- 架构、schema、映射和运维文档均已完成。
-- 未决事项已汇总到 `BLOCKERS.md`，等待人工决策。
-
-## 审核结论
-
-除 `zhongguoyuyan` 为 `blocked` 外，其余来源均为 `approved-with-gaps`。缺口不阻止继续整理设计，但在实现前需先处理 `BLOCKERS.md` 中的 P0 项。
+| `p0-decisions` | 人工决策 | 未关闭前不进入来源实现和转换器实现，明细只看 `ISSUES.md` |
+| `restricted-source-access` | 外部授权或人工核验 | 受限来源保持登记状态，满足契约后才可变更，明细只看 `ISSUES.md` |

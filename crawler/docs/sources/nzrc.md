@@ -1,5 +1,7 @@
 # 中国农业人才网
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `nzrc`
 
 状态: `approved-with-gaps`
@@ -152,37 +154,37 @@
 
 ### crawler std 层
 
-目标标准实体为 `std_recruitment_posting`。raw 层保存列表和详情 HTML；stage 层保留 `nzrc_job` 的原始字段和抓取上下文；std 层统一岗位字段。
+目标标准实体为 `std_jobs`。raw 层保存列表和详情 HTML；stage 层保留 `nzrc_job` 的原始字段和抓取上下文；std 层统一岗位字段。
 
 | 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| `checkbox2.value` / 详情 URL 中的 `{job_id}` | `std_recruitment_posting.source_item_id` | `recruitment_postings.source_item_id` | 来源内岗位 ID，保留字符串 |
-| 详情 URL | `std_recruitment_posting.source_url` | `recruitment_postings.source_url` | 规范化为绝对 URL，作为来源内自然键 |
-| `来源 ID = nzrc` | `std_recruitment_posting.source_id` | `recruitment_posting_sources.source_id` | 固定 `nzrc` |
-| `h2` | `std_recruitment_posting.title` | `recruitment_postings.title` | 去掉 `招聘职位：` 前缀，多个岗位以逗号拆分为 `title_extra` |
-| `h1 a` | `std_recruitment_posting.company_name` | `recruitment_postings.company_name` | 直接映射 |
-| `h1 a[href]` | `std_recruitment_posting.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
-| `li:contains("工作地点")` | `std_recruitment_posting.location_raw` | `recruitment_postings.location_raw` | 保留原文，拆出首个地区到 `region` |
-| `li:contains("招聘方式")` | `std_recruitment_posting.employment_type` | `recruitment_postings.employment_type` | 如 `全职` |
-| `li:contains("招聘人数")` | `std_recruitment_posting.headcount_raw` | `recruitment_postings.headcount` | 去掉 `人` 后转整数，无法解析存 null |
-| `li:contains("承诺月薪")` | `std_recruitment_posting.salary_raw` | `recruitment_postings.salary_raw` | `面议` 保持原文，不推断金额 |
-| `li:contains("学历要求")` | `std_recruitment_posting.education_raw` | `recruitment_postings.education_raw` | 直接映射 |
-| `li:contains("性别要求")` | `std_recruitment_posting.gender_requirement` | `recruitment_postings.gender_requirement` | 直接映射 |
-| `li:contains("发布日期")` | `std_recruitment_posting.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期 |
-| `li:contains("有效时间")` | `std_recruitment_posting.validity_days` | `recruitment_postings.validity_days` | 解析天数；截止日按发布日期加天数计算，并与抓取时间交叉校验 |
-| `#brief_info p` | `std_recruitment_posting.description_html` | `recruitment_postings.description` | 保留清洗后 HTML 或纯文本，移除脚本和样式 |
-| `#brief_info p` 中职责和要求 | `std_recruitment_posting.requirements_text` | `recruitment_postings.requirements` | 可按“岗位职责”“任职要求”分段 |
-| `#address` / Ajax `address` | `std_recruitment_posting.company_address` | `recruitment_postings.company_address` | 未登录为 null，不越过登录限制 |
-| `#officeuser` / Ajax `officeuser` | `std_recruitment_posting.contact_name` | `recruitment_postings.contact_name` | 未登录为 null |
-| `#fixtel` / Ajax `tel` | `std_recruitment_posting.contact_phone` | `recruitment_postings.contact_phone` | 未登录为 null；公开页有值时可保留 |
-| `#fax` / Ajax `fax` | `std_recruitment_posting.contact_fax` | `recruitment_postings.contact_fax` | 未登录为 null |
-| `#site` / Ajax `site` | `std_recruitment_posting.company_website` | `recruitment_postings.company_website` | 转绝对 URL |
-| `#postNumber` / Ajax `post` | `std_recruitment_posting.postal_code` | `recruitment_postings.postal_code` | 未登录为 null |
-| Ajax `email` | `std_recruitment_posting.contact_email` | `recruitment_postings.contact_email` | 只接收公开响应中的值，不登录提取 |
-| 列表 `div.suozaidi` | `std_recruitment_posting.location_raw` | `recruitment_postings.location_raw` | 详情缺失时回退 |
-| 列表 `div.shijian` | `std_recruitment_posting.listed_at` | `recruitment_postings.listed_at` | 详情发布日期缺失时回退 |
-| 详情 HTML 正文 | `std_recruitment_posting.content_hash` | `recruitment_postings.content_hash` | 对规范化正文计算 SHA-256 |
-| 抓取时间 | `std_recruitment_posting.fetched_at` | `recruitment_postings.fetched_at` | 每次采集更新 |
+| `checkbox2.value` / 详情 URL 中的 `{job_id}` | `std_jobs.source_item_id` | `recruitment_postings.source_item_id` | 来源内岗位 ID，保留字符串 |
+| 详情 URL | `std_jobs.source_url` | `recruitment_postings.source_url` | 规范化为绝对 URL，作为来源内自然键 |
+| `来源 ID = nzrc` | `std_jobs.source_id` | `recruitment_posting_sources.source_id` | 固定 `nzrc` |
+| `h2` | `std_jobs.title` | `recruitment_postings.title` | 去掉 `招聘职位：` 前缀，多个岗位以逗号拆分为 `title_extra` |
+| `h1 a` | `std_jobs.company_name` | `recruitment_postings.company_name` | 直接映射 |
+| `h1 a[href]` | `std_jobs.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
+| `li:contains("工作地点")` | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 保留原文，拆出首个地区到 `region` |
+| `li:contains("招聘方式")` | `std_jobs.employment_type` | `recruitment_postings.employment_type` | 如 `全职` |
+| `li:contains("招聘人数")` | `std_jobs.headcount_raw` | `recruitment_postings.headcount` | 去掉 `人` 后转整数，无法解析存 null |
+| `li:contains("承诺月薪")` | `std_jobs.salary_raw` | `recruitment_postings.salary_raw` | `面议` 保持原文，不推断金额 |
+| `li:contains("学历要求")` | `std_jobs.education_raw` | `recruitment_postings.education_raw` | 直接映射 |
+| `li:contains("性别要求")` | `std_jobs.gender_requirement` | `recruitment_postings.gender_requirement` | 直接映射 |
+| `li:contains("发布日期")` | `std_jobs.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期 |
+| `li:contains("有效时间")` | `std_jobs.validity_days` | `recruitment_postings.validity_days` | 解析天数；截止日按发布日期加天数计算，并与抓取时间交叉校验 |
+| `#brief_info p` | `std_jobs.description_html` | `recruitment_postings.description` | 保留清洗后 HTML 或纯文本，移除脚本和样式 |
+| `#brief_info p` 中职责和要求 | `std_jobs.requirements_text` | `recruitment_postings.requirements` | 可按“岗位职责”“任职要求”分段 |
+| `#address` / Ajax `address` | `std_jobs.company_address` | `recruitment_postings.company_address` | 未登录为 null，不越过登录限制 |
+| `#officeuser` / Ajax `officeuser` | `std_jobs.contact_name` | `recruitment_postings.contact_name` | 未登录为 null |
+| `#fixtel` / Ajax `tel` | `std_jobs.contact_phone` | `recruitment_postings.contact_phone` | 未登录为 null；公开页有值时可保留 |
+| `#fax` / Ajax `fax` | `std_jobs.contact_fax` | `recruitment_postings.contact_fax` | 未登录为 null |
+| `#site` / Ajax `site` | `std_jobs.company_website` | `recruitment_postings.company_website` | 转绝对 URL |
+| `#postNumber` / Ajax `post` | `std_jobs.postal_code` | `recruitment_postings.postal_code` | 未登录为 null |
+| Ajax `email` | `std_jobs.contact_email` | `recruitment_postings.contact_email` | 只接收公开响应中的值，不登录提取 |
+| 列表 `div.suozaidi` | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 详情缺失时回退 |
+| 列表 `div.shijian` | `std_jobs.listed_at` | `recruitment_postings.listed_at` | 详情发布日期缺失时回退 |
+| 详情 HTML 正文 | `std_jobs.content_hash` | `recruitment_postings.content_hash` | 对规范化正文计算 SHA-256 |
+| 抓取时间 | `std_jobs.fetched_at` | `recruitment_postings.fetched_at` | 每次采集更新 |
 
 ### 粤乡智匠建议表
 

@@ -1,6 +1,7 @@
 {
   "version": 1,
   "generated_at": "2026-10-19T00:00:00+08:00",
+  "contract": "sources/CONTRACT.md",
   "sources": [
     {
       "id": "ihchina",
@@ -8,6 +9,7 @@
       "domains": ["www.ihchina.cn"],
       "content_domains": ["ich", "crafts"],
       "priority": "P0",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/ihchina.md",
@@ -16,9 +18,10 @@
     {
       "id": "aqsc-moa",
       "name": "农业农村部农产品质量安全中心及监管司",
-      "domains": ["www.aqsc.agri.cn", "jgs.moa.gov.cn"],
+      "domains": ["www.aqsc.agri.cn", "mtyx.aqsc.org", "jgs.moa.gov.cn"],
       "content_domains": ["agri-products"],
       "priority": "P0",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "http-and-files",
       "document": "sources/aqsc-moa.md",
@@ -30,6 +33,7 @@
       "domains": ["www.cnipa.gov.cn", "ggfw.cnipa.gov.cn"],
       "content_domains": ["agri-products"],
       "priority": "P0",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright-json",
       "document": "sources/cnipa.md",
@@ -41,6 +45,7 @@
       "domains": ["www.weather.com.cn"],
       "content_domains": ["weather"],
       "priority": "P1",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/weather.md",
@@ -52,6 +57,7 @@
       "domains": ["www.nzrc.com.cn"],
       "content_domains": ["jobs"],
       "priority": "P1",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/nzrc.md",
@@ -63,6 +69,7 @@
       "domains": ["nongmuhr.com"],
       "content_domains": ["jobs"],
       "priority": "P1",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/nongmuhr.md",
@@ -74,6 +81,7 @@
       "domains": ["www.5ajob.com"],
       "content_domains": ["jobs"],
       "priority": "P1",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/5ajob.md",
@@ -85,6 +93,7 @@
       "domains": ["dialect.org.cn"],
       "content_domains": ["dialects"],
       "priority": "P1",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/dialect-org.md",
@@ -96,8 +105,17 @@
       "domains": ["ling.cass.cn"],
       "content_domains": ["dialects", "research"],
       "priority": "P2",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
+      "excluded_subresources": [
+        {
+          "domain": "www.dialectgrammar.com",
+          "access": "login-required",
+          "in_scope": false,
+          "reason": "方言语法特征语料库的检索和例句需要注册登录，不属于 ling.cass.cn 公开自动采集主体。"
+        }
+      ],
       "document": "sources/cass-linguistics.md",
       "review": "reviews/cass-linguistics.md"
     },
@@ -107,8 +125,18 @@
       "domains": ["www.cnopendata.com"],
       "content_domains": ["dialects", "ich"],
       "priority": "P2",
-      "access": "public",
+      "status": "approved-with-gaps",
+      "access": "login-required",
       "verification": "playwright",
+      "scope": "public-metadata-only",
+      "excluded_subresources": [
+        {
+          "domain": "sso.cnopendata.com",
+          "access": "login-required",
+          "in_scope": false,
+          "reason": "完整数据、下载和 API 需要登录或购买，只登记 www.cnopendata.com 的公开元数据。"
+        }
+      ],
       "document": "sources/cnopendata.md",
       "review": "reviews/cnopendata.md"
     },
@@ -118,6 +146,7 @@
       "domains": ["zhongguoyuyan.cn"],
       "content_domains": ["dialects"],
       "priority": "P2",
+      "status": "blocked",
       "access": "robots-restricted",
       "verification": "robots-only",
       "document": "sources/zhongguoyuyan.md",
@@ -129,6 +158,7 @@
       "domains": ["www.feiyiw.cn"],
       "content_domains": ["ich", "crafts"],
       "priority": "P2",
+      "status": "approved-with-gaps",
       "access": "public",
       "verification": "playwright",
       "document": "sources/feiyiw.md",

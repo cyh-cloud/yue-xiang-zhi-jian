@@ -1,8 +1,12 @@
 # 中国天气网
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `weather`
 
 状态: `approved-with-gaps`
+
+访问等级: `public`
 
 验证时间: `2026-10-19 01:04 Asia/Shanghai`
 
@@ -109,7 +113,7 @@ var dataSK={"city":"101010100","cityname":"北京",...};
 - 页面 URL: `https://www.weather.com.cn/weather1d/101010100.shtml`
 - 抓取时间: `2026-10-19 01:04 Asia/Shanghai`
 - 关键字段: `cityname=北京`，`city=101010100`，`temp=6.1`，`weather=晴`，`WD=西风`，`WS=1级`，`SD=89%`，`rain=0`，`rain24h=0`，`aqi=23`，`time=00:45`，`date=10月19日(星期一)`
-- 目标映射: `std_weather_candidate` 的北京实时观测候选，不落历史表
+- 目标映射: `weather_dto` 的北京实时观测候选，不落历史表
 
 ### 样本 2
 
@@ -117,39 +121,39 @@ var dataSK={"city":"101010100","cityname":"北京",...};
 - 页面 URL: `https://www.weather.com.cn/weather1d/101280101.shtml`
 - 抓取时间: `2026-10-19 01:04 Asia/Shanghai`
 - 关键字段: `cityname=广州`，`city=101280101`，`temp=23.5`，`weather=晴`，`WD=北风`，`WS=2级`，`SD=94%`，`rain=0`，`rain24h=0`，`aqi=26`，`time=00:45`，`date=10月19日(星期一)`
-- 目标映射: `std_weather_candidate` 的广州实时观测候选，不落历史表
+- 目标映射: `weather_dto` 的广州实时观测候选，不落历史表
 
 ## 字段映射
 
-### crawler std 层
+### 运行时 DTO
 
-建议使用临时标准实体 `std_weather_candidate` 承接一次请求，不建立 `weather_history` 表。该实体可以写入 raw 响应索引，但标准层只保留最近一次候选供调试和转换使用。
+`weather_dto` 是运行时 DTO，不是采集库 `std` 表。一次请求在内存中组装，raw 层只保存响应快照、URL、取得时间和哈希，不建立 `weather_history` 或其他历史天气表。转换器不读取天气，天气不进入导入批次和回滚。
 
-| 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
+| 来源字段 | 运行时 DTO 字段 | 粤乡智匠展示字段 | 说明 |
 | --- | --- | --- | --- |
-| `city` | `std_weather_candidate.city_code` | 运行时提示 DTO `city_code` | 城市自然键，保留字符串 |
-| `cityname` | `std_weather_candidate.city_name` | 运行时提示 DTO `city_name` | 直接映射 |
-| `nameen` | `std_weather_candidate.city_slug` | 运行时提示 DTO `city_slug` | 可用于日志，不用于展示 |
-| `temp` | `std_weather_candidate.temperature_c` | 运行时提示 DTO `temperature_c` | 转数值，保留一位小数 |
-| `tempf` | `std_weather_candidate.temperature_f` | 不展示 | 保留原始值用于核对 |
-| `weather` | `std_weather_candidate.condition_text` | 运行时提示 DTO `condition_text` | 直接映射 |
-| `weathercode` | `std_weather_candidate.condition_code` | 运行时提示 DTO `condition_code` | 直接映射 |
-| `WD` | `std_weather_candidate.wind_direction` | 运行时提示 DTO `wind_direction` | 直接映射 |
-| `WS` | `std_weather_candidate.wind_level` | 运行时提示 DTO `wind_level` | 直接映射 |
-| `wse` | `std_weather_candidate.wind_speed` | 运行时提示 DTO `wind_speed` | 保留原字符串 |
-| `SD` | `std_weather_candidate.humidity` | 运行时提示 DTO `humidity` | 去掉百分号存入，另保留原文 |
-| `qy` | `std_weather_candidate.pressure_hpa` | 运行时提示 DTO `pressure_hpa` | 转数值 |
-| `njd` | `std_weather_candidate.visibility` | 运行时提示 DTO `visibility` | 保留原字符串 |
-| `rain` | `std_weather_candidate.rain_current` | 运行时提示 DTO `rain_current` | 转数值 |
-| `rain24h` | `std_weather_candidate.rain_24h` | 运行时提示 DTO `rain_24h` | 转数值 |
-| `aqi` | `std_weather_candidate.aqi` | 运行时提示 DTO `aqi` | 转整数 |
-| `aqi_pm25` | `std_weather_candidate.aqi_pm25` | 不展示 | 保留供诊断 |
-| `limitnumber` | `std_weather_candidate.traffic_limit` | 不展示 | 与农时提示无关，可丢弃 |
-| `time` | `std_weather_candidate.observed_time_raw` | 运行时提示 DTO `observed_at` | 与 `date`、抓取日期组合为完整时间 |
-| `date` | `std_weather_candidate.observed_date_raw` | 运行时提示 DTO `observed_at` | 解析中文日期和星期 |
-| 响应正文 | `std_weather_candidate.content_hash` | 运行时提示 DTO `content_hash` | 对规范化正文计算 SHA-256 |
-| 请求 URL | `std_weather_candidate.source_url` | 运行时提示 DTO `source_url` | 原始接口 URL |
-| 抓取时间 | `std_weather_candidate.fetched_at` | 运行时提示 DTO `fetched_at` | 必须随响应保存 |
+| `city` | `dto.city_code` | 运行时提示 DTO `city_code` | 城市自然键，保留字符串 |
+| `cityname` | `dto.city_name` | 运行时提示 DTO `city_name` | 直接映射 |
+| `nameen` | `dto.city_slug` | 运行时提示 DTO `city_slug` | 可用于日志，不用于展示 |
+| `temp` | `dto.temperature_c` | 运行时提示 DTO `temperature_c` | 转数值，保留一位小数 |
+| `tempf` | `dto.temperature_f` | 不展示 | 保留原始值用于核对 |
+| `weather` | `dto.condition_text` | 运行时提示 DTO `condition_text` | 直接映射 |
+| `weathercode` | `dto.condition_code` | 运行时提示 DTO `condition_code` | 直接映射 |
+| `WD` | `dto.wind_direction` | 运行时提示 DTO `wind_direction` | 直接映射 |
+| `WS` | `dto.wind_level` | 运行时提示 DTO `wind_level` | 直接映射 |
+| `wse` | `dto.wind_speed` | 运行时提示 DTO `wind_speed` | 保留原字符串 |
+| `SD` | `dto.humidity` | 运行时提示 DTO `humidity` | 去掉百分号存入，另保留原文 |
+| `qy` | `dto.pressure_hpa` | 运行时提示 DTO `pressure_hpa` | 转数值 |
+| `njd` | `dto.visibility` | 运行时提示 DTO `visibility` | 保留原字符串 |
+| `rain` | `dto.rain_current` | 运行时提示 DTO `rain_current` | 转数值 |
+| `rain24h` | `dto.rain_24h` | 运行时提示 DTO `rain_24h` | 转数值 |
+| `aqi` | `dto.aqi` | 运行时提示 DTO `aqi` | 转整数 |
+| `aqi_pm25` | `dto.aqi_pm25` | 不展示 | 保留供诊断 |
+| `limitnumber` | `dto.traffic_limit` | 不展示 | 与农时提示无关，可丢弃 |
+| `time` | `dto.observed_time_raw` | 运行时提示 DTO `observed_at` | 与 `date`、抓取日期组合为完整时间 |
+| `date` | `dto.observed_date_raw` | 运行时提示 DTO `observed_at` | 解析中文日期和星期 |
+| 响应正文 | `dto.content_hash` | 运行时提示 DTO `content_hash` | 对规范化正文计算 SHA-256 |
+| 请求 URL | `dto.source_url` | 运行时提示 DTO `source_url` | 原始接口 URL |
+| 抓取时间 | `dto.fetched_at` | 运行时提示 DTO `fetched_at` | 必须随响应保存 |
 
 ### 粤乡智匠建议表
 

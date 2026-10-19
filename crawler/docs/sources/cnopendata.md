@@ -1,5 +1,7 @@
 # CnOpenData 方言与非遗数据
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `cnopendata`
 
 状态: `approved-with-gaps`
@@ -103,7 +105,7 @@
 - 抓取时间: `2026-10-19 01:10 Asia/Shanghai`
 - 关键字段: 标题“中国各地区方言信息数据”；时间范围“1986版与2012版”；更新频率“不定时更新”；3 张表；2012 版 9 字段，1986 版 8 字段，少数民族 1986 版 10 字段
 - 公开字段: `省份`、`市级`、`区县`、`区县经度`、`区县纬度`、`乡镇街道`、`方言大类`、`分片区`、`分小片区`、`小片区细分一级`、`小片区细分二级`
-- 目标映射: 有授权数据时，候选映射到 `std_dialect_points` 和粤乡智匠建议表 `dialects`，不映射到 `dialect_phrases`
+- 目标映射: 有授权数据时，候选映射到 `std_dialect_pointss` 和粤乡智匠建议表 `dialects`，不映射到 `dialect_phrases`
 
 ### 样本 2: 非遗数据集
 
@@ -114,7 +116,7 @@
 - 项目名录字段: `序号`、`项目序号`、`编号`、`名称`、`类别`、`公布时间`、`类型`、`申报地区或单位`、`保护单位`、`链接`、`正文内容`
 - 传承人字段: `序号`、`姓名`、`性别`、`民族`、`类别`、`项目编号`、`项目名称`、`申报地区或单位`、`正文内容`
 - 教科文名录字段: `序号`、`项目名称`、`列入年份`、`类型`、`申报方式`、`申报国家`、`正文内容`
-- 目标映射: 仅作为候选字段参考；获得授权前不映射到 `std_ich_projects`，也不写入粤乡智匠 `crafts`
+- 目标映射: 仅作为候选字段参考；获得授权前不映射到 `std_ich_projectss`，也不写入粤乡智匠 `crafts`
 
 ## 字段映射
 
@@ -125,22 +127,22 @@
 | 数据集 `key=zgfyxx` | `raw.source_page.source_id` | 不适用 | 只保存公开说明页的响应和哈希，来源 ID 固定为 `cnopendata` |
 | `title` | `stage_cnopendata_dataset.title` | 不适用 | 数据集级标题 |
 | `tables[].fields[].name` | `stage_cnopendata_field.field_name` | 不适用 | 保留原始字段名和顺序 |
-| `省份` | `std_dialect_points.province` | `dialects.region` 或建议新增 `province` | 候选映射，授权后才能形成 `std` 记录 |
-| `市级` | `std_dialect_points.city` | 建议新增 `dialects.city` | 候选映射 |
-| `区县` | `std_dialect_points.county` | `dialects.areas` 的地区部分 | 候选映射 |
-| `区县经度` | `std_dialect_points.longitude` | 建议新增 `dialects.longitude` | 保留数值类型 |
-| `区县纬度` | `std_dialect_points.latitude` | 建议新增 `dialects.latitude` | 保留数值类型 |
-| `乡镇街道` | `std_dialect_points.township` | 建议新增 `dialects.township` | 2012 版存在，其他表可为空 |
-| `方言大类` | `std_dialect_points.dialect_group` | `dialects.name` 的候选依据 | 不能替代粤乡智匠人工确认的方言名称 |
-| `分片区` | `std_dialect_points.subgroup` | `dialects.features` 或建议新增 `subgroup` | 保持来源原文 |
-| `分小片区` | `std_dialect_points.sub_subgroup` | `dialects.features` 或建议新增 `sub_subgroup` | 保持来源原文 |
-| 非遗 `编号` | `std_ich_projects.project_code` | 建议新增 `crafts.project_code` | 候选映射 |
-| 非遗 `名称` | `std_ich_projects.name` | `crafts.name` | 仅授权且人工复核后使用 |
-| 非遗 `类别` | `std_ich_projects.category` | 建议新增 `crafts.ich_category` | 十大门类原文 |
-| 非遗 `申报地区或单位` | `std_ich_projects.region_or_unit` | `crafts.origin` 的候选依据 | 地区与单位可能混写，需拆分或保留原文 |
-| 非遗 `保护单位` | `std_ich_projects.protection_unit` | 建议新增 `crafts.protection_unit` | 保留原文 |
-| 非遗 `链接` | `std_ich_projects.source_url` | 建议新增 `crafts.source_url` | 发布前验证链接可直达 |
-| 非遗 `正文内容` | `std_ich_projects.body_text` | `crafts.history` 的候选来源 | 完整正文只在授权范围内保存，不直接公开转载 |
+| `省份` | `std_dialect_pointss.province` | `dialects.region` 或建议新增 `province` | 候选映射，授权后才能形成 `std` 记录 |
+| `市级` | `std_dialect_pointss.city` | 建议新增 `dialects.city` | 候选映射 |
+| `区县` | `std_dialect_pointss.county` | `dialects.areas` 的地区部分 | 候选映射 |
+| `区县经度` | `std_dialect_pointss.longitude` | 建议新增 `dialects.longitude` | 保留数值类型 |
+| `区县纬度` | `std_dialect_pointss.latitude` | 建议新增 `dialects.latitude` | 保留数值类型 |
+| `乡镇街道` | `std_dialect_pointss.township` | 建议新增 `dialects.township` | 2012 版存在，其他表可为空 |
+| `方言大类` | `std_dialect_pointss.dialect_group` | `dialects.name` 的候选依据 | 不能替代粤乡智匠人工确认的方言名称 |
+| `分片区` | `std_dialect_pointss.subgroup` | `dialects.features` 或建议新增 `subgroup` | 保持来源原文 |
+| `分小片区` | `std_dialect_pointss.sub_subgroup` | `dialects.features` 或建议新增 `sub_subgroup` | 保持来源原文 |
+| 非遗 `编号` | `std_ich_projectss.project_code` | 建议新增 `crafts.project_code` | 候选映射 |
+| 非遗 `名称` | `std_ich_projectss.name` | `crafts.name` | 仅授权且人工复核后使用 |
+| 非遗 `类别` | `std_ich_projectss.category` | 建议新增 `crafts.ich_category` | 十大门类原文 |
+| 非遗 `申报地区或单位` | `std_ich_projectss.region_or_unit` | `crafts.origin` 的候选依据 | 地区与单位可能混写，需拆分或保留原文 |
+| 非遗 `保护单位` | `std_ich_projectss.protection_unit` | 建议新增 `crafts.protection_unit` | 保留原文 |
+| 非遗 `链接` | `std_ich_projectss.source_url` | 建议新增 `crafts.source_url` | 发布前验证链接可直达 |
+| 非遗 `正文内容` | `std_ich_projectss.body_text` | `crafts.history` 的候选来源 | 完整正文只在授权范围内保存，不直接公开转载 |
 
 ### 粤乡智匠表
 

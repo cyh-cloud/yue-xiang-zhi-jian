@@ -198,6 +198,9 @@
 | `company_address` | TEXT | 默认 `''` | 公开企业地址 |
 | `region` | TEXT | 默认 `''` | 首个工作地区 |
 | `location_raw` | TEXT | 默认 `''` | 地点原文 |
+| `province` | TEXT | 默认 `''` | 省份，来自 std 的规范化地点 |
+| `city` | TEXT | 默认 `''` | 城市，来自 std 的规范化地点 |
+| `county` | TEXT | 默认 `''` | 区县，来自 std 的规范化地点 |
 | `employment_type` | TEXT | 默认 `''` | 全职、兼职等 |
 | `headcount` | INTEGER | 可空 | 可靠解析时填写 |
 | `salary_raw` | TEXT | 默认 `''` | 薪资原文 |
@@ -236,7 +239,8 @@
 索引：
 
 - `(source_id, published_at)`
-- `(province, city)` 若增加省市列
+- `(province, city, county)`
+- `(region)`
 - `(is_agriculture_related, publish_status)`
 - `(deadline_at)`
 - `(content_hash)`
@@ -278,6 +282,8 @@
 兼容策略：只服务新招聘表，不改 `recruitment_sources`。
 
 回滚方式：先删本表，再删 `recruitment_postings`。
+
+迁移兼容：`province`、`city`、`county` 以新增可空列发布，旧行默认空字符串。转换器只从 `std_jobs.province`、`std_jobs.city`、`std_jobs.location_raw` 升级写入，无法确认的行政区写空值并保留 `location_raw`。索引不得引用不存在的列。
 
 ## 新增 dialect_points
 
@@ -419,7 +425,7 @@
 ## 缺口
 
 - `crafts` 与 `std_ich_projects` 的多来源合并策略仍需以实际导入样本验证。
-- `agri_certified_products` 的 `normalized_name` 规则需要与 PDF/XLSX 解析结果对齐。
+- `agri_certified_products` 的 `normalized_name` 规则已冻结为去空白、统一全半角和大小写不敏感比较值，仍需用 PDF/XLSX 样本做回归。
 - 招聘岗位是否展示公开联系方式需要运营和来源授权共同确认。
 - 方言词条发布到现有 `dialect_phrases` 的映射规则未在本次冻结。
 - `schema_migrations` 的具体迁移编号由后续实现票据分配。

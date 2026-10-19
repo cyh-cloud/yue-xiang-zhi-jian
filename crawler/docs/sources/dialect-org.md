@@ -1,5 +1,7 @@
 # 中国方言库
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `dialect-org`
 
 状态: `approved-with-gaps`
@@ -76,7 +78,7 @@
 - 抓取时间: `2026-10-19 01:08 Asia/Shanghai`
 - 关键字段: 地区 `北京`；词条 `你好`；读音 `Nǐ hǎo`；释义 `普通话标准发音`；页面存在 `<audio src="https://你的OSS bucket.oss-cn-hangzhou.aliyuncs.com/hello.mp3">`
 - 音频结论: 存在 `audio` 元素但地址是占位字符串，Playwright 实测 `MediaError code 4`、`networkState=3`，音频不可用
-- 目标映射: `std_dialect_points`（北京）+ `std_dialect_lexemes` + `std_dialect_lexeme_sources`
+- 目标映射: `std_dialect_pointss`（北京）+ `std_dialect_lexemes` + `std_dialect_lexeme_sources`
 
 ### 样本 2
 
@@ -101,12 +103,12 @@
 | 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
 | --- | --- | --- | --- |
 | 详情路径中的 `id` | `std_dialect_lexeme_sources.source_record_id` | `dialect_lexeme_sources.source_record_id` | 来源内自然键一部分 |
-| `region` | `std_dialect_points.region_raw` | `dialect_points.region_raw` | 保留原值，再生成规范化省/市 |
-| `region` 规范化结果 | `std_dialect_points.province`、`std_dialect_points.city` | `dialect_points.province`、`dialect_points.city` | 仅在有证据时拆分，不猜县级点 |
+| `region` | `std_dialect_pointss.region_raw` | `dialect_points.region_raw` | 保留原值，再生成规范化省/市 |
+| `region` 规范化结果 | `std_dialect_pointss.province`、`std_dialect_pointss.city` | `dialect_points.province`、`dialect_points.city` | 仅在有证据时拆分，不猜县级点 |
 | `name` / `.detail-word` | `std_dialect_lexemes.lemma` | `dialect_lexemes.lemma` | 词条/词形原文 |
 | `phonetic` / `.detail-phonetic` | `std_dialect_lexemes.phonetic` | `dialect_lexemes.phonetic` | 保留来源拼写；不擅自改国际音标 |
 | 文化解读 | `std_dialect_lexemes.definition` | `dialect_lexemes.definition` | 保存短释义，保留原文 |
-| 摘要中的“粤语”“上海话”等 | `std_dialect_points.dialect_name` | `dialect_points.dialect_name` | 仅作建议值，需人工复核 |
+| 摘要中的“粤语”“上海话”等 | `std_dialect_pointss.dialect_name` | `dialect_points.dialect_name` | 仅作建议值，需人工复核 |
 | `<audio src>` | `std_dialect_lexemes.audio_url` | `dialect_lexemes.audio_url` | 只在 URL 可实际访问时写入；当前全部为 null |
 | “暂无音频录音” | `std_dialect_lexemes.audio_status` | `dialect_lexemes.audio_status` | 记为 `missing`；占位 URL 记为 `invalid` |
 | 详情 URL | `std_dialect_lexeme_sources.source_url` | `dialect_lexeme_sources.source_url` | 直接可打开 |

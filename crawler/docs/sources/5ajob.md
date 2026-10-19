@@ -1,5 +1,7 @@
 # 5A 农业人才网
 
+共享契约: 见 `sources/CONTRACT.md`。通用字段、访问等级、状态和详情 URL 规则不在本文重复。
+
 来源 ID: `5ajob`
 
 状态: `approved-with-gaps`
