@@ -611,7 +611,7 @@ JSON 必须能被标准 JSON 解析器读取；空值用 `{}` 或 `[]`，不用�
 
 ### 非遗域
 
-#### std_ich_projectss
+#### std_ich_projects
 
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
@@ -670,7 +670,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
 | `id` | INTEGER | PK | 传承人标准 ID |
-| `project_id` | INTEGER | 可空 | 关联 `std_ich_projectss.id` |
+| `project_id` | INTEGER | 可空 | 关联 `std_ich_projects.id` |
 | `source_id` | TEXT | NOT NULL | 来源 ID |
 | `source_item_id` | TEXT | NOT NULL | 来源传承人 ID |
 | `source_url` | TEXT | NOT NULL | 传承人详情 URL |
@@ -692,7 +692,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(project_id)`、`(ich_code)`、`(name)`、`(source_id, source_item_id)`。
 
-外键：`project_id` 引用 `std_ich_projectss.id`，删除项目时置空或级联由实现策略决定。
+外键：`project_id` 引用 `std_ich_projects.id`，删除项目时置空或级联由实现策略决定。
 
 保留策略：人物资料按来源文档保留，业务发布须经审核。
 
@@ -718,7 +718,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(subject_project_id)`、`(related_project_id)`、`(relation_type)`。
 
-外键：`subject_project_id`、`related_project_id` 引用 `std_ich_projectss.id`。
+外键：`subject_project_id`、`related_project_id` 引用 `std_ich_projects.id`。
 
 #### std_ich_media_links
 
@@ -742,7 +742,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(project_id)`、`(media_type)`、`(availability)`。
 
-外键：`project_id` 引用 `std_ich_projectss.id`。
+外键：`project_id` 引用 `std_ich_projects.id`。
 
 保留策略：只保存链接和元数据，不把媒体文件复制进业务库。
 
@@ -925,7 +925,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 ### 方言域
 
-#### std_dialect_pointss
+#### std_dialect_points
 
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
@@ -972,7 +972,7 @@ JSON 语义：`extra` 保存来源未建模的附加字段；关键可筛选属�
 
 索引：`(point_id, lemma)`、`(audio_status)`、`(publish_status)`。
 
-外键：`point_id` 引用 `std_dialect_pointss.id`。
+外键：`point_id` 引用 `std_dialect_points.id`。
 
 #### std_dialect_lexeme_sources
 

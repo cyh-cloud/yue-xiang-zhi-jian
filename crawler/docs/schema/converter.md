@@ -57,7 +57,7 @@
 
 ### `ich`
 
-`std_ich_projectss` 转 `crafts` 基础资料，先写 `draft` 和 `is_teachable=0`。传承人、相关项目和媒体只写来源关系或扩展字段，不伪造教学步骤。`is_teachable=1` 由运营补齐教学证据后设置。
+`std_ich_projects` 转 `crafts` 基础资料，先写 `draft` 和 `is_teachable=0`。传承人、相关项目和媒体只写来源关系或扩展字段，不伪造教学步骤。`is_teachable=1` 由运营补齐教学证据后设置。
 
 ### `agri`
 
@@ -69,7 +69,7 @@
 
 ### `dialects`
 
-`std_dialect_pointss`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 按自然键升级写入同名业务表。现有 `dialects`、`dialect_phrases`、`dialect_quick_questions` 不变；发布到展示表由独立映射决定。
+`std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 按自然键升级写入同名业务表。现有 `dialects`、`dialect_phrases`、`dialect_quick_questions` 不变；发布到展示表由独立映射决定。
 
 ### `weather`
 
