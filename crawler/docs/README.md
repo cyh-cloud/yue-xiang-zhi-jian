@@ -11,17 +11,16 @@
 ## 阅读顺序
 
 1. `SPEC.md`：完整规格和已冻结的产品决策。
-2. `IMPLEMENTATION-SPEC.md`：后续会话直接执行的实现规格。
-3. `GLOSSARY.md`：采集域术语。
-4. `sources/CONTRACT.md`：来源文档共享接口和发布硬规则。
-5. `sources.json`：来源清单、来源状态和访问边界的唯一真相源。
-6. `sources/`：逐来源差异、证据、样本和字段映射。
-7. `reviews/`：逐来源独立审核记录。
-8. `schema/`：采集库、业务库变更和转换器设计。
-9. `mapping/`：内容域字段映射。
-10. `operations/`：采集规则、验收和上线顺序。
-11. `TASKS.md`：当前任务图、依赖和实施批次指针。
-12. `ISSUES.md`：问题清单、状态和待决事项的唯一真相源；`BLOCKERS.md` 只是入口指针。
+2. `GLOSSARY.md`：采集域术语。
+3. `sources/CONTRACT.md`：来源文档共享接口和发布硬规则。
+4. `sources.json`：来源清单、来源状态和访问边界的唯一真相源。
+5. `sources/`：逐来源差异、证据、样本和字段映射。
+6. `reviews/`：逐来源独立审核记录。
+7. `schema/`：采集库、业务库变更和转换器设计。
+8. `mapping/`：内容域字段映射。
+9. `operations/`：采集规则、验收和上线顺序。
+10. `TASKS.md`：当前任务图、依赖和实施批次指针。
+11. `ISSUES.md`：问题清单、状态和待决事项的唯一真相源；`BLOCKERS.md` 只是入口指针。
 
 ## 状态含义
 
