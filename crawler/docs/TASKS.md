@@ -21,7 +21,7 @@
 | `public-fixture-hygiene` | `tools/generate_public_fixtures.py`、`tests/fixtures/evidence/` | 9 个确定性合成 fixture，无个人数据、隐藏 token、原始作者元数据或完整源附件 |
 | `schema-contract-parity` | `pipeline/database.py`、`docs/schema/crawler-db.md` | 文档嵌入实际 DDL，主 std 和关系表带 direct/missing locator CHECK，农产品自然键统一 |
 | `crawler-acceptance-command` | `docs/README.md`、`docs/operations/validation.md` | 自包含 crawler 单测命令和全仓基线数据库边界 |
-| `history-clean-public-branch` | `main`、`crawler/docs/operations/history-hygiene.md` | 从 `main` 重建单提交公开分支，空基线，clean clone 历史扫描 0 命中 |
+| `history-clean-public-branch` | `main`、`crawler/docs/operations/history-hygiene.md` | 从 `main` 重建干净公开分支，空基线，clean clone 历史扫描 0 命中 |
 | `converter-service` | `pipeline/converter.py` | 真实 batch_id、std_sources 优先级、冲突落库和 rollback |
 | `registry-alignment` | `sources.json`、`sources/`、`reviews/`、`ISSUES.md` | 状态、权利、计数和证据对齐 |
 | `contract-hardening` | `tools/check_contracts.py`、`tools/check_history_hygiene.py` | 文档、实现、问题统计和历史卫生机械检查 |
