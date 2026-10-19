@@ -21,6 +21,7 @@
 | `public-fixture-hygiene` | `tools/generate_public_fixtures.py`、`tests/fixtures/evidence/` | 9 个确定性合成 fixture，无个人数据、隐藏 token、原始作者元数据或完整源附件 |
 | `schema-contract-parity` | `pipeline/database.py`、`docs/schema/crawler-db.md` | 文档嵌入实际 DDL，主 std 和关系表带 direct/missing locator CHECK，农产品自然键统一 |
 | `crawler-acceptance-command` | `docs/README.md`、`docs/operations/validation.md` | 自包含 crawler 单测命令和全仓基线数据库边界 |
+| `history-clean-public-branch` | `main`、`crawler/docs/operations/history-hygiene.md` | 从 `main` 重建单提交公开分支，空基线，clean clone 历史扫描 0 命中 |
 | `converter-service` | `pipeline/converter.py` | 真实 batch_id、std_sources 优先级、冲突落库和 rollback |
 | `registry-alignment` | `sources.json`、`sources/`、`reviews/`、`ISSUES.md` | 状态、权利、计数和证据对齐 |
 | `contract-hardening` | `tools/check_contracts.py`、`tools/check_history_hygiene.py` | 文档、实现、问题统计和历史卫生机械检查 |
@@ -30,7 +31,6 @@
 | 任务 | 状态 | 解除条件 |
 | --- | --- | --- |
 | `real-source-runs` | deferred | 完成 IHChina 全量详情、CNIPA 全量 PDF 和 HTML 公告附件、Dialect 15 条的真实运行证据；5ajob 需先取得可复核许可，再验证 250 页列表和详情回填 |
-| `history-clean-public-branch` | deferred | 从干净工作树生成独立公开分支，保持空基线并运行 `check_history_hygiene.py` 得到 0 命中；本分支不改写历史 |
 | `research-resource-schema` | deferred | 冻结 `std_research_sources`、`std_research_resources` 的字段、自然键和回滚方式 |
 
 ## 待复核
@@ -41,4 +41,4 @@
 
 ## 首批阻塞
 
-无。所有未完成项都在 `ISSUES.md` 标为 `deferred` 或 `excluded`，且 `阻塞首批=否`。公开分支清理是发布前独立步骤，不伪装成已解决或首批阻塞。
+无。所有未完成项都在 `ISSUES.md` 标为 `deferred` 或 `excluded`，且 `阻塞首批=否`。公开分支已从 `main` 重建并验证 0 命中；实时源全量证据仍按 deferred 条件处理。

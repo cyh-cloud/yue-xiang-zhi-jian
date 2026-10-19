@@ -10,7 +10,7 @@
 
 `crawler/download/` 是本地证据目录，已整体忽略。原始 HTML、JSON、PDF、XLSX、图片和 `.headers` 默认只保留在本机；需要公开时，只提交标准化全文、元数据和 `crawler/tests/fixtures/evidence/` 下经过脱敏、体积受控的最小测试样本。`.headers` 可能包含 `Set-Cookie`、会话标识或第三方响应信息；下载目录中的 `.headers` 禁止提交，fixture 中的 headers 也必须先确认不含凭据。
 
-本次只停止继续跟踪，没有改写 Git 历史。此前提交过的原始文件和会话头仍存在于旧提交对象中，直到仓库历史被正式清理；公开仓库不能把这些旧 blob 视为已移除。普通功能提交不负责重写历史。
+公开发布使用从 `main` 重建的单提交分支 `codex/crawler-public-release`。该分支的可达历史不含 `crawler/download/`、`.headers`、会话头或原始附件；`check_history_hygiene.py` 在单分支 clean clone 中为 0 命中。内部集成分支的旧历史不进入公开分支，也不需要改写。
 
 ## 字段
 

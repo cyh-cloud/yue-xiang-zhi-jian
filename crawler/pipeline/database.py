@@ -41,9 +41,21 @@ CREATE TABLE IF NOT EXISTS raw_fetches (
     duration_ms INTEGER,
     metadata_json TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL,
+    CHECK (length(trim(request_url)) > 0),
+    CHECK (length(trim(final_url)) > 0),
+    CHECK (length(trim(source_url)) > 0),
+    CHECK (length(trim(long_term_url)) > 0),
     CHECK (
-        detail_url_status = 'direct'
-        OR (locator IS NOT NULL AND length(trim(locator)) > 0)
+        (
+            detail_url_status = 'direct'
+            AND detail_url IS NOT NULL
+            AND length(trim(detail_url)) > 0
+        )
+        OR (
+            detail_url_status = 'missing'
+            AND locator IS NOT NULL
+            AND length(trim(locator)) > 0
+        )
     )
 );
 
@@ -76,9 +88,21 @@ CREATE TABLE IF NOT EXISTS raw_files (
     media_metadata TEXT NOT NULL DEFAULT '{}',
     retrieved_at TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    CHECK (length(trim(source_url)) > 0),
+    CHECK (length(trim(long_term_url)) > 0),
+    CHECK (length(trim(file_url)) > 0),
+    CHECK (length(trim(final_url)) > 0),
     CHECK (
-        detail_url_status = 'direct'
-        OR (locator IS NOT NULL AND length(trim(locator)) > 0)
+        (
+            detail_url_status = 'direct'
+            AND detail_url IS NOT NULL
+            AND length(trim(detail_url)) > 0
+        )
+        OR (
+            detail_url_status = 'missing'
+            AND locator IS NOT NULL
+            AND length(trim(locator)) > 0
+        )
     )
 );
 
@@ -104,9 +128,19 @@ CREATE TABLE IF NOT EXISTS stage_source_items (
     parser_version TEXT NOT NULL,
     extra TEXT NOT NULL DEFAULT '{}',
     UNIQUE(raw_fetch_id, source_item_id),
+    CHECK (length(trim(source_url)) > 0),
+    CHECK (length(trim(long_term_url)) > 0),
     CHECK (
-        detail_url_status = 'direct'
-        OR (locator IS NOT NULL AND length(trim(locator)) > 0)
+        (
+            detail_url_status = 'direct'
+            AND detail_url IS NOT NULL
+            AND length(trim(detail_url)) > 0
+        )
+        OR (
+            detail_url_status = 'missing'
+            AND locator IS NOT NULL
+            AND length(trim(locator)) > 0
+        )
     )
 );
 

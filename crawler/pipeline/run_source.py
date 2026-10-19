@@ -1643,6 +1643,18 @@ def run_source(source_id, mode, config):
                 )
                 continue
             try:
+                gate_row = (
+                    item["point"] if source_id == "dialect-org" else item
+                )
+                try:
+                    validate_detail_locator(
+                        gate_row.get("detail_url_status"),
+                        gate_row.get("detail_url"),
+                        gate_row.get("locator"),
+                    )
+                except ValueError:
+                    skipped += 1
+                    continue
                 content_hash = _stage_item(
                     conn,
                     source_id,
@@ -1654,9 +1666,6 @@ def run_source(source_id, mode, config):
                 if item.get("record_kind") == "announcement":
                     skipped += 1
                     continue
-                gate_row = (
-                    item["point"] if source_id == "dialect-org" else item
-                )
                 decision = evaluate_publication(gate_row)
                 if not decision.allowed:
                     skipped += 1

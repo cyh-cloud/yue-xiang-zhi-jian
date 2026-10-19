@@ -69,6 +69,8 @@ def validate_detail_locator(detail_url_status, detail_url=None, locator=None):
         raise ValueError(
             "detail_url_status must be either 'direct' or 'missing'"
         )
+    if status == "direct" and not (detail_url or "").strip():
+        raise ValueError("detail_url is required when detail_url_status is direct")
     if status == "missing" and not (locator or "").strip():
         raise ValueError("locator is required when detail_url_status is missing")
 

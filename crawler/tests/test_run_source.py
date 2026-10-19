@@ -226,7 +226,7 @@ class RunSourceContractTest(unittest.TestCase):
             try:
                 self.assertEqual(
                     conn.execute("SELECT COUNT(*) FROM stage_fixture_items").fetchone()[0],
-                    4,
+                    3,
                 )
                 rows = conn.execute(
                     "SELECT source_item_id FROM std_jobs"
