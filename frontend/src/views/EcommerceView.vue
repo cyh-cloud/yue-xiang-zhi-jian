@@ -28,6 +28,8 @@ import LiveScriptTraining from "@/components/ecommerce/LiveScriptTraining.vue";
   </section>
 </template>
 
+<style src="./ecommerce/ecommerce.css"></style>
+
 <style scoped>
 #ecommerce-tab {
   min-height: calc(100vh - 72px);

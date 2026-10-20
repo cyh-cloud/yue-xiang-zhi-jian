@@ -1329,6 +1329,8 @@ function saveProduct(productId: string): void {
   </section>
 </template>
 
+<style src="./agriculture/agriculture.css"></style>
+
 <style scoped>
 button.product-card {
   width: 100%;
