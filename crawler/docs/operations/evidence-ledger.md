@@ -30,19 +30,19 @@
 | source_id | verified_at | key_urls | fixture_dir | files | bytes | sha256_index | review |
 | --- | --- | --- | --- | ---: | ---: | --- | --- |
 | `ihchina` | 2026-10-19 18:05 Asia/Shanghai | `https://www.ihchina.cn/getProject.html`；`https://www.ihchina.cn/project_details/12178.html` | `crawler/tests/fixtures/evidence/ihchina/` | 1 | 1019 | 见下方 fixture 表 | `docs/reviews/ihchina.md` |
-| `aqsc-moa` | 2026-10-19 01:29 Asia/Shanghai | `http://www.aqsc.agri.cn/tzgg/`；`http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 2 | 10757 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
-| `cnipa` | 2026-10-19 01:53 Asia/Shanghai | `https://ggfw.cnipa.gov.cn/dlbzsq/dbQuery`；`https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541` | `crawler/tests/fixtures/evidence/cnipa/` | 1 | 1484 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
+| `aqsc-moa` | 2026-10-19 01:29 Asia/Shanghai | `http://www.aqsc.agri.cn/tzgg/`；`http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 3 | 11799 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
+| `cnipa` | 2026-10-19 01:53 Asia/Shanghai | `https://ggfw.cnipa.gov.cn/dlbzsq/dbQuery`；`https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541` | `crawler/tests/fixtures/evidence/cnipa/` | 2 | 2012 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
 | `weather` | 2026-10-19 01:29 Asia/Shanghai | `https://www.weather.com.cn/`；`https://d1.weather.com.cn/sk_2d/101010100.html` | `crawler/tests/fixtures/evidence/weather/` | 2 | 407 | 下方 fixture 表 | `docs/reviews/weather.md` |
 | `open-meteo` | 2026-10-20 Asia/Shanghai | `https://open-meteo.com/`；`https://api.open-meteo.com/v1/forecast` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/open-meteo.md` |
 | `qweather` | 2026-10-20 Asia/Shanghai | `https://www.qweather.com/`；`https://devapi.qweather.com/v7/weather/now` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/qweather.md` |
-| `nzrc` | 2026-10-19 01:28 Asia/Shanghai | `http://www.nzrc.com.cn/career_seek.html`；`http://www.nzrc.com.cn/company/jobs/8235500.html` | `crawler/tests/fixtures/evidence/nzrc/` | 2 | 770 | 下方 fixture 表 | `docs/reviews/nzrc.md` |
-| `nongmuhr` | 2026-10-19 01:28 Asia/Shanghai | `http://nongmuhr.com/Employ.aspx`；`http://nongmuhr.com/EmployView.aspx?id=13520` | `crawler/tests/fixtures/evidence/nongmuhr/` | 2 | 538 | 下方 fixture 表 | `docs/reviews/nongmuhr.md` |
+| `nzrc` | 2026-10-19 01:28 Asia/Shanghai | `http://www.nzrc.com.cn/career_seek.html`；`http://www.nzrc.com.cn/company/jobs/8235500.html` | `crawler/tests/fixtures/evidence/nzrc/` | 3 | 1920 | 下方 fixture 表 | `docs/reviews/nzrc.md` |
+| `nongmuhr` | 2026-10-19 01:28 Asia/Shanghai | `http://nongmuhr.com/Employ.aspx`；`http://nongmuhr.com/EmployView.aspx?id=13520` | `crawler/tests/fixtures/evidence/nongmuhr/` | 3 | 1651 | 下方 fixture 表 | `docs/reviews/nongmuhr.md` |
 | `5ajob` | 2026-10-19 01:29 Asia/Shanghai | `http://www.5ajob.com/job/`；`http://www.5ajob.com/c-d-9975f684d6022631-h/50506.html` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/5ajob.md` |
-| `dialect-org` | 2026-10-19 01:29 Asia/Shanghai | `https://dialect.org.cn/`；`https://dialect.org.cn/dialect/1` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/dialect-org.md` |
-| `cass-linguistics` | 2026-10-19 01:29 Asia/Shanghai | `http://ling.cass.cn/`；`http://ling.cass.cn/news/bensuo/202609/t20260904_6066095.html` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/cass-linguistics.md` |
+| `dialect-org` | 2026-10-19 01:29 Asia/Shanghai | `https://dialect.org.cn/`；`https://dialect.org.cn/dialect/1` | `crawler/tests/fixtures/evidence/dialect-org/` | 1 | 495 | 下方 fixture 表 | `docs/reviews/dialect-org.md` |
+| `cass-linguistics` | 2026-10-19 01:29 Asia/Shanghai | `http://ling.cass.cn/`；`http://ling.cass.cn/news/bensuo/202609/t20260904_6066095.html` | `crawler/tests/fixtures/evidence/cass-linguistics/` | 1 | 613 | 下方 fixture 表 | `docs/reviews/cass-linguistics.md` |
 | `cnopendata` | 2026-10-19 01:45 Asia/Shanghai | `https://www.cnopendata.com/data/m/culture/zgfyxx.html`；`https://www.cnopendata.com/data/m/culture/intangible-cultural-heritage.html` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/cnopendata.md` |
 | `zhongguoyuyan` | 2026-10-19 01:45 Asia/Shanghai | `https://zhongguoyuyan.cn/robots.txt`；首页未请求 | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/zhongguoyuyan.md` |
-| `feiyiw` | 2026-10-19 01:45 Asia/Shanghai | `https://www.feiyiw.cn/`；`https://www.feiyiw.cn/index.php?app=article&act=view&article_id=70177` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/feiyiw.md` |
+| `feiyiw` | 2026-10-19 01:45 Asia/Shanghai | `https://www.feiyiw.cn/`；`https://www.feiyiw.cn/index.php?app=article&act=view&article_id=70177` | `crawler/tests/fixtures/evidence/feiyiw/` | 1 | 556 | 下方 fixture 表 | `docs/reviews/feiyiw.md` |
 
 ## 当前汇总
 
@@ -63,7 +63,7 @@
 | `crawler/tests/fixtures/evidence/cass-linguistics/discover.json` | 613 | `9683fcd3a167e43c434b7c2be358d3634e9776adbe2162c0113040c77508bc8b` |
 | `crawler/tests/fixtures/evidence/cnipa/discover.json` | 528 | `845c367b6faa0597f41f7167dacf1745444f7bf219b3190a38ae4fcc798f8c37` |
 | `crawler/tests/fixtures/evidence/cnipa/synthetic-announcement-687.pdf` | 1484 | `a003e49e62921be5b06de41993ed8f55ba6faceb805521f860e2fe21c947caea` |
-| `crawler/tests/fixtures/evidence/dialect-org/discover.json` | 495 | `90fa503e21d4975f1c6ca914928eb7066fd08e0572bb474a8dfa1c05939af5b5` |
+| `crawler/tests/fixtures/evidence/dialect-org/discover.json` | 495 | `7236c533df2f9100684adbd8b65a5e18c2abb7f48452474273bb3970c1e6fd20` |
 | `crawler/tests/fixtures/evidence/feiyiw/discover.json` | 556 | `443233489783b53f804ad26da39405b2d7b71a6e3e709bdb8082aff4235f8397` |
 | `crawler/tests/fixtures/evidence/ihchina/discover.json` | 1019 | `2865d896c53bf4d87b0724eba9ec8efcebed0936af618ab9a2c800513fb2f9aa` |
 | `crawler/tests/fixtures/evidence/nongmuhr/discover.json` | 1113 | `9cc3da018da52c8d487fd9abc625a9011943d2fca6e766360c314c1f99e35337` |

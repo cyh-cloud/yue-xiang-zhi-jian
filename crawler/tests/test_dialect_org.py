@@ -53,12 +53,12 @@ class DialectOrgSourceTest(unittest.TestCase):
             finally:
                 conn.close()
 
-            self.assertEqual(point[0], "未知地区")
-            self.assertIsNone(point[1])
-            self.assertIsNone(point[2])
+            self.assertEqual(point[0], "广东广州")
+            self.assertEqual(point[1], "广东")
+            self.assertEqual(point[2], "广州")
             self.assertIsNone(point[3])
             point_extra = json.loads(point[4])
-            self.assertEqual(point_extra["region_normalization"]["status"], "unresolved")
+            self.assertEqual(point_extra["region_normalization"]["status"], "resolved")
             self.assertNotIn("latitude", point_extra)
             self.assertNotIn("longitude", point_extra)
             self.assertNotIn("dialect_family", point_extra)

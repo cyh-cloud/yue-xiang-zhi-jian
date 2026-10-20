@@ -7,37 +7,40 @@
 ## 列表
 
 - URL: `http://nongmuhr.com/Employ.aspx`
+- 取得时间: `2026-10-21T05:12:00+08:00`
 - HTTP: `200`
-- 响应字节: 93687
-- SHA-256: `c42e8addf79b11cd4f22659f4ad529641828b95adb0145dc014daa5d6eb78d27`
-- 可见岗位链接: 5 条以上
-- 样本 ID: `13539`、`13538`、`13537`、`13536`、`13535`
-- 分页: 页面由 ASP.NET 表单驱动，本轮只验证第 1 页
+- robots: `http://nongmuhr.com/robots.txt` 返回 `200`，结论为 `allowed`
+- 详情请求: 10 条
+- 样本 ID: `13545`、`13546`、`13540`、`13541`、`13542`
 
 ## 详情
 
-| source_item_id | HTTP | 字节 | 结构结论 |
-| --- | ---: | ---: | --- |
-| 13539 | 200 | 25009 | 旧 `#project_L`、`#brief_info`、字段 `li` 均不存在 |
-| 13538 | 200 | 24539 | 旧 `#project_L`、`#brief_info`、字段 `li` 均不存在 |
-| 13537 | 200 | 28486 | 旧 `#project_L`、`#brief_info`、字段 `li` 均不存在 |
-| 13536 | 200 | 28562 | 旧 `#project_L`、`#brief_info`、字段 `li` 均不存在 |
-| 13535 | 200 | 23520 | 旧 `#project_L`、`#brief_info`、字段 `li` 均不存在 |
+前 5 条详情 URL 均返回 `200`：
 
-5 个详情页均返回 `200`，但当前 HTML 不匹配已登记字段结构。页面中的 `li` 是导航菜单，不是岗位字段，不能把这些内容当作岗位数据。
+- `http://nongmuhr.com/EmployView.aspx?Id=13545`
+- `http://nongmuhr.com/EmployView.aspx?Id=13546`
+- `http://nongmuhr.com/EmployView.aspx?Id=13540`
+- `http://nongmuhr.com/EmployView.aspx?Id=13541`
+- `http://nongmuhr.com/EmployView.aspx?Id=13542`
 
-详情证据 URL：
+取得时间：`2026-10-21T05:12:02+08:00` 至 `2026-10-21T05:12:13+08:00`。
 
-- `http://nongmuhr.com/EmployView.aspx?id=13539`
-- `http://nongmuhr.com/EmployView.aspx?id=13538`
-- `http://nongmuhr.com/EmployView.aspx?id=13537`
-- `http://nongmuhr.com/EmployView.aspx?id=13536`
-- `http://nongmuhr.com/EmployView.aspx?id=13535`
+## 计数
 
-取得时间：2026-10-21（Asia/Shanghai）。HTTP 状态和响应字节见上表；原始响应哈希与下载证据保存在本次隔离采集库和下载根，不写入公开 fixture。失败摘要：5 条详情均为 `200`，但详情字段选择器全部失配，候选计数为 0。
+- raw: 11
+- stage: 0
+- 候选标准实体: 0
+- blocked: 0
+- failed: 10
+
+## 失败摘要
+
+10 条详情均返回 `200`，但 `#project_L` 容器不存在，`parse_job_detail` 访问字段容器时触发 `AttributeError: 'NoneType' object has no attribute 'select'`。运行报告状态为 `failed`，不是成功，也不能把导航菜单的 `li` 当作岗位字段。
+
+证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-nongmuhr-2907e74ff22a4579bd820034a29d05e0\download`。
 
 ## 解除条件
 
 - 重新定位详情页岗位字段容器和标签结构。
-- 用新结构重新跑 5 条详情解析，确认至少标题、地点、有效期、招聘人数和发布日期可读。
+- 用新结构重新跑 5 条详情，确认至少标题、地点、有效期、招聘人数和发布日期可读。
 - 在此之前只保留离线 fixture 和接口测试结论，不报告 live 成功。

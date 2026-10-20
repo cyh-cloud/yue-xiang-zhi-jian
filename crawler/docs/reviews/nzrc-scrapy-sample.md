@@ -2,28 +2,40 @@
 
 日期: 2026-10-21
 
-结果: succeeded
+结果: blocked
 
 ## 列表
 
 - URL: `http://www.nzrc.com.cn/career_seek.html`
+- 取得时间: `2026-10-21T05:11:23+08:00`
 - HTTP: `200`
-- 列表行: 21
-- 响应字节: 67250
-- SHA-256: `fb839a2550fb34337a597295224a1e32e753e9e0dadfb637ab218a6d0f1da140`
+- 详情请求: 19 条
+- 样本 ID: `8235894`、`8235893`、`8235892`、`8235891`、`8235890`
 
 ## 详情
 
-| source_item_id | HTTP | 字节 | 公开字段 |
-| --- | ---: | ---: | --- |
-| 7985970 | 200 | 21655 | 地点、有效期、方式、人数、性别、薪资、日期、学历 |
-| 7985974 | 200 | 21639 | 地点、有效期、方式、人数、性别、薪资、日期、学历 |
-| 7985979 | 200 | 21533 | 地点、有效期、方式、人数、性别、薪资、日期、学历 |
-| 7986002 | 200 | 21532 | 地点、有效期、方式、人数、性别、薪资、日期、学历 |
-| 7986234 | 200 | 21480 | 地点、有效期、方式、人数、性别、薪资、日期、学历 |
+前 5 条详情 URL 均返回 `200`：
 
-## 边界
+- `http://www.nzrc.com.cn/company/jobs/8235894.html`
+- `http://www.nzrc.com.cn/company/jobs/8235893.html`
+- `http://www.nzrc.com.cn/company/jobs/8235892.html`
+- `http://www.nzrc.com.cn/company/jobs/8235891.html`
+- `http://www.nzrc.com.cn/company/jobs/8235890.html`
 
-- 5 条列表和 5 条详情均返回 200。
-- 联系方式区域存在登录提示或掩码，未提取联系人、电话、邮箱或简历信息。
-- fixture 回放与 live 结果分开记录。
+## 计数
+
+- raw: 20
+- stage: 19
+- 候选标准实体: 0
+- blocked: 19
+- failed: 0
+
+## 失败摘要
+
+`http://www.nzrc.com.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。采集侧准入按保守策略阻断全部 19 条候选，失败原因统一为 `robots:not-found`。联系方式区域未提取，公开岗位字段边界不变。
+
+证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-nzrc-aefad5969770471a8b77307d35d616d5\download`。
+
+## 重试条件
+
+站点提供可确认的 robots 允许规则，或项目负责人对 `not-found` 作出明确书面策略裁决后，重跑 5 条列表加 5 条详情。

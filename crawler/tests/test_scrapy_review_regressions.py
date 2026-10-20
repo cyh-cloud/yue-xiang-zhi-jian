@@ -94,33 +94,127 @@ class ProjectSettingsPathTest(unittest.TestCase):
 
 
 class ProjectFixtureReplayTest(unittest.TestCase):
-    def test_every_project_has_a_replay_entry_and_stage_is_idempotent(self):
-        entries = (
-            ("ihchina", "ihchina", "ihchina", "replay_ihchina_fixture"),
-            ("nzrc", "nzrc", "nzrc", "replay_nzrc_fixture"),
-            (
-                "nongmuhr",
-                "nongmuhr",
-                "nongmuhr",
-                "replay_nongmuhr_fixture",
-            ),
-            (
-                "dialect-org",
-                "dialect-org",
-                "dialect_org",
-                "replay_dialect_fixture",
-            ),
-            (
-                "cass-linguistics",
-                "cass-linguistics",
-                "cass_linguistics",
-                "replay_cass_fixture",
-            ),
-            ("feiyiw", "feiyiw", "feiyiw", "replay_feiyiw_fixture"),
-            ("aqsc-moa", "aqsc-moa", "aqsc_moa", "replay_aqsc_fixture"),
-            ("cnipa", "cnipa", "cnipa", "replay_cnipa_fixture"),
-        )
-        for source_id, project, package, function_name in entries:
+    entries = (
+        (
+            "ihchina",
+            "ihchina",
+            "ihchina",
+            "replay_ihchina_fixture",
+            "succeeded",
+            2,
+            2,
+            0,
+            "std_ich_projects",
+            "protection_unit",
+            "示例保护单位",
+        ),
+        (
+            "nzrc",
+            "nzrc",
+            "nzrc",
+            "replay_nzrc_fixture",
+            "succeeded",
+            2,
+            2,
+            0,
+            "std_jobs",
+            "company_url",
+            "http://www.nzrc.com.cn/company/companys/90001.html",
+        ),
+        (
+            "nongmuhr",
+            "nongmuhr",
+            "nongmuhr",
+            "replay_nongmuhr_fixture",
+            "succeeded",
+            2,
+            2,
+            0,
+            "std_jobs",
+            "validity_days",
+            90,
+        ),
+        (
+            "dialect-org",
+            "dialect-org",
+            "dialect_org",
+            "replay_dialect_fixture",
+            "succeeded",
+            1,
+            1,
+            0,
+            "std_dialect_points",
+            "city",
+            "广州",
+        ),
+        (
+            "cass-linguistics",
+            "cass-linguistics",
+            "cass_linguistics",
+            "replay_cass_fixture",
+            "succeeded",
+            1,
+            1,
+            0,
+            "std_research_articles",
+            "summary",
+            "公开摘要",
+        ),
+        (
+            "feiyiw",
+            "feiyiw",
+            "feiyiw",
+            "replay_feiyiw_fixture",
+            "succeeded",
+            1,
+            1,
+            0,
+            "std_ich_articles",
+            "body_text",
+            "公开正文",
+        ),
+        (
+            "aqsc-moa",
+            "aqsc-moa",
+            "aqsc_moa",
+            "replay_aqsc_fixture",
+            "partial",
+            0,
+            2,
+            2,
+            None,
+            None,
+            None,
+        ),
+        (
+            "cnipa",
+            "cnipa",
+            "cnipa",
+            "replay_cnipa_fixture",
+            "partial",
+            0,
+            1,
+            1,
+            None,
+            None,
+            None,
+        ),
+    )
+
+    def test_every_project_replays_from_its_entry_with_expected_counts(self):
+        for (
+            source_id,
+            project,
+            package,
+            function_name,
+            expected_status,
+            expected_candidates,
+            expected_stage,
+            expected_blocked,
+            table,
+            column,
+            expected_value,
+        ) in self.entries:
             with self.subTest(source_id=source_id):
                 sys.path.insert(0, str(PROJECTS / project))
                 replay = getattr(
@@ -137,20 +231,143 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                     }
                     first = replay(**kwargs)
                     second = replay(**kwargs)
-                    self.assertIn(first.status, {"succeeded", "partial"})
-                    self.assertIn(second.status, {"succeeded", "partial"})
+                    self.assertEqual(first.status, expected_status)
+                    self.assertEqual(second.status, expected_status)
+                    self.assertEqual(
+                        first.candidate_count, expected_candidates
+                    )
+                    self.assertEqual(
+                        second.candidate_count, expected_candidates
+                    )
+                    self.assertEqual(first.stage_count, expected_stage)
+                    self.assertEqual(second.stage_count, expected_stage)
+                    self.assertEqual(first.blocked, expected_blocked)
+                    self.assertEqual(second.blocked, expected_blocked)
                     conn = sqlite3.connect(root / "crawler.db")
                     try:
                         raw_count = conn.execute(
-                            "SELECT COUNT(*) FROM raw_fetches"
+                            "SELECT COUNT(*) FROM raw_fetches "
+                            "WHERE source_id = ?",
+                            (source_id,),
                         ).fetchone()[0]
                         stage_count = conn.execute(
-                            "SELECT COUNT(*) FROM stage_source_items"
+                            "SELECT COUNT(*) FROM stage_source_items "
+                            "WHERE source_id = ?",
+                            (source_id,),
                         ).fetchone()[0]
+                        stage_extra = json.loads(
+                            conn.execute(
+                                "SELECT extra FROM stage_source_items "
+                                "WHERE source_id = ? ORDER BY id LIMIT 1",
+                                (source_id,),
+                            ).fetchone()[0]
+                        )
+                        raw_file_count = conn.execute(
+                            "SELECT COUNT(*) FROM raw_files "
+                            "WHERE source_id = ?",
+                            (source_id,),
+                        ).fetchone()[0]
+                        raw_file_rows = conn.execute(
+                            "SELECT file_name, sha256, byte_size "
+                            "FROM raw_files WHERE source_id = ? "
+                            "ORDER BY file_name",
+                            (source_id,),
+                        ).fetchall()
+                        if table is None:
+                            candidate_count = 0
+                            candidate_states = []
+                            selected_value = None
+                        else:
+                            candidate_count = conn.execute(
+                                f"SELECT COUNT(*) FROM {table} "
+                                "WHERE source_id = ?",
+                                (source_id,),
+                            ).fetchone()[0]
+                            candidate_states = conn.execute(
+                                f"SELECT candidate_status, COUNT(*) "
+                                f"FROM {table} WHERE source_id = ? "
+                                "GROUP BY candidate_status",
+                                (source_id,),
+                            ).fetchall()
+                            selected_value = conn.execute(
+                                f"SELECT {column} FROM {table} "
+                                "WHERE source_id = ? ORDER BY id LIMIT 1",
+                                (source_id,),
+                            ).fetchone()[0]
                     finally:
                         conn.close()
-                    self.assertEqual(raw_count, 2)
-                    self.assertGreaterEqual(stage_count, 1)
+                    self.assertEqual(stage_count, expected_stage)
+                    self.assertEqual(candidate_count, expected_candidates)
+                    if expected_candidates:
+                        self.assertEqual(
+                            candidate_states,
+                            [("candidate", expected_candidates)],
+                        )
+                    else:
+                        self.assertEqual(candidate_states, [])
+                    self.assertEqual(selected_value, expected_value)
+                    if source_id == "cass-linguistics":
+                        self.assertEqual(
+                            stage_extra["media"], "中国社会科学网"
+                        )
+                    if source_id == "feiyiw":
+                        self.assertIn("supplementary", stage_extra)
+                    self.assertEqual(
+                        raw_count, 2 * first.raw_count
+                    )
+                    if source_id in {"aqsc-moa", "cnipa"}:
+                        self.assertEqual(
+                            raw_file_count, 2 * expected_stage
+                        )
+                        fixture_files = sorted(
+                            path
+                            for path in source_fixture_dir(source_id).iterdir()
+                            if path.suffix.lower()
+                            in {".xlsx", ".pdf"}
+                        )
+                        expected_files = {
+                            (
+                                path.name,
+                                hashlib.sha256(path.read_bytes()).hexdigest(),
+                                path.stat().st_size,
+                            )
+                            for path in fixture_files
+                        }
+                        self.assertEqual(
+                            {
+                                tuple(row)
+                                for row in raw_file_rows
+                            },
+                            expected_files,
+                        )
+                    else:
+                        self.assertEqual(
+                            raw_file_count, 2 * first.raw_count
+                        )
+
+    def test_every_project_rejects_a_fixture_directory_for_another_source(self):
+        for (
+            source_id,
+            project,
+            package,
+            function_name,
+            *_,
+        ) in self.entries:
+            with self.subTest(source_id=source_id):
+                sys.path.insert(0, str(PROJECTS / project))
+                replay = getattr(
+                    importlib.import_module(f"{package}.replay"),
+                    function_name,
+                )
+                with tempfile.TemporaryDirectory() as tmp:
+                    root = Path(tmp)
+                    with self.assertRaises(ValueError):
+                        replay(
+                            fixture_dir=source_fixture_dir("weather"),
+                            database_path=root / "crawler.db",
+                            download_root=root / "downloads",
+                            registry_path=REGISTRY,
+                        )
 
 
 class AdmissionRegressionTest(unittest.TestCase):

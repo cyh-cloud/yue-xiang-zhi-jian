@@ -2,35 +2,41 @@
 
 日期: 2026-10-21
 
-结果: succeeded
+结果: blocked
 
 ## 列表
 
-- URL: `https://www.ihchina.cn/getProject.html?province=&rx_time=&type=&cate=&keywords=&category_id=16&limit=5&p=1`
-- 取得时间: `2026-10-21T03:36:52+08:00`
+- URL: `https://www.ihchina.cn/getProject.html?category_id=16&limit=10&p=1`
+- 取得时间: `2026-10-21T05:10:03+08:00`
 - HTTP: `200`
-- Content-Type: `application/json; charset=utf-8`
-- 响应字节: 23732
-- SHA-256: `ccc154890691354db8e8a7eafecddbae9faa642e30e04ef717a837358eae5853`
-- total: 3610
-- count: 3610
-- list 条数: 5
-- 样本 ID: `12178`、`12177`、`12179`、`23632`、`12180`
+- 列表请求: 2 页
+- 详情请求: 20 条
+- 样本 ID: `12185`、`12184`、`12183`、`12182`、`12181`
 
 ## 详情
 
-| source_item_id | HTTP | 字节 | 字段数 |
-| --- | ---: | ---: | ---: |
-| 12178 | 200 | 40312 | 8 |
-| 12177 | 200 | 38985 | 8 |
-| 12179 | 200 | 36167 | 8 |
-| 23632 | 200 | 35605 | 8 |
-| 12180 | 200 | 36462 | 8 |
+前 5 条详情 URL 均返回 `200`：
 
-5 个详情页均返回 `200`，主标题和 8 个基本信息键值均可定位。
+- `https://www.ihchina.cn/project_details/12185.html`
+- `https://www.ihchina.cn/project_details/12184.html`
+- `https://www.ihchina.cn/project_details/12183.html`
+- `https://www.ihchina.cn/project_details/12182.html`
+- `https://www.ihchina.cn/project_details/12181.html`
 
-## 边界
+## 计数
 
-- fixture 回放与 live 结果分开记录。
-- 本次没有保存全量详情或媒体文件。
-- 证据只记录 URL、取得时间、状态码、字节数和哈希，不包含登录态或 Cookie。
+- raw: 23
+- stage: 20
+- 候选标准实体: 0
+- blocked: 20
+- failed: 0
+
+## 失败摘要
+
+`https://www.ihchina.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。采集侧准入按保守策略阻断全部 20 条候选，失败原因统一为 `robots:not-found`。详情页本身可访问，不能把本次结果写成候选成功。
+
+证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-ihchina-736f27ec38934feab384df46eca528b0\download`。
+
+## 重试条件
+
+站点提供可确认的 robots 允许规则，或项目负责人对 `not-found` 作出明确书面策略裁决后，重跑 5 条列表加 5 条详情。重跑前不得绕过 robots 或把 `not-found` 改成 `allowed`。
