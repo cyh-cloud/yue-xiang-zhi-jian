@@ -1961,6 +1961,8 @@ function isIntentRegistered(key: string): boolean {
   </Teleport>
 </template>
 
+<style src="./employment/employment.css"></style>
+
 <style scoped>
 .employment-view {
   min-height: 70vh;
