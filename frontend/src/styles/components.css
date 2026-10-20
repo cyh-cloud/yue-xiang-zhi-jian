@@ -229,6 +229,44 @@
   gap: 8px;
 }
 
+/* Shared page-panel header used by ecommerce and crafts training panels. */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.panel-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-primary);
+  font-family: "Microsoft YaHei", "SimHei", "Heiti SC", "PingFang SC", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.panel-header h3.card-section-title {
+  color: var(--color-text-primary);
+  font-family: "Microsoft YaHei", "SimHei", "Heiti SC", "PingFang SC", sans-serif;
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.panel-header .icon-btn {
+  color: var(--color-text-secondary);
+}
+
+.panel-header .icon-btn:hover {
+  background: var(--surface-canvas);
+  color: var(--color-text-primary);
+}
+
 /* Resume content card shared by the employment editor and enterprise detail. */
 .resume-block {
   padding: 16px;

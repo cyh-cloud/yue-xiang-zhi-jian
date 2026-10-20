@@ -16,36 +16,6 @@
     padding: 28px;
     margin-top: 30px;
 }
-.panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
-.panel-header h3 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    /* 与 .panel-header h3.card-section-title 同口径：卡片已是浅色底，
-       这里不能再写死白色（2026-10-18 走查）。 */
-    color: var(--text-primary);
-    font-family: 'Microsoft YaHei', 'SimHei', 'Heiti SC', 'PingFang SC', sans-serif;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.panel-header h3.card-section-title {
-    /* 手工传承的「3D互动教学」标题挂在 .panel-header 里，而 .panel-header h3 是
-       color: white —— 该卡片背景是页面底色（不是深色 live-panel），
-       白字压在浅色底上等于看不见（2026-10-12 学员走查）。
-       只有明确写 .card-section-title 的选择器在这里才拿得到深色文字色。
-       同时按学员要求改用黑体系字体：--font 首选的 'SF Pro Display' 在 Windows 上
-       缺失，会一路落到 Segoe UI/system-ui，中文标题偏细、远看发虚。 */
-    color: var(--text-primary);
-    font-family: 'Microsoft YaHei', 'SimHei', 'Heiti SC', 'PingFang SC', sans-serif;
-}
-.panel-header-actions { display: flex; align-items: center; gap: 12px; }
-.panel-header .icon-btn { color: var(--text-secondary); }
-.panel-header .icon-btn:hover { color: var(--text-primary); background: var(--bg-primary); }
 .live-badge {
     display: inline-flex;
     align-items: center;
