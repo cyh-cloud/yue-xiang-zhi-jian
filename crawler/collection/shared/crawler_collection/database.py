@@ -23,7 +23,9 @@ class CollectionDatabase:
 
     def connect(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        return sqlite3.connect(self.path)
+        conn = sqlite3.connect(self.path)
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
 
     def append_raw(self, evidence: RawEvidence):
         with self.connect() as conn:

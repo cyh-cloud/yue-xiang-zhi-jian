@@ -43,6 +43,7 @@ class RawEvidence:
     response_headers: dict = field(default_factory=dict)
     robots_decision: str = "unknown"
     run_id: str | None = None
+    declared_size: int | None = None
     metadata: dict = field(default_factory=dict)
 
     @property
