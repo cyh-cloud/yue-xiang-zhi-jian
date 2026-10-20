@@ -384,7 +384,7 @@ async function submit(): Promise<void> {
         </div>
       </div>
 
-      <div class="script-block copy-mine-block">
+      <div class="script-block copy-mine-block copywriting-mine-block">
         <div class="script-block-title">
           <i
             class="fas fa-pen"
@@ -452,20 +452,20 @@ async function submit(): Promise<void> {
 
       <div
         v-if="feedback"
-        class="copy-feedback"
+        class="copy-feedback copywriting-feedback"
       >
-        <div class="copy-feedback-head">
+        <div class="copy-feedback-head copywriting-feedback-head">
           <span
-            class="copy-feedback-overall"
+            class="copy-feedback-overall copywriting-feedback-overall"
             data-testid="copy-score-overall"
           >{{ feedback.overall_score }}</span>
-          <span class="copy-feedback-label">文案评分（规则 · 可复现）</span>
+          <span class="copy-feedback-label copywriting-feedback-label">文案评分（规则 · 可复现）</span>
         </div>
-        <div class="copy-feedback-metrics">
+        <div class="copy-feedback-metrics copywriting-feedback-metrics">
           <div
             v-for="metric in scoreMetrics"
             :key="metric.label"
-            class="copy-feedback-metric"
+            class="copy-feedback-metric copywriting-feedback-metric"
           >
             <label>{{ metric.label }}</label>
             <div class="progress-bar">
@@ -477,11 +477,11 @@ async function submit(): Promise<void> {
             <em>{{ metric.value }}</em>
           </div>
         </div>
-        <div class="copy-feedback-suggestions">
+        <div class="copy-feedback-suggestions copywriting-feedback-suggestions">
           <div
             v-for="suggestion in feedback.suggestions"
             :key="suggestion"
-            class="copy-feedback-tip"
+            class="copy-feedback-tip copywriting-feedback-tip"
           >
             <i
               class="fas fa-lightbulb"

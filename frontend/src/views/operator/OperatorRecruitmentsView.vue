@@ -394,8 +394,8 @@ onMounted(async () => {
           </button>
         </template>
 
-        <div class="bo-filterbar">
-          <label class="bo-field">
+        <div class="bo-filterbar backoffice-filterbar">
+          <label class="bo-field backoffice-field">
             <span>岗位类别</span>
             <select v-model="categoryFilter">
               <option value="">
@@ -427,9 +427,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -458,10 +458,10 @@ onMounted(async () => {
                 <td>{{ item.source_count }}</td>
                 <td>{{ item.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small"
+                      class="bo-button backoffice-button is-small"
                       :class="
                         selectedKey === item.key ? 'is-secondary' : ''
                       "
@@ -471,14 +471,14 @@ onMounted(async () => {
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openRecruitment(item)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeRecruitment(item)"
                     >
                       删除
@@ -502,7 +502,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             :disabled="!selectedKey"
             @click="openSource(null)"
           >
@@ -545,9 +545,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -571,17 +571,17 @@ onMounted(async () => {
                 <td>{{ source.url }}</td>
                 <td>{{ source.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openSource(source)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeSource(source)"
                     >
                       删除

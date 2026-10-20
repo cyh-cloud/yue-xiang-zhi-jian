@@ -279,31 +279,31 @@ onMounted(loadContent);
     <Teleport to="body">
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="bo-modal backoffice-modal is-confirm"
           data-testid="admin-content-delete-dialog"
           role="dialog"
           aria-modal="true"
           :aria-label="deleteTitle"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>{{ deleteTitle }}</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="bo-modal-body backoffice-modal-body">
+            <p class="bo-confirm-copy backoffice-confirm-copy">
               {{ deleteCopy }}
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -311,7 +311,7 @@ onMounted(loadContent);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="bo-button backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >

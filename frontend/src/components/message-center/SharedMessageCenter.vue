@@ -921,7 +921,7 @@ function safeType(type: string): string {
 
         <div
           v-else
-          class="msg-dropdown-body"
+          class="msg-dropdown-body message-dropdown-body"
         >
           <div
             v-if="partialFailureText && !allSourcesFailed"
@@ -937,7 +937,7 @@ function safeType(type: string): string {
           </div>
           <div
             v-if="loading"
-            class="msg-empty"
+            class="msg-empty message-empty"
           >
             <i
               class="fas fa-spinner fa-spin"
@@ -947,7 +947,7 @@ function safeType(type: string): string {
           </div>
           <div
             v-else-if="allSourcesFailed"
-            class="msg-empty"
+            class="msg-empty message-empty"
             data-testid="message-center-error"
           >
             <i
@@ -966,7 +966,7 @@ function safeType(type: string): string {
           </div>
           <div
             v-else-if="!activeItems.length"
-            class="msg-empty"
+            class="msg-empty message-empty"
             data-testid="message-center-empty"
           >
             <i
@@ -979,7 +979,7 @@ function safeType(type: string): string {
             <div
               v-for="item in activeItems"
               :key="item.key"
-              class="msg-item is-clickable"
+              class="msg-item message-item is-clickable"
               :class="{ unread: !item.isRead, 'has-reply': item.replyId }"
               data-testid="message-center-item"
               :data-unread="item.isRead ? 'false' : 'true'"
@@ -990,7 +990,7 @@ function safeType(type: string): string {
               @keydown.space.prevent="handleItem(item)"
             >
               <div
-                class="msg-item-icon"
+                class="msg-item-icon message-item-icon"
                 :class="`type-${safeType(item.type)}`"
               >
                 <i
@@ -999,30 +999,30 @@ function safeType(type: string): string {
                   aria-hidden="true"
                 />
               </div>
-              <div class="msg-item-text">
-                <div class="msg-item-title">
+              <div class="msg-item-text message-item-text">
+                <div class="msg-item-title message-item-title">
                   {{ item.title }}
                   <span
-                    class="msg-tag"
+                    class="msg-tag message-tag"
                     :class="`msg-tag-${safeType(item.type)}`"
                   >{{ item.tag }}</span>
                 </div>
-                <div class="msg-item-preview">
+                <div class="msg-item-preview message-item-preview">
                   {{ item.preview }}
                 </div>
-                <div class="msg-item-time">
+                <div class="msg-item-time message-item-time">
                   {{ formatTimeAgo(item.time) }}
                 </div>
                 <span
                   v-if="item.replyId"
-                  class="msg-reply-btn"
+                  class="msg-reply-btn message-reply-btn"
                 >回复</span>
               </div>
             </div>
           </template>
         </div>
 
-        <footer class="msg-dropdown-footer">
+        <footer class="msg-dropdown-footer message-dropdown-footer">
           <button
             type="button"
             data-testid="message-center-disable"
@@ -1069,7 +1069,7 @@ function safeType(type: string): string {
           <div class="modal-body">
             <div class="notif-detail">
               <span
-                class="msg-tag"
+                class="msg-tag message-tag"
                 :class="`msg-tag-${safeType(detailItem.type)}`"
               >{{ detailItem.tag }}</span>
               <div class="notif-detail-body">
@@ -1123,7 +1123,7 @@ function safeType(type: string): string {
               >
                 <div
                   v-if="conversation.loading"
-                  class="msg-empty"
+                  class="msg-empty message-empty"
                 >
                   <i
                     class="fas fa-spinner fa-spin"
@@ -1133,7 +1133,7 @@ function safeType(type: string): string {
                 </div>
                 <div
                   v-else-if="conversation.loadError"
-                  class="msg-empty"
+                  class="msg-empty message-empty"
                 >
                   <i
                     class="fas fa-triangle-exclamation"
@@ -1150,7 +1150,7 @@ function safeType(type: string): string {
                 </div>
                 <div
                   v-else-if="!conversation.messages.length"
-                  class="msg-empty"
+                  class="msg-empty message-empty"
                 >
                   <i
                     class="fas fa-comments"
@@ -1162,14 +1162,14 @@ function safeType(type: string): string {
                   <div
                     v-for="message in conversation.messages"
                     :key="conversationMessageKey(message)"
-                    class="msg-bubble"
+                    class="msg-bubble message-bubble"
                     :class="message.sender_id === session.user?.id ? 'mine' : 'theirs'"
                     data-testid="message-center-bubble"
                   >
-                    <div class="msg-bubble-content">
+                    <div class="msg-bubble-content message-bubble-content">
                       {{ message.content }}
                     </div>
-                    <div class="msg-bubble-time">
+                    <div class="msg-bubble-time message-bubble-time">
                       {{ formatMessageTime(message.created_at) }}
                     </div>
                   </div>

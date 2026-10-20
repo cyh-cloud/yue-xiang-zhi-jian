@@ -330,7 +330,7 @@ onMounted(loadTrainings);
             >{{ selected.script }}</pre>
             <p
               v-else
-              class="bo-muted"
+              class="bo-muted backoffice-muted"
             >
               该条提交没有可展示的正文，可能是早期版本留下的记录。
             </p>
@@ -341,7 +341,7 @@ onMounted(loadTrainings);
               :message="gradeError"
               testid="teacher-grade-error"
             />
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>我的评分（0-100）</span>
               <input
                 v-model="gradeScore"
@@ -352,7 +352,7 @@ onMounted(loadTrainings);
                 required
               >
             </label>
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>评语（可留空，学员会在消息中心看到）</span>
               <textarea
                 v-model="gradeFeedback"
@@ -360,10 +360,10 @@ onMounted(loadTrainings);
               />
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="grading"
               @click="closeGrade"
             >
@@ -371,7 +371,7 @@ onMounted(loadTrainings);
             </button>
             <button
               type="button"
-              class="bo-button"
+              class="bo-button backoffice-button"
               :disabled="grading"
               @click="submitGrade"
             >

@@ -33,10 +33,12 @@ class SemanticAliasTest(unittest.TestCase):
         violations = []
         for path in sorted(SOURCE_ROOT.rglob("*.vue")):
             source = path.read_text(encoding="utf-8")
-            template = re.search(r"<template>(.*?)</template>", source, re.S)
-            if not template:
+            start = source.find("<template>")
+            end = source.rfind("</template>")
+            if start < 0 or end <= start:
                 continue
-            for match in re.finditer(r'(?<!:)class="([^"]*)"', template.group(1)):
+            template = source[start + len("<template>"):end]
+            for match in re.finditer(r'(?<!:)class="([^"]*)"', template):
                 tokens = match.group(1).split()
                 for token in tokens:
                     if any(char in token for char in "{}$`"):
@@ -52,10 +54,12 @@ class SemanticAliasTest(unittest.TestCase):
         violations = []
         for path in sorted(SOURCE_ROOT.rglob("*.vue")):
             source = path.read_text(encoding="utf-8")
-            template = re.search(r"<template>(.*?)</template>", source, re.S)
-            if not template:
+            start = source.find("<template>")
+            end = source.rfind("</template>")
+            if start < 0 or end <= start:
                 continue
-            for match in re.finditer(r'(?<!:)class="([^"]*)"', template.group(1)):
+            template = source[start + len("<template>"):end]
+            for match in re.finditer(r'(?<!:)class="([^"]*)"', template):
                 tokens = match.group(1).split()
                 if len(tokens) != len(set(tokens)):
                     violations.append(str(path.relative_to(REPO_ROOT)))

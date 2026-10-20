@@ -494,8 +494,8 @@ onBeforeUnmount(() => {
         </button>
       </template>
 
-      <div class="bo-filterbar teacher-filterbar">
-        <label class="bo-field bo-search-field">
+      <div class="bo-filterbar backoffice-filterbar teacher-filterbar">
+        <label class="bo-field backoffice-field bo-search-field backoffice-search-field">
           <span>搜索学员</span>
           <input
             v-model="search"
@@ -504,7 +504,7 @@ onBeforeUnmount(() => {
             autocomplete="off"
           >
         </label>
-        <span class="bo-muted">{{ students.length }} 人</span>
+        <span class="bo-muted backoffice-muted">{{ students.length }} 人</span>
       </div>
 
       <BackofficeState
@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
       >
         <button
           type="button"
-          class="bo-button"
+          class="bo-button backoffice-button"
           @click="loadStudents"
         >
           重试
@@ -534,9 +534,9 @@ onBeforeUnmount(() => {
       />
       <div
         v-else
-        class="bo-table-wrap"
+        class="bo-table-wrap backoffice-table-wrap"
       >
-        <table class="bo-table teacher-roster-table">
+        <table class="bo-table backoffice-table teacher-roster-table">
           <thead>
             <tr>
               <th>学号</th>
@@ -583,14 +583,14 @@ onBeforeUnmount(() => {
                 </template>
                 <span
                   v-else
-                  class="bo-muted"
+                  class="bo-muted backoffice-muted"
                 >
                   暂无证书记录{{ student.user_id ? "" : "（未关联账号）" }}
                 </span>
               </td>
               <td>
                 <span
-                  class="bo-status"
+                  class="bo-status backoffice-status"
                   :class="student.status === 'suspended' ? 'is-suspended' : 'is-active'"
                 >
                   {{ student.status === "suspended" ? "停课" : "在读" }}
@@ -598,19 +598,19 @@ onBeforeUnmount(() => {
               </td>
               <td>
                 <template v-if="student.user_id">
-                  <span class="bo-status is-active">已关联</span>
+                  <span class="bo-status backoffice-status is-active">已关联</span>
                   <small>{{ student.user_id }}</small>
                 </template>
                 <template v-else>
-                  <span class="bo-status is-suspended">未关联</span>
+                  <span class="bo-status backoffice-status is-suspended">未关联</span>
                   <small>无法登录</small>
                 </template>
               </td>
               <td>
-                <div class="bo-row-actions">
+                <div class="bo-row-actions backoffice-row-actions">
                   <button
                     type="button"
-                    class="bo-button is-small is-secondary"
+                    class="bo-button backoffice-button is-small is-secondary"
                     data-testid="teacher-student-view"
                     @click="openDetail(student.id)"
                   >
@@ -618,7 +618,7 @@ onBeforeUnmount(() => {
                   </button>
                   <button
                     type="button"
-                    class="bo-button is-small"
+                    class="bo-button backoffice-button is-small"
                     data-testid="teacher-student-edit"
                     @click="openEdit(student.id)"
                   >
@@ -626,7 +626,7 @@ onBeforeUnmount(() => {
                   </button>
                   <button
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="bo-button backoffice-button is-small is-danger"
                     data-testid="teacher-student-delete"
                     @click="askDelete(student)"
                   >
@@ -645,7 +645,7 @@ onBeforeUnmount(() => {
         title="AI 教学报告"
         description="AI 只根据当前名册与证书真实完成度生成报告。"
       >
-        <label class="bo-field">
+        <label class="bo-field backoffice-field">
           <span>分析需求</span>
           <textarea
             v-model="reportPrompt"
@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
         <div class="teacher-card-actions">
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             :disabled="reportLoading"
             @click="generateReport"
           >
@@ -721,7 +721,7 @@ onBeforeUnmount(() => {
         </ul>
         <p
           v-else
-          class="bo-muted"
+          class="bo-muted backoffice-muted"
         >
           暂无学员动态。
         </p>
@@ -731,25 +731,25 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="addOpen"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeAdd"
       >
         <form
-          class="bo-modal"
+          class="bo-modal backoffice-modal"
           data-testid="teacher-student-editor"
           role="dialog"
           aria-modal="true"
           aria-label="添加学员"
           @submit.prevent="submitAdd"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>名册维护</p>
               <h2>添加学员</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="bo-icon-button backoffice-icon-button"
               aria-label="关闭"
               @click="closeAdd"
             >
@@ -759,14 +759,14 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="bo-modal-body backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="teacher-student-editor-error"
             />
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>学员姓名</span>
               <input
                 ref="addNameInput"
@@ -775,8 +775,8 @@ onBeforeUnmount(() => {
                 autocomplete="off"
               >
             </label>
-            <div class="bo-form-grid">
-              <label class="bo-field">
+            <div class="bo-form-grid backoffice-form-grid">
+              <label class="bo-field backoffice-field">
                 <span>班级</span>
                 <input
                   v-model="addForm.className"
@@ -784,7 +784,7 @@ onBeforeUnmount(() => {
                   placeholder="可选"
                 >
               </label>
-              <label class="bo-field">
+              <label class="bo-field backoffice-field">
                 <span>学习方向</span>
                 <select v-model="addForm.direction">
                   <option
@@ -797,7 +797,7 @@ onBeforeUnmount(() => {
                 </select>
               </label>
             </div>
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>平台账号</span>
               <select v-model="addForm.accountMode">
                 <option value="link">关联已有学员账号</option>
@@ -807,7 +807,7 @@ onBeforeUnmount(() => {
             </label>
             <label
               v-if="addForm.accountMode === 'link'"
-              class="bo-field"
+              class="bo-field backoffice-field"
             >
               <span>选择要关联的账号</span>
               <select v-model="addForm.linkUsername">
@@ -822,15 +822,15 @@ onBeforeUnmount(() => {
                   {{ account.name || account.username }}（{{ account.username }}）
                 </option>
               </select>
-              <small class="bo-muted">
+              <small class="bo-muted backoffice-muted">
                 {{ accountsError || (linkableAccounts.length ? `仅显示未被占用的学员账号，共 ${linkableAccounts.length} 个。` : "目前没有空闲的学员账号。") }}
               </small>
             </label>
             <div
               v-if="addForm.accountMode === 'create'"
-              class="bo-form-grid"
+              class="bo-form-grid backoffice-form-grid"
             >
-              <label class="bo-field">
+              <label class="bo-field backoffice-field">
                 <span>用户名</span>
                 <input
                   v-model="addForm.newUsername"
@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
                   placeholder="登录用"
                 >
               </label>
-              <label class="bo-field">
+              <label class="bo-field backoffice-field">
                 <span>初始密码</span>
                 <input
                   v-model="addForm.newPassword"
@@ -849,15 +849,15 @@ onBeforeUnmount(() => {
             </div>
             <p
               v-if="addForm.accountMode === 'none'"
-              class="bo-note"
+              class="bo-note backoffice-note"
             >
               该学员将无法登录、收不到站内通知，之后可在编辑中关联账号。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="editorSaving"
               @click="closeAdd"
             >
@@ -865,7 +865,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="bo-button backoffice-button"
               :disabled="editorSaving"
             >
               {{ editorSaving ? "保存中..." : "确认添加" }}
@@ -876,25 +876,25 @@ onBeforeUnmount(() => {
 
       <div
         v-if="editOpen && editForm"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeEdit"
       >
         <form
-          class="bo-modal"
+          class="bo-modal backoffice-modal"
           data-testid="teacher-student-editor"
           role="dialog"
           aria-modal="true"
           aria-label="编辑学员"
           @submit.prevent="submitEdit"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>名册维护</p>
               <h2>编辑学员 · {{ editForm.id }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="bo-icon-button backoffice-icon-button"
               aria-label="关闭"
               @click="closeEdit"
             >
@@ -904,14 +904,14 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="bo-modal-body backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="teacher-student-editor-error"
             />
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>学员姓名</span>
               <input
                 ref="editNameInput"
@@ -920,15 +920,15 @@ onBeforeUnmount(() => {
                 autocomplete="off"
               >
             </label>
-            <div class="bo-form-grid">
-              <label class="bo-field">
+            <div class="bo-form-grid backoffice-form-grid">
+              <label class="bo-field backoffice-field">
                 <span>班级</span>
                 <input
                   v-model="editForm.className"
                   autocomplete="off"
                 >
               </label>
-              <label class="bo-field">
+              <label class="bo-field backoffice-field">
                 <span>学习方向</span>
                 <select v-model="editForm.direction">
                   <option
@@ -941,7 +941,7 @@ onBeforeUnmount(() => {
                 </select>
               </label>
             </div>
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>状态</span>
               <select v-model="editForm.status">
                 <option value="active">
@@ -952,7 +952,7 @@ onBeforeUnmount(() => {
                 </option>
               </select>
             </label>
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>平台账号</span>
               <select v-model="editForm.linkUsername">
                 <option value="">
@@ -972,15 +972,15 @@ onBeforeUnmount(() => {
                   {{ account.name || account.username }}（{{ account.username }}）
                 </option>
               </select>
-              <small class="bo-muted">
+              <small class="bo-muted backoffice-muted">
                 {{ accountsError || (editForm.currentAccount ? `当前已关联账号 ${editForm.currentAccount}。选择「改为不关联账号」会保留名册与历史学习数据。` : "该学员尚未关联账号，无法登录、收不到站内通知。") }}
               </small>
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="editorSaving"
               @click="closeEdit"
             >
@@ -988,7 +988,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="bo-button backoffice-button"
               :disabled="editorSaving"
             >
               {{ editorSaving ? "保存中..." : "保存修改" }}
@@ -999,24 +999,24 @@ onBeforeUnmount(() => {
 
       <div
         v-if="detailOpen"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="detailOpen = false"
       >
         <div
-          class="bo-modal"
+          class="bo-modal backoffice-modal"
           data-testid="teacher-student-detail"
           role="dialog"
           aria-modal="true"
           aria-label="学员详情"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>学员详情</p>
               <h2>{{ detailStudent?.name || "加载中" }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="bo-icon-button backoffice-icon-button"
               aria-label="关闭"
               @click="detailOpen = false"
             >
@@ -1026,7 +1026,7 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="bo-modal-body backoffice-modal-body">
             <BackofficeState
               v-if="detailLoading"
               kind="loading"
@@ -1064,10 +1064,10 @@ onBeforeUnmount(() => {
               </dl>
             </template>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               @click="detailOpen = false"
             >
               关闭
@@ -1075,7 +1075,7 @@ onBeforeUnmount(() => {
             <button
               v-if="detailStudent"
               type="button"
-              class="bo-button"
+              class="bo-button backoffice-button"
               @click="openEdit(detailStudent.id)"
             >
               编辑信息
@@ -1086,31 +1086,31 @@ onBeforeUnmount(() => {
 
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="bo-modal backoffice-modal is-confirm"
           data-testid="teacher-confirm-delete"
           role="dialog"
           aria-modal="true"
           aria-label="确认删除"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>确认删除</p>
               <h2>删除学员</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="bo-modal-body backoffice-modal-body">
+            <p class="bo-confirm-copy backoffice-confirm-copy">
               确定要删除学员「{{ deleteTarget.name }}」吗？仅删除名册记录，平台账号不会被删除，历史学习数据仍会保留。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -1118,7 +1118,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="bo-button backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >

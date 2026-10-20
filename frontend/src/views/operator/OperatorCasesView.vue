@@ -504,9 +504,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -537,24 +537,24 @@ onMounted(async () => {
                 <td>{{ item.lesson_count }}</td>
                 <td>{{ item.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small"
+                      class="bo-button backoffice-button is-small"
                       @click="selectCase(item)"
                     >
                       查看内容
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openCase(item)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeCase(item)"
                     >
                       删除
@@ -576,7 +576,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             :disabled="!selectedCaseId"
             @click="openChild(null)"
           >
@@ -631,9 +631,9 @@ onMounted(async () => {
           />
           <div
             v-else
-            class="bo-table-wrap"
+            class="bo-table-wrap backoffice-table-wrap"
           >
-            <table class="bo-table">
+            <table class="bo-table backoffice-table">
               <thead>
                 <tr>
                   <th
@@ -658,17 +658,17 @@ onMounted(async () => {
                     {{ value }}
                   </td>
                   <td>
-                    <div class="bo-row-actions">
+                    <div class="bo-row-actions backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button is-small is-secondary"
+                        class="bo-button backoffice-button is-small is-secondary"
                         @click="openChild(row)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button is-small is-danger"
+                        class="bo-button backoffice-button is-small is-danger"
                         @click="removeChild(row)"
                       >
                         删除

@@ -386,10 +386,10 @@ function updateString(
             </label>
           </template>
 
-          <footer class="bo-modal-actions operator-dialog-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions operator-dialog-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="busy"
               @click="emit('close')"
             >
@@ -397,7 +397,7 @@ function updateString(
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="bo-button backoffice-button"
               :disabled="busy"
             >
               <i

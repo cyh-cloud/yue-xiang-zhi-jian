@@ -628,8 +628,8 @@ onMounted(async () => {
           </button>
         </template>
 
-        <div class="bo-filterbar">
-          <label class="bo-field">
+        <div class="bo-filterbar backoffice-filterbar">
+          <label class="bo-field backoffice-field">
             <span>作物筛选</span>
             <select v-model="productFilter">
               <option value="">
@@ -644,7 +644,7 @@ onMounted(async () => {
               </option>
             </select>
           </label>
-          <label class="bo-field">
+          <label class="bo-field backoffice-field">
             <span>月份筛选</span>
             <select v-model="monthFilter">
               <option value="">
@@ -668,7 +668,7 @@ onMounted(async () => {
           </label>
           <button
             type="button"
-            class="bo-button is-secondary"
+            class="bo-button backoffice-button is-secondary"
             :disabled="tasksLoading"
             @click="refreshTasks"
           >
@@ -694,9 +694,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>日期</th>
@@ -726,7 +726,7 @@ onMounted(async () => {
                 <td>{{ priorityLabel(task.priority) }}</td>
                 <td>
                   <span
-                    class="bo-status"
+                    class="bo-status backoffice-status"
                     :class="task.is_verified ? 'is-active' : 'is-suspended'"
                   >
                     {{ task.is_verified ? "已复核" : "待复核" }}
@@ -734,24 +734,24 @@ onMounted(async () => {
                   <small>{{ verificationText(task) }}</small>
                 </td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-success"
+                      class="bo-button backoffice-button is-small is-success"
                       @click="verifyTask(task)"
                     >
                       {{ task.is_verified ? "重新复核" : "标记已复核" }}
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openTask(task)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeTask(task)"
                     >
                       删除
@@ -771,7 +771,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             @click="openCreate"
           >
             <i
@@ -807,9 +807,9 @@ onMounted(async () => {
 
         <div
           v-if="activeReferenceTab === 'products'"
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>id</th>
@@ -835,17 +835,17 @@ onMounted(async () => {
                 <td>{{ product.is_active ? "启用" : "停用" }}</td>
                 <td>{{ product.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openEdit('products', product)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeReference('products', product)"
                     >
                       删除
@@ -864,9 +864,9 @@ onMounted(async () => {
 
         <div
           v-else-if="activeReferenceTab === 'phenophases'"
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>作物</th>
@@ -894,17 +894,17 @@ onMounted(async () => {
                 <td>{{ phase.description }}</td>
                 <td>{{ phase.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openEdit('phenophases', phase)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeReference('phenophases', phase)"
                     >
                       删除
@@ -923,9 +923,9 @@ onMounted(async () => {
 
         <div
           v-else-if="activeReferenceTab === 'sources'"
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>key</th>
@@ -951,17 +951,17 @@ onMounted(async () => {
                 <td>{{ source.doc_no || "待核" }}</td>
                 <td>{{ source.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openEdit('sources', source)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeReference('sources', source)"
                     >
                       删除
@@ -980,9 +980,9 @@ onMounted(async () => {
 
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>key</th>
@@ -1003,17 +1003,17 @@ onMounted(async () => {
                 <td>{{ category.color || "未设置" }}</td>
                 <td>{{ category.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openEdit('categories', category)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       @click="removeReference('categories', category)"
                     >
                       删除

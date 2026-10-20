@@ -412,9 +412,9 @@ async function removeDetail(
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>名称</th>
@@ -448,24 +448,24 @@ async function removeDetail(
                 <td>{{ dialect.question_count }}</td>
                 <td>{{ dialect.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="bo-row-actions backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="selectDialect(dialect.id)"
                     >
                       管理内容
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="bo-button backoffice-button is-small is-secondary"
                       @click="openDialect(dialect)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="bo-button backoffice-button is-small is-danger"
                       :disabled="dialect.id === 'cantonese'"
                       @click="removeDialect(dialect)"
                     >
@@ -487,7 +487,7 @@ async function removeDetail(
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             :disabled="loading || detailLoading"
             @click="openCreateDetail"
           >
@@ -537,9 +537,9 @@ async function removeDetail(
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr v-if="activeTab === 'phrases'">
                 <th>方言说法</th>
@@ -567,17 +567,17 @@ async function removeDetail(
                   <td>{{ phrase.pinyin }}</td>
                   <td>{{ phrase.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions">
+                    <div class="bo-row-actions backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button is-small is-secondary"
+                        class="bo-button backoffice-button is-small is-secondary"
                         @click="openPhrase(phrase)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button is-small is-danger"
+                        class="bo-button backoffice-button is-small is-danger"
                         @click="removePhrase(phrase)"
                       >
                         删除
@@ -596,17 +596,17 @@ async function removeDetail(
                   <td>{{ question.question }}</td>
                   <td>{{ question.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions">
+                    <div class="bo-row-actions backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button is-small is-secondary"
+                        class="bo-button backoffice-button is-small is-secondary"
                         @click="openQuestion(question)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button is-small is-danger"
+                        class="bo-button backoffice-button is-small is-danger"
                         @click="removeQuestion(question)"
                       >
                         删除

@@ -1026,7 +1026,7 @@ function externalVideoUrl(video: CraftVideo): string {
             <model-viewer
               v-else
               ref="modelViewer"
-              class="craft-3d-viewer"
+              class="craft-3d-viewer crafts-3d-viewer"
               camera-controls
               :auto-rotate="paused ? undefined : ''"
               :rotation-per-second="slow ? '10deg' : '30deg'"
@@ -1054,15 +1054,15 @@ function externalVideoUrl(video: CraftVideo): string {
             </h4>
             <div
               v-if="detail?.steps.length"
-              class="craft-progress"
+              class="craft-progress crafts-progress"
             >
-              <div class="craft-progress-bar">
+              <div class="craft-progress-bar crafts-progress-bar">
                 <div
-                  class="craft-progress-fill"
+                  class="craft-progress-fill crafts-progress-fill"
                   :style="{ width: progressPercent() }"
                 />
               </div>
-              <span class="craft-progress-text">{{ progressText() }}</span>
+              <span class="craft-progress-text crafts-progress-text">{{ progressText() }}</span>
             </div>
             <div
               v-if="detailError"
@@ -1130,14 +1130,14 @@ function externalVideoUrl(video: CraftVideo): string {
 
         <div
           v-if="models.length > 1"
-          class="craft-model-tabs"
+          class="craft-model-tabs crafts-model-tabs"
           aria-label="切换 3D 模型"
         >
           <button
             v-for="(model, index) in models"
             :key="model.id"
             type="button"
-            class="craft-model-tab"
+            class="craft-model-tab crafts-model-tab"
             :class="{ active: index === selectedModelIndex }"
             :aria-pressed="index === selectedModelIndex"
             @click="selectModel(index)"
@@ -1194,7 +1194,7 @@ function externalVideoUrl(video: CraftVideo): string {
         <template v-else-if="purchaseGuide">
           <div
             v-if="purchaseGuide.budget"
-            class="guide-budget"
+            class="guide-budget purchase-guide-budget"
           >
             <div class="budget-item starter">
               <i
@@ -1219,7 +1219,7 @@ function externalVideoUrl(video: CraftVideo): string {
           </div>
           <div
             v-if="purchaseGuide.buying_tips"
-            class="guide-buying-tips"
+            class="guide-buying-tips purchase-guide-buying-tips"
           >
             <i
               class="fas fa-compass"
@@ -1231,7 +1231,7 @@ function externalVideoUrl(video: CraftVideo): string {
           </div>
           <div
             v-if="purchaseCategories.length"
-            class="guide-toolbar"
+            class="guide-toolbar purchase-guide-toolbar"
           >
             <button
               type="button"
@@ -1249,15 +1249,12 @@ function externalVideoUrl(video: CraftVideo): string {
           <div
             v-for="category in purchaseCategories"
             :key="category.key"
-            class="guide-category"
-            :class="[
-              category.key,
-              { open: openCategoryKeys.includes(category.key) },
-            ]"
+            class="guide-category purchase-guide-category"
+            :class="[ category.key, { open: openCategoryKeys.includes(category.key) }, ]"
           >
             <button
               type="button"
-              class="guide-cat-head"
+              class="guide-cat-head purchase-guide-cat-head"
               :aria-expanded="openCategoryKeys.includes(category.key)"
               @click="toggleCategory(category.key)"
             >
@@ -1268,31 +1265,31 @@ function externalVideoUrl(video: CraftVideo): string {
               />
               <span>{{ category.label }}</span>
               <small>{{ category.desc }}</small>
-              <span class="guide-cat-meta">
+              <span class="guide-cat-meta purchase-guide-cat-meta">
                 <b
                   v-if="categorySubtotal(category)"
-                  class="guide-subtotal"
+                  class="guide-subtotal purchase-guide-subtotal"
                 >
                   {{ categorySubtotal(category) }}
                 </b>
-                <em class="guide-count">{{ category.items.length }} 项</em>
+                <em class="guide-count purchase-guide-count">{{ category.items.length }} 项</em>
                 <i
-                  class="fas fa-chevron-down guide-chevron"
+                  class="fas fa-chevron-down guide-chevron purchase-guide-chevron"
                   aria-hidden="true"
                 />
               </span>
             </button>
-            <div class="guide-body">
-              <div class="guide-items">
+            <div class="guide-body purchase-guide-body">
+              <div class="guide-items purchase-guide-items">
                 <div
                   v-for="item in category.items"
                   :key="`${category.key}-${item.name}`"
-                  class="guide-item"
+                  class="guide-item purchase-guide-item"
                   :class="category.key"
                 >
-                  <div class="guide-item-head">
+                  <div class="guide-item-head purchase-guide-item-head">
                     <span
-                      class="guide-badge"
+                      class="guide-badge purchase-guide-badge"
                       :class="category.key"
                     >
                       {{ categoryMeta(category).badge }}
@@ -1302,7 +1299,7 @@ function externalVideoUrl(video: CraftVideo): string {
                   </div>
                   <div
                     v-if="item.spec"
-                    class="guide-spec"
+                    class="guide-spec purchase-guide-spec"
                   >
                     <i
                       class="fas fa-ruler-combined"
@@ -1312,7 +1309,7 @@ function externalVideoUrl(video: CraftVideo): string {
                   </div>
                   <div
                     v-if="item.where"
-                    class="guide-where"
+                    class="guide-where purchase-guide-where"
                   >
                     <i
                       class="fas fa-map-marker-alt"
@@ -1322,7 +1319,7 @@ function externalVideoUrl(video: CraftVideo): string {
                   </div>
                   <div
                     v-if="item.tip"
-                    class="guide-tip"
+                    class="guide-tip purchase-guide-tip"
                   >
                     <i
                       class="fas fa-lightbulb"
