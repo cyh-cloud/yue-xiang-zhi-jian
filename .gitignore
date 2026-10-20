@@ -89,6 +89,7 @@ desktop.ini
 # <<< magpie <<<
 # ---- crawler local runtime data and private sessions ----
 crawler/data/
+crawler/.tmp-test/
 crawler/docs/private/
 # Raw evidence can contain page content, attachments, and session headers.
 # Keep the entire local evidence store out of the public repository.
