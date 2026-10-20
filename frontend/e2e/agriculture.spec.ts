@@ -68,7 +68,7 @@ test.describe("agriculture calendar", () => {
 
     if (calendar.sources_all.length > 0) {
       await page.getByRole("button", { name: /查看数据依据/ }).click();
-      await expect(page.locator(".fdn-sources")).toBeVisible();
+      await expect(page.locator(".farming-sources")).toBeVisible();
     }
 
     const datedTask = calendar.tasks.find((task) => task.day !== null);

@@ -721,11 +721,11 @@
 /* P1-3（2026-10-06 走查）：客服回复失败的错误占位 */
 .cs-error-msg .cs-msg-avatar { background: rgba(217,162,39,0.14); color: #d9a227; }
 .cs-error-msg .cs-msg-bubble {
-    background: rgba(217,162,39,0.08) !important;
-    border: 1px dashed rgba(217,162,39,0.5) !important;
-    color: #b8860b !important;
+    background: rgba(217,162,39,0.08);
+    border: 1px dashed rgba(217,162,39,0.5);
+    color: #b8860b;
 }
-[data-theme="dark"] .cs-error-msg .cs-msg-bubble { color: #e0b84a !important; }
+[data-theme="dark"] .cs-error-msg .cs-msg-bubble { color: #e0b84a; }
 /* ===== 体验优化（2026-10-06）===== */
 /* ① 学员气泡旁的该句得分徽标 */
 .cs-msg-score {

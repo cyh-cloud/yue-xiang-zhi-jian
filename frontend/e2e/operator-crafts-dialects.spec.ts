@@ -211,18 +211,18 @@ test.describe("operator crafts and dialects", () => {
 
       await page.goto("/crafts");
       const publicCraft = page
-        .locator(".craft-grid .craft-card")
+        .locator(".crafts-grid .crafts-card")
         .filter({ hasText: craftName });
       await expect(publicCraft).toBeVisible();
       await publicCraft.click();
       await expect(page.locator(".step").filter({ hasText: stepAChanged })).toBeVisible();
       await expect(
-        page.locator(".guide-item").filter({ hasText: itemChanged }),
+        page.locator(".purchase-guide-item").filter({ hasText: itemChanged }),
       ).toBeVisible();
       await expect(page.getByText("100-150 元")).toBeVisible();
       await expect(page.getByText("T21 采购建议")).toBeVisible();
       await expect(
-        page.locator(".craft-video-card-title").filter({ hasText: videoChanged }),
+        page.locator(".crafts-video-card-title").filter({ hasText: videoChanged }),
       ).toBeVisible();
 
       const publicDetail = await request.get(
