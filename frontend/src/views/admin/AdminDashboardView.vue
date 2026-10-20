@@ -192,3 +192,5 @@ onMounted(loadOverview);
     </template>
   </section>
 </template>
+
+<style src="./admin.css"></style>

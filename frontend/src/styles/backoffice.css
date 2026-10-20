@@ -649,13 +649,6 @@ html[data-large-text] .bo-shell {
   flex-wrap: wrap;
 }
 
-.bo-protection {
-  max-width: 220px;
-  color: var(--bo-muted);
-  font-size: 0.68rem;
-  line-height: 1.4;
-}
-
 .bo-form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
