@@ -276,6 +276,7 @@ class RunReportExtension:
             return
         stats = self.crawler.stats
         downloader_failures = 0
+        robots_blocked = 0
         for key, value in (stats.get_stats() if stats else {}).items():
             if (
                 key.startswith("downloader/exception_count/")
@@ -288,7 +289,13 @@ class RunReportExtension:
                 self._failure_reasons.append(
                     f"{key}={value}"
                 )
+            if key == "robotstxt/forbidden" and value:
+                robots_blocked += int(value)
+                self._failure_reasons.append(f"{key}={value}")
         item_counts = dict(getattr(spider, "_collection_counts", {}))
+        item_counts["blocked"] = (
+            int(item_counts.get("blocked", 0)) + robots_blocked
+        )
         pipeline_failures = int(item_counts.get("failed", 0))
         request_failures = len(self._failed_requests)
         failed = (
