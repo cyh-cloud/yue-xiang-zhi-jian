@@ -634,34 +634,4 @@ async function removeDetail(
   </section>
 </template>
 
-<style scoped>
-.operator-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--bo-card-border);
-}
-
-.operator-tabs button {
-  min-height: 32px;
-  padding: 5px 13px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 999px;
-  background: var(--bo-card-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.operator-tabs button.active {
-  border-color: var(--bo-accent);
-  background: var(--bo-accent);
-  color: #fff;
-}
-
-tr.is-selected {
-  background: var(--bo-accent-soft);
-}
-</style>
+<style src="./operator.css"></style>
