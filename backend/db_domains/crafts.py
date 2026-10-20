@@ -31,14 +31,6 @@ CAPABILITY = 'craft'
 _DETAIL_FIELDS = ('name', 'origin', 'history')
 
 
-# 列表层的产地口径。详情层 crafts.origin 是完整地名（「佛山石湾」），
-# 而学员端列表卡一直只显示地级市（「佛山」）。这是同一个事实的两个粒度，
-# 不是脏数据，故在读取侧按原口径收窄，不改库里的真值。
-# 没有登记映射的技艺原样返回：不为凑格式把地名改短。
-_LIST_ORIGIN = {
-    'ceramics': u'佛山',
-}
-
 # ---- 写侧列白名单（T15）----
 # id 一律不在其中：主键由调用方给出（delete_* 按 id 定位），update 改不到它。
 # 与 farming / pest 两个域同一口径：None 表示「不碰这一列」，与「置空」两回事。
@@ -90,15 +82,15 @@ def _require_category(conn, craft_id, category_key):
 def get_crafts():
     """技艺列表：id / name / origin / level，顺序与切库前一致。
 
-    origin 取列表层口径（见 _LIST_ORIGIN）；level 直接取库里的 crafts.level，
-    该列目前是空串（T05 灌库时未迁该值），运营在后台补等级后这里立即生效。
+    origin 与 level 都直接取 crafts 表。运营在后台改完立即生效，读取侧
+    不再持有任何按 id 覆写的展示值。
     """
     conn = get_connection()
     rows = conn.execute(
         "SELECT id, name, origin, level FROM crafts ORDER BY sort_order, id").fetchall()
     conn.close()
     return [{'id': r['id'], 'name': r['name'],
-             'origin': _LIST_ORIGIN.get(r['id'], r['origin']),
+             'origin': r['origin'],
              'level': r['level'] or ''} for r in rows]
 
 
@@ -579,6 +571,20 @@ def get_craft_videos(craft_id):
         return _craft_videos(conn, craft_id)
     finally:
         conn.close()
+
+
+def get_craft_videos_for_editor(craft_id):
+    """运营后台的视频列表，保留原始列名与排序字段供编辑使用。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            'SELECT id, bvid, title, author, duration, view_count, danmaku, '
+            'like_count, pubdate, cover, craft_id, sort_order FROM craft_videos '
+            'WHERE craft_id = ? ORDER BY sort_order, id',
+            (craft_id,)).fetchall()
+    finally:
+        conn.close()
+    return [dict(row) for row in rows]
 
 
 def create_craft_video(craft_id, bvid, **fields):

@@ -7,15 +7,16 @@
 
 import os
 
-from flask import Flask
+from flask import Flask, jsonify
 from flask_cors import CORS
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import repo_paths
+from shared.upload_limits import MAX_REQUEST_BYTES, MAX_UPLOAD_MEGABYTES
 
 # ---- CORS：只放行本机来源 ----
-# 本应用的所有页面（index.html / teacher.html / admin.html / 各门户页）都跟 API 同源，
-# 同源请求根本用不到 CORS 头；跨域只可能出现在本地调试时（例如页面在 127.0.0.1
-# 而 js/core.js 的默认 API 基址指向另一个源）。
+# 生产环境中前端由同源 nginx 伺服，跨域只可能出现在本地调试时（例如 Vite 端口
+# 与 Flask 端口不同）。开发期由 Vite 代理 /api，也不需要为业务页面开放跨域。
 # 此前是 CORS(app) —— 等于对**任意来源**开放。一旦填上 AI_API_KEY，任何站点都能借
 # 用户浏览器直接调本站接口，把这里当成免费大模型代理刷额度（还可能顺带试出会话头）。
 # 需要跨域部署（独立域名前端）时，用环境变量 CORS_ORIGINS 显式追加，逗号分隔。
@@ -39,9 +40,12 @@ def create_app():
     # 应用配置
     app.config.update(
         SECRET_KEY=os.getenv('SECRET_KEY', os.urandom(24).hex()),
-        MAX_CONTENT_LENGTH=16 * 1024 * 1024,
+        # Flask 限制的是整个 multipart 请求；文件本身的上限由领域路由校验。
+        # 这里预留固定的 multipart 开销，避免恰好 50MB 的文件被边界字段顶成 413。
+        MAX_CONTENT_LENGTH=MAX_REQUEST_BYTES,
         JSON_AS_ASCII=False
     )
+    _register_error_handlers(app)
 
     # 仅对 /api/* 下发 CORS 头：静态资源一律不参与跨域（默认拒绝）。
     CORS(app, resources={r'/api/*': {
@@ -52,6 +56,21 @@ def create_app():
 
     _register_blueprints(app)
     return app
+
+
+def _register_error_handlers(app):
+    """Keep transport failures machine-readable for the SPA.
+
+    A reverse proxy may reject an oversized body before Flask sees it; when Flask
+    does see it, the frontend still needs the same code/message contract.
+    """
+    @app.errorhandler(RequestEntityTooLarge)
+    def handle_request_entity_too_large(_error):
+        return jsonify({
+            "success": False,
+            "code": "file_too_large",
+            "message": "文件过大，上传文件不能超过 %dMB" % MAX_UPLOAD_MEGABYTES,
+        }), 413
 
 
 def _register_blueprints(app):

@@ -276,12 +276,17 @@ def register_farming_routes(bp):
         for key in ('product_id', 'name', 'color', 'description'):
             if key in data:
                 fields[key] = _text(data.get(key))
-        for key in ('start_month', 'end_month', 'sort_order'):
+        for key in ('start_month', 'end_month'):
             if key in data:
                 value = _optional_int(data.get(key))
                 if value is None or value < 1 or value > 12:
                     return fail(u'月份需为 1 到 12 的整数', 400)
                 fields[key] = value
+        if 'sort_order' in data:
+            value = _optional_int(data.get('sort_order'))
+            if value is None or value < 0:
+                return fail(u'排序需为不小于 0 的整数', 400)
+            fields['sort_order'] = value
         return run_write(farming_db.update_farming_phenophase, phase_id, **fields)
 
     @bp.route('/api/operator/farming/phenophases/<int:phase_id>', methods=['DELETE'])

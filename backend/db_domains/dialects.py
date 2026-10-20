@@ -116,6 +116,15 @@ def get_dialect_row(dialect_id):
     return dict(row) if row else None
 
 
+def get_dialect_editor_row(dialect_id):
+    """运营编辑用的一行方言：保留全部可写列，并把 features 解成数组。"""
+    row = get_dialect_row(dialect_id)
+    if row is None:
+        return None
+    row['features'] = _decode_features(row.get('features'))
+    return row
+
+
 def create_dialect(dialect_id, name, **fields):
     """新增一种方言，返回 dialect_id（字符串主键由调用方给出）。"""
     dialect_id = (dialect_id or '').strip()

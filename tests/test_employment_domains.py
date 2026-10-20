@@ -157,6 +157,7 @@ class JobDetailTest(EmploymentDomainTestBase):
 
     def test_pending_job_is_invisible_and_unapplicable(self):
         self.addCleanup(self._cleanup)
+        sid = self._login()
         conn = get_connection()
         conn.execute("""
             INSERT INTO job_listings (title, company, salary, requirements, description,
@@ -183,7 +184,8 @@ class JobDetailTest(EmploymentDomainTestBase):
         # 不能被申请
         r = self.client.post('/api/employment/apply',
                              data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers={'X-Session-Id': sid})
         self.assertFalse(json.loads(r.data)['success'])
 
     def test_unknown_job_detail_is_404(self):
@@ -195,9 +197,15 @@ class JobDetailTest(EmploymentDomainTestBase):
 class CertificatesAndPointsTest(EmploymentDomainTestBase):
     """证书与积分：档案口径与兑换三态。"""
 
+    def setUp(self):
+        super().setUp()
+        self.student_sid = self._login()
+        self.student_headers = {'X-Session-Id': self.student_sid}
+
     def test_certificates_come_from_the_certificate_table(self):
         data = json.loads(self.client.get(
-            '/api/employment/certificates/student_demo').data)
+            '/api/employment/certificates/student_demo',
+            headers=self.student_headers).data)
         self.assertTrue(data['success'])
         conn = get_connection()
         expected = [dict(r) for r in conn.execute(
@@ -208,7 +216,8 @@ class CertificatesAndPointsTest(EmploymentDomainTestBase):
 
     def test_points_match_the_points_table(self):
         data = json.loads(self.client.get(
-            '/api/employment/points/student_demo').data)
+            '/api/employment/points/student_demo',
+            headers=self.student_headers).data)
         self.assertTrue(data['success'])
         conn = get_connection()
         row = conn.execute(
@@ -220,11 +229,13 @@ class CertificatesAndPointsTest(EmploymentDomainTestBase):
     def test_exchange_deducts_and_reports_remaining(self):
         self.addCleanup(self._cleanup)
         before = json.loads(self.client.get(
-            '/api/employment/points/student_demo').data)['points']
+            '/api/employment/points/student_demo',
+            headers=self.student_headers).data)['points']
         r = self.client.post('/api/employment/exchange',
                              data=json.dumps({'user_id': 'student_demo',
                                               'item': '测试兑换', 'cost': 10}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers=self.student_headers)
         body = json.loads(r.data)
         self.assertTrue(body['success'])
         self.assertEqual(body['remaining_points'], before - 10)
@@ -234,14 +245,93 @@ class CertificatesAndPointsTest(EmploymentDomainTestBase):
         r = self.client.post('/api/employment/exchange',
                              data=json.dumps({'user_id': 'student_demo',
                                               'item': '天价商品', 'cost': 99999999}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers=self.student_headers)
         body = json.loads(r.data)
         self.assertFalse(body['success'])
         self.assertEqual(body['message'], '积分不足')
 
+    def test_points_certificates_and_exchange_are_session_bound(self):
+        teacher_sid = self._login('teacher_demo')
+        teacher_headers = {'X-Session-Id': teacher_sid}
+
+        requests = (
+            self.client.get('/api/employment/certificates/student_demo'),
+            self.client.get('/api/employment/points/student_demo'),
+            self.client.post(
+                '/api/employment/exchange',
+                data=json.dumps({
+                    'user_id': 'student_demo',
+                    'item': '越权兑换',
+                    'cost': 1,
+                }),
+                content_type='application/json',
+            ),
+            self.client.get(
+                '/api/employment/certificates/student_demo',
+                headers=teacher_headers,
+            ),
+            self.client.get(
+                '/api/employment/points/student_demo',
+                headers=teacher_headers,
+            ),
+            self.client.post(
+                '/api/employment/exchange',
+                data=json.dumps({
+                    'user_id': 'student_demo',
+                    'item': '越权兑换',
+                    'cost': 1,
+                }),
+                content_type='application/json',
+                headers=teacher_headers,
+            ),
+        )
+
+        for response in requests[:3]:
+            self.assertEqual(response.status_code, 401)
+        for response in requests[3:]:
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(
+                json.loads(response.data)['message'],
+                '无权访问他人的求职资料',
+            )
+
+    def test_exchange_rejects_non_positive_and_invalid_costs(self):
+        before = json.loads(self.client.get(
+            '/api/employment/points/student_demo',
+            headers=self.student_headers).data)['points']
+
+        for cost in (-10, 0, 'abc', None, 1.5, True):
+            with self.subTest(cost=cost):
+                response = self.client.post(
+                    '/api/employment/exchange',
+                    data=json.dumps({
+                        'user_id': 'student_demo',
+                        'item': '非法兑换',
+                        'cost': cost,
+                    }),
+                    content_type='application/json',
+                    headers=self.student_headers,
+                )
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(
+                    json.loads(response.data)['message'],
+                    '兑换积分必须为正整数',
+                )
+
+        after = json.loads(self.client.get(
+            '/api/employment/points/student_demo',
+            headers=self.student_headers).data)['points']
+        self.assertEqual(after, before)
+
 
 class ApplyAndSaveTest(EmploymentDomainTestBase):
     """投递与收藏：参数校验、重复投递、收藏增删查。"""
+
+    def setUp(self):
+        super().setUp()
+        self.student_sid = self._login()
+        self.student_headers = {'X-Session-Id': self.student_sid}
 
     def _make_approved_job(self, title='__T15已审岗位__'):
         conn = get_connection()
@@ -257,10 +347,11 @@ class ApplyAndSaveTest(EmploymentDomainTestBase):
         conn.close()
         return job_id
 
-    def test_apply_requires_user_and_job(self):
-        for payload in ({}, {'user_id': 'student_demo'}, {'job_id': 1}):
+    def test_apply_requires_job(self):
+        for payload in ({}, {'user_id': 'student_demo'}):
             r = self.client.post('/api/employment/apply', data=json.dumps(payload),
-                                 content_type='application/json')
+                                 content_type='application/json',
+                                 headers=self.student_headers)
             self.assertEqual(r.status_code, 200)
             body = json.loads(r.data)
             self.assertFalse(body['success'])
@@ -272,7 +363,8 @@ class ApplyAndSaveTest(EmploymentDomainTestBase):
 
         r = self.client.post('/api/employment/apply',
                              data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers=self.student_headers)
         body = json.loads(r.data)
         self.assertTrue(body['success'])
         self.assertIn('20积分奖励', body['message'])
@@ -281,12 +373,14 @@ class ApplyAndSaveTest(EmploymentDomainTestBase):
         # 重复申请被拒
         r = self.client.post('/api/employment/apply',
                              data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers=self.student_headers)
         self.assertEqual(json.loads(r.data)['message'], '您已申请过该职位')
 
         # 投递记录里能查到
         apps = json.loads(self.client.get(
-            '/api/employment/applications/student_demo').data)['applications']
+            '/api/employment/applications/student_demo',
+            headers=self.student_headers).data)['applications']
         self.assertIn(job_id, [a['job_id'] for a in apps])
         for a in apps:
             for key in ('id', 'user_id', 'job_id', 'status', 'applied_at',
@@ -294,24 +388,28 @@ class ApplyAndSaveTest(EmploymentDomainTestBase):
                 self.assertIn(key, a)
 
         counts = json.loads(self.client.get(
-            '/api/employment/applications/student_demo/counts').data)['counts']
+            '/api/employment/applications/student_demo/counts',
+            headers=self.student_headers).data)['counts']
         self.assertEqual(set(counts), {'total', 'pending', 'approved', 'rejected'})
         self.assertEqual(counts['total'], len(apps))
 
         stats = json.loads(self.client.get(
-            '/api/employment/stats/student_demo').data)['stats']
+            '/api/employment/stats/student_demo',
+            headers=self.student_headers).data)['stats']
         self.assertEqual(set(stats), {'applied', 'saved', 'intents', 'messages'})
         self.assertEqual(stats['applied'], len(apps))
 
     def test_applications_status_filter(self):
         self.addCleanup(self._cleanup)
         all_apps = json.loads(self.client.get(
-            '/api/employment/applications/student_demo').data)['applications']
+            '/api/employment/applications/student_demo',
+            headers=self.student_headers).data)['applications']
         if not all_apps:
             self.skipTest('演示账号没有投递记录，无法验证状态筛选')
         status = all_apps[0]['status']
         filtered = json.loads(self.client.get(
-            '/api/employment/applications/student_demo?status=%s' % status).data)
+            '/api/employment/applications/student_demo?status=%s' % status,
+            headers=self.student_headers).data)
         self.assertTrue(all(a['status'] == status for a in filtered['applications']))
 
     def test_save_and_unsave_round_trip(self):
@@ -320,33 +418,126 @@ class ApplyAndSaveTest(EmploymentDomainTestBase):
 
         r = self.client.post('/api/employment/save',
                              data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers=self.student_headers)
         self.assertTrue(json.loads(r.data)['success'])
         saved = json.loads(self.client.get(
-            '/api/employment/saved/student_demo').data)['saved_ids']
+            '/api/employment/saved/student_demo',
+            headers=self.student_headers).data)['saved_ids']
         self.assertIn(job_id, saved)
 
         # 重复收藏返回已收藏过
         r = self.client.post('/api/employment/save',
                              data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                             content_type='application/json')
+                             content_type='application/json',
+                             headers=self.student_headers)
         self.assertEqual(json.loads(r.data)['message'], '已收藏过该职位')
 
         r = self.client.delete('/api/employment/save',
                                data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                               content_type='application/json')
+                               content_type='application/json',
+                               headers=self.student_headers)
         self.assertTrue(json.loads(r.data)['success'])
         saved = json.loads(self.client.get(
-            '/api/employment/saved/student_demo').data)['saved_ids']
+            '/api/employment/saved/student_demo',
+            headers=self.student_headers).data)['saved_ids']
         self.assertNotIn(job_id, saved)
 
-    def test_save_requires_user_and_job(self):
-        r = self.client.post('/api/employment/save', data=json.dumps({'user_id': 'x'}),
-                             content_type='application/json')
+    def test_save_requires_job(self):
+        r = self.client.post('/api/employment/save',
+                             data=json.dumps({'user_id': 'student_demo'}),
+                             content_type='application/json',
+                             headers=self.student_headers)
         self.assertEqual(json.loads(r.data)['message'], '参数不完整')
-        r = self.client.delete('/api/employment/save', data=json.dumps({'job_id': 1}),
-                               content_type='application/json')
+        r = self.client.delete('/api/employment/save', data=json.dumps({}),
+                               content_type='application/json',
+                               headers=self.student_headers)
         self.assertEqual(json.loads(r.data)['message'], '参数不完整')
+
+    def test_personal_employment_state_cannot_be_read_or_written_cross_user(self):
+        """收藏、投递与投递历史只能由会话本人读写。"""
+        self.addCleanup(self._cleanup)
+        job_id = self._make_approved_job('__T15IDOR岗位__')
+        teacher_sid = self._login('teacher_demo')
+        teacher_headers = {'X-Session-Id': teacher_sid}
+
+        attempts = (
+            self.client.post('/api/employment/apply',
+                             data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
+                             content_type='application/json', headers=teacher_headers),
+            self.client.post('/api/employment/save',
+                             data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
+                             content_type='application/json', headers=teacher_headers),
+            self.client.get('/api/employment/saved/student_demo',
+                            headers=teacher_headers),
+            self.client.get('/api/employment/applications/student_demo',
+                            headers=teacher_headers),
+            self.client.get('/api/employment/applications/student_demo/counts',
+                            headers=teacher_headers),
+            self.client.get('/api/employment/stats/student_demo',
+                            headers=teacher_headers),
+        )
+        for response in attempts:
+            self.assertEqual(response.status_code, 403)
+            self.assertEqual(json.loads(response.data)['message'],
+                             '无权访问他人的求职资料')
+
+        conn = get_connection()
+        self.assertEqual(conn.execute(
+            "SELECT COUNT(*) FROM job_applications WHERE job_id = ?",
+            (job_id,)).fetchone()[0], 0)
+        self.assertEqual(conn.execute(
+            "SELECT COUNT(*) FROM saved_jobs WHERE job_id = ?",
+            (job_id,)).fetchone()[0], 0)
+        conn.close()
+
+        for path, method, payload in (
+            ('/api/employment/apply', 'POST',
+             {'user_id': 'student_demo', 'job_id': job_id}),
+            ('/api/employment/save', 'POST',
+             {'user_id': 'student_demo', 'job_id': job_id}),
+            ('/api/employment/saved/student_demo', 'GET', None),
+        ):
+            response = self.client.open(
+                path, method=method,
+                data=json.dumps(payload) if payload is not None else None,
+                content_type='application/json')
+            self.assertEqual(response.status_code, 401, path)
+            self.assertEqual(json.loads(response.data)['message'], '请先登录')
+
+        # user_id 可以省略：后端从会话派生归属，而不是相信客户端字段。
+        r = self.client.post('/api/employment/save',
+                             data=json.dumps({'job_id': job_id}),
+                             content_type='application/json',
+                             headers=self.student_headers)
+        self.assertTrue(json.loads(r.data)['success'])
+
+        r = self.client.delete('/api/employment/save',
+                               data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
+                               content_type='application/json',
+                               headers=teacher_headers)
+        self.assertEqual(r.status_code, 403)
+
+        conn = get_connection()
+        saved_owner = conn.execute(
+            "SELECT user_id FROM saved_jobs WHERE job_id = ?", (job_id,)).fetchone()
+        conn.close()
+        self.assertIsNotNone(saved_owner)
+        self.assertEqual(saved_owner['user_id'], 'student_demo')
+
+        r = self.client.post('/api/employment/apply',
+                             data=json.dumps({'job_id': job_id}),
+                             content_type='application/json',
+                             headers=self.student_headers)
+        self.assertTrue(json.loads(r.data)['success'])
+
+        conn = get_connection()
+        applied_owner = conn.execute(
+            "SELECT user_id FROM job_applications WHERE job_id = ?",
+            (job_id,)).fetchone()
+        conn.close()
+        self.assertIsNotNone(applied_owner)
+        self.assertEqual(applied_owner['user_id'], 'student_demo')
 
 
 class SelfOnlyGuardTest(EmploymentDomainTestBase):
@@ -553,6 +744,67 @@ class ResumeAiTest(EmploymentDomainTestBase):
                              content_type='application/json')
         self.assertEqual(r.status_code, 401)
 
+    def test_successful_generation_records_which_section_used_ai(self):
+        from unittest.mock import patch
+        from db_init import init_db
+        init_db()
+        sid = self._login()
+        try:
+            with patch(
+                'domains.employment_profile.routes.ai.client.ai_configured',
+                return_value=True,
+            ), patch(
+                'domains.employment_profile.routes.call_ai_service',
+                return_value='根据平台真实学习数据整理的段落',
+            ):
+                response = self._post_ai(sid, {
+                    'user_id': 'student_demo',
+                    'section': 'skills',
+                    'draft': '本人填写的基础技能',
+                })
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(json.loads(response.data)['success'])
+
+            resume = json.loads(self.client.get(
+                '/api/employment/resume/student_demo',
+                headers={'X-Session-Id': sid},
+            ).data)['resume']
+            self.assertEqual(resume['ai_used'], 1)
+            self.assertEqual(resume['ai_sections'], ['skills'])
+        finally:
+            self._cleanup()
+
+    def test_experience_polish_uses_the_unsaved_draft(self):
+        from unittest.mock import patch
+        from db_init import init_db
+        init_db()
+        self._cleanup()
+        sid = self._login()
+        captured = {}
+
+        def fake_call(system_prompt, user_prompt, **kwargs):
+            captured['prompt'] = user_prompt
+            return '负责农产品直播策划与店铺日常运营。'
+
+        try:
+            with patch(
+                'domains.employment_profile.routes.ai.client.ai_configured',
+                return_value=True,
+            ), patch(
+                'domains.employment_profile.routes.call_ai_service',
+                side_effect=fake_call,
+            ):
+                response = self._post_ai(sid, {
+                    'user_id': 'student_demo',
+                    'section': 'experience',
+                    'draft': '粤乡合作社 / 运营助理 / 2024：协助店铺运营',
+                })
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('粤乡合作社', captured['prompt'])
+            self.assertIn('协助店铺运营', captured['prompt'])
+        finally:
+            self._cleanup()
+
 
 class JobIntentTest(EmploymentDomainTestBase):
     """求职意向：登记幂等、不存在的公告 404、取消、聚合下发。"""
@@ -734,7 +986,8 @@ class SelfOnlyHelperOwnershipTest(EmploymentDomainTestBase):
 
             r = self.client.post('/api/employment/apply',
                                  data=json.dumps({'user_id': 'student_demo', 'job_id': job_id}),
-                                 content_type='application/json')
+                                 content_type='application/json',
+                                 headers={'X-Session-Id': sid})
             self.assertFalse(json.loads(r.data)['has_resume'])
 
             data = json.loads(self.client.get(

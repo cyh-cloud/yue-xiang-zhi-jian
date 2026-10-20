@@ -311,13 +311,22 @@ class TeacherReportTest(TeacherDomainTestBase):
         self.assertTrue(body['success'])
         self.assertEqual(body['report']['title'], 'AI 教学报告')
         self.assertIn('暂无数据', body['report']['content'])
+        self.assertTrue(body['report']['degraded'])
+        self.assertEqual(body['report']['degraded_reason'], 'no_roster_data')
 
     def _restore_roster(self):
         conn = get_connection()
         if conn.execute("SELECT COUNT(*) FROM students").fetchone()[0] == 0:
             conn.execute(
-                "INSERT INTO students (id, user_id, name, class_name, direction) "
-                "VALUES ('STU001', 'student_demo', '小明', '一班', '荔枝种植')")
+                "INSERT INTO students "
+                "(id, user_id, teacher_id, name, class_name, direction) "
+                "VALUES ('STU001', 'student_demo', 'teacher_demo', "
+                "'小明', '一班', '荔枝种植')")
+            conn.execute(
+                "INSERT INTO students "
+                "(id, user_id, teacher_id, name, class_name, direction) "
+                "VALUES ('STU002', '', 'teacher_demo', "
+                "'小红', '一班', '电商运营')")
             conn.commit()
         conn.close()
 
@@ -326,7 +335,7 @@ class TeacherReportTest(TeacherDomainTestBase):
         self.addCleanup(self._cleanup)
         sid = self._login()
         self._json('POST', '/api/teacher/students/add',
-                   {'name': '__T16报表__', 'link_username': 'test_user'}, session_id=sid)
+                   {'name': '__T16报表__'}, session_id=sid)
 
         import domains.teacher.reports as reports
         original = reports.call_ai_service
@@ -341,6 +350,8 @@ class TeacherReportTest(TeacherDomainTestBase):
         self.assertEqual(r.status_code, 200)
         report = json.loads(r.data)['report']
         self.assertEqual(report['title'], 'AI 教学报告')
+        self.assertTrue(report['degraded'])
+        self.assertEqual(report['degraded_reason'], 'ai_unavailable')
         self.assertIn('数据口径：证书真实完成度', report['content'])
         self.assertIn('__T16报表__', report['content'])
         # 兜底概览与主路径同一套键
@@ -350,7 +361,7 @@ class TeacherReportTest(TeacherDomainTestBase):
             'directions', 'at_risk', 'excellent', 'focus', 'title',
             'highlight_stats'})
         self.assertEqual(report['overview']['total'],
-                         len(teaching.get_roster_completion()))
+                         len(teaching.get_roster_completion('teacher_demo')))
 
     def test_report_sends_roster_context_to_the_upstream(self):
         """上游调用必须带上名册数据，且报告主题随 prompt 切换。
@@ -380,6 +391,8 @@ class TeacherReportTest(TeacherDomainTestBase):
         self.assertEqual(r.status_code, 200)
         report = json.loads(r.data)['report']
         self.assertEqual(report['content'], '## 风险预警\n\n内容')
+        self.assertFalse(report['degraded'])
+        self.assertEqual(report['degraded_reason'], '')
         self.assertEqual(report['overview']['focus'], 'risk')
         self.assertEqual(report['overview']['title'], '风险预警概览')
         self.assertEqual(report['overview']['highlight_stats'],
@@ -659,8 +672,8 @@ class CourseCrudTest(TeacherDomainTestBase):
                        session_id=admin)
         self.assertEqual(r.status_code, 403)
 
-    def test_materials_get_is_public_but_write_needs_teacher(self):
-        """素材读写：读公开、写要课程教师。
+    def test_materials_read_and_write_require_the_course_teacher(self):
+        """素材读写：课程教师本人可读可写，匿名与学员均被拒绝。
 
         课程由本用例自己造，不再去库里挑一门现成的。内容落库之后课程是教师产生的、
         没有演示数据，挑现成的会让用例依赖「库里恰好残留着别处造的数据」。
@@ -674,6 +687,11 @@ class CourseCrudTest(TeacherDomainTestBase):
         self.addCleanup(courses_db.delete_course, course_id)
 
         r = self.client.get('/api/teacher/courses/%d/materials' % course_id)
+        self.assertEqual(r.status_code, 403)
+        r = self.client.get(
+            '/api/teacher/courses/%d/materials' % course_id,
+            headers={'X-Session-Id': sid},
+        )
         self.assertEqual(r.status_code, 200)
         self.assertEqual(json.loads(r.data)['materials'], [])
 
@@ -696,11 +714,35 @@ class MaterialUploadTest(TeacherDomainTestBase):
         conn.commit()
         conn.close()
 
+    def _create_course(self, session_id):
+        response = self.client.post(
+            '/api/teacher/courses',
+            json={'title': '__T16材料课程__', 'description': 'material test'},
+            headers={'X-Session-Id': session_id},
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        course_id = response.get_json()['id']
+
+        def cleanup():
+            conn = get_connection()
+            rows = conn.execute(
+                "SELECT file_path FROM course_materials WHERE course_id = ?",
+                (course_id,),
+            ).fetchall()
+            conn.close()
+            for row in rows:
+                path = os.path.join(repo_paths.REPO_ROOT, row['file_path'])
+                if os.path.exists(path):
+                    os.remove(path)
+            courses_db.delete_course(course_id)
+
+        self.addCleanup(cleanup)
+        return course_id
+
     def test_material_upload_round_trip_and_type_judgement(self):
-        course_id = 990101
-        self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
         headers = {'X-Session-Id': sid}
+        course_id = self._create_course(sid)
 
         payload = b'%PDF-1.4 T16 material round trip probe\n'
         uploaded = self.client.post(
@@ -733,9 +775,8 @@ class MaterialUploadTest(TeacherDomainTestBase):
         self.assertFalse(os.path.isfile(on_disk), '删除后文件必须真的从磁盘上消失')
 
     def test_video_extension_is_judged_as_video(self):
-        course_id = 990102
-        self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
+        course_id = self._create_course(sid)
         uploaded = self.client.post(
             '/api/teacher/courses/%d/materials' % course_id,
             data={'file': (io.BytesIO(b'not really a video'), 't16_probe.mp4')},
@@ -748,9 +789,8 @@ class MaterialUploadTest(TeacherDomainTestBase):
                            headers={'X-Session-Id': sid})
 
     def test_unknown_extension_is_judged_as_other(self):
-        course_id = 990103
-        self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
+        course_id = self._create_course(sid)
         uploaded = self.client.post(
             '/api/teacher/courses/%d/materials' % course_id,
             data={'file': (io.BytesIO(b'whatever'), 't16_probe.xyz')},
@@ -763,10 +803,9 @@ class MaterialUploadTest(TeacherDomainTestBase):
                            headers={'X-Session-Id': sid})
 
     def test_missing_file_and_empty_filename_are_rejected(self):
-        course_id = 990104
-        self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
         headers = {'X-Session-Id': sid}
+        course_id = self._create_course(sid)
         r = self.client.post('/api/teacher/courses/%d/materials' % course_id,
                              data={}, headers=headers)
         self.assertEqual(r.status_code, 400)
@@ -778,9 +817,8 @@ class MaterialUploadTest(TeacherDomainTestBase):
 
     def test_uploaded_filename_gets_a_timestamp_prefix(self):
         """文件名带时间戳前缀，避免同名文件互相覆盖。"""
-        course_id = 990105
-        self.addCleanup(self._cleanup)
         sid = self._login('teacher_demo')
+        course_id = self._create_course(sid)
         uploaded = self.client.post(
             '/api/teacher/courses/%d/materials' % course_id,
             data={'file': (io.BytesIO(b'x'), 't16_probe.pdf')},
@@ -798,14 +836,14 @@ class Model3dTest(TeacherDomainTestBase):
     def _cleanup(self):
         conn = get_connection()
         rows = conn.execute(
-            "SELECT id, file_path FROM models_3d WHERE title LIKE '__T16%'").fetchall()
-        for r in rows:
-            full = os.path.join(repo_paths.REPO_ROOT, r['file_path'])
+            "SELECT id, file_path FROM models_3d "
+            "WHERE title LIKE '__T16%' OR title LIKE '__T17%'").fetchall()
+        conn.close()
+        for row in rows:
+            courses_db.delete_model_3d(row['id'])
+            full = os.path.join(repo_paths.REPO_ROOT, row['file_path'])
             if os.path.isfile(full):
                 os.remove(full)
-        conn.execute("DELETE FROM models_3d WHERE title LIKE '__T16%'")
-        conn.commit()
-        conn.close()
 
     def _upload(self, session_id, filename, content, **fields):
         data = {'file': (io.BytesIO(content), filename)}
@@ -884,6 +922,108 @@ class Model3dTest(TeacherDomainTestBase):
         self.assertEqual(row['title'], 't16_probe_default.glb')
         self.client.delete('/api/teacher/models-3d/%d' % model_id,
                            headers={'X-Session-Id': sid})
+
+    def test_list_only_contains_the_current_teachers_models(self):
+        self.addCleanup(self._cleanup)
+        other_id = courses_db.create_model_3d(
+            '__T17其他教师模型__', '', '', 'uploads/models_3d/other.glb',
+            'other.glb', 4, 'another_teacher')
+        own_id = courses_db.create_model_3d(
+            '__T17本人模型__', '', '', 'uploads/models_3d/own.glb',
+            'own.glb', 4, 'teacher_demo')
+
+        sid = self._login('teacher_demo')
+        models = json.loads(self.client.get(
+            '/api/teacher/models-3d',
+            headers={'X-Session-Id': sid}).data)['models']
+        ids = [model['id'] for model in models]
+        self.assertIn(own_id, ids)
+        self.assertNotIn(other_id, ids)
+
+    def test_teacher_cannot_delete_another_teachers_model(self):
+        self.addCleanup(self._cleanup)
+        file_path = 'uploads/models_3d/__T17_other_teacher.glb'
+        full_path = os.path.join(repo_paths.REPO_ROOT, file_path)
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, 'wb') as handle:
+            handle.write(b'other')
+        other_id = courses_db.create_model_3d(
+            '__T17其他教师删除保护__', '', '', file_path,
+            '__T17_other_teacher.glb', 5, 'another_teacher')
+
+        sid = self._login('teacher_demo')
+        r = self.client.delete(
+            '/api/teacher/models-3d/%d' % other_id,
+            headers={'X-Session-Id': sid})
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(json.loads(r.data)['message'], '只能删除自己上传的模型')
+        self.assertTrue(os.path.isfile(full_path))
+
+    def test_approval_publishes_and_delete_removes_the_model_everywhere(self):
+        self.addCleanup(self._cleanup)
+        sid = self._login('teacher_demo')
+        payload = b'glTF T17 public lifecycle'
+        uploaded = self._upload(
+            sid, 't17_public_lifecycle.glb', payload,
+            title='__T17公开生命周期__', craft_type='embroidery')
+        self.assertEqual(uploaded.status_code, 200)
+        model_id = json.loads(uploaded.data)['id']
+
+        from db_domains import reviews
+        review = reviews.get_review_by_content('model_3d', model_id)
+        admin = self._login('admin_demo', 'admin123')
+        approved = self._json(
+            'POST', '/api/admin/reviews/%d/approve' % review['id'], {},
+            session_id=admin)
+        self.assertEqual(approved.status_code, 200)
+
+        public_before = json.loads(
+            self.client.get('/api/teacher/public-models-3d').data)['models']
+        self.assertIn(model_id, [model['id'] for model in public_before])
+
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT file_path FROM models_3d WHERE id = ?", (model_id,)
+        ).fetchone()
+        conn.close()
+        on_disk = os.path.join(repo_paths.REPO_ROOT, row['file_path'])
+        self.assertTrue(os.path.isfile(on_disk))
+
+        removed = self.client.delete(
+            '/api/teacher/models-3d/%d' % model_id,
+            headers={'X-Session-Id': sid})
+        self.assertEqual(removed.status_code, 200)
+        self.assertFalse(os.path.isfile(on_disk))
+        self.assertIsNone(reviews.get_review_by_content('model_3d', model_id))
+
+        public_after = json.loads(
+            self.client.get('/api/teacher/public-models-3d').data)['models']
+        self.assertNotIn(model_id, [model['id'] for model in public_after])
+
+    def test_rejection_reason_is_visible_to_the_teacher(self):
+        self.addCleanup(self._cleanup)
+        sid = self._login('teacher_demo')
+        uploaded = self._upload(
+            sid, 't17_rejected_reason.glb', b'glTF rejected',
+            title='__T17驳回理由模型__')
+        self.assertEqual(uploaded.status_code, 200)
+        model_id = json.loads(uploaded.data)['id']
+
+        from db_domains import reviews
+        review = reviews.get_review_by_content('model_3d', model_id)
+        admin = self._login('admin_demo', 'admin123')
+        rejected = self._json(
+            'POST', '/api/admin/reviews/%d/reject' % review['id'],
+            {'comment': '模型缺少正面展示'}, session_id=admin)
+        self.assertEqual(rejected.status_code, 200)
+
+        models = json.loads(self.client.get(
+            '/api/teacher/models-3d',
+            headers={'X-Session-Id': sid}).data)['models']
+        row = next(model for model in models if model['id'] == model_id)
+        self.assertEqual(row['review_status'], 'rejected')
+        self.assertEqual(row['review_comment'], '模型缺少正面展示')
+        self.assertIn('reviewed_at', row)
 
 
 class HealthCheckTest(TeacherDomainTestBase):

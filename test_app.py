@@ -38,9 +38,14 @@ class TestYueXiangApp(unittest.TestCase):
         return json.loads(r.data)['session_id']
 
     def test_index_page(self):
-        """测试主页"""
+        """Flask 不再伺服旧主页；SPA 由 nginx 或测试静态入口提供。"""
         response = self.client.get('/')
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(json.loads(response.data), {
+            "success": False,
+            "code": "not_found",
+            "message": "文件不存在",
+        })
 
     def test_health_check(self):
         """测试健康检查"""
@@ -182,6 +187,7 @@ class TestYueXiangApp(unittest.TestCase):
         用例结束会删除自建岗位，不污染真实数据。
         """
         ent_sid = None
+        student_sid = None
         job_id = None
         try:
             # 企业端登录
@@ -190,6 +196,10 @@ class TestYueXiangApp(unittest.TestCase):
             }), content_type='application/json')
             ent_sid = json.loads(r.data)['session_id']
             headers = {'X-Session-Id': ent_sid}
+            r = self.client.post('/api/auth/login', data=json.dumps({
+                'username': 'student_demo', 'password': '123456', 'role': 'student'
+            }), content_type='application/json')
+            student_sid = json.loads(r.data)['session_id']
 
             # 企业发布岗位 → 初始状态 pending
             r = self.client.post('/api/enterprise/jobs', data=json.dumps({
@@ -209,7 +219,8 @@ class TestYueXiangApp(unittest.TestCase):
             # ③ 未审岗位不能被申请
             r = self.client.post('/api/employment/apply', data=json.dumps({
                 'user_id': 'student_demo', 'job_id': job_id
-            }), content_type='application/json')
+            }), content_type='application/json',
+                headers={'X-Session-Id': student_sid})
             self.assertFalse(json.loads(r.data)['success'])
             conn = get_connection()
             cnt = conn.execute(
@@ -240,6 +251,14 @@ class TestYueXiangApp(unittest.TestCase):
                 try:
                     conn = _db.get_connection()
                     conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (ent_sid,))
+                    conn.commit()
+                    conn.close()
+                except Exception:
+                    pass
+            if student_sid:
+                try:
+                    conn = _db.get_connection()
+                    conn.execute("DELETE FROM user_sessions WHERE session_id = ?", (student_sid,))
                     conn.commit()
                     conn.close()
                 except Exception:

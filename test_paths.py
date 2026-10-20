@@ -196,7 +196,13 @@ class RepoRootPathBaselineTest(unittest.TestCase):
         session_id = json.loads(login.data)['session_id']
         headers = {'X-Session-Id': session_id}
 
-        course_id = 990001
+        created = client.post(
+            '/api/teacher/courses',
+            data=json.dumps({'title': '__T02路径课程__', 'description': 'probe'}),
+            content_type='application/json', headers=headers)
+        self.assertEqual(created.status_code, 200)
+        course_id = json.loads(created.data)['id']
+        self.addCleanup(courses.delete_course, course_id)
         material_bytes = b'%PDF-1.4 T02 repo-root path probe\n'
         model_bytes = b'glTF T02 repo-root path probe'
         written = []

@@ -23,7 +23,8 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 
-from core.session import TEACHER_ROLES, require_role
+from core.permissions import SUPER_ADMIN
+from core.session import TEACHER_ROLES, get_session_user, require_role
 from db_domains import students as students_db
 from db_domains.teaching import get_dashboard_stats, get_roster_completion
 from db_domains.users import register_user
@@ -38,12 +39,20 @@ CAPABILITIES_USED = ('user.read', 'teaching.read')
 teacher_bp = Blueprint('teacher', __name__)
 
 
+def _teacher_scope(user=None):
+    """Teacher-owned reads use the username; super admins retain an all-scope."""
+    current = user or get_session_user() or {}
+    if current.get('role') == SUPER_ADMIN:
+        return None
+    return current.get('username') or ''
+
+
 @teacher_bp.route('/api/teacher/dashboard', methods=['GET'])
 @require_role(*TEACHER_ROLES)
 def get_teacher_dashboard():
     # 2026-10-07：原返回里有一段硬编码的 recent_activities（"张小明 2小时前" 等
     # 编造数据），前端从未渲染它。按「不编造」红线直接移除，只回真实统计。
-    stats = get_dashboard_stats()
+    stats = get_dashboard_stats(_teacher_scope())
     return jsonify({"success": True, "dashboard": {"stats": stats}})
 
 
@@ -51,10 +60,11 @@ def get_teacher_dashboard():
 @require_role(*TEACHER_ROLES)
 def get_students():
     search = request.args.get('search', None)
-    students = students_db.get_students(search)
+    teacher_id = _teacher_scope()
+    students = students_db.get_students(search, teacher_id=teacher_id)
     # 附上「证书真实完成度」—— 名册自己的 progress 是手填字段，学员端没有任何入口
     # 会更新它；前端「已获得证书」的判定改用真实证书数据（2026-10-07）。
-    comp = {r['id']: r for r in get_roster_completion()}
+    comp = {r['id']: r for r in get_roster_completion(teacher_id)}
     for s in students:
         r = comp.get(s['id'])
         if r:
@@ -69,9 +79,10 @@ def get_students():
 @require_role(*TEACHER_ROLES)
 def get_student_detail(student_id):
     """获取学员详情（附证书真实完成度）"""
-    student = students_db.get_student(student_id)
+    teacher_id = _teacher_scope()
+    student = students_db.get_student(student_id, teacher_id=teacher_id)
     if student:
-        for r in get_roster_completion():
+        for r in get_roster_completion(teacher_id):
             if r['id'] == student_id:
                 student.update({
                     'cert_total': r['cert_total'], 'cert_earned': r['cert_earned'],
@@ -116,9 +127,15 @@ def add_student():
     elif link_username:
         account_username = link_username
 
-    sid = students_db.add_student(name, class_name, direction)
+    current = get_session_user()
+    sid = students_db.add_student(
+        name, class_name, direction,
+        teacher_id=(current or {}).get('username', ''),
+    )
     if account_username:
-        ok, msg = students_db.set_student_account(sid, account_username)
+        ok, msg = students_db.set_student_account(
+            sid, account_username, teacher_id=_teacher_scope(current),
+        )
         if not ok:
             # 关联失败（账号不存在 / 已被别人占用…）→ 回滚名册行，避免留下孤儿记录
             students_db.delete_student(sid)
@@ -145,7 +162,9 @@ def link_student_account(student_id):
     """关联 / 解除名册与平台账号。body: {"username": "xxx"}，空串表示解除。"""
     data = request.get_json() or {}
     username = (data.get('username') or '').strip()
-    ok, msg = students_db.set_student_account(student_id, username)
+    ok, msg = students_db.set_student_account(
+        student_id, username, teacher_id=_teacher_scope(),
+    )
     if not ok:
         return jsonify({"success": False, "message": msg}), 400
     return jsonify({"success": True, "message": msg, "user_id": username})
@@ -162,7 +181,8 @@ def update_student(student_id):
         class_name=data.get('class_name'),
         direction=data.get('direction'),
         progress=data.get('progress'),
-        status=data.get('status')
+        status=data.get('status'),
+        teacher_id=_teacher_scope(),
     )
     if result:
         return jsonify({"success": True, "message": "更新成功"})
@@ -173,7 +193,7 @@ def update_student(student_id):
 @require_role(*TEACHER_ROLES)
 def delete_student(student_id):
     """删除学员"""
-    result = students_db.delete_student(student_id)
+    result = students_db.delete_student(student_id, teacher_id=_teacher_scope())
     if result:
         return jsonify({"success": True, "message": "删除成功"})
     return jsonify({"success": False, "message": "未找到学员"})
@@ -192,12 +212,14 @@ def generate_teacher_report():
         # 2026-10-07：改用「证书真实完成度」口径（get_roster_completion）。
         # 原 context 直接聚合 students.progress —— 那是**手填**字段，学员端没有任何
         # 入口会更新它，AI 据此写出的「学员进度」与真实学习情况无关。
-        roster = get_roster_completion()
+        roster = get_roster_completion(_teacher_scope())
         if not roster:
             return jsonify({"success": True, "report": {
                 "title": "AI 教学报告",
                 "generated_at": datetime.now().isoformat(),
-                "content": "## 暂无数据\n\n当前没有学员数据，请先添加学员后再生成报告。"
+                "content": "## 暂无数据\n\n当前没有学员数据，请先添加学员后再生成报告。",
+                "degraded": True,
+                "degraded_reason": "no_roster_data",
             }})
 
         report = generate_report(roster, user_prompt)
@@ -205,14 +227,16 @@ def generate_teacher_report():
             "title": "AI 教学报告",
             "generated_at": datetime.now().isoformat(),
             "content": report["content"],
-            "overview": report["overview"]
+            "overview": report["overview"],
+            "degraded": False,
+            "degraded_reason": "",
         }})
 
     except Exception as e:
         logger.error(f"报告生成失败: {e}")
         # 兜底报告（口径与主路径一致：证书真实完成度）
         try:
-            roster = get_roster_completion()
+            roster = get_roster_completion(_teacher_scope())
             fallback = _build_fallback_report(roster, user_prompt)
             overview = _build_fallback_overview(roster, user_prompt)
         except Exception:
@@ -221,7 +245,9 @@ def generate_teacher_report():
         resp = {"success": True, "report": {
             "title": "AI 教学报告",
             "generated_at": datetime.now().isoformat(),
-            "content": fallback
+            "content": fallback,
+            "degraded": True,
+            "degraded_reason": "ai_unavailable",
         }}
         if overview:
             resp["report"]["overview"] = overview

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="粤乡智匠 - 基于 AI 实训的农村本土人才赋能平台" />
+    <title>粤乡智匠</title>
+    <link
+      id="font-awesome-cdn"
+      rel="stylesheet"
+      href="https://cdn.bootcdn.net/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      onload="document.documentElement.dataset.cdnFontAwesome = 'loaded'"
+      onerror="document.documentElement.dataset.cdnFontAwesome = 'failed'"
+    />
+    <script
+      id="model-viewer-cdn"
+      type="module"
+      src="https://unpkg.com/@google/model-viewer@3.5.0/dist/model-viewer.min.js"
+      onload="document.documentElement.dataset.cdnModelViewer = 'loaded'"
+      onerror="document.documentElement.dataset.cdnModelViewer = 'failed'"
+    ></script>
+    <script>
+      // Keys mirror src/shared/storageKeys.ts. This pre-paint bootstrap must stay
+      // inline to avoid a theme or large-text flash before Vue mounts.
+      try {
+        var theme = localStorage.getItem("yuexiang_theme");
+        if (theme === "dark" || theme === "light") {
+          document.documentElement.dataset.theme = theme;
+        }
+        if (localStorage.getItem("yuexiang_large_text") === "1") {
+          document.documentElement.dataset.largeText = "1";
+        }
+      } catch (error) {
+        // Storage may be unavailable in private mode.
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

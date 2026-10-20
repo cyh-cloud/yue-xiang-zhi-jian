@@ -59,6 +59,9 @@ def enterprise_create_job():
 @require_capability('job.manage')
 def enterprise_update_job(job_id):
     user = get_session_user()
+    owner = employment.get_job_owner(job_id)
+    if owner != user['username']:
+        return jsonify({"success": False, "message": "职位不存在或无权操作"}), 404
     data = request.get_json()
     # 内容改了就重新走审核：否则「先发一条合规的骗过审核、通过后再改成违规内容」
     # 会绕过整个审核链路。改回 pending 并新开一条审核记录，逻辑收在就业域里。
@@ -107,6 +110,9 @@ def enterprise_get_applications():
 @require_capability('job.manage')
 def enterprise_update_application(app_id):
     user = get_session_user()
+    owner = employment.get_application_owner_enterprise(app_id)
+    if owner != user['username']:
+        return jsonify({"success": False, "message": "投递不存在或无权操作"}), 404
     data = request.get_json()
     new_status = data.get('status', '')
     if new_status not in ('approved', 'rejected', 'interview'):

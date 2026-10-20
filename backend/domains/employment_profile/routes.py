@@ -125,12 +125,18 @@ def resume_ai_generate():
     resume = employment.get_resume(user_id) or {}
     own_input = ''
     if section == 'experience':
-        exp = resume.get('experience') or []
-        if isinstance(exp, list) and exp:
-            own_input = '\n'.join(
-                '- %s / %s / %s：%s' % (e.get('company') or '', e.get('position') or '',
-                                        e.get('period') or '', (e.get('desc') or '').strip())
-                for e in exp if isinstance(e, dict))
+        # The learner may polish a row before saving it. Prefer the draft the
+        # browser just sent; only fall back to the persisted resume when no
+        # draft was supplied.
+        if isinstance(draft, str) and draft.strip():
+            own_input = draft.strip()
+        else:
+            exp = resume.get('experience') or []
+            if isinstance(exp, list) and exp:
+                own_input = '\n'.join(
+                    '- %s / %s / %s：%s' % (e.get('company') or '', e.get('position') or '',
+                                            e.get('period') or '', (e.get('desc') or '').strip())
+                    for e in exp if isinstance(e, dict))
     elif isinstance(draft, str):
         own_input = draft.strip()
 
@@ -154,7 +160,7 @@ def resume_ai_generate():
         return jsonify({"success": False, "code": "ai_unavailable",
                         "message": "AI 没有返回内容，请稍后重试"}), 503
 
-    employment.mark_resume_ai_used(user_id)
+    employment.mark_resume_ai_used(user_id, section)
     return jsonify({
         "success": True,
         "section": section,

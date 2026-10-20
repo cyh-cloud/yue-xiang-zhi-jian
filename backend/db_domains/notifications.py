@@ -22,7 +22,8 @@ def create_notification(user_id, ntype, title, content='', link_type='', link_id
     conn.commit()
     conn.close()
 
-def create_notification_for_all_students(ntype, title, content='', link_type='', link_id=None):
+def create_notification_for_all_students(ntype, title, content='', link_type='',
+                                         link_id=None, teacher_id=None):
     """给所有**已关联平台账号**的学员发站内通知。
 
     ⚠️ notifications.user_id 的语义是全站统一的 username（见全局红线）。
@@ -33,7 +34,7 @@ def create_notification_for_all_students(ntype, title, content='', link_type='',
     conn = get_connection()
     # T05：收件人清单由学员域的窄接口提供，本域 SQL 只碰 notifications
     from db_domains.students import get_linked_student_user_ids
-    recipients = get_linked_student_user_ids()
+    recipients = get_linked_student_user_ids(teacher_id)
     for r in recipients:
         conn.execute(
             "INSERT INTO notifications (user_id, type, title, content, link_type, link_id) VALUES (?, ?, ?, ?, ?, ?)",
@@ -96,20 +97,41 @@ def clear_read_notifications(user_id):
 
 # ---- 已读旁路表（system_announcements / job_applications 两个无 is_read 的来源）----
 
-def get_read_refs(user_id, source):
-    """取某用户在某来源上已读的 ref_id 列表。"""
+def get_read_refs(user_id, source, include_dismissed=True):
+    """取某用户在某来源上已读的 ref_id 列表。
+
+    Unread counts include dismissed refs because clearing a read item must not
+    turn it back into an unread item. The message center asks for active refs
+    only, then separately receives the dismissed ids so it can hide them.
+    """
+    conn = get_connection()
+    sql = (
+        "SELECT ref_id FROM notification_reads "
+        "WHERE user_id = ? AND source = ?"
+    )
+    if not include_dismissed:
+        sql += " AND dismissed_at IS NULL"
+    rows = conn.execute(sql, (user_id, source)).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
+
+
+def get_dismissed_refs(user_id, source):
     conn = get_connection()
     rows = conn.execute(
-        "SELECT ref_id FROM notification_reads WHERE user_id = ? AND source = ?",
-        (user_id, source)
+        "SELECT ref_id FROM notification_reads "
+        "WHERE user_id = ? AND source = ? AND dismissed_at IS NOT NULL",
+        (user_id, source),
     ).fetchall()
     conn.close()
     return [r[0] for r in rows]
 
+
 def mark_ref_read(user_id, source, ref_id):
     conn = get_connection()
     conn.execute(
-        "INSERT OR IGNORE INTO notification_reads (user_id, source, ref_id) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO notification_reads "
+        "(user_id, source, ref_id) VALUES (?, ?, ?)",
         (user_id, source, str(ref_id))
     )
     conn.commit()
@@ -120,7 +142,8 @@ def mark_refs_read(user_id, source, ref_ids):
     conn = get_connection()
     for rid in ref_ids:
         conn.execute(
-            "INSERT OR IGNORE INTO notification_reads (user_id, source, ref_id) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO notification_reads "
+            "(user_id, source, ref_id) VALUES (?, ?, ?)",
             (user_id, source, str(rid))
         )
     conn.commit()
@@ -129,7 +152,8 @@ def mark_refs_read(user_id, source, ref_ids):
 def clear_read_refs(user_id, source):
     conn = get_connection()
     conn.execute(
-        "DELETE FROM notification_reads WHERE user_id = ? AND source = ?",
+        "UPDATE notification_reads SET dismissed_at = datetime('now','localtime') "
+        "WHERE user_id = ? AND source = ?",
         (user_id, source)
     )
     conn.commit()

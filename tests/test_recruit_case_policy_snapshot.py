@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""招募、案例、政策三条接口切库（T09）的响应快照比对：API 层 seam，逐字节比对。
+"""招募、案例、政策三条接口切库（T09）的响应快照比对：API 层 seam。
 
-票的验收第 1 条是「招募、案例、政策三条接口的响应 JSON 与切换前逐字节一致」。这条
-不能靠断言几个字段糊过去：三条接口一次下发的内容都很大，而且读回时要重组的形状各不
-相同 ——
+案例与政策比对完整响应字节；招募公告另对日期派生字段和由其决定的排序做稳定化，
+再比对内容哈希。三条接口一次下发的内容都很大，而且读回时要重组的形状各不相同 ——
 
   · 招募公告：14 条公告 × 16 字段 + 16 行来源，读回要按 sort_order 重组 sources，
     还要按当天日期重算 status / status_label / days_left / starts_in 四个派生字段；
@@ -11,15 +10,14 @@
     21 借鉴点），读回时五张表要按原形状组装；
   · 政策：正文不动（政府端本来就管它），变的是口径说明的来源。
 
-所以这里存的是**切换前的原始响应**：tests/baseline_recruit_case_policy_switch.json 在
-切库前由一次性脚本生成；本文件的用例在切库后重放同一批请求，逐项比 sha256 与字节数。
-用 sha256 而不是解析后比对，是因为 json.loads 之后键序由插入序决定，而「键序变化」
-对前端无害、对「逐字节一致」的验收标准却致命。
+案例与政策存的是切换前原始响应；招募侧存的是去掉日期派生字段、按公告 key 稳定排序后
+的内容。canonical JSON + sha256 锁住字段值和结构化内容，同时不让运行日期自然改变
+排序，制造与内容无关的红灯。
 
 ⚠️ 招募侧为什么只比对 recruitments 数组而不是整个响应体：/api/employment/jobs 把
 「企业岗位」与「招募公告」两类数据合并在一个响应里，而企业岗位那半边
 （enterprise_review_pending、jobs 数组）会随其它测试文件往 job_listings 插行又删行
-而变。那不是本次改动引入的差异，把它纳入字节比对会让这条用例在全量跑测试时随机红。
+而变。那不是本次改动引入的差异，把它纳入内容比对会让这条用例在全量跑测试时随机红。
 所以招募侧钉住**本次真正改动的三块**：recruitments 数组、两条口径文案、
 category_options.recruit；其余字段由既有测试（test_employment_domains.py 的
 JobListTest）继续看守。
@@ -68,7 +66,7 @@ RECRUIT_VARIANTS = (
     ('/api/employment/jobs', {'keyword': 'zzz-no-such-keyword'}),
 )
 
-# 招募响应里参与字节比对的三块：公告数组 + 两条口径文案 + 招募侧分类下拉。
+# 招募响应里参与内容比对的三块：公告数组 + 两条口径文案 + 招募侧分类下拉。
 RECRUIT_COMPARED_KEYS = ('recruitments', 'recruit_source_note',
                          'recruit_disclaimer', 'category_options')
 
@@ -90,7 +88,7 @@ def _canonical(value):
 
 
 # 招募公告里由**当天日期**算出的字段。它们是派生值而不是内容本身，随运行日期
-# 自然变化，纳入字节比对会让这条用例隔天就红。比对时置成常量，内容字段仍逐字节比。
+# 自然变化，纳入内容比对会让这条用例隔天就红。比对时置成常量，内容字段仍逐项比。
 # ⚠️ status / status_label 同样由日期算出（open / upcoming / closed 三种状态会随
 #    截止日期翻转），d6275da 只剔了 days_left / starts_in，公告一过期就红 ——
 #    红的原因与「内容是否被改对」无关，故一并剔除（T11 实测 8 条已过期）。
@@ -98,7 +96,12 @@ VOLATILE_FIELDS = ('days_left', 'starts_in', 'status', 'status_label')
 
 
 def _strip_volatile(value):
-    """把公告数组里随时间漂移的派生字段置成 None，其余原样保留。"""
+    """Remove date-derived values and canonicalize their date-dependent order.
+
+    The endpoint intentionally sorts open announcements before closed ones. That
+    order changes as the calendar advances even when every content row is
+    unchanged, so the snapshot compares the same content in a stable key order.
+    """
     if not isinstance(value, list):
         return value
     out = []
@@ -106,11 +109,11 @@ def _strip_volatile(value):
         if isinstance(item, dict):
             item = {k: (None if k in VOLATILE_FIELDS else v) for k, v in item.items()}
         out.append(item)
-    return out
+    return sorted(out, key=lambda item: item.get('key', '') if isinstance(item, dict) else '')
 
 
 class RecruitCasePolicySwitchSnapshotTest(unittest.TestCase):
-    """切换到读库之后，三条接口的响应与切换前逐字节一致。"""
+    """案例/政策保持字节一致；招募内容在日期归一化后保持一致。"""
 
     def setUp(self):
         from app import app
@@ -136,8 +139,8 @@ class RecruitCasePolicySwitchSnapshotTest(unittest.TestCase):
             with self.subTest(key):
                 self._assert_same(key, self.client.get(path, query_string=args))
 
-    def test_recruitment_payload_is_byte_identical(self):
-        """招募侧的公告数组 + 口径文案 + 分类下拉，与切换前逐字节一致。"""
+    def test_recruitment_content_matches_after_date_normalization(self):
+        """招募内容与切换前一致，日期派生值和由其决定的排序先归一化。"""
         for path, args in RECRUIT_VARIANTS:
             key = _key(path, args)
             with self.subTest(key):
@@ -145,7 +148,7 @@ class RecruitCasePolicySwitchSnapshotTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200, key)
                 body = json.loads(response.get_data())
                 actual = {name: body[name] for name in RECRUIT_COMPARED_KEYS}
-                # days_left / starts_in 由当天日期算出，随运行日期漂移，不能进字节比对
+                # 日期派生值随运行日期漂移，不能进稳定内容比对
                 actual['recruitments'] = _strip_volatile(actual['recruitments'])
                 expected = self.baseline[key]['recruit_payload']
                 expected_value = dict(expected['value'])

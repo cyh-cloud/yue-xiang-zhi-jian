@@ -1,0 +1,74 @@
+.public-shell {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+.public-main {
+  flex: 1 0 auto;
+}
+
+.public-shell > .footer {
+  margin-top: 0;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column-reverse;
+}
+
+[data-large-text] .scroll-nav-hint {
+  display: none;
+}
+
+.public-user-trigger {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.nav-login {
+  white-space: nowrap;
+}
+
+.public-connection-state {
+  color: #b3382f;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cdn-fallback {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1100;
+  display: grid;
+  width: min(420px, calc(100vw - 48px));
+  gap: 6px;
+  padding: 14px 18px;
+  border: 1px solid rgba(217, 162, 39, 0.45);
+  border-radius: 12px;
+  background: #fff8e8;
+  color: #5d4309;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.cdn-fallback strong {
+  color: #7a5600;
+  font-size: 0.88rem;
+}
+
+[data-theme="dark"] .cdn-fallback {
+  border-color: rgba(239, 199, 94, 0.45);
+  background: #2c2516;
+  color: #f4dfaa;
+}
+
+[data-theme="dark"] .cdn-fallback strong {
+  color: #efc75e;
+}

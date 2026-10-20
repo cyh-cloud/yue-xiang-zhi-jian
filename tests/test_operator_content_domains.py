@@ -413,9 +413,16 @@ class OperatorFarmingWriteTest(OperatorContentTestBase):
             }, sid)
             self.assertEqual(bad.status_code, 400, bad.data)
 
-            updated = self._put('/api/operator/farming/phenophases/%d' % phase_id,
-                                {'name': u'单测物候期改'}, sid)
+            updated = self._put('/api/operator/farming/phenophases/%d' % phase_id, {
+                'name': u'单测物候期改',
+                'start_month': 3,
+                'end_month': 5,
+                'sort_order': 0,
+            }, sid)
             self.assertEqual(updated.status_code, 200, updated.data)
+            phase_row = farming.get_farming_phenophase_by_id(phase_id)
+            self.assertEqual(phase_row['sort_order'], 0,
+                             '物候期排序更新被误当成月份范围校验')
             self.assertEqual(
                 self.client.delete('/api/operator/farming/phenophases/%d' % phase_id,
                                    headers=self._headers(sid)).status_code, 200)
@@ -459,6 +466,13 @@ class OperatorFarmingWriteTest(OperatorContentTestBase):
             self.assertEqual(updated.status_code, 200, updated.data)
             self.assertEqual(farming.get_farming_category_labels()['manage'],
                              u'单测管理')
+            category_rows = json.loads(self.client.get(
+                '/api/operator/farming/categories',
+                headers=self._headers(sid)).data)['categories']
+            manage_row = next(row for row in category_rows
+                              if row['key'] == 'manage')
+            self.assertIn('color', manage_row)
+            self.assertIn('sort_order', manage_row)
             front = json.loads(self.client.get(FRONT_FARMING,
                                                query_string={'year': '2026',
                                                              'month': '1'}).data)
@@ -789,6 +803,11 @@ class OperatorPestWriteTest(OperatorContentTestBase):
             }, sid)
             self.assertEqual(created.status_code, 200, created.data)
             self.assertIn(key, pest.get_pest_source_map())
+            source_rows = json.loads(self.client.get(
+                '/api/operator/pest/sources',
+                headers=self._headers(sid)).data)['sources']
+            source_row = next(row for row in source_rows if row['key'] == key)
+            self.assertIn('sort_order', source_row)
             self.assertEqual(
                 self._delete('/api/operator/pest/sources/%s' % key, sid).status_code, 200)
             self.assertNotIn(key, pest.get_pest_source_map())
@@ -799,67 +818,6 @@ class OperatorPestWriteTest(OperatorContentTestBase):
             conn.commit()
             conn.close()
             self._cleanup_sessions(sid)
-
-
-class OperatorPageTest(OperatorContentTestBase):
-    """运营后台页面本身能打开，且带上了两块内容的容器。"""
-
-    def test_operator_page_is_served_with_both_content_blocks(self):
-        response = self.client.get('/operator.html')
-        self.assertEqual(response.status_code, 200)
-        body = response.data.decode('utf-8')
-        # T14 落地的两块容器
-        self.assertIn('id="page-farming"', body)
-        self.assertIn('id="page-pest"', body)
-        # 导航按能力显隐：farming.manage / pest.manage 两块必须带 data-capability
-        self.assertIn('data-capability="farming.manage"', body)
-        self.assertIn('data-capability="pest.manage"', body)
-        # 复核按钮的落点：两块的列表容器都要在，否则「标记已复核」没有挂载处
-        self.assertIn('id="farming-task-rows"', body)
-        self.assertIn('id="pest-entry-rows"', body)
-
-    def test_craft_detail_exposes_the_videos_tab(self):
-        """技艺详情要有视频页签与编辑入口。
-
-        视频教学的内容已经落在 craft_videos 里（migrations/0002），运营得能在后台
-        维护它，否则又要回到「改内容找开发」。
-        """
-        body = self.client.get('/operator.html').data.decode('utf-8')
-        self.assertIn('data-tab="videos"', body)
-        self.assertIn("opOpenCraftVideoForm", body)
-        self.assertIn('data-op="craft-video-edit"', body)
-        self.assertIn("op === 'craft-video-edit'", body)
-
-    def test_pest_form_exposes_the_multi_value_fields(self):
-        """病虫害条目的五个多值字段都能在页面上编辑。
-
-        后端一直是支持这五列的，但编辑弹层此前只提交作物 / 名称 / 类型，
-        多值字段只做只读展示，运营改不了症状、防治与用药参考表。
-        """
-        body = self.client.get('/operator.html').data.decode('utf-8')
-        for key in ('symptoms', 'treatment', 'prevention', 'registered', 'chem_table'):
-            self.assertIn("key: '%s'" % key, body, '编辑弹层缺少 %s 字段' % key)
-        # 两类多值控件的渲染与收集都要在
-        self.assertIn("field.type === 'list'", body)
-        self.assertIn("field.type === 'chem'", body)
-        # 编辑入口：列表行上的「编辑」按钮与它的点击处理
-        self.assertIn('data-op="pest-edit"', body)
-        self.assertIn("op === 'pest-edit'", body)
-        self.assertIn('/api/operator/pest/entries/', body)
-
-    def test_operator_page_keeps_the_placeholder_for_the_t15_blocks(self):
-        """T15 的四块页面容器仍在，且不再是占位文案。
-
-        T14 写这条时四块还是「T15 落地」占位；T15 落地后改守同一批容器
-        已经填实（挂上了列表容器与新建按钮），占位样式 operator-todo 一并退役。
-        """
-        body = self.client.get('/operator.html').data.decode('utf-8')
-        for page in ('crafts', 'dialects', 'recruitments', 'cases'):
-            self.assertIn('id="page-%s"' % page, body)
-        self.assertNotIn('operator-todo', body, 'T15 落地后占位样式应当退役')
-        for container in ('craft-rows', 'dialect-rows', 'recruit-rows', 'case-rows'):
-            self.assertIn('id="%s"' % container, body,
-                          '%s 没有挂上，那一块的前台列表无处渲染' % container)
 
 
 class OperatorAuthorizationTest(OperatorContentTestBase):

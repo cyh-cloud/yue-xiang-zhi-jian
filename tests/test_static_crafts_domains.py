@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-"""静态资源域与手工技艺域的路由行为测试（T07）。
+"""静态媒体域与手工技艺域的路由行为测试。
 
 这两个域是「蓝图模式第一次端到端落地」的验证对象：首页与静态兜底从 app.py 搬进
 domains/static_files/，技艺列表与详情搬进 domains/crafts/，改由 core.app_factory
-注册蓝图。本文件锁住搬迁前后外部行为完全一致：URL、响应结构、状态码、错误码，
-以及静态白名单的防护效果（源码 / 配置 / 数据库仍不可经静态路由取走）。
+注册蓝图。T24 收口后，Flask 只提供 API 与 uploads/images 媒体，不再伺服旧 MPA；
+本文件锁住这条运行边界与静态白名单的防护效果。
 
 断言全部基于 HTTP 行为，不测模块怎么划分。拆分不产生新行为，为结构写测试只会
 把实现细节钉死（见 spec 的 Testing Decisions）。
@@ -23,24 +23,25 @@ import repo_paths  # noqa: E402
 
 
 class StaticDomainTest(unittest.TestCase):
-    """静态资源域：首页、白名单内的静态资源、uploads 下的上传产物。"""
+    """静态媒体域：仅 uploads/images 可取，旧页面与根级资源不可取。"""
 
     def setUp(self):
         from app import app
         self.client = app.test_client()
 
-    def test_index_page_serves_index_html(self):
+    def test_flask_root_is_not_a_frontend_entry(self):
         response = self.client.get('/')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'DOCTYPE', response.data)
-        self.assertIn('text/html', response.content_type)
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(
+            json.loads(response.data),
+            {"success": False, "code": "not_found", "message": "文件不存在"},
+        )
 
-    def test_root_level_static_assets_are_served(self):
+    def test_retired_root_level_static_assets_are_not_served(self):
         for path in ('/index.html', '/styles.css', '/portal.css', '/portal.js',
                      '/crafts.html', '/sw.js', '/js/core.js'):
             response = self.client.get(path)
-            self.assertEqual(response.status_code, 200, path)
-            self.assertGreater(len(response.data), 0, path)
+            self.assertEqual(response.status_code, 404, path)
 
     def test_uploaded_files_under_uploads_are_served(self):
         """uploads/ 按目录整体放行：教师上传的课程材料与 3D 模型必须原路取回。"""
@@ -59,7 +60,7 @@ class StaticDomainTest(unittest.TestCase):
 
     def test_missing_but_allowed_path_is_404(self):
         """过白名单却不存在的文件仍由 send_from_directory 兜 404（搬迁前后同形）。"""
-        response = self.client.get('/definitely-not-here.css')
+        response = self.client.get('/images/definitely-not-here.jpg')
         self.assertEqual(response.status_code, 404)
 
 
@@ -113,10 +114,11 @@ class StaticDenylistTest(unittest.TestCase):
     def test_allowlist_sets_are_intact(self):
         from domains import static_files
         self.assertIn('uploads', static_files._ALLOWED_STATIC_DIRS)
-        self.assertIn('js', static_files._ALLOWED_STATIC_DIRS)
-        self.assertIn('.html', static_files._ALLOWED_STATIC_EXTS)
-        self.assertIn('.css', static_files._ALLOWED_STATIC_EXTS)
-        self.assertIn('.js', static_files._ALLOWED_STATIC_EXTS)
+        self.assertIn('images', static_files._ALLOWED_STATIC_DIRS)
+        self.assertEqual(
+            set(static_files._ALLOWED_STATIC_DIRS),
+            {'uploads', 'images'},
+        )
         self.assertIn('.py', static_files._FORBIDDEN_STATIC_EXTS)
         self.assertIn('.env', static_files._FORBIDDEN_STATIC_EXTS)
         self.assertIn('.db', static_files._FORBIDDEN_STATIC_EXTS)

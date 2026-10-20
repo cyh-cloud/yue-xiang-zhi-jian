@@ -13,25 +13,48 @@ from db_connection import get_connection
 # 本模块，谁就必须持 teaching.manage（读操作受 teaching.read 管）。
 CAPABILITY = 'teaching'
 
+# Teacher announcements created by a super admin remain platform-wide. The
+# registration route strips usernames, so a whitespace-only owner cannot
+# collide with a real account; it also stays distinct from legacy blank rows
+# that the ownership migration backfills.
+GLOBAL_TEACHER_ID = ' '
 
-def create_announcement(title, content, category='通知', pinned=0):
+
+def create_announcement(title, content, category='通知', pinned=0,
+                        teacher_id=''):
     conn = get_connection()
-    cursor = conn.execute("INSERT INTO announcements (title, content, category, pinned) VALUES (?, ?, ?, ?)",
-                          (title, content, category, pinned))
+    cursor = conn.execute(
+        "INSERT INTO announcements "
+        "(teacher_id, title, content, category, pinned) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (teacher_id, title, content, category, pinned),
+    )
     conn.commit()
     aid = cursor.lastrowid
     conn.close()
     return aid
 
-def get_announcements(limit=50):
+def get_announcements(limit=50, teacher_id=None):
     conn = get_connection()
-    rows = conn.execute("SELECT * FROM announcements ORDER BY pinned DESC, created_at DESC LIMIT ?", (limit,)).fetchall()
+    sql = "SELECT * FROM announcements WHERE 1=1"
+    params = []
+    if teacher_id is not None:
+        sql += " AND (teacher_id = ? OR teacher_id = ?)"
+        params.extend([teacher_id, GLOBAL_TEACHER_ID])
+    sql += " ORDER BY pinned DESC, created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def delete_announcement(ann_id):
+def delete_announcement(ann_id, teacher_id=None):
     conn = get_connection()
-    result = conn.execute("DELETE FROM announcements WHERE id = ?", (ann_id,))
+    sql = "DELETE FROM announcements WHERE id = ?"
+    params = [ann_id]
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    result = conn.execute(sql, params)
     conn.commit()
     deleted = result.rowcount > 0
     conn.close()
@@ -212,7 +235,7 @@ def get_live_trainings(student_id):
     """取某学员的全部直播实训记录（每个作物各一条）。"""
     return get_trainings(student_id, 'live')
 
-def get_all_trainings():
+def get_all_trainings(teacher_id=None):
     """教师端：全部学员的电商实训提交（按提交时间倒序）。
 
     复用既有作业链路（assignments + assignment_submissions），
@@ -224,13 +247,23 @@ def get_all_trainings():
        JOIN 会让同一条提交重复出现。
     """
     conn = get_connection()
-    rows = conn.execute(
+    sql = (
         "SELECT s.*, a.title AS assignment_title "
         "FROM assignment_submissions s "
         "LEFT JOIN assignments a ON s.assignment_id = a.id "
-        "WHERE a.direction = ? ORDER BY s.submitted_at DESC"
-        , (LIVE_ASSIGNMENT_DIRECTION,)
-    ).fetchall()
+        "WHERE a.direction = ?"
+    )
+    params = [LIVE_ASSIGNMENT_DIRECTION]
+    if teacher_id is not None:
+        from db_domains.students import get_linked_student_user_ids
+        student_ids = get_linked_student_user_ids(teacher_id)
+        if not student_ids:
+            conn.close()
+            return []
+        sql += " AND s.student_id IN (%s)" % ",".join("?" * len(student_ids))
+        params.extend(student_ids)
+    sql += " ORDER BY s.submitted_at DESC"
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     # T05：名册姓名由学员域窄接口补齐（原先是标量子查询，改成批量一次取回）
     from db_domains.students import get_roster_names_by_user_id
@@ -251,7 +284,7 @@ def get_all_trainings():
 
 # ==================== 学情分析 ====================
 
-def get_roster_completion():
+def get_roster_completion(teacher_id=None):
     """名册每位学员的「证书真实完成度」。
 
     口径（2026-10-07 用户拍板：学情分析 / AI 教学报告 / 仪表板统计不再使用
@@ -264,7 +297,7 @@ def get_roster_completion():
     # T05：名册行与证书进度分别向学员域、证书域取，本域 SQL 只碰 assignments
     from db_domains.certificates import get_cert_progress_for
     from db_domains.students import get_roster_rows_for_completion
-    rows = get_roster_rows_for_completion()
+    rows = get_roster_rows_for_completion(teacher_id)
     out = []
     for r in rows:
         uid = r['user_id'] or ''
@@ -281,13 +314,13 @@ def get_roster_completion():
         })
     return out
 
-def get_analytics_data():
+def get_analytics_data(teacher_id=None):
     """学情分析数据 —— 口径：**证书真实完成度**（见 get_roster_completion）。
 
     2026-10-07 修正：原实现直接聚合 students.progress（教师手填、学员端没有任何
     入口会更新它），画出来的「进度分布」与学员真实学习情况无关。
     """
-    roster = get_roster_completion()
+    roster = get_roster_completion(teacher_id)
     ranges = [(0, 20, '0-20%'), (21, 40, '21-40%'), (41, 60, '41-60%'), (61, 80, '61-80%'), (81, 100, '81-100%')]
     progress_dist = []
     for low, high, label in ranges:
@@ -322,7 +355,7 @@ def get_analytics_data():
 # ==================== 消息系统 ====================
 
 
-def get_dashboard_stats():
+def get_dashboard_stats(teacher_id=None):
     """获取教师仪表板统计（口径：教师名册表 students + 证书真实完成度）。
 
     2026-10-07 修正（两处）：
@@ -332,7 +365,7 @@ def get_dashboard_stats():
     ② avg_score（界面文案「平均进度」）原取 students.progress 的平均值 —— 那是**手填**
        字段，学员端没有任何入口会更新它。现改用证书真实完成度（见 get_roster_completion）。
     """
-    roster = get_roster_completion()
+    roster = get_roster_completion(teacher_id)
     total = len(roster)
     earned = sum(r['cert_earned'] for r in roster)
     with_cert = sum(1 for r in roster if r['cert_earned'] > 0)

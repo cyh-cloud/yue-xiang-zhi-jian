@@ -54,13 +54,50 @@ def get_comments(target_type, target_id):
     conn.close()
     return _attach_author_names([dict(r) for r in rows])
 
-def soft_delete_comment(comment_id, deleted_by=''):
-    """软删除评论"""
+
+def get_moderation_comments(limit=200):
+    """超管内容监管用：未删除评论及所属讨论帖标题。"""
     conn = get_connection()
-    conn.execute("UPDATE comments SET is_deleted=1, deleted_by=? WHERE id=?", (deleted_by, comment_id))
-    conn.commit()
+    rows = conn.execute(
+        """SELECT c.*, d.title AS target_title
+           FROM comments c
+           LEFT JOIN discussions d
+             ON c.target_type = 'discussion' AND c.target_id = d.id
+           WHERE c.is_deleted = 0
+           ORDER BY c.created_at DESC, c.id DESC
+           LIMIT ?""",
+        (max(1, min(int(limit), 500)),)).fetchall()
     conn.close()
-    return True
+    return _attach_author_names([dict(r) for r in rows])
+
+
+def soft_delete_comment(comment_id, deleted_by=''):
+    """软删除评论，并同步所属讨论帖的评论数。
+
+    返回是否真的从公开读路径删掉了一行。重复删除与不存在都返回 False，
+    让路由层可以回 404，而不是把没有发生的操作报成成功。
+    """
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT target_type, target_id, is_deleted FROM comments WHERE id=?",
+        (comment_id,)).fetchone()
+    if row is None or row['is_deleted']:
+        conn.close()
+        return False
+    cur = conn.execute(
+        "UPDATE comments SET is_deleted=1, deleted_by=? "
+        "WHERE id=? AND is_deleted=0",
+        (deleted_by, comment_id))
+    if row['target_type'] == 'discussion':
+        conn.execute(
+            "UPDATE discussions SET comment_count = "
+            "CASE WHEN comment_count > 0 THEN comment_count - 1 ELSE 0 END "
+            "WHERE id=?",
+            (row['target_id'],))
+    conn.commit()
+    deleted = cur.rowcount > 0
+    conn.close()
+    return deleted
 
 
 # ==================== 讨论区 ====================
@@ -107,12 +144,15 @@ def get_discussion(disc_id):
     return _attach_author_names([dict(row)])[0] if row else None
 
 def soft_delete_discussion(disc_id):
-    """软删除讨论帖"""
+    """软删除讨论帖。返回是否真的删掉了一行。"""
     conn = get_connection()
-    conn.execute("UPDATE discussions SET is_deleted = 1 WHERE id = ?", (disc_id,))
+    cur = conn.execute(
+        "UPDATE discussions SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
+        (disc_id,))
     conn.commit()
+    deleted = cur.rowcount > 0
     conn.close()
-    return True
+    return deleted
 
 
 # ==================== 农产品求购 ====================

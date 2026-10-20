@@ -20,6 +20,7 @@ T07 起内容改读 pest 域的五张表（db_domains.pest），不再读代码�
 from flask import jsonify, request
 
 from db_domains import pest
+from shared.review_freshness import is_review_current
 
 PEST_DISCLAIMER = (
     u'本速查整理自省、市、县农业农村部门公开发布的病虫情报、防控技术指引与农药登记数据，'
@@ -90,7 +91,11 @@ def pest_entry_view(entry):
         # 无授权实拍图时明确为 None，前端据此显示「暂无实拍图」占位。
         u'image': entry.get('image'),
         u'sources': entry.get('sources') or [],
-        u'is_verified': int(entry.get('is_verified') or 0),
+        u'is_verified': (
+            int(entry.get('is_verified') or 0)
+            if is_review_current(entry.get('verified_at'))
+            else 0
+        ),
     }
 
 

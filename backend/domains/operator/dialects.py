@@ -76,12 +76,14 @@ def register_dialects_routes(bp):
     def operator_dialects():
         """方言列表，带短语与快问条数，供后台判断「这种方言填全了没有」。"""
         dialects = []
-        for row in dialects_db.get_dialects():
-            dialect = dict(row)
+        for summary in dialects_db.get_dialects():
+            dialect = dialects_db.get_dialect_editor_row(
+                summary['id']) or dict(summary)
             dialect['phrase_count'] = len(
                 dialects_db.get_dialect_phrases(dialect['id']))
             dialect['question_count'] = len(
                 dialects_db.get_dialect_quick_questions(dialect['id']))
+            dialect['feature_count'] = len(dialect.get('features') or [])
             dialects.append(dialect)
         return ok(dialects=dialects)
 

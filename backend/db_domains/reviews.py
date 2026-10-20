@@ -238,3 +238,23 @@ def get_review_by_content(content_type, content_id):
         (content_type, content_id)).fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_latest_reviews_by_content(content_type, content_ids):
+    """Return the newest review for each content id with one query."""
+    ids = list(dict.fromkeys(content_ids or []))
+    if not ids:
+        return {}
+    conn = get_connection()
+    placeholders = ','.join('?' * len(ids))
+    rows = conn.execute(
+        "SELECT cr.* FROM content_reviews cr "
+        "WHERE cr.content_type = ? AND cr.content_id IN (%s) "
+        "AND cr.id = (SELECT MAX(latest.id) FROM content_reviews latest "
+        "             WHERE latest.content_type = cr.content_type "
+        "               AND latest.content_id = cr.content_id)"
+        % placeholders,
+        [content_type] + ids,
+    ).fetchall()
+    conn.close()
+    return {row['content_id']: dict(row) for row in rows}

@@ -23,7 +23,12 @@ from flask import Blueprint, jsonify, request
 
 import re
 
-from ai.client import AI_REASONING_TOKEN_RESERVE, chat_completion, chat_model
+from ai.client import (
+    AI_REASONING_TOKEN_RESERVE,
+    ai_configured,
+    chat_completion,
+    chat_model,
+)
 from core.session import client_key, get_session_user, rate_limited
 from shared.ec_products import (
     EC_COPY_MAX_LEN,
@@ -155,6 +160,9 @@ def live_ai_comments():
     if not speech:
         return jsonify({"success": False, "code": "empty_speech",
                         "message": "没有收到主播说的话"}), 400
+    if not ai_configured():
+        return jsonify({"success": False, "code": "ai_unavailable",
+                        "message": "AI 评论暂不可用"}), 503
 
     tone = {
         '新手': '友善、好奇，顺着主播的话提问',

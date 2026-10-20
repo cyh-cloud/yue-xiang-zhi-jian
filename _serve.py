@@ -16,11 +16,10 @@ if _BACKEND_DIR not in sys.path:
 
 from run import resolve_port  # noqa: E402
 
-db_init.init_db()
-
-from app import app
 import db_init  # noqa: E402
+from app import app  # noqa: E402
 
 if __name__ == '__main__':
+    db_init.init_db()
     port, _source = resolve_port()
     app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
