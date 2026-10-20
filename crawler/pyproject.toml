@@ -1,0 +1,27 @@
+[project]
+name = "yuexiang-crawler"
+version = "0.1.0"
+description = "Scrapy collection projects for the Yuexiang platform"
+requires-python = ">=3.12"
+dependencies = [
+    "beautifulsoup4==4.13.4",
+    "openpyxl==3.1.5",
+    "pypdf==6.21.1",
+    "scrapy>=2.13,<3",
+]
+
+[dependency-groups]
+dev = []
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["crawler*"]

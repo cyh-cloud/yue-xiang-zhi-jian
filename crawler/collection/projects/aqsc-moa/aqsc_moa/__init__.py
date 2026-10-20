@@ -1,0 +1,1 @@
+"""aqsc-moa Scrapy project."""

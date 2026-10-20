@@ -1,0 +1,1 @@
+"""cnipa Scrapy project."""

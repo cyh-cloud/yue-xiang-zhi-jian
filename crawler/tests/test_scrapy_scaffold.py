@@ -1,0 +1,244 @@
+import ast
+import json
+import unittest
+from pathlib import Path
+
+from crawler.collection.shared.crawler_collection.admission import (
+    evaluate_admission,
+)
+from crawler.collection.shared.crawler_collection.dedupe import (
+    candidate_natural_key,
+    stage_natural_key,
+)
+from crawler.collection.shared.crawler_collection.items import (
+    CollectionItem,
+    validate_item,
+)
+from crawler.collection.shared.crawler_collection.projects import (
+    discover_projects,
+)
+from crawler.collection.shared.crawler_collection.reporting import RunReport
+from crawler.collection.shared.crawler_collection.robots import RobotsFact
+
+
+ROOT = Path(__file__).resolve().parents[1]
+REGISTRY = ROOT / "docs" / "sources.json"
+PROJECTS = ROOT / "collection" / "projects"
+
+
+EXPECTED_PROJECTS = {
+    "ihchina",
+    "nzrc",
+    "nongmuhr",
+    "dialect-org",
+    "cass-linguistics",
+    "feiyiw",
+    "aqsc-moa",
+    "cnipa",
+}
+
+
+class ScrapyProjectDiscoveryTest(unittest.TestCase):
+    def test_discovery_returns_only_eight_scoped_projects(self):
+        projects = discover_projects(PROJECTS)
+
+        self.assertEqual(set(projects), EXPECTED_PROJECTS)
+        for source_id, project in projects.items():
+            self.assertEqual(project.source_id, source_id)
+            self.assertTrue(project.config_path.is_file())
+            self.assertTrue(project.package_path.is_dir())
+
+    def test_excluded_and_deferred_sources_have_no_scrapy_project(self):
+        for source_id in (
+            "5ajob",
+            "zhongguoyuyan",
+            "cnopendata",
+            "open-meteo",
+            "qweather",
+        ):
+            self.assertFalse((PROJECTS / source_id).exists())
+
+
+class CollectionItemContractTest(unittest.TestCase):
+    def _item(self, **overrides):
+        payload = {
+            "source_id": "ihchina",
+            "source_item_id": "project-1",
+            "source_url": "https://www.ihchina.cn/project/1",
+            "long_term_url": "https://www.ihchina.cn/project/1",
+            "detail_url": "https://www.ihchina.cn/project/1",
+            "detail_url_status": "direct",
+            "run_id": "run-1",
+            "mode": "fixture",
+            "rights_status": "attribution-required",
+        }
+        payload.update(overrides)
+        return CollectionItem(**payload)
+
+    def test_direct_detail_requires_detail_url(self):
+        with self.assertRaises(ValueError):
+            validate_item(
+                self._item(detail_url=None, detail_url_status="direct")
+            )
+
+    def test_missing_detail_requires_locator(self):
+        with self.assertRaises(ValueError):
+            validate_item(
+                self._item(
+                    detail_url=None,
+                    detail_url_status="missing",
+                    locator=None,
+                )
+            )
+
+    def test_validate_item_returns_serializable_mapping(self):
+        item = self._item(locator="fixture row 1")
+
+        payload = validate_item(item)
+
+        self.assertEqual(payload["source_id"], "ihchina")
+        json.dumps(payload)
+        self.assertNotIn("response", payload)
+
+    def test_natural_keys_are_stable(self):
+        item = self._item()
+
+        self.assertEqual(
+            stage_natural_key(item, raw_fetch_id=7),
+            ("7", "project-1"),
+        )
+        self.assertEqual(
+            candidate_natural_key(item),
+            ("ihchina", "project-1"),
+        )
+
+
+class AdmissionContractTest(unittest.TestCase):
+    def setUp(self):
+        self.registry_path = REGISTRY
+
+    def _admit(self, source_id, **overrides):
+        item = CollectionItem(
+            source_id=source_id,
+            source_item_id="1",
+            source_url="https://example.test/1",
+            long_term_url="https://example.test/1",
+            detail_url="https://example.test/1",
+            detail_url_status="direct",
+            run_id="run-1",
+            mode="fixture",
+            rights_status="attribution-required",
+        )
+        return evaluate_admission(
+            item,
+            registry_path=self.registry_path,
+            robots=RobotsFact(
+                decision=overrides.get("robots_decision", "allowed"),
+                evidence_url="https://example.test/robots.txt",
+            ),
+        )
+
+    def test_enabled_source_with_direct_detail_is_candidate(self):
+        decision = self._admit("ihchina")
+
+        self.assertEqual(decision.status, "candidate")
+        self.assertTrue(decision.allowed)
+
+    def test_disabled_source_is_blocked(self):
+        decision = self._admit("5ajob")
+
+        self.assertEqual(decision.status, "blocked")
+        self.assertFalse(decision.allowed)
+        self.assertIn("source", decision.reason)
+
+    def test_robots_rejection_is_blocked(self):
+        decision = self._admit("ihchina", robots_decision="disallowed")
+
+        self.assertEqual(decision.status, "blocked")
+        self.assertFalse(decision.allowed)
+
+    def test_unknown_source_is_blocked_without_defaults(self):
+        decision = self._admit("not-registered")
+
+        self.assertEqual(decision.status, "blocked")
+        self.assertFalse(decision.allowed)
+
+
+class RunReportContractTest(unittest.TestCase):
+    def test_partial_when_some_items_fail(self):
+        report = RunReport(
+            run_id="run-1",
+            source_id="ihchina",
+            mode="fixture",
+            discovered=2,
+            written=1,
+            failed=1,
+        )
+
+        self.assertEqual(report.status, "partial")
+
+    def test_failed_when_no_item_succeeds(self):
+        report = RunReport(
+            run_id="run-1",
+            source_id="ihchina",
+            mode="fixture",
+            discovered=2,
+            failed=2,
+        )
+
+        self.assertEqual(report.status, "failed")
+
+    def test_empty_result_is_failed(self):
+        report = RunReport(
+            run_id="run-1",
+            source_id="ihchina",
+            mode="fixture",
+            discovered=0,
+        )
+
+        self.assertEqual(report.status, "failed")
+
+
+class SharedPackageBoundaryTest(unittest.TestCase):
+    def test_shared_package_does_not_import_business_or_converter(self):
+        shared_root = ROOT / "collection" / "shared" / "crawler_collection"
+        forbidden = ("backend", "pipeline.converter", "pipeline.database")
+
+        for path in shared_root.rglob("*.py"):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imports = []
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    imports.extend(alias.name for alias in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    imports.append(node.module)
+            for module in imports:
+                self.assertFalse(
+                    any(module.startswith(name) for name in forbidden),
+                    f"{path} imports {module}",
+                )
+
+    def test_fixture_paths_stay_under_evidence_root(self):
+        fixture_root = ROOT / "tests" / "fixtures" / "evidence"
+        exceptions = json.loads(
+            (
+                ROOT
+                / "collection"
+                / "shared"
+                / "fixture_exceptions.json"
+            ).read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(set(exceptions), {"aqsc"})
+        self.assertEqual(exceptions["aqsc"]["source_id"], "aqsc-moa")
+        self.assertTrue(fixture_root.is_dir())
+        for child in fixture_root.iterdir():
+            self.assertTrue(child.is_dir())
+
+    def test_fixture_root_is_not_created_inside_projects(self):
+        for project in discover_projects(PROJECTS).values():
+            self.assertFalse((project.package_path / "fixtures").exists())
+
+
+if __name__ == "__main__":
+    unittest.main()
