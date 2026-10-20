@@ -105,19 +105,19 @@ KIND_ORDER = {
 }
 
 SHARED_COMPONENT_MARKERS = (
-    ".bo-button",
-    ".bo-field",
-    ".bo-card",
-    ".bo-table",
-    ".bo-feedback",
-    ".bo-state",
-    ".bo-modal",
+    ".backoffice-button",
+    ".backoffice-field",
+    ".backoffice-card",
+    ".backoffice-table",
+    ".backoffice-feedback",
+    ".backoffice-state",
+    ".backoffice-modal",
     ".tag",
     ".empty-state",
     ".loading-state",
     ".error-state",
-    ".msg-center-wrap",
-    ".msg-dropdown",
+    ".message-center-wrap",
+    ".message-dropdown",
     ".conversation-send",
 )
 
@@ -558,7 +558,7 @@ def is_global_override(selector: str) -> bool:
 def is_shell_scoped_selector(selector: str) -> bool:
     return bool(
         re.search(
-            r"\.(?:bo-shell|public-shell|community-shell)(?:\b|$|[\[.:#])",
+            r"\.(?:backoffice-shell|public-shell|community-shell)(?:\b|$|[\[.:#])",
             selector,
         )
     )

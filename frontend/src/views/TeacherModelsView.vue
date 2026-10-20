@@ -358,8 +358,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="bo-page backoffice-page model-page">
-    <header class="bo-page-header backoffice-page-header">
+  <section class="backoffice-page model-page">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>3D 模型</h1>
@@ -379,18 +379,18 @@ onBeforeUnmount(() => {
     <CdnFallbackNotice />
 
     <form
-      class="bo-card backoffice-card model-upload-card"
+      class="backoffice-card model-upload-card"
       data-testid="teacher-model-upload"
       @submit.prevent="submitUpload"
     >
-      <header class="bo-card-head backoffice-card-head">
+      <header class="backoffice-card-head">
         <div>
           <h2>上传模型</h2>
           <p>文件通过真实 multipart 请求上传，保存后立即出现在下方列表。</p>
         </div>
       </header>
       <div class="model-form-grid">
-        <label class="bo-field backoffice-field is-wide">
+        <label class="backoffice-field is-wide">
           <span>模型文件</span>
           <input
             id="model-file"
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
         >
           已选择：{{ selectedFileSummary }}
         </p>
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>标题</span>
           <input
             id="model-title"
@@ -415,7 +415,7 @@ onBeforeUnmount(() => {
             placeholder="默认使用文件名"
           >
         </label>
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>技艺类型</span>
           <select
             id="model-craft"
@@ -438,7 +438,7 @@ onBeforeUnmount(() => {
             </option>
           </select>
         </label>
-        <label class="bo-field backoffice-field is-wide">
+        <label class="backoffice-field is-wide">
           <span>描述</span>
           <textarea
             id="model-description"
@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
       <div class="model-upload-actions">
         <button
           type="submit"
-          class="bo-button backoffice-button"
+          class="backoffice-button"
           :disabled="uploading"
         >
           <i
@@ -472,7 +472,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button
           type="button"
-          class="bo-button backoffice-button is-secondary is-small"
+          class="backoffice-button is-secondary is-small"
           :disabled="loading"
           @click="loadModels"
         >
@@ -498,7 +498,7 @@ onBeforeUnmount(() => {
       >
         <button
           type="button"
-          class="bo-button backoffice-button"
+          class="backoffice-button"
           @click="loadModels"
         >
           重试
@@ -512,9 +512,9 @@ onBeforeUnmount(() => {
       />
       <div
         v-else
-        class="bo-table-wrap backoffice-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table backoffice-table model-table">
+        <table class="backoffice-table model-table">
           <thead>
             <tr>
               <th>模型</th>
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
               </td>
               <td>
                 <span
-                  class="bo-status backoffice-status model-status"
+                  class="backoffice-status model-status"
                   :class="reviewStatusClass(model.review_status)"
                 >
                   {{ reviewStatusLabel(model.review_status) }}
@@ -564,18 +564,18 @@ onBeforeUnmount(() => {
                 <span>{{ model.created_at }}</span>
               </td>
               <td>
-                <div class="bo-row-actions backoffice-row-actions model-actions">
+                <div class="backoffice-row-actions model-actions">
                   <button
                     v-if="canPreview(model)"
                     type="button"
-                    class="bo-button backoffice-button is-secondary is-small"
+                    class="backoffice-button is-secondary is-small"
                     data-testid="teacher-model-preview"
                     @click="openPreview(model)"
                   >
                     预览
                   </button>
                   <a
-                    class="bo-button backoffice-button is-secondary is-small"
+                    class="backoffice-button is-secondary is-small"
                     :href="resolveMediaUrl(model.file_path)"
                     target="_blank"
                     rel="noopener"
@@ -585,7 +585,7 @@ onBeforeUnmount(() => {
                   <button
                     v-if="canDelete(model)"
                     type="button"
-                    class="bo-button backoffice-button is-danger is-small"
+                    class="backoffice-button is-danger is-small"
                     data-testid="teacher-model-delete"
                     @click="askDelete(model)"
                   >
@@ -602,24 +602,24 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="previewModel"
-        class="bo-modal-overlay backoffice-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closePreview"
       >
         <section
-          class="bo-modal backoffice-modal model-preview-dialog"
+          class="backoffice-modal model-preview-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="3D 模型预览"
           data-testid="teacher-model-preview-dialog"
         >
-          <header class="bo-modal-head backoffice-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>模型预览</p>
               <h2>{{ previewModel.title }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button backoffice-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭预览"
               @click="closePreview"
             >
@@ -629,7 +629,7 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body backoffice-modal-body">
+          <div class="backoffice-modal-body">
             <div class="model-preview-meta">
               <span>{{ previewModel.file_name }}</span>
               <span>{{ formatBytes(previewModel.file_size) }}</span>
@@ -650,7 +650,7 @@ onBeforeUnmount(() => {
                 <button
                   v-if="previewState === 'error'"
                   type="button"
-                  class="bo-button backoffice-button is-secondary is-small"
+                  class="backoffice-button is-secondary is-small"
                   @click="retryPreview"
                 >
                   重新加载
@@ -702,7 +702,7 @@ onBeforeUnmount(() => {
             <div class="model-preview-footer">
               <span>模型预览依赖外部 model-viewer 资源。</span>
               <a
-                class="bo-button backoffice-button is-secondary is-small"
+                class="backoffice-button is-secondary is-small"
                 :href="previewUrl"
                 target="_blank"
                 rel="noopener"
@@ -718,24 +718,24 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay backoffice-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <section
-          class="bo-modal backoffice-modal is-confirm"
+          class="backoffice-modal is-confirm"
           role="dialog"
           aria-modal="true"
           aria-label="删除 3D 模型"
           data-testid="teacher-model-delete-dialog"
         >
-          <header class="bo-modal-head backoffice-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>删除模型</p>
               <h2>{{ deleteTarget.title }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button backoffice-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭删除确认"
               :disabled="deleting"
               @click="closeDelete"
@@ -746,7 +746,7 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body backoffice-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="deleteError"
               kind="error"
@@ -758,7 +758,7 @@ onBeforeUnmount(() => {
             <div class="model-delete-actions">
               <button
                 type="button"
-                class="bo-button backoffice-button is-secondary"
+                class="backoffice-button is-secondary"
                 :disabled="deleting"
                 @click="closeDelete"
               >
@@ -766,7 +766,7 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="bo-button backoffice-button is-danger"
+                class="backoffice-button is-danger"
                 :disabled="deleting"
                 @click="confirmDelete"
               >

@@ -63,10 +63,10 @@ onMounted(loadAnalytics);
 
 <template>
   <section
-    class="bo-page backoffice-page"
+    class="backoffice-page"
     data-testid="teacher-analytics"
   >
-    <header class="bo-page-header backoffice-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>学情分析</h1>
@@ -74,7 +74,7 @@ onMounted(loadAnalytics);
       </div>
       <button
         type="button"
-        class="bo-button backoffice-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadAnalytics"
       >
@@ -100,7 +100,7 @@ onMounted(loadAnalytics);
     >
       <button
         type="button"
-        class="bo-button backoffice-button"
+        class="backoffice-button"
         @click="loadAnalytics"
       >
         重试
@@ -193,10 +193,10 @@ onMounted(loadAnalytics);
         description="只展示接口真实返回的方向与证书数据。"
       >
         <div
-          class="bo-table-wrap backoffice-table-wrap"
+          class="backoffice-table-wrap"
           data-testid="teacher-direction-detail"
         >
-          <table class="bo-table backoffice-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>方向</th>

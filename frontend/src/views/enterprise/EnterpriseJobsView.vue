@@ -197,8 +197,8 @@ onMounted(loadJobs);
 </script>
 
 <template>
-  <section class="bo-page backoffice-page">
-    <header class="bo-page-header backoffice-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>招聘管理</p>
         <h1>职位管理</h1>
@@ -206,7 +206,7 @@ onMounted(loadJobs);
       </div>
       <button
         type="button"
-        class="bo-button backoffice-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadJobs"
       >
@@ -238,8 +238,8 @@ onMounted(loadJobs);
         class="enterprise-job-form"
         @submit.prevent="saveJob"
       >
-        <div class="bo-form-grid backoffice-form-grid">
-          <label class="bo-field backoffice-field">
+        <div class="backoffice-form-grid">
+          <label class="backoffice-field">
             <span>职位标题</span>
             <input
               v-model="form.title"
@@ -248,7 +248,7 @@ onMounted(loadJobs);
               placeholder="如：农产品电商运营专员"
             >
           </label>
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>薪资</span>
             <input
               v-model="form.salary"
@@ -257,8 +257,8 @@ onMounted(loadJobs);
             >
           </label>
         </div>
-        <div class="bo-form-grid backoffice-form-grid">
-          <label class="bo-field backoffice-field">
+        <div class="backoffice-form-grid">
+          <label class="backoffice-field">
             <span>工作地点</span>
             <input
               v-model="form.location"
@@ -266,7 +266,7 @@ onMounted(loadJobs);
               placeholder="如：茂名"
             >
           </label>
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>职位类别</span>
             <input
               v-model="form.category"
@@ -275,8 +275,8 @@ onMounted(loadJobs);
             >
           </label>
         </div>
-        <div class="bo-form-grid backoffice-form-grid">
-          <label class="bo-field backoffice-field">
+        <div class="backoffice-form-grid">
+          <label class="backoffice-field">
             <span>工作类型</span>
             <input
               v-model="form.job_type"
@@ -284,7 +284,7 @@ onMounted(loadJobs);
               placeholder="全职 / 兼职"
             >
           </label>
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>学历要求</span>
             <input
               v-model="form.education"
@@ -293,8 +293,8 @@ onMounted(loadJobs);
             >
           </label>
         </div>
-        <div class="bo-form-grid backoffice-form-grid">
-          <label class="bo-field backoffice-field">
+        <div class="backoffice-form-grid">
+          <label class="backoffice-field">
             <span>经验要求</span>
             <input
               v-model="form.experience"
@@ -302,7 +302,7 @@ onMounted(loadJobs);
               placeholder="如：1年 / 不限"
             >
           </label>
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>所属行业</span>
             <input
               v-model="form.industry"
@@ -311,7 +311,7 @@ onMounted(loadJobs);
             >
           </label>
         </div>
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>职位描述</span>
           <textarea
             v-model="form.description"
@@ -319,7 +319,7 @@ onMounted(loadJobs);
             placeholder="描述岗位职责与工作内容"
           />
         </label>
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>任职要求（每行一条）</span>
           <textarea
             v-model="form.requirements"
@@ -327,10 +327,10 @@ onMounted(loadJobs);
             placeholder="熟悉直播运营&#10;会基础数据分析"
           />
         </label>
-        <div class="bo-row-actions backoffice-row-actions">
+        <div class="backoffice-row-actions">
           <button
             type="submit"
-            class="bo-button backoffice-button"
+            class="backoffice-button"
             :disabled="saving"
           >
             {{ saving ? "保存中..." : editingId === null ? "发布职位" : "保存并重新审核" }}
@@ -338,7 +338,7 @@ onMounted(loadJobs);
           <button
             v-if="editingId !== null"
             type="button"
-            class="bo-button backoffice-button is-secondary"
+            class="backoffice-button is-secondary"
             :disabled="saving"
             @click="resetForm"
           >
@@ -366,7 +366,7 @@ onMounted(loadJobs);
       >
         <button
           type="button"
-          class="bo-button backoffice-button"
+          class="backoffice-button"
           @click="loadJobs"
         >
           重试
@@ -380,9 +380,9 @@ onMounted(loadJobs);
       />
       <div
         v-else
-        class="bo-table-wrap backoffice-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table backoffice-table">
+        <table class="backoffice-table">
           <thead>
             <tr>
               <th>职位</th>
@@ -423,17 +423,17 @@ onMounted(loadJobs);
                 </small>
               </td>
               <td>
-                <div class="bo-row-actions backoffice-row-actions">
+                <div class="backoffice-row-actions">
                   <button
                     type="button"
-                    class="bo-button backoffice-button is-small is-secondary"
+                    class="backoffice-button is-small is-secondary"
                     @click="startEdit(job)"
                   >
                     编辑
                   </button>
                   <button
                     type="button"
-                    class="bo-button backoffice-button is-small is-danger"
+                    class="backoffice-button is-small is-danger"
                     @click="askDelete(job)"
                   >
                     删除
@@ -449,31 +449,31 @@ onMounted(loadJobs);
     <Teleport to="body">
       <div
         v-if="pendingDelete"
-        class="bo-modal-overlay backoffice-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="cancelDelete"
       >
         <div
-          class="bo-modal backoffice-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="enterprise-job-delete-confirm"
           role="dialog"
           aria-modal="true"
           aria-label="确认删除职位"
         >
-          <header class="bo-modal-head backoffice-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>删除确认</p>
               <h2>确认删除职位</h2>
             </div>
           </header>
-          <div class="bo-modal-body backoffice-modal-body">
-            <p class="bo-confirm-copy backoffice-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               确定删除「{{ pendingDelete.title }}」？该职位及其收藏记录会被移除，此操作不可恢复。
             </p>
           </div>
-          <footer class="bo-modal-actions backoffice-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button backoffice-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="deleting"
               @click="cancelDelete"
             >
@@ -481,7 +481,7 @@ onMounted(loadJobs);
             </button>
             <button
               type="button"
-              class="bo-button backoffice-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >

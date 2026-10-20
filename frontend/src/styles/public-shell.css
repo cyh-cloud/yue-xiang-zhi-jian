@@ -72,3 +72,26 @@
 [data-theme="dark"] .cdn-fallback strong {
   color: #efc75e;
 }
+
+/* Bewly-style public section sidebar tokens. */
+[data-theme="dark"] .bewly-sidebar {
+  --bew-surface: rgba(27, 44, 37, 0.78);
+  --bew-hairline: rgba(255, 255, 255, 0.08);
+}
+
+/* Public section color tokens. */
+/* ---------- 批次3：板块色彩编码（农业青绿 / 电商靛蓝 / 手工陶土 / 本土资源墨绿 / 就业稻金） ---------- */
+#agriculture-tab {
+    --pa: #1f5e43; --pa-deep: #123a2a; --pa-tint: #eaf3ed; --pa-soft: rgba(31, 94, 67, 0.08);
+}
+#ecommerce-tab {
+    --pa: #4a6fa5; --pa-deep: #2e4a75; --pa-tint: #e6eaf2; --pa-soft: rgba(74, 111, 165, 0.08);
+}
+#employment-tab {
+    --pa: #a87a15; --pa-deep: #7a5810; --pa-tint: #fbefd2; --pa-soft: rgba(168, 122, 21, 0.08);
+}
+
+[data-theme="dark"] #agriculture-tab { --pa: #8fc0a5; --pa-deep: #c6e0d1; --pa-tint: #1e3329; --pa-soft: rgba(143, 192, 165, 0.10); }
+[data-theme="dark"] #ecommerce-tab   { --pa: #85a8d8; --pa-deep: #b5cee8; --pa-tint: #1f2b3c; --pa-soft: rgba(133, 168, 216, 0.10); }
+[data-theme="dark"] #employment-tab  { --pa: #efc75e; --pa-deep: #f5dc9a; --pa-tint: #3a2f14; --pa-soft: rgba(239, 199, 94, 0.10); }
+

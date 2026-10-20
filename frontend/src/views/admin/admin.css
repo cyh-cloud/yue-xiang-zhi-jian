@@ -3,7 +3,7 @@
  * components.css; shell layout and role themes remain in backoffice.css.
  */
 
-.bo-protection {
+.backoffice-protection {
   max-width: 220px;
   color: var(--bo-muted);
   font-size: 0.68rem;

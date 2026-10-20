@@ -9,7 +9,7 @@
 [data-theme="dark"] .calendar-tasks { background: var(--bg-secondary); border-color: var(--border); }
 [data-theme="dark"] .calendar-day:hover { background: rgba(255,255,255,0.08); }
 
-[data-theme="dark"] .qa-box textarea { background: #1b2c25; border-color: #33473d; color: var(--text-primary); }
+[data-theme="dark"] .agriculture-qa-box textarea { background: #1b2c25; border-color: #33473d; color: var(--text-primary); }
 [data-theme="dark"] .example-btn { background: rgba(255,255,255,0.06); border-color: #33473d; color: var(--text-secondary); }
 [data-theme="dark"] .example-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
 
@@ -353,7 +353,7 @@
 }
 
 /* ==================== QA Chat ==================== */
-.qa-chat-wrap {
+.agriculture-qa-chat-wrap {
     background: var(--bg-primary);
     border: 1px solid var(--border-light);
     border-radius: var(--radius);
@@ -361,7 +361,7 @@
     display: flex;
     flex-direction: column;
 }
-.qa-chat-flow {
+.agriculture-qa-chat-flow {
     flex: 1;
     max-height: 480px;
     overflow-y: auto;
@@ -370,32 +370,32 @@
     flex-direction: column;
     gap: 16px;
 }
-.qa-welcome {
+.agriculture-qa-welcome {
     text-align: center;
     padding: 24px 16px;
     color: var(--text-muted);
 }
-.qa-welcome i {
+.agriculture-qa-welcome i {
     font-size: 2rem;
     color: var(--accent-blue);
     margin-bottom: 10px;
     display: block;
 }
-.qa-welcome p { font-size: 0.9rem; line-height: 1.6; }
-.qa-welcome strong { color: var(--accent-blue); }
+.agriculture-qa-welcome p { font-size: 0.9rem; line-height: 1.6; }
+.agriculture-qa-welcome strong { color: var(--accent-blue); }
 
 /* 消息气泡 */
-.qa-message {
+.agriculture-qa-message {
     display: flex;
     gap: 10px;
     max-width: 85%;
     animation: fadeInUp 0.25s ease;
 }
-.qa-message.user {
+.agriculture-qa-message.user {
     align-self: flex-end;
     flex-direction: row-reverse;
 }
-.qa-message .msg-avatar {
+.agriculture-qa-message .message-avatar {
     width: 32px;
     height: 32px;
     border-radius: 50%;
@@ -405,62 +405,62 @@
     flex-shrink: 0;
     font-size: 0.8rem;
 }
-.qa-message.user .msg-avatar {
+.agriculture-qa-message.user .message-avatar {
     background: var(--gradient-main);
     color: white;
 }
-.qa-message.bot .msg-avatar {
+.agriculture-qa-message.bot .message-avatar {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     color: var(--accent-blue);
 }
-.qa-message .msg-bubble {
+.agriculture-qa-message .message-bubble {
     padding: 12px 16px;
     border-radius: var(--radius-sm);
     font-size: 0.9rem;
     line-height: 1.7;
 }
-.qa-message.user .msg-bubble {
+.agriculture-qa-message.user .message-bubble {
     background: var(--gradient-main);
     color: white;
     border-bottom-right-radius: 4px;
 }
-.qa-message.bot .msg-bubble {
+.agriculture-qa-message.bot .message-bubble {
     background: var(--bg-secondary);
     border: 1px solid var(--border-light);
     color: var(--text-primary);
     border-bottom-left-radius: 4px;
 }
-.qa-message.bot .msg-bubble p { margin-bottom: 8px; }
-.qa-message.bot .msg-bubble p:last-child { margin-bottom: 0; }
-.qa-message.bot .msg-bubble strong { color: var(--accent-blue); }
-.qa-message.bot .msg-bubble ul, .qa-message.bot .msg-bubble ol {
+.agriculture-qa-message.bot .message-bubble p { margin-bottom: 8px; }
+.agriculture-qa-message.bot .message-bubble p:last-child { margin-bottom: 0; }
+.agriculture-qa-message.bot .message-bubble strong { color: var(--accent-blue); }
+.agriculture-qa-message.bot .message-bubble ul, .agriculture-qa-message.bot .message-bubble ol {
     padding-left: 18px;
     margin: 6px 0;
 }
-.qa-message.bot .msg-bubble li { margin-bottom: 4px; }
+.agriculture-qa-message.bot .message-bubble li { margin-bottom: 4px; }
 
 /* 失败态：让「AI 不可用」看起来就是失败，而不是一条正常回答 */
-.qa-message-error .msg-bubble {
+.agriculture-qa-message-error .message-bubble {
     border-color: var(--danger, #dc2626);
 }
-.qa-message-error .msg-bubble .error-state {
+.agriculture-qa-message-error .message-bubble .error-state {
     background: transparent;
     border: none;
     padding: 0;
     text-align: left;
     align-items: flex-start;
 }
-.qa-message-error .msg-bubble .error-state i {
+.agriculture-qa-message-error .message-bubble .error-state i {
     font-size: 1.1rem;
     margin-bottom: 6px;
 }
-.qa-message-error .msg-bubble .error-state p {
+.agriculture-qa-message-error .message-bubble .error-state p {
     font-size: 0.85rem;
     line-height: 1.6;
 }
 /* 流式回答中途中断时，补在气泡末尾的说明 */
-.qa-inline-note {
+.agriculture-qa-inline-note {
     margin-top: 10px;
     padding-top: 8px;
     border-top: 1px dashed var(--border-light);
@@ -469,7 +469,7 @@
 }
 /* AI 问答常驻免责说明：与农时日历的「待核」措辞分开维护，
    针对问答场景补充农药用量与重大决策的边界提示 */
-.qa-disclaimer {
+.agriculture-qa-disclaimer {
     display: flex;
     align-items: flex-start;
     gap: 8px;
@@ -482,7 +482,7 @@
     line-height: 1.6;
     color: var(--text-secondary);
 }
-.qa-disclaimer i {
+.agriculture-qa-disclaimer i {
     margin-top: 3px;
     font-size: 0.8rem;
     color: var(--text-muted, #8b968f);
@@ -492,18 +492,18 @@
    这些按钮此前只是「点了被静默忽略」，视觉上却仍可点击，容易让人误以为失效。 */
 #ask-agriculture-btn:disabled,
 .example-btn:disabled,
-.qa-action-btn.suggest-btn:disabled {
+.agriculture-qa-action-btn.suggest-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
 /* 操作按钮 */
-.qa-msg-actions {
+.agriculture-qa-msg-actions {
     display: flex;
     gap: 6px;
     margin-top: 8px;
 }
-.qa-action-btn {
+.agriculture-qa-action-btn {
     padding: 4px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius-xs);
@@ -516,11 +516,11 @@
     align-items: center;
     gap: 4px;
 }
-.qa-action-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
-.qa-action-btn.copied { border-color: var(--accent-green); color: var(--accent-green); }
+.agriculture-qa-action-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.agriculture-qa-action-btn.copied { border-color: var(--accent-green); color: var(--accent-green); }
 
 /* 推荐追问 */
-.qa-suggestions {
+.agriculture-qa-suggestions {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
@@ -528,11 +528,11 @@
     border-top: 1px solid var(--border-light);
     background: var(--bg-secondary);
 }
-.qa-suggestions .example-btn {
+.agriculture-qa-suggestions .example-btn {
     font-size: 0.78rem;
     padding: 5px 12px;
 }
-.qa-suggestions-label {
+.agriculture-qa-suggestions-label {
     font-size: 0.78rem;
     color: var(--text-muted);
     display: flex;
@@ -542,14 +542,14 @@
 }
 
 /* 输入栏 */
-.qa-input-bar {
+.agriculture-qa-input-bar {
     display: flex;
     gap: 10px;
     padding: 14px 20px;
     border-top: 1px solid var(--border-light);
     background: var(--bg-secondary);
 }
-.qa-input-bar textarea {
+.agriculture-qa-input-bar textarea {
     flex: 1;
     padding: 10px 14px;
     border: 1px solid var(--border);
@@ -562,24 +562,24 @@
     max-height: 100px;
     line-height: 1.4;
 }
-.qa-input-bar textarea:focus {
+.agriculture-qa-input-bar textarea:focus {
     outline: none;
     border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px rgba(31,94,67,0.1);
 }
-.qa-input-bar .btn {
+.agriculture-qa-input-bar .btn {
     flex-shrink: 0;
     align-self: flex-end;
 }
 
 /* 工具栏 */
-.qa-toolbar {
+.agriculture-qa-toolbar {
     display: flex;
     justify-content: flex-end;
     padding: 8px 20px;
     border-top: 1px solid var(--border-light);
 }
-.qa-toolbar-btn {
+.agriculture-qa-toolbar-btn {
     padding: 4px 10px;
     border: none;
     background: none;
@@ -591,10 +591,10 @@
     align-items: center;
     gap: 4px;
 }
-.qa-toolbar-btn:hover { color: var(--accent-blue); }
+.agriculture-qa-toolbar-btn:hover { color: var(--accent-blue); }
 
 /* 加载动画 */
-.qa-typing {
+.agriculture-qa-typing {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -602,7 +602,7 @@
     color: var(--text-muted);
     font-size: 0.85rem;
 }
-.qa-typing-dots span {
+.agriculture-qa-typing-dots span {
     display: inline-block;
     width: 6px;
     height: 6px;
@@ -610,21 +610,21 @@
     background: var(--accent-blue);
     animation: typingDot 1.2s infinite;
 }
-.qa-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
-.qa-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+.agriculture-qa-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.agriculture-qa-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
 @keyframes typingDot {
     0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
     30% { opacity: 1; transform: scale(1); }
 }
 
 /* 暗色模式 */
-[data-theme="dark"] .qa-chat-wrap { background: var(--bg-primary); border-color: var(--border); }
-[data-theme="dark"] .qa-message.bot .msg-bubble { background: #1b2c25; border-color: var(--border); }
-[data-theme="dark"] .qa-input-bar { background: var(--bg-secondary); border-color: var(--border); }
-[data-theme="dark"] .qa-input-bar textarea { background: var(--bg-primary); border-color: var(--border); }
-[data-theme="dark"] .qa-suggestions { background: var(--bg-secondary); border-color: var(--border); }
-[data-theme="dark"] .qa-action-btn { background: var(--bg-primary); border-color: var(--border); }
-[data-theme="dark"] .qa-toolbar { border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-chat-wrap { background: var(--bg-primary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-message.bot .message-bubble { background: #1b2c25; border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-input-bar { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-input-bar textarea { background: var(--bg-primary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-suggestions { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-action-btn { background: var(--bg-primary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-toolbar { border-color: var(--border); }
 
 .module-card, .sim-module-card, .diagnosis-entry-card {
     background: var(--bg-secondary);
@@ -895,8 +895,8 @@
 /* ===== 数据来源分级展示（依据公开技术资料编排 vs 已人工复核） ===== */
 
 /* 提示条内层：文案 + 可展开的来源清单 */
-.farming-date-notice .fdn-body { flex: 1; min-width: 0; }
-.farming-date-notice .fdn-toggle {
+.farming-date-notice .farming-body { flex: 1; min-width: 0; }
+.farming-date-notice .farming-toggle {
     border: none;
     background: none;
     padding: 0;
@@ -906,9 +906,9 @@
     text-decoration: underline;
     text-underline-offset: 2px;
 }
-.farming-date-notice .fdn-toggle.is-hidden { display: none; }
-.farming-date-notice .fdn-toggle i { margin-top: 0; }
-.farming-date-notice .fdn-sources {
+.farming-date-notice .farming-toggle.is-hidden { display: none; }
+.farming-date-notice .farming-toggle i { margin-top: 0; }
+.farming-date-notice .farming-sources {
     list-style: none;
     margin: 8px 0 0;
     padding: 0;
@@ -916,19 +916,19 @@
     flex-direction: column;
     gap: 6px;
 }
-.farming-date-notice .fdn-sources.is-hidden { display: none; }
-.farming-date-notice .fdn-sources li {
+.farming-date-notice .farming-sources.is-hidden { display: none; }
+.farming-date-notice .farming-sources li {
     padding: 6px 8px;
     border-radius: var(--radius-xs);
     background: color-mix(in srgb, var(--text-primary) 5%, transparent);
 }
-.farming-date-notice .fdn-src-name {
+.farming-date-notice .farming-src-name {
     display: block;
     font-weight: 600;
     color: var(--text-primary);
 }
-.farming-date-notice .fdn-src-meta { display: block; font-size: 0.72rem; }
-.farming-date-notice .fdn-sources a {
+.farming-date-notice .farming-src-meta { display: block; font-size: 0.72rem; }
+.farming-date-notice .farming-sources a {
     color: var(--accent-gold, var(--gold));
     text-underline-offset: 2px;
 }
@@ -1048,4 +1048,4 @@
 }
 #agriculture-tab[data-large-text] .product-icon { width: 56px; height: 56px; font-size: 1.4rem; }
 #agriculture-tab[data-large-text] .example-btn { font-size: 1rem; padding: 10px 18px; }
-#agriculture-tab[data-large-text] .qa-input-bar textarea { font-size: 1.05rem; min-height: 52px; }
+#agriculture-tab[data-large-text] .agriculture-qa-input-bar textarea { font-size: 1.05rem; min-height: 52px; }

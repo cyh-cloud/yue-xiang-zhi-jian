@@ -73,7 +73,7 @@
   line-height: 1.65;
 }
 
-.government-policy-card .bo-row-actions {
+.government-policy-card .backoffice-row-actions {
   min-width: 0;
 }
 
@@ -87,7 +87,7 @@
   margin-bottom: 16px;
 }
 
-.government-policy-form .bo-field textarea {
+.government-policy-form .backoffice-field textarea {
   width: 100%;
   min-height: 84px;
   padding: 9px 10px;
@@ -101,7 +101,7 @@
   resize: vertical;
 }
 
-.government-policy-form .bo-field textarea:focus {
+.government-policy-form .backoffice-field textarea:focus {
   border-color: var(--bo-accent);
   box-shadow: 0 0 0 3px var(--bo-accent-soft);
   outline: none;

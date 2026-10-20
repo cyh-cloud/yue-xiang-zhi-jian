@@ -675,10 +675,10 @@ function saveProduct(productId: string): void {
                 class="fas fa-circle-info"
                 aria-hidden="true"
               />
-              <div class="fdn-body farming-body">
+              <div class="farming-body">
                 <button
                   type="button"
-                  class="fdn-toggle farming-toggle"
+                  class="farming-toggle"
                   :aria-expanded="sourceListOpen"
                   aria-controls="farming-date-notice-sources"
                   @click="sourceListOpen = !sourceListOpen"
@@ -693,14 +693,14 @@ function saveProduct(productId: string): void {
                 <ul
                   v-show="sourceListOpen"
                   id="farming-date-notice-sources"
-                  class="fdn-sources farming-sources"
+                  class="farming-sources"
                 >
                   <li
                     v-for="source in sources"
                     :key="source.key"
                   >
-                    <span class="fdn-src-name farming-src-name">{{ source.name }}</span>
-                    <span class="fdn-src-meta farming-src-meta">
+                    <span class="farming-src-name">{{ source.name }}</span>
+                    <span class="farming-src-meta">
                       {{ sourceMeta(source) }}
                       <a
                         v-if="source.url"

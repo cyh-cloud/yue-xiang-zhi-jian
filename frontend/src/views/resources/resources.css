@@ -193,7 +193,7 @@
     border: 1px solid var(--border-light);
     border-bottom-left-radius: 4px;
 }
-.voice-msg .msg-dialect-tag {
+.voice-msg .message-dialect-tag {
     display: inline-block;
     padding: 2px 8px;
     background: rgba(255,255,255,0.2);
@@ -201,8 +201,8 @@
     font-size: 0.68rem;
     margin-bottom: 4px;
 }
-.voice-msg.bot .msg-dialect-tag { background: rgba(31,94,67,0.1); color: var(--accent-blue); }
-.voice-msg .msg-suggestions {
+.voice-msg.bot .message-dialect-tag { background: rgba(31,94,67,0.1); color: var(--accent-blue); }
+.voice-msg .message-suggestions {
     display: flex;
     gap: 6px;
     flex-wrap: wrap;

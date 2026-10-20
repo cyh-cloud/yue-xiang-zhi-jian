@@ -37,14 +37,14 @@ npm run test:e2e
 
 ## CSS 契约与视觉矩阵
 
-样式归属、过渡期旧样式例外和机械检查边界见
+样式归属、旧样式退役状态和机械检查边界见
 `../docs/css-style-ownership.md`。视觉矩阵的基线库准备、运行方式与更新规则见
 `../docs/css-visual-regression.md`。
 
 全局语义 token 在 `src/styles/tokens.css`，reset、基础元素、焦点和减少动效规则在
 `src/styles/base.css`，跨页面复用的按钮、字段、标签、卡片、表格、状态、弹窗和消息
-中心原语在 `src/styles/components.css`。`src/main.ts` 依次加载 token、基础、共享
-组件三层，再加载 T13 前仍保留的 `src/styles/legacy-public.css`。
+中心原语在 `src/styles/components.css`。`src/main.ts` 只加载 token、基础、共享组件，
+以及外壳和页面域样式；旧全局样式已退出活动入口。
 
 ```powershell
 python tools/check_frontend_styles.py

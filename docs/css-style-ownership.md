@@ -44,7 +44,7 @@ CSS 组件化的目标是降低样式影响面，不改变现有视觉。判断�
 - `admin`
 
 页面私有样式只能由同一域导入。共享原语进入 `frontend/src/styles/components.css`，
-由 `main.ts` 在 `base.css` 之后、`legacy-public.css` 之前加载。跨域复用先判断是否
+由 `main.ts` 在 `base.css` 之后加载。跨域复用先判断是否
 真的出现第二个使用点，再决定上提为共享组件样式。
 
 ## 主题、角色与动态值
@@ -57,24 +57,15 @@ CSS 组件化的目标是降低样式影响面，不改变现有视觉。判断�
 - 无法证明无引用的动态类、第三方注入类和旧站稳定外部契约先保留并标记，
   不以“看起来没用”为删除依据。
 
-## 过渡状态
+## 旧样式退役
 
-T13 之前，活动入口保留一条显式例外：
+活动入口只加载 `tokens.css`、`base.css`、`components.css` 和外壳/页面域样式。
+`frontend/src/styles/legacy-public.css` 已删除，旧样式只保留在
+`legacy/reference/frontend/legacy-public.css` 作为历史参照，文件头包含
+“历史参照，禁止活动代码引用”。任何活动代码都不得 import `legacy/reference/`。
 
-```text
-frontend/src/main.ts
-  -> frontend/src/styles/legacy-public.css
-```
-
-这是唯一允许的旧样式活动 import。旧样式只读快照位于
-`legacy/reference/frontend/legacy-public.css`，文件头必须保留
-“历史参照，禁止活动代码引用”。任何活动代码都不得 import `legacy/reference/`，
-也不得从 `main.ts` 之外再次 import 当前旧样式。T13 删除该例外。
-
-新增规则一律进入上表的目标层，不写入 `legacy-public.css`。T2 已把全局 token 与
-基础规则收口到 `tokens.css` / `base.css`。T3 把共享按钮、字段、标签/状态、卡片、
-表格、反馈/状态、弹窗和消息中心原语收口到 `components.css`，旧样式表只保留尚未
-迁移的页面与外壳规则。
+尚未上提的跨页规则已经按原顺序并入 `components.css`，页面专属规则由各页面域
+样式文件持有。新增规则一律进入上表的目标层。
 
 ## 机械检查
 
@@ -87,12 +78,12 @@ python -m unittest tests.test_frontend_styles -v
 
 检查器负责：
 
-- 只读旧样式 import 和过渡期唯一例外；
+- 只读旧样式 import；
 - 活动入口对 `tokens.css` / `base.css` 的显式导入与顺序；
-- `components.css` 在 `base.css` 之后、过渡期旧样式之前的导入顺序；
+- `components.css` 在 `base.css` 之后的导入顺序；
 - 共享组件层原语覆盖、禁止 token 定义、角色选择器和 `!important`；
 - 全局语义 token 分组、明暗主题和大字模式覆盖完整性；
-- 过渡期旧样式不得重新定义全局 token、reset 或全站焦点规则；
+- 共享层不得重新定义全局 token、reset 或全站焦点规则；
 - 页面私有样式跨域 import；
 - 基础层与外壳之外的万能全局选择器；
 - 外壳与 token 层之外的 `[data-role]` 选择器；

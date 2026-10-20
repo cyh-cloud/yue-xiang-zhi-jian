@@ -518,10 +518,10 @@ function formatDuration(seconds: number): string {
 
 <template>
   <section
-    class="bo-page backoffice-page operator-crafts"
+    class="backoffice-page operator-crafts"
     data-testid="operator-crafts"
   >
-    <header class="bo-page-header backoffice-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -531,7 +531,7 @@ function formatDuration(seconds: number): string {
       </div>
       <button
         type="button"
-        class="bo-button backoffice-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadCrafts()"
       >
@@ -564,7 +564,7 @@ function formatDuration(seconds: number): string {
     >
       <button
         type="button"
-        class="bo-button backoffice-button"
+        class="backoffice-button"
         @click="loadCrafts()"
       >
         重试
@@ -579,7 +579,7 @@ function formatDuration(seconds: number): string {
         <template #actions>
           <button
             type="button"
-            class="bo-button backoffice-button"
+            class="backoffice-button"
             :disabled="loading"
             @click="openCreateCraft"
           >
@@ -599,9 +599,9 @@ function formatDuration(seconds: number): string {
         />
         <div
           v-else
-          class="bo-table-wrap backoffice-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table backoffice-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>名称</th>
@@ -632,7 +632,7 @@ function formatDuration(seconds: number): string {
                 <td>{{ craft.item_count }}</td>
                 <td>
                   <span
-                    class="bo-status backoffice-status"
+                    class="backoffice-status"
                     :class="craft.has_budget ? 'is-active' : 'is-suspended'"
                   >
                     {{ craft.has_budget ? "已填" : "待填" }}
@@ -640,24 +640,24 @@ function formatDuration(seconds: number): string {
                 </td>
                 <td>{{ craft.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions backoffice-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="selectCraft(craft.id)"
                     >
                       管理内容
                     </button>
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openCraft(craft)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeCraft(craft)"
                     >
                       删除
@@ -678,7 +678,7 @@ function formatDuration(seconds: number): string {
         <template #actions>
           <button
             type="button"
-            class="bo-button backoffice-button"
+            class="backoffice-button"
             :disabled="loading || detailLoading"
             @click="openCreateDetail"
           >
@@ -702,7 +702,7 @@ function formatDuration(seconds: number): string {
           <p>{{ budget?.buying_tips || "尚未填写采购建议" }}</p>
           <button
             type="button"
-            class="bo-button backoffice-button is-small is-secondary"
+            class="backoffice-button is-small is-secondary"
             :disabled="loading || budgetLoading"
             @click="openBudget"
           >
@@ -755,9 +755,9 @@ function formatDuration(seconds: number): string {
         />
         <div
           v-else
-          class="bo-table-wrap backoffice-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table backoffice-table">
+          <table class="backoffice-table">
             <thead>
               <tr v-if="activeTab === 'steps'">
                 <th>标题</th>
@@ -803,17 +803,17 @@ function formatDuration(seconds: number): string {
                   <td>{{ step.tips }}</td>
                   <td>{{ step.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions backoffice-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openStep(step)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removeStep(step)"
                       >
                         删除
@@ -834,17 +834,17 @@ function formatDuration(seconds: number): string {
                   <td>{{ category.desc }}</td>
                   <td>{{ category.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions backoffice-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openCategory(category)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removeCategory(category)"
                       >
                         删除
@@ -869,17 +869,17 @@ function formatDuration(seconds: number): string {
                   <td>{{ item.where }}</td>
                   <td>{{ item.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions backoffice-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openItem(item)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removeItem(item)"
                       >
                         删除
@@ -901,17 +901,17 @@ function formatDuration(seconds: number): string {
                   <td>{{ formatDuration(video.duration) }}</td>
                   <td>{{ video.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions backoffice-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openVideo(video)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button backoffice-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removeVideo(video)"
                       >
                         删除

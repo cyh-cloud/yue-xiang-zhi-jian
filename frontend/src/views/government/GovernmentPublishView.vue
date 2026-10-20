@@ -207,10 +207,10 @@ onMounted(loadPolicies);
 
 <template>
   <section
-    class="bo-page backoffice-page government-policy-form-page"
+    class="backoffice-page government-policy-form-page"
     data-testid="government-policy-form-page"
   >
-    <header class="bo-page-header backoffice-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>政务工作</p>
         <h1 data-testid="backoffice-page-title">
@@ -236,7 +236,7 @@ onMounted(loadPolicies);
     >
       <button
         type="button"
-        class="bo-button backoffice-button"
+        class="backoffice-button"
         @click="loadPolicies"
       >
         重试
@@ -253,7 +253,7 @@ onMounted(loadPolicies);
         data-testid="government-policy-form"
         @submit.prevent="submitPolicy"
       >
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>政策标题</span>
           <input
             v-model="form.title"
@@ -262,8 +262,8 @@ onMounted(loadPolicies);
           >
         </label>
 
-        <div class="bo-form-grid backoffice-form-grid">
-          <label class="bo-field backoffice-field">
+        <div class="backoffice-form-grid">
+          <label class="backoffice-field">
             <span>政策分类</span>
             <select v-model="form.category">
               <option
@@ -275,7 +275,7 @@ onMounted(loadPolicies);
               </option>
             </select>
           </label>
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>发布日期</span>
             <input
               v-model="form.date"
@@ -284,7 +284,7 @@ onMounted(loadPolicies);
           </label>
         </div>
 
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>摘要</span>
           <input
             v-model="form.summary"
@@ -293,7 +293,7 @@ onMounted(loadPolicies);
           >
         </label>
 
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>资料来源</span>
           <textarea
             v-model="form.source"
@@ -302,7 +302,7 @@ onMounted(loadPolicies);
           />
         </label>
 
-        <label class="bo-field backoffice-field">
+        <label class="backoffice-field">
           <span>政策内容</span>
           <textarea
             v-model="form.content"
@@ -314,7 +314,7 @@ onMounted(loadPolicies);
         <div class="government-policy-form-actions">
           <button
             type="submit"
-            class="bo-button backoffice-button"
+            class="backoffice-button"
             data-testid="government-policy-submit"
             :disabled="saving"
           >
@@ -323,7 +323,7 @@ onMounted(loadPolicies);
           <button
             v-if="isEditing"
             type="button"
-            class="bo-button backoffice-button is-secondary"
+            class="backoffice-button is-secondary"
             data-testid="government-policy-cancel"
             :disabled="saving"
             @click="cancelEdit"

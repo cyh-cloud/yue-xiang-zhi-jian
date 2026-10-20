@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Guards the expand phase of the semantic class-name migration."""
+"""Guards the contracted semantic class-name migration."""
 
 import re
 import unittest
@@ -8,28 +8,21 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / "frontend" / "src"
 
-PREFIX_ALIASES = {
-    "emp-": "employment-",
-    "craft-": "crafts-",
-    "cs-": "customer-service-",
-    "copy-": "copywriting-",
-    "msg-": "message-",
-    "bo-": "backoffice-",
-    "qa-": "agriculture-qa-",
-    "fdn-": "farming-",
-    "guide-": "purchase-guide-",
-}
-
-
-def alias_for(token: str) -> str:
-    for old, new in PREFIX_ALIASES.items():
-        if token.startswith(old):
-            return new + token[len(old):]
-    return ""
+RETIRED_PREFIXES = (
+    "emp-",
+    "craft-",
+    "cs-",
+    "copy-",
+    "msg-",
+    "bo-",
+    "qa-",
+    "fdn-",
+    "guide-",
+)
 
 
 class SemanticAliasTest(unittest.TestCase):
-    def test_static_legacy_classes_keep_their_semantic_alias(self):
+    def test_static_classes_do_not_use_retired_prefixes(self):
         violations = []
         for path in sorted(SOURCE_ROOT.rglob("*.vue")):
             source = path.read_text(encoding="utf-8")
@@ -39,14 +32,12 @@ class SemanticAliasTest(unittest.TestCase):
                 continue
             template = source[start + len("<template>"):end]
             for match in re.finditer(r'(?<!:)class="([^"]*)"', template):
-                tokens = match.group(1).split()
-                for token in tokens:
+                for token in match.group(1).split():
                     if any(char in token for char in "{}$`"):
                         continue
-                    alias = alias_for(token)
-                    if alias and alias not in tokens:
+                    if token.startswith(RETIRED_PREFIXES):
                         violations.append(
-                            f"{path.relative_to(REPO_ROOT)}: {token} lacks {alias}"
+                            f"{path.relative_to(REPO_ROOT)}: {token}"
                         )
         self.assertEqual(violations, [])
 

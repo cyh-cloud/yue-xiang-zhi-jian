@@ -150,8 +150,8 @@ onMounted(loadApplications);
 </script>
 
 <template>
-  <section class="bo-page backoffice-page">
-    <header class="bo-page-header backoffice-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>招聘管理</p>
         <h1>简历管理</h1>
@@ -159,7 +159,7 @@ onMounted(loadApplications);
       </div>
       <button
         type="button"
-        class="bo-button backoffice-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadApplications"
       >
@@ -204,7 +204,7 @@ onMounted(loadApplications);
       >
         <button
           type="button"
-          class="bo-button backoffice-button"
+          class="backoffice-button"
           @click="loadApplications"
         >
           重试
@@ -218,9 +218,9 @@ onMounted(loadApplications);
       />
       <div
         v-else
-        class="bo-table-wrap backoffice-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table backoffice-table">
+        <table class="backoffice-table">
           <thead>
             <tr>
               <th>申请人</th>
@@ -254,17 +254,17 @@ onMounted(loadApplications);
                   </span>
                 </td>
                 <td>
-                  <div class="bo-row-actions backoffice-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="toggleResume(application.id)"
                     >
                       {{ expandedIds.has(application.id) ? "收起简历" : "查看简历" }}
                     </button>
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       :disabled="busyId !== null || application.status === 'interview'"
                       @click="changeStatus(application, 'interview')"
                     >
@@ -272,7 +272,7 @@ onMounted(loadApplications);
                     </button>
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-success"
+                      class="backoffice-button is-small is-success"
                       :disabled="busyId !== null || application.status === 'approved'"
                       @click="changeStatus(application, 'approved')"
                     >
@@ -280,7 +280,7 @@ onMounted(loadApplications);
                     </button>
                     <button
                       type="button"
-                      class="bo-button backoffice-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       :disabled="busyId !== null || application.status === 'rejected'"
                       @click="changeStatus(application, 'rejected')"
                     >

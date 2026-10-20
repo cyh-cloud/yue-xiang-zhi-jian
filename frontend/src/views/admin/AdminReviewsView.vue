@@ -243,8 +243,8 @@ onMounted(loadReviews);
 </script>
 
 <template>
-  <section class="bo-page backoffice-page">
-    <header class="bo-page-header backoffice-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -254,7 +254,7 @@ onMounted(loadReviews);
       </div>
       <button
         type="button"
-        class="bo-button backoffice-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadReviews"
       >
@@ -299,7 +299,7 @@ onMounted(loadReviews);
         </div>
 
         <div class="admin-review-filters">
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>内容类型</span>
             <select v-model="contentType">
               <option
@@ -311,7 +311,7 @@ onMounted(loadReviews);
               </option>
             </select>
           </label>
-          <label class="bo-field backoffice-field">
+          <label class="backoffice-field">
             <span>排序</span>
             <select v-model="sort">
               <option value="modified">
@@ -341,7 +341,7 @@ onMounted(loadReviews);
         >
           <button
             type="button"
-            class="bo-button backoffice-button"
+            class="backoffice-button"
             @click="loadReviews"
           >
             重试
@@ -419,7 +419,7 @@ onMounted(loadReviews);
           <footer class="admin-review-actions">
             <a
               v-if="modelFileUrl(review)"
-              class="bo-button backoffice-button is-small is-secondary"
+              class="backoffice-button is-small is-secondary"
               :href="modelFileUrl(review)"
               target="_blank"
               rel="noopener"
@@ -429,7 +429,7 @@ onMounted(loadReviews);
             <template v-if="review.status === 'pending'">
               <button
                 type="button"
-                class="bo-button backoffice-button is-small is-success"
+                class="backoffice-button is-small is-success"
                 :disabled="busyId !== null"
                 @click="approve(review)"
               >
@@ -437,7 +437,7 @@ onMounted(loadReviews);
               </button>
               <button
                 type="button"
-                class="bo-button backoffice-button is-small is-danger"
+                class="backoffice-button is-small is-danger"
                 :disabled="busyId !== null"
                 @click="openReject(review)"
               >
@@ -447,7 +447,7 @@ onMounted(loadReviews);
             <button
               v-else
               type="button"
-              class="bo-button backoffice-button is-small is-secondary"
+              class="backoffice-button is-small is-secondary"
               :disabled="busyId !== null"
               @click="openRevoke(review)"
             >
@@ -461,25 +461,25 @@ onMounted(loadReviews);
     <Teleport to="body">
       <div
         v-if="rejectTarget"
-        class="bo-modal-overlay backoffice-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeReject"
       >
         <form
-          class="bo-modal backoffice-modal"
+          class="backoffice-modal"
           data-testid="admin-review-reject-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="驳回内容"
           @submit.prevent="confirmReject"
         >
-          <header class="bo-modal-head backoffice-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>审核结论</p>
               <h2>驳回 {{ reviewTitle(rejectTarget) }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button backoffice-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeReject"
             >
@@ -489,13 +489,13 @@ onMounted(loadReviews);
               />
             </button>
           </header>
-          <div class="bo-modal-body backoffice-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="rejectError"
               kind="error"
               :message="rejectError"
             />
-            <label class="bo-field backoffice-field">
+            <label class="backoffice-field">
               <span>驳回理由</span>
               <textarea
                 v-model="rejectReason"
@@ -505,10 +505,10 @@ onMounted(loadReviews);
               />
             </label>
           </div>
-          <footer class="bo-modal-actions backoffice-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button backoffice-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="busyId !== null"
               @click="closeReject"
             >
@@ -516,7 +516,7 @@ onMounted(loadReviews);
             </button>
             <button
               type="submit"
-              class="bo-button backoffice-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="busyId !== null"
             >
               {{ busyId !== null ? "提交中..." : "确认驳回" }}
@@ -527,31 +527,31 @@ onMounted(loadReviews);
 
       <div
         v-if="revokeTarget"
-        class="bo-modal-overlay backoffice-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeRevoke"
       >
         <div
-          class="bo-modal backoffice-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="admin-review-confirm-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="撤销审核"
         >
-          <header class="bo-modal-head backoffice-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>撤销审核</h2>
             </div>
           </header>
-          <div class="bo-modal-body backoffice-modal-body">
-            <p class="bo-confirm-copy backoffice-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               确定撤销「{{ reviewTitle(revokeTarget) }}」的审核结论？内容会退回待审核并立即从公开页面下架。
             </p>
           </div>
-          <footer class="bo-modal-actions backoffice-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button backoffice-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="busyId !== null"
               @click="closeRevoke"
             >
@@ -559,7 +559,7 @@ onMounted(loadReviews);
             </button>
             <button
               type="button"
-              class="bo-button backoffice-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="busyId !== null"
               @click="confirmRevoke"
             >

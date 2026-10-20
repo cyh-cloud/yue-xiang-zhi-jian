@@ -11,8 +11,8 @@
 活动前端只有 `frontend/` 的 Vue SPA。Flask 只提供 API 与 `uploads/`、`images/`
 媒体；生产由 nginx 伺服 `frontend/dist`，e2e 由测试静态入口伺服同一份构建产物。
 
-旧站页面里对 `styles.css` 的引用保留为迁移时原样。SPA 实际复用的公共样式已经移到
-`frontend/src/styles/legacy-public.css`。T13 之前该活动文件仍是过渡期入口，
+旧站页面里对 `styles.css` 的引用保留为迁移时原样。SPA 实际复用的公共样式已经
+完成归属化；`frontend/src/styles/legacy-public.css` 已退役删除。
 `frontend/legacy-public.css` 只是历史快照，不参与构建、运行或测试。
 
 旧测试中的行为已迁到 `frontend/e2e/`，覆盖六角色登录与回退、会话恢复、权限拒绝、

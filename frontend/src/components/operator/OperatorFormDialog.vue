@@ -222,13 +222,13 @@ function updateString(
     >
       <section
         ref="dialog"
-        class="bo-modal backoffice-modal operator-dialog"
+        class="backoffice-modal operator-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="operator-dialog-title"
         data-testid="operator-record-dialog"
       >
-        <header class="bo-modal-head backoffice-modal-head">
+        <header class="backoffice-modal-head">
           <div>
             <p>{{ eyebrow }}</p>
             <h2 id="operator-dialog-title">
@@ -237,7 +237,7 @@ function updateString(
           </div>
           <button
             type="button"
-            class="bo-icon-button backoffice-icon-button"
+            class="backoffice-icon-button"
             aria-label="关闭"
             :disabled="busy"
             @click="emit('close')"
@@ -250,12 +250,12 @@ function updateString(
         </header>
 
         <form
-          class="bo-modal-body backoffice-modal-body operator-dialog-form"
+          class="backoffice-modal-body operator-dialog-form"
           @submit.prevent="submit"
         >
           <div
             v-if="error"
-            class="bo-feedback backoffice-feedback is-error"
+            class="backoffice-feedback is-error"
             role="alert"
             data-testid="operator-dialog-error"
           >
@@ -268,7 +268,7 @@ function updateString(
           >
             <label
               v-if="field.type === 'select'"
-              class="bo-field backoffice-field"
+              class="backoffice-field"
             >
               <span>{{ field.label }}{{ field.required ? " *" : "" }}</span>
               <select
@@ -297,7 +297,7 @@ function updateString(
 
             <label
               v-else-if="field.type === 'textarea' || field.type === 'list' || field.type === 'chem'"
-              class="bo-field backoffice-field"
+              class="backoffice-field"
             >
               <span>{{ field.label }}{{ field.required ? " *" : "" }}</span>
               <textarea
@@ -364,7 +364,7 @@ function updateString(
 
             <label
               v-else
-              class="bo-field backoffice-field"
+              class="backoffice-field"
             >
               <span>{{ field.label }}{{ field.required ? " *" : "" }}</span>
               <input
@@ -386,10 +386,10 @@ function updateString(
             </label>
           </template>
 
-          <footer class="bo-modal-actions backoffice-modal-actions operator-dialog-actions">
+          <footer class="backoffice-modal-actions operator-dialog-actions">
             <button
               type="button"
-              class="bo-button backoffice-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="busy"
               @click="emit('close')"
             >
@@ -397,7 +397,7 @@ function updateString(
             </button>
             <button
               type="submit"
-              class="bo-button backoffice-button"
+              class="backoffice-button"
               :disabled="busy"
             >
               <i

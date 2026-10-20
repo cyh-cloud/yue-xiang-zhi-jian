@@ -122,8 +122,8 @@ onMounted(loadTrainings);
 </script>
 
 <template>
-  <section class="bo-page backoffice-page">
-    <header class="bo-page-header backoffice-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>实训提交</h1>
@@ -131,7 +131,7 @@ onMounted(loadTrainings);
       </div>
       <button
         type="button"
-        class="bo-button backoffice-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadTrainings"
       >
@@ -172,7 +172,7 @@ onMounted(loadTrainings);
     >
       <button
         type="button"
-        class="bo-button backoffice-button"
+        class="backoffice-button"
         @click="loadTrainings"
       >
         重试
@@ -188,8 +188,8 @@ onMounted(loadTrainings);
       v-else
       flush
     >
-      <div class="bo-table-wrap backoffice-table-wrap">
-        <table class="bo-table backoffice-table teacher-training-table">
+      <div class="backoffice-table-wrap">
+        <table class="backoffice-table teacher-training-table">
           <thead>
             <tr>
               <th>学员</th>
@@ -250,7 +250,7 @@ onMounted(loadTrainings);
               <td>
                 <button
                   type="button"
-                  class="bo-button backoffice-button is-small is-secondary"
+                  class="backoffice-button is-small is-secondary"
                   data-testid="teacher-training-open"
                   @click="openGrade(training)"
                 >
@@ -266,25 +266,25 @@ onMounted(loadTrainings);
     <Teleport to="body">
       <div
         v-if="selected"
-        class="bo-modal-overlay backoffice-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeGrade"
       >
         <form
-          class="bo-modal backoffice-modal teacher-grade-modal"
+          class="backoffice-modal teacher-grade-modal"
           data-testid="teacher-grade-dialog"
           role="dialog"
           aria-modal="true"
           :aria-label="selectedTitle"
           @submit.prevent="submitGrade"
         >
-          <header class="bo-modal-head backoffice-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>实训批改</p>
               <h2>{{ selectedTitle }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button backoffice-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeGrade"
             >
@@ -294,7 +294,7 @@ onMounted(loadTrainings);
               />
             </button>
           </header>
-          <div class="bo-modal-body backoffice-modal-body">
+          <div class="backoffice-modal-body">
             <p class="teacher-grade-meta">
               学员：<strong>{{ selected.student_name || selected.student_id }}</strong>
               · 第 {{ selected.attempts || 1 }} 次提交
@@ -330,7 +330,7 @@ onMounted(loadTrainings);
             >{{ selected.script }}</pre>
             <p
               v-else
-              class="bo-muted backoffice-muted"
+              class="backoffice-muted"
             >
               该条提交没有可展示的正文，可能是早期版本留下的记录。
             </p>
@@ -341,7 +341,7 @@ onMounted(loadTrainings);
               :message="gradeError"
               testid="teacher-grade-error"
             />
-            <label class="bo-field backoffice-field">
+            <label class="backoffice-field">
               <span>我的评分（0-100）</span>
               <input
                 v-model="gradeScore"
@@ -352,7 +352,7 @@ onMounted(loadTrainings);
                 required
               >
             </label>
-            <label class="bo-field backoffice-field">
+            <label class="backoffice-field">
               <span>评语（可留空，学员会在消息中心看到）</span>
               <textarea
                 v-model="gradeFeedback"
@@ -360,10 +360,10 @@ onMounted(loadTrainings);
               />
             </label>
           </div>
-          <footer class="bo-modal-actions backoffice-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button backoffice-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="grading"
               @click="closeGrade"
             >
@@ -371,7 +371,7 @@ onMounted(loadTrainings);
             </button>
             <button
               type="button"
-              class="bo-button backoffice-button"
+              class="backoffice-button"
               :disabled="grading"
               @click="submitGrade"
             >
