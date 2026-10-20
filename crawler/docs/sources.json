@@ -163,7 +163,7 @@
         "jobs"
       ],
       "priority": "P1",
-      "enabled": true,
+      "enabled": false,
       "status": "approved-with-gaps",
       "access": "public",
       "rights_status": "prohibited",
