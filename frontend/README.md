@@ -35,6 +35,20 @@ npm run test:e2e
 旧 `.html` 路径仍由前端路由静默重定向；它们不依赖旧页面文件，也不会回退到 Flask
 静态路由。Flask 只提供 API 与 `/uploads/`、`/images/` 媒体。
 
+## CSS 契约与视觉矩阵
+
+样式归属、过渡期旧样式例外和机械检查边界见
+`../docs/css-style-ownership.md`。视觉矩阵的基线库准备、运行方式与更新规则见
+`../docs/css-visual-regression.md`。
+
+```powershell
+python tools/check_frontend_styles.py
+npm run test:visual:matrix
+```
+
+在仓库根运行 Python 检查；第二条命令在 `frontend/` 目录运行。矩阵需要
+`data/baseline.db`，该文件不提交。
+
 ## 生产
 
 构建后由 nginx 伺服 `frontend/dist`。完整模板见仓库根

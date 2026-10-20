@@ -1,3 +1,8 @@
+/*
+ * Transitional active sheet. T13 removes this import and retires the file.
+ * Do not add rules here; new work belongs in the CSS ownership layers.
+ */
+
 /* ==================== CSS Variables ==================== */
 :root {
     /* ---- 岭南青绿 · 品牌主色阶 ---- */

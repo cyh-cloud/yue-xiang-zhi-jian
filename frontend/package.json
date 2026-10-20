@@ -10,6 +10,8 @@
     "typecheck": "vue-tsc -b --pretty false",
     "test:unit": "vitest run",
     "test:e2e": "npm run build && playwright test && playwright test --config playwright.backend-unavailable.config.ts",
+    "test:visual:matrix": "npm run build && playwright test e2e/visual-matrix.spec.ts",
+    "test:visual:matrix:update": "npm run build && playwright test e2e/visual-matrix.spec.ts --update-snapshots",
     "lint": "eslint ."
   },
   "dependencies": {
