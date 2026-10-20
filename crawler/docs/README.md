@@ -1,6 +1,6 @@
 # 粤乡智匠数据采集设计索引
 
-本目录是数据采集系统的设计交付，不是运行中的爬虫。这里只保留导航和共享语义，不复制来源明细或问题明细。
+本目录是数据采集系统的设计、运行和验收索引。Scrapy 项目位于 `crawler/collection/projects/`，共享契约位于 `crawler/collection/shared/`。
 
 ## 交付边界
 
@@ -24,6 +24,8 @@ python tools/check_python.py
 python tools/check_architecture.py
 ```
 
+Scrapy 项目的依赖由 `crawler/pyproject.toml` 和 `crawler/uv.lock` 统一管理。项目运行入口、fixture 回放和当前 8 项目验收结果见 `operations/scrapy-migration.md` 与 `specs/scrapy-migration-validation.md`。
+
 仓库根的全量单测需要应用基线数据库 `data/baseline.db` 或等效测试库，不属于 crawler 验收。clean clone 没有该被忽略数据库时，全量单测失败不代表 crawler 交付失败。
 
 ## 阅读顺序
@@ -37,8 +39,9 @@ python tools/check_architecture.py
 7. `schema/`：采集库、业务库变更和转换器设计。
 8. `mapping/`：内容域字段映射。
 9. `operations/`：采集规则、验收和上线顺序。
-10. `TASKS.md`：当前任务图、依赖和实施批次指针。
-11. `ISSUES.md`：问题清单、状态和待决事项的唯一真相源；`BLOCKERS.md` 只是入口指针。
+10. `specs/scrapy-migration-validation.md`：8 个 Scrapy 项目的集成验收和阻断记录。
+11. `TASKS.md`：当前任务图、依赖和实施批次指针。
+12. `ISSUES.md`：问题清单、状态和待决事项的唯一真相源；`BLOCKERS.md` 只是入口指针。
 
 ## 状态含义
 

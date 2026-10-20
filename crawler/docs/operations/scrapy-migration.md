@@ -1,6 +1,6 @@
 # Scrapy 迁移计划
 
-状态: draft
+状态: implemented
 
 日期: 2026-10-21
 
@@ -25,7 +25,7 @@ raw
 
 ## 目标目录
 
-下面的结构是迁移目标。目录和模块在第一个实现票据中冻结，本轮不创建运行代码。
+下面的结构已实现。项目目录、共享契约和项目发现入口已经冻结；后续站点变更只修改对应项目目录。
 
 ```text
 crawler/
@@ -60,6 +60,25 @@ crawler/
           ...
     collection/
 ```
+
+## 运行入口
+
+安装依赖和生成锁文件：
+
+```powershell
+cd crawler
+uv lock --offline
+uv sync
+```
+
+运行全量 crawler 测试：
+
+```powershell
+cd <repo-root>
+python -m unittest discover -s crawler/tests -p "test_*.py" -t .
+```
+
+单独运行站点项目时，在该项目目录使用其 `scrapy.cfg`。fixture 项目（`aqsc-moa`、`cnipa`）没有 live 入口，只运行站点测试和 fixture 接口验证。
 
 `crawler/pyproject.toml` 和 `crawler/uv.lock` 是唯一依赖声明和锁文件，所有项目在同一 uv 环境中运行。项目自己的目录、settings、Spider 和测试入口仍然隔离，不复制根锁文件。fixture 统一放在 `crawler/tests/fixtures/evidence/<source_id>/`，现有证据原地保留，每个项目只引用自己的子目录。
 
@@ -127,8 +146,7 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 
 ## 非目标
 
-- 不安装 Scrapy，不创建 Spider、settings、middlewares 或 pipelines。
-- 不修改采集库 schema、业务库 schema 或现有 ADR。来源注册表只做 `5ajob` 启停状态的最小修正。
+- 本轮不修改业务库 schema、后端、前端或 ADR 0001/0002/0003。
 - 不让 Scrapy Pipeline 写业务库，不用 Pipeline 替代转换器。
 - 不把天气迁移为 Scrapy 项目；`open-meteo` 和 `qweather` 不建立 Spider。
 - 不为排除或延后的来源创建项目。本轮恰好 8 个项目：`ihchina`、`nzrc`、`nongmuhr`、`dialect-org`、`cass-linguistics`、`feiyiw`、`aqsc-moa`、`cnipa`。
@@ -136,7 +154,22 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 - `5ajob`、`zhongguoyuyan`、`cnopendata`、`open-meteo`、`qweather` 不是可执行项目。`5ajob` 不建 Scrapy 项目、不启用 live、不重新开启采集，只保留现有离线解析器和 fixture 测试；`zhongguoyuyan` 保持 `excluded`，`cnopendata` 保持 `deferred`。
 - [来源扩展候选](source-expansion.md) 中的 9 个未验证站点仍是候选，不属于本轮 8 个项目；正式登记和审核前不建立项目。
 - 不新增调度平台、代理池、验证码处理或反爬策略。
-- 不执行网络采集，不改写 Git 历史，不创建 PR 或 issue。
+- 不执行全量采集，不改写 Git 历史。`aqsc-moa` 与 `cnipa` 不执行真实文件采集。
+
+## 当前验收结果
+
+完整记录见 [Scrapy 迁移集成验收](../specs/scrapy-migration-validation.md)。
+
+| 项目 | 结果 |
+| --- | --- |
+| `ihchina` | live 5 列表 + 5 详情通过 |
+| `nzrc` | live 21 列表 + 5 详情通过，联系方式不采集 |
+| `nongmuhr` | 5 列表 + 5 详情 HTTP 200，但字段结构变化，blocked |
+| `dialect-org` | live 15 列表 + 5 详情通过 |
+| `cass-linguistics` | live 9 列表 + 5 详情通过 |
+| `feiyiw` | live 25 列表 + 5 详情通过 |
+| `aqsc-moa` | fixture 骨架通过，无 live |
+| `cnipa` | fixture 骨架通过，无 live |
 
 ## 框架例外
 
