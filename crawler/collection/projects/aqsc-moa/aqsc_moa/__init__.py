@@ -1,1 +1,1 @@
-"""aqsc-moa Scrapy project."""
+"""aqsc-moa fixture-only Scrapy project."""
