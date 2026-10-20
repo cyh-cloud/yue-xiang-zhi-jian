@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from .items import CollectionItem
+from .run_id import new_run_id
 from .reporting import RunReport
 from .runtime import CollectionRuntime
 
@@ -17,7 +18,9 @@ def replay_fixture(
     database_path,
     download_root,
     registry_path=None,
-    run_id="fixture-replay",
+    run_id=None,
+    item_builder=None,
+    candidate_writer=None,
 ):
     fixture_dir = Path(fixture_dir)
     fixture_path = fixture_dir / "discover.json"
@@ -31,7 +34,7 @@ def replay_fixture(
             errors=(f"fixture not found: {fixture_path}",),
         )
     payload = json.loads(fixture_path.read_text(encoding="utf-8"))
-    raw_items = payload.get("items") or []
+    raw_items = payload.get("items") or payload.get("list") or []
     if not raw_items:
         return RunReport(
             run_id=run_id,
@@ -42,10 +45,12 @@ def replay_fixture(
             errors=(f"fixture has no items: {fixture_path}",),
         )
 
+    run_id = run_id or new_run_id(source_id)
     runtime = CollectionRuntime(
         database_path=database_path,
         download_root=download_root,
         registry_path=registry_path,
+        candidate_writer=candidate_writer,
     )
     raw_id = runtime.persist_raw(
         runtime.evidence_from_fixture(
@@ -61,20 +66,17 @@ def replay_fixture(
     failed = 0
     for index, raw in enumerate(raw_items):
         try:
-            item = CollectionItem(
-                source_id=source_id,
-                source_item_id=str(raw["source_item_id"]),
-                source_url=raw["source_url"],
-                long_term_url=raw["long_term_url"],
-                detail_url=raw.get("detail_url"),
-                detail_url_status=raw["detail_url_status"],
-                locator=raw.get("locator"),
-                title=raw.get("title"),
-                run_id=run_id,
-                mode="fixture",
-                rights_status="attribution-required",
-                source_index=index,
+            payload = (
+                item_builder(raw, index=index)
+                if item_builder is not None
+                else _default_item(raw, source_id=source_id, index=index)
             )
+            if isinstance(payload, CollectionItem):
+                item = payload
+            else:
+                item = _item_from_payload(
+                    payload, source_id=source_id, run_id=run_id, index=index
+                )
             result = runtime.write_item(item, raw_evidence_id=raw_id)
             if result["candidate_status"] == "candidate":
                 written += 1
@@ -92,3 +94,44 @@ def replay_fixture(
         blocked=blocked,
         failed=failed,
     )
+
+
+def _default_item(raw, *, source_id, index):
+    detail_url = raw.get("detail_url")
+    return {
+        "source_id": source_id,
+        "source_item_id": str(
+            raw.get("source_item_id") or raw.get("id") or index + 1
+        ),
+        "source_url": raw.get("source_url")
+        or detail_url
+        or f"https://fixture.local/{source_id}/{index + 1}",
+        "long_term_url": raw.get("long_term_url")
+        or detail_url
+        or f"https://fixture.local/{source_id}/{index + 1}",
+        "detail_url": detail_url,
+        "detail_url_status": raw.get("detail_url_status")
+        or ("direct" if detail_url else "missing"),
+        "locator": raw.get("locator")
+        or f"fixture item {raw.get('source_item_id') or index + 1}",
+        "title": raw.get("title"),
+        "body_text": raw.get("body_text"),
+        "extra": raw.get("extra") or {},
+    }
+
+
+def _item_from_payload(payload, *, source_id, run_id, index):
+    merged = dict(payload)
+    merged.setdefault("source_id", source_id)
+    merged.setdefault("run_id", run_id)
+    merged.setdefault("mode", "fixture")
+    merged.setdefault("rights_status", "attribution-required")
+    merged.setdefault("source_index", index)
+    extra = dict(merged.get("extra") or {})
+    known = set(CollectionItem.__dataclass_fields__)
+    for key, value in list(merged.items()):
+        if key not in known and key != "extra":
+            extra[key] = value
+            merged.pop(key)
+    merged["extra"] = extra
+    return CollectionItem(**merged)

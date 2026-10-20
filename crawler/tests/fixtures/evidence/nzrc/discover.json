@@ -1,0 +1,35 @@
+{
+  "source_id": "nzrc",
+  "items": [
+    {
+      "source_item_id": "8235500",
+      "title": "销售经理",
+      "source_url": "http://www.nzrc.com.cn/company/jobs/8235500.html",
+      "long_term_url": "http://www.nzrc.com.cn/company/jobs/8235500.html",
+      "detail_url": "http://www.nzrc.com.cn/company/jobs/8235500.html",
+      "detail_url_status": "direct",
+      "locator": "fixture row 8235500",
+      "body_text": "公开岗位职责",
+      "extra": {
+        "company_name": "示例农业公司",
+        "location_raw": "广东",
+        "salary_raw": "面议"
+      }
+    },
+    {
+      "source_item_id": "8240109",
+      "title": "农业技术员",
+      "source_url": "http://www.nzrc.com.cn/company/jobs/8240109.html",
+      "long_term_url": "http://www.nzrc.com.cn/company/jobs/8240109.html",
+      "detail_url": "http://www.nzrc.com.cn/company/jobs/8240109.html",
+      "detail_url_status": "direct",
+      "locator": "fixture row 8240109",
+      "body_text": "公开岗位职责",
+      "extra": {
+        "company_name": "示例农业公司",
+        "location_raw": "广东",
+        "salary_raw": "面议"
+      }
+    }
+  ]
+}

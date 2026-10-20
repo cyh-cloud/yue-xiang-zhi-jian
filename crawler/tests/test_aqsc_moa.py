@@ -9,7 +9,7 @@ from crawler.pipeline.converter import run_batch
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DOWNLOAD = ROOT / "tests" / "fixtures" / "evidence" / "aqsc"
+DOWNLOAD = ROOT / "tests" / "fixtures" / "evidence" / "aqsc-moa"
 
 
 class AqscMoaSourceTest(unittest.TestCase):

@@ -3,13 +3,15 @@ import scrapy
 from crawler.collection.shared.crawler_collection.items import (
     item_from_mapping,
 )
+from crawler.collection.shared.crawler_collection.spiders import (
+    CollectionSpiderMixin,
+)
 from ..parsers import parse_dialect_detail, parse_dialect_list
 
 
-class DialectOrgSpider(scrapy.Spider):
+class DialectOrgSpider(CollectionSpiderMixin, scrapy.Spider):
     name = "dialect-org"
     source_id = "dialect-org"
-    run_id = "live"
     allowed_domains = ["dialect.org.cn"]
     start_urls = ["https://dialect.org.cn/"]
 
@@ -19,6 +21,14 @@ class DialectOrgSpider(scrapy.Spider):
                 item["detail_url"],
                 callback=self.parse_detail,
                 cb_kwargs={"list_item": item},
+                meta={
+                    "detail_url": item["detail_url"],
+                    "source_url": item.get("source_url") or response.url,
+                    "long_term_url": (
+                        item.get("long_term_url") or item["detail_url"]
+                    ),
+                    "locator": item.get("locator") or item["detail_url"],
+                },
             )
 
     def parse_detail(self, response, list_item):

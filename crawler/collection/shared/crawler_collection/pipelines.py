@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from pathlib import Path
 
 from .items import validate_item
@@ -14,12 +15,14 @@ class CollectionPipeline:
         database_path,
         download_root=None,
         registry_path=None,
+        candidate_writer=None,
     ):
         self.runtime = CollectionRuntime(
             database_path=database_path,
             download_root=download_root
             or Path(database_path).parent / "downloads",
             registry_path=registry_path,
+            candidate_writer=candidate_writer,
         )
 
     @classmethod
@@ -32,6 +35,9 @@ class CollectionPipeline:
             database_path,
             download_root=settings.get("COLLECTION_DOWNLOAD_ROOT"),
             registry_path=settings.get("SOURCE_REGISTRY_PATH"),
+            candidate_writer=_load_candidate_writer(
+                settings.get("COLLECTION_CANDIDATE_WRITER")
+            ),
         )
 
     def process_item(self, item, spider):
@@ -48,8 +54,22 @@ class CollectionPipeline:
         return item
 
 
-def collection_settings(*, bot_name, package_name, database_path,
-                        download_root, registry_path):
+def _load_candidate_writer(dotted_path):
+    if not dotted_path:
+        return None
+    module_name, attribute = dotted_path.rsplit(".", 1)
+    return getattr(import_module(module_name), attribute)
+
+
+def collection_settings(
+    *,
+    bot_name,
+    package_name,
+    database_path,
+    download_root,
+    registry_path,
+    candidate_writer=None,
+):
     return {
         "BOT_NAME": bot_name,
         "SPIDER_MODULES": [f"{package_name}.spiders"],
@@ -66,6 +86,7 @@ def collection_settings(*, bot_name, package_name, database_path,
         "COLLECTION_DATABASE_PATH": database_path,
         "COLLECTION_DOWNLOAD_ROOT": download_root,
         "SOURCE_REGISTRY_PATH": registry_path,
+        "COLLECTION_CANDIDATE_WRITER": candidate_writer,
         "DOWNLOADER_MIDDLEWARES": {
             "crawler.collection.shared.crawler_collection.middlewares."
             "RawEvidenceMiddleware": 543,

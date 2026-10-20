@@ -24,7 +24,7 @@ from crawler.collection.shared.crawler_collection.runtime import CollectionRunti
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FIXTURE = ROOT / "tests" / "fixtures" / "evidence" / "aqsc"
+FIXTURE = ROOT / "tests" / "fixtures" / "evidence" / "aqsc-moa"
 REGISTRY = ROOT / "docs" / "sources.json"
 
 
@@ -63,6 +63,7 @@ class AqscMoaScrapySkeletonTest(unittest.TestCase):
                     body=b"fixture",
                     content_type="text/plain",
                     declared_size=1,
+                    robots_decision="allowed",
                 )
             )
 

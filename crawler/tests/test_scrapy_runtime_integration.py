@@ -127,6 +127,7 @@ class ScrapyRuntimeIntegrationTest(unittest.TestCase):
                     "long_term_url": (
                         "https://www.ihchina.cn/project_details/12178.html"
                     ),
+                    "robots_decision": "allowed",
                 },
             )
             response = HtmlResponse(

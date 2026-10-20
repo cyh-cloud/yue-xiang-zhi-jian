@@ -1,1 +1,18 @@
-{"source_id":"cass-linguistics","items":[]}
+{
+  "source_id": "cass-linguistics",
+  "items": [
+    {
+      "source_item_id": "6066095",
+      "title": "公开研究",
+      "summary": "公开摘要",
+      "published_at": "2026-09-04",
+      "body_text": "公开研究正文",
+      "body_access": "public",
+      "source_url": "http://ling.cass.cn/news/bensuo/202609/t20260904_6066095.html",
+      "long_term_url": "http://ling.cass.cn/news/bensuo/202609/t20260904_6066095.html",
+      "detail_url": "http://ling.cass.cn/news/bensuo/202609/t20260904_6066095.html",
+      "detail_url_status": "direct",
+      "locator": "fixture article 6066095"
+    }
+  ]
+}

@@ -148,7 +148,7 @@
 
 ## 公开合成 fixture
 
-公开目录: `crawler/tests/fixtures/evidence/aqsc/`
+公开目录: `crawler/tests/fixtures/evidence/aqsc-moa/`
 
 | 文件 | 公告详情 URL | 附件 URL | 大小 | SHA-256 | 结构 |
 | --- | --- | --- | ---: | --- | --- |
@@ -471,7 +471,7 @@
 
 ## 实现验证
 
-- 2026-10-20 通过 `python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc` 解析两份公开合成 fixture，共 8 行写入 raw/stage；没有 direct 详情 URL，不写 std。
+- 2026-10-20 通过 `python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc-moa` 解析两份公开合成 fixture，共 8 行写入 raw/stage；没有 direct 详情 URL，不写 std。
 - 名特优新样本 4 行，特质农品样本 4 行；每行保留附件名、工作表、行号 locator。真实本地附件的 790 行和 152 行规模不进入公开仓库。
 - 这些行没有单条详情 URL，`detail_url=null`、`detail_url_status=missing`、`publish_status=blocked`，只作为 stage 证据，不进入 std 或业务发布候选。
 - 水产关键词误报词形保持 `is_aquatic=NULL`，不根据关键词自动判定为水产。

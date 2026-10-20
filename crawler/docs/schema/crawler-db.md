@@ -25,7 +25,7 @@
 | --- | --- | --- |
 | raw | `raw_fetches` | 一次请求一行，追加保存请求、最终 URL、详情 URL、locator、响应头和响应体元数据。自然键：无，允许同一 URL 多次请求。 |
 | raw | `raw_files` | 文件级证据，追加保存文件 URL、承载页 URL、本地路径、字节数和 SHA-256。自然键：无。 |
-| stage | `stage_source_items` | 当前唯一 stage 表，按中性来源行保存解析结果。自然键：`(raw_fetch_id, source_item_id)`。来源专属 stage 表仍 deferred。 |
+| stage | `stage_source_items` | 当前唯一 stage 表，按中性来源行保存解析结果。自然键：`(source_id, source_item_id)`，`raw_fetch_id` 指向最近一次证据。来源专属 stage 表仍 deferred。 |
 | std | `std_agri_products` | 认证农产品标准实体。物理自然键：`(source_id, source_item_id)`；转换合并键：`(cert_type, normalized_name, province, region)`，跨来源差异由来源关系表保留。 |
 | std | `std_agri_product_sources` | 产品来源关系。自然键：`(product_id, source_id, source_url)`，并带完整来源与 locator 证据。 |
 | std | `std_agri_product_aliases` | 产品别名关系。自然键：`(product_id, alias, alias_type)`，并带来源证据。 |
@@ -60,7 +60,9 @@
 
 ### stage_source_items
 
-当前唯一 stage 表，按中性来源行保存解析结果。自然键：`(raw_fetch_id, source_item_id)`。来源专属 stage 表仍 deferred。
+当前唯一 stage 表，按中性来源行保存解析结果。自然键：`(source_id, source_item_id)`，`raw_fetch_id` 指向最近一次证据。来源专属 stage 表仍 deferred。
+
+从旧版 `UNIQUE(raw_fetch_id, source_item_id)` 升级时，迁移保留每个来源自然键的最大 `id` 行，并把旧 `run_id` 补为 `legacy`。回滚点是迁移前的数据库文件；迁移不删除 raw 证据。
 
 #### std_agri_products
 
@@ -141,10 +143,10 @@
 ## Physical DDL
 
 ```sql
-
 CREATE TABLE IF NOT EXISTS raw_fetches (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     job_key TEXT,
     request_url TEXT NOT NULL,
     final_url TEXT NOT NULL,
@@ -247,6 +249,7 @@ CREATE TABLE IF NOT EXISTS stage_source_items (
     id INTEGER PRIMARY KEY,
     raw_fetch_id INTEGER NOT NULL,
     source_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_item_id TEXT NOT NULL,
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
@@ -264,7 +267,7 @@ CREATE TABLE IF NOT EXISTS stage_source_items (
     content_hash TEXT NOT NULL,
     parser_version TEXT NOT NULL,
     extra TEXT NOT NULL DEFAULT '{}',
-    UNIQUE(raw_fetch_id, source_item_id),
+    UNIQUE(source_id, source_item_id),
     CHECK (length(trim(source_url)) > 0),
     CHECK (length(trim(long_term_url)) > 0),
     CHECK (
@@ -288,6 +291,7 @@ CREATE TABLE IF NOT EXISTS std_agri_products (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,
@@ -426,6 +430,7 @@ CREATE TABLE IF NOT EXISTS std_ich_projects (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,
@@ -613,6 +618,7 @@ CREATE TABLE IF NOT EXISTS std_jobs (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,
@@ -756,6 +762,7 @@ CREATE TABLE IF NOT EXISTS std_dialect_points (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,
@@ -806,6 +813,7 @@ CREATE TABLE IF NOT EXISTS std_dialect_lexemes (
     point_id INTEGER NOT NULL,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,
@@ -892,6 +900,7 @@ CREATE TABLE IF NOT EXISTS std_ich_articles (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,
@@ -938,6 +947,7 @@ CREATE TABLE IF NOT EXISTS std_research_articles (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
     source_item_id TEXT NOT NULL,
+    run_id TEXT NOT NULL DEFAULT 'legacy',
     source_url TEXT NOT NULL,
     long_term_url TEXT NOT NULL,
     detail_url TEXT,

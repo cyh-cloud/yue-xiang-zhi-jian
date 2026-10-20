@@ -3,13 +3,15 @@ import scrapy
 from crawler.collection.shared.crawler_collection.items import (
     item_from_mapping,
 )
+from crawler.collection.shared.crawler_collection.spiders import (
+    CollectionSpiderMixin,
+)
 from ..parsers import parse_list_page, parse_project_detail
 
 
-class IhchinaSpider(scrapy.Spider):
+class IhchinaSpider(CollectionSpiderMixin, scrapy.Spider):
     name = "ihchina"
     source_id = "ihchina"
-    run_id = "live"
     allowed_domains = ["www.ihchina.cn"]
     start_urls = [
         "https://www.ihchina.cn/getProject.html?"
@@ -23,6 +25,14 @@ class IhchinaSpider(scrapy.Spider):
                 item["detail_url"],
                 callback=self.parse_detail,
                 cb_kwargs={"list_item": item},
+                meta={
+                    "detail_url": item["detail_url"],
+                    "source_url": item.get("source_url") or response.url,
+                    "long_term_url": (
+                        item.get("long_term_url") or item["detail_url"]
+                    ),
+                    "locator": item.get("locator") or item["detail_url"],
+                },
             )
         if parsed["next_page"] is not None:
             next_url = (

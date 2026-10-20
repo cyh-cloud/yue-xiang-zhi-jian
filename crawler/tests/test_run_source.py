@@ -71,7 +71,7 @@ class RunSourceContractTest(unittest.TestCase):
                 conn.close()
 
             self.assertEqual(len(raw), 2)
-            self.assertEqual(len(stage), 2)
+            self.assertEqual(len(stage), 1)
             self.assertEqual(len(std), 1)
             self.assertTrue(
                 all(

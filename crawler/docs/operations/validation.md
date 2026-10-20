@@ -192,7 +192,7 @@ python crawler/tools/check_history_hygiene.py
 公开 fixture 足以复核 P0 的附件行门禁。以下命令使用临时采集库，不访问网络：
 
 ```powershell
-python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc
+python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc-moa
 python -m crawler.run cnipa --mode pdf --database crawler/data/crawler-audit.db --pdf-root crawler/tests/fixtures/evidence/cnipa
 ```
 

@@ -45,14 +45,14 @@ class RawEvidence:
     detail_url_status: str = "missing"
     fetch_url: str | None = None
     locator: str | None = None
-    access_level: str = "public"
-    rights_status: str = "unknown"
+    access_level: str | None = None
+    rights_status: str | None = None
     attribution_required: bool = False
     attribution_text: str | None = None
     rights_evidence_url: str | None = None
     retrieved_at: str | None = None
     started_at: str | None = None
-    fetch_status: str = "ok"
+    fetch_status: str | None = None
     error_message: str | None = None
     request_headers: dict = field(default_factory=dict)
     response_headers: dict = field(default_factory=dict)
@@ -62,6 +62,17 @@ class RawEvidence:
     metadata: dict = field(default_factory=dict)
 
     def __post_init__(self):
+        if self.fetch_status is None:
+            status = self.status_code
+            if status is None:
+                fetch_status = "unknown"
+            elif 200 <= int(status) < 300:
+                fetch_status = "ok"
+            elif int(status) >= 400:
+                fetch_status = "http_error"
+            else:
+                fetch_status = "unknown"
+            object.__setattr__(self, "fetch_status", fetch_status)
         if self.detail_url_status == "direct" and not (
             self.detail_url or ""
         ).strip():

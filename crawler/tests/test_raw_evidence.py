@@ -11,7 +11,7 @@ from crawler.pipeline.evidence import RawEvidence, persist_raw_evidence
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AQSC = ROOT / "tests" / "fixtures" / "evidence" / "aqsc"
+AQSC = ROOT / "tests" / "fixtures" / "evidence" / "aqsc-moa"
 CNIPA = ROOT / "tests" / "fixtures" / "evidence" / "cnipa"
 NZRC = ROOT / "tests" / "fixtures" / "evidence" / "nzrc"
 

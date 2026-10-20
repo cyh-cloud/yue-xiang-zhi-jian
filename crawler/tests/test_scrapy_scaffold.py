@@ -105,7 +105,7 @@ class CollectionItemContractTest(unittest.TestCase):
 
         self.assertEqual(
             stage_natural_key(item, raw_fetch_id=7),
-            ("7", "project-1"),
+            ("ihchina", "project-1"),
         )
         self.assertEqual(
             candidate_natural_key(item),
@@ -225,8 +225,6 @@ class SharedPackageBoundaryTest(unittest.TestCase):
             self.assertTrue(child.is_dir())
         for project in discover_projects(PROJECTS).values():
             expected = fixture_root / project.source_id
-            if project.source_id == "aqsc-moa":
-                expected = fixture_root / "aqsc"
             self.assertTrue(expected.is_dir(), project.source_id)
 
     def test_fixture_root_is_not_created_inside_projects(self):

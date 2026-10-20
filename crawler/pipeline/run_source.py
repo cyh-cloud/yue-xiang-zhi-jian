@@ -28,6 +28,14 @@ _SOURCE_MODES = {
     source_id: source_registry.run_modes(source)
     for source_id, source in source_registry.load_registry().items()
 }
+_LEGACY_SOURCE_MODES = {
+    "aqsc-moa": frozenset({"xlsx"}),
+    "cnipa": frozenset({"pdf", "announcement-fixture"}),
+    "nzrc": frozenset({"saved"}),
+    "nongmuhr": frozenset({"saved"}),
+}
+for source_id, modes in _LEGACY_SOURCE_MODES.items():
+    _SOURCE_MODES[source_id] = modes
 _SOURCE_MODES.update(_TEST_SOURCE_MODES)
 RUN_MODES = tuple(
     sorted({mode for modes in _SOURCE_MODES.values() for mode in modes})
@@ -1423,7 +1431,9 @@ def _discover(source_id, mode, config):
     raise ValueError(f"unsupported source: {source_id}")
 
 
-def _stage_item(conn, source_id, mode, raw_fetch_id, item, retrieved_at):
+def _stage_item(
+    conn, source_id, mode, run_id, raw_fetch_id, item, retrieved_at
+):
     if source_id == "dialect-org":
         point = item["point"]
         lexeme = item["lexeme"]
@@ -1469,13 +1479,15 @@ def _stage_item(conn, source_id, mode, raw_fetch_id, item, retrieved_at):
     conn.execute(
         """
         INSERT INTO stage_source_items (
-            raw_fetch_id, source_id, source_item_id, source_url,
+            raw_fetch_id, source_id, run_id, source_item_id, source_url,
             long_term_url, detail_url, detail_url_status, fetch_url, locator,
             rights_status, attribution_required, attribution_text,
             rights_evidence_url, title, retrieved_at, content_hash,
             parser_version, extra
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(raw_fetch_id, source_item_id) DO UPDATE SET
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source_id, source_item_id) DO UPDATE SET
+            raw_fetch_id=excluded.raw_fetch_id,
+            run_id=excluded.run_id,
             source_url=excluded.source_url,
             long_term_url=excluded.long_term_url,
             detail_url=excluded.detail_url,
@@ -1495,6 +1507,7 @@ def _stage_item(conn, source_id, mode, raw_fetch_id, item, retrieved_at):
         (
             raw_fetch_id,
             source_id,
+            run_id,
             source_item_id,
             source_url,
             long_term_url,
@@ -1567,7 +1580,9 @@ def run_source(source_id, mode, config):
                 failed_count=0,
                 errors=(source_decision.reason or "source_blocked",),
             )
-        allowed_modes = source_registry.run_modes(source)
+        allowed_modes = _SOURCE_MODES.get(
+            source_id, source_registry.run_modes(source)
+        )
     else:
         allowed_modes = _TEST_SOURCE_MODES[source_id]
     if mode not in allowed_modes:
@@ -1659,6 +1674,7 @@ def run_source(source_id, mode, config):
                     conn,
                     source_id,
                     mode,
+                    run_id,
                     raw_fetch_id,
                     item,
                     retrieved_at,

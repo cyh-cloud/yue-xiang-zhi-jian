@@ -6,6 +6,9 @@ from dataclasses import asdict, dataclass, field, fields
 from datetime import datetime, timezone
 from typing import Any
 
+from .evidence import sha256_bytes
+from .run_id import new_run_id
+
 
 CANDIDATE_STATUSES = frozenset({"candidate", "blocked", "deferred"})
 DETAIL_URL_STATUSES = frozenset({"direct", "missing"})
@@ -25,6 +28,7 @@ class CollectionItem:
     run_id: str
     mode: str
     rights_status: str
+    access_level: str | None = None
     locator: str | None = None
     fetch_url: str | None = None
     title: str | None = None
@@ -48,16 +52,21 @@ def item_from_mapping(payload, *, source_id, response, list_item=None):
     merged = dict(list_item or {})
     merged.update(payload or {})
     merged.setdefault("source_id", source_id)
-    merged.setdefault("run_id", "live")
+    merged.setdefault(
+        "run_id",
+        response.meta.get("run_id") or new_run_id(source_id),
+    )
     merged.setdefault("mode", "live")
     merged.setdefault("rights_status", "attribution-required")
     merged.setdefault("retrieved_at", datetime.now(timezone.utc).isoformat())
     merged.setdefault(
         "raw_evidence_id", response.meta.get("raw_evidence_id")
     )
-    merged.setdefault(
-        "content_hash", response.meta.get("raw_evidence_id")
-    )
+    if not merged.get("content_hash"):
+        merged["content_hash"] = (
+            response.meta.get("content_hash")
+            or sha256_bytes(response.body)
+        )
     known = {field.name for field in fields(CollectionItem)}
     extra = dict(merged.get("extra") or {})
     unknown = {
@@ -85,6 +94,7 @@ def validate_item(item: CollectionItem | dict) -> dict[str, Any]:
     payload.setdefault("attribution_required", False)
     payload.setdefault("attribution_text", None)
     payload.setdefault("rights_evidence_url", None)
+    payload.setdefault("access_level", None)
     payload.setdefault("content_type", None)
     payload.setdefault("content_hash", None)
     payload.setdefault("retrieved_at", None)

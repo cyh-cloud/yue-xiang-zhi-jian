@@ -75,6 +75,7 @@ class CnipaScrapySkeletonTest(unittest.TestCase):
                     body=b"fixture",
                     content_type="application/pdf",
                     declared_size=1,
+                    robots_decision="allowed",
                 )
             )
 

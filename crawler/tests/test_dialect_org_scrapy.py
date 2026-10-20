@@ -21,6 +21,7 @@ from dialect_org.parsers import (
 from dialect_org.spiders.collection import (
     DialectOrgSpider,
 )
+from dialect_org.candidate import write_candidate
 from crawler.collection.shared.crawler_collection.runtime import (
     CollectionRuntime,
 )
@@ -90,6 +91,7 @@ class DialectOrgScrapyTest(unittest.TestCase):
                     / "docs"
                     / "sources.json"
                 ),
+                candidate_writer=write_candidate,
             )
             parsed = parse_dialect_detail(
                 HtmlResponse(

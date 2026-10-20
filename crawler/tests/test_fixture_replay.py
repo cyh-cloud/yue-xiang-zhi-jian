@@ -68,7 +68,7 @@ class FixtureReplayTest(unittest.TestCase):
         finally:
             conn.close()
         self.assertEqual(raw_count, 2)
-        self.assertEqual(stage_count, 2)
+        self.assertEqual(stage_count, 1)
         self.assertEqual(candidate_count, 1)
 
     def test_empty_fixture_is_failed_not_succeeded(self):

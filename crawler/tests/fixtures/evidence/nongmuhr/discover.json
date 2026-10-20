@@ -1,0 +1,35 @@
+{
+  "source_id": "nongmuhr",
+  "items": [
+    {
+      "source_item_id": "13519",
+      "title": "技术员",
+      "source_url": "http://nongmuhr.com/EmployView.aspx?id=13519",
+      "long_term_url": "http://nongmuhr.com/EmployView.aspx?id=13519",
+      "detail_url": "http://nongmuhr.com/EmployView.aspx?id=13519",
+      "detail_url_status": "direct",
+      "locator": "fixture row 13519",
+      "body_text": "公开岗位职责",
+      "extra": {
+        "company_name": "示例农牧公司",
+        "location_raw": "广东",
+        "salary_raw": "面议"
+      }
+    },
+    {
+      "source_item_id": "13520",
+      "title": "养殖员",
+      "source_url": "http://nongmuhr.com/EmployView.aspx?id=13520",
+      "long_term_url": "http://nongmuhr.com/EmployView.aspx?id=13520",
+      "detail_url": "http://nongmuhr.com/EmployView.aspx?id=13520",
+      "detail_url_status": "direct",
+      "locator": "fixture row 13520",
+      "body_text": "公开岗位职责",
+      "extra": {
+        "company_name": "示例农牧公司",
+        "location_raw": "广东",
+        "salary_raw": "面议"
+      }
+    }
+  ]
+}

@@ -48,7 +48,27 @@ def evaluate_admission(item, *, registry_path=None, robots=None):
         return AdmissionDecision(
             False, "blocked", f"source_rights:{rights or 'missing'}"
         )
-    if robots is not None and robots.decision != "allowed":
+    item_rights = str(
+        item.get("rights_status")
+        if isinstance(item, dict)
+        else item.rights_status
+    ).strip()
+    if item_rights in NON_RUNNABLE_RIGHTS:
+        return AdmissionDecision(
+            False, "blocked", f"item_rights:{item_rights or 'missing'}"
+        )
+    item_access = str(
+        item.get("access_level", "")
+        if isinstance(item, dict)
+        else getattr(item, "access_level", "")
+    ).strip()
+    if item_access in NON_RUNNABLE_ACCESS:
+        return AdmissionDecision(
+            False, "blocked", f"item_access:{item_access}"
+        )
+    if robots is None:
+        return AdmissionDecision(False, "blocked", "robots:unknown")
+    if robots.decision != "allowed":
         return AdmissionDecision(
             False, "blocked", f"robots:{robots.decision}"
         )

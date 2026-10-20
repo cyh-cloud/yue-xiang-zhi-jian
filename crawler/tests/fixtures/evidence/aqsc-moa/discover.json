@@ -1,0 +1,31 @@
+{
+  "source_id": "aqsc-moa",
+  "items": [
+    {
+      "source_item_id": "synthetic-mtyx-sample",
+      "title": "synthetic-mtyx-sample",
+      "source_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm",
+      "long_term_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm",
+      "detail_url": null,
+      "detail_url_status": "missing",
+      "locator": "synthetic-mtyx-sample.xlsx#Sheet1!A1",
+      "extra": {
+        "cert_type": "名特优新",
+        "product_name": "示例产品"
+      }
+    },
+    {
+      "source_item_id": "synthetic-tepinongpin-sample",
+      "title": "synthetic-tepinongpin-sample",
+      "source_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468195.htm",
+      "long_term_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468195.htm",
+      "detail_url": null,
+      "detail_url_status": "missing",
+      "locator": "synthetic-tepinongpin-sample.xlsx#Sheet1!A1",
+      "extra": {
+        "cert_type": "特质农品",
+        "product_name": "示例产品"
+      }
+    }
+  ]
+}

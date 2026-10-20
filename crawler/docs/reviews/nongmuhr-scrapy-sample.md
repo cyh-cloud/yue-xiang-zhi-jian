@@ -26,6 +26,16 @@
 
 5 个详情页均返回 `200`，但当前 HTML 不匹配已登记字段结构。页面中的 `li` 是导航菜单，不是岗位字段，不能把这些内容当作岗位数据。
 
+详情证据 URL：
+
+- `http://nongmuhr.com/EmployView.aspx?id=13539`
+- `http://nongmuhr.com/EmployView.aspx?id=13538`
+- `http://nongmuhr.com/EmployView.aspx?id=13537`
+- `http://nongmuhr.com/EmployView.aspx?id=13536`
+- `http://nongmuhr.com/EmployView.aspx?id=13535`
+
+取得时间：2026-10-21（Asia/Shanghai）。HTTP 状态和响应字节见上表；原始响应哈希与下载证据保存在本次隔离采集库和下载根，不写入公开 fixture。失败摘要：5 条详情均为 `200`，但详情字段选择器全部失配，候选计数为 0。
+
 ## 解除条件
 
 - 重新定位详情页岗位字段容器和标签结构。

@@ -1,13 +1,30 @@
-from .converter import BatchResult, RollbackResult, rollback_batch, run_batch
-from .run_source import RUN_MODES, RunConfig, SourceRunResult, run_source
+"""Conversion pipeline package with lazy public exports."""
 
-__all__ = [
-    "BatchResult",
-    "RollbackResult",
-    "RunConfig",
-    "RUN_MODES",
-    "SourceRunResult",
-    "rollback_batch",
-    "run_batch",
-    "run_source",
-]
+from __future__ import annotations
+
+from importlib import import_module
+
+
+_EXPORTS = {
+    "BatchResult": ".converter",
+    "RollbackResult": ".converter",
+    "rollback_batch": ".converter",
+    "run_batch": ".converter",
+    "RUN_MODES": ".run_source",
+    "RunConfig": ".run_source",
+    "SourceRunResult": ".run_source",
+    "run_source": ".run_source",
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name):
+    module_name = _EXPORTS.get(name)
+    if module_name is None:
+        raise AttributeError(name)
+    module = import_module(module_name, __name__)
+    for export, export_module in _EXPORTS.items():
+        if export_module == module_name and hasattr(module, export):
+            globals()[export] = getattr(module, export)
+    return globals()[name]

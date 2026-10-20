@@ -1,0 +1,18 @@
+{
+  "source_id": "cnipa",
+  "items": [
+    {
+      "source_item_id": "synthetic-announcement-687",
+      "title": "synthetic-announcement-687",
+      "source_url": "https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541",
+      "long_term_url": "https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541",
+      "detail_url": null,
+      "detail_url_status": "missing",
+      "locator": "synthetic-announcement-687.pdf#page=1",
+      "extra": {
+        "cert_type": "公告",
+        "product_name": "示例地理标志产品"
+      }
+    }
+  ]
+}

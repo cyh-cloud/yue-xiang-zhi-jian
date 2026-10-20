@@ -34,6 +34,8 @@ crawler/
   collection/
     shared/
       crawler_collection/
+        candidate.py
+        schema.py
         items.py
         evidence.py
         database.py
@@ -42,6 +44,8 @@ crawler/
         dedupe.py
         logging.py
         robots.py
+        run_id.py
+        spiders.py
     projects/
       <source_id>/
         scrapy.cfg
@@ -50,6 +54,8 @@ crawler/
           items.py
           middlewares.py
           pipelines.py
+          candidate.py
+          replay.py
           spiders/
   pipeline/
     converter.py
@@ -133,7 +139,7 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 | 门 | 通过条件 |
 | --- | --- |
 | 离线契约 | 现有 fixture 套件通过；Scrapy 回放得到相同的必填字段、URL、locator、版权字段和跳过结果。 |
-| 采集库回放 | 使用临时采集库连续运行两次，raw 按请求追加，stage 与本次 raw 证据一一对应，候选标准实体按来源自然键不重复，运行计数可对账。 |
+| 采集库回放 | 使用临时采集库连续运行两次，raw 按请求追加，stage 按 `(source_id, source_item_id)` 幂等并指向最近一次 raw 证据，候选标准实体按来源自然键不重复，运行计数可对账。 |
 | 实时 canary | 使用独立采集库和下载目录；robots、访问等级、User-Agent、限速、状态码、哈希和取得时间完整。 |
 | 样本覆盖 | `ihchina`、`nzrc`、`nongmuhr`、`dialect-org`、`cass-linguistics`、`feiyiw` 在站点允许时验证 5 条列表记录和 5 条详情记录；保留失败样本和反例。 |
 | 文件项目边界 | `aqsc-moa` 和 `cnipa` 只通过项目骨架、fixture 和接口契约测试验收，不执行实时文件采集。 |

@@ -49,7 +49,7 @@
       "document": "sources/aqsc-moa.md",
       "review": "reviews/aqsc-moa.md",
       "run_modes": [
-        "xlsx"
+        "fixture"
       ],
       "attribution_required": true,
       "attribution_text": "农业农村部农产品质量安全中心",
@@ -74,8 +74,7 @@
       "document": "sources/cnipa.md",
       "review": "reviews/cnipa.md",
       "run_modes": [
-        "pdf",
-        "announcement-fixture"
+        "fixture"
       ],
       "attribution_required": true,
       "attribution_text": "国家知识产权局",
@@ -123,7 +122,8 @@
       "document": "sources/nzrc.md",
       "review": "reviews/nzrc.md",
       "run_modes": [
-        "saved"
+        "fixture",
+        "live"
       ],
       "attribution_required": true,
       "attribution_text": "中国农业人才网",
@@ -147,7 +147,8 @@
       "document": "sources/nongmuhr.md",
       "review": "reviews/nongmuhr.md",
       "run_modes": [
-        "saved"
+        "fixture",
+        "live"
       ],
       "attribution_required": true,
       "attribution_text": "农牧人才网",
@@ -195,7 +196,8 @@
       "document": "sources/dialect-org.md",
       "review": "reviews/dialect-org.md",
       "run_modes": [
-        "fixture"
+        "fixture",
+        "live"
       ],
       "attribution_required": true,
       "attribution_text": "中国方言库",
@@ -228,7 +230,8 @@
       "document": "sources/cass-linguistics.md",
       "review": "reviews/cass-linguistics.md",
       "run_modes": [
-        "fixture"
+        "fixture",
+        "live"
       ],
       "attribution_required": true,
       "attribution_text": "中国社会科学院语言研究所",
@@ -307,7 +310,8 @@
       "document": "sources/feiyiw.md",
       "review": "reviews/feiyiw.md",
       "run_modes": [
-        "fixture"
+        "fixture",
+        "live"
       ],
       "attribution_required": true,
       "attribution_text": "外研非遗网（www.feiyiw.cn）",

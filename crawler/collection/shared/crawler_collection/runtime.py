@@ -7,12 +7,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .admission import evaluate_admission
+from .admission import (
+    NON_RUNNABLE_ACCESS,
+    NON_RUNNABLE_RIGHTS,
+    evaluate_admission,
+)
+from .candidate import write_default_candidate
 from .database import CollectionDatabase
 from .evidence import RawEvidence, sanitize_headers, sha256_bytes
 from .items import validate_item
 from .registry import load_registry
-from crawler.pipeline import database as crawler_database
+from .robots import RobotsFact
 
 
 DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
@@ -39,13 +44,15 @@ class CollectionRuntime:
         download_root,
         registry_path=None,
         max_download_bytes=DEFAULT_MAX_DOWNLOAD_BYTES,
+        candidate_writer=None,
     ):
         self.database_path = Path(database_path)
         self.download_root = Path(download_root)
         self.registry_path = registry_path
         self.max_download_bytes = max_download_bytes
+        self.candidate_writer = candidate_writer or write_default_candidate
         self.database = CollectionDatabase(self.database_path)
-        conn = crawler_database.connect(self.database_path)
+        conn = self.database.connect()
         conn.close()
 
     def evidence_from_fixture(
@@ -63,6 +70,7 @@ class CollectionRuntime:
             run_id=run_id,
             retrieved_at=_now(),
             started_at=_now(),
+            robots_decision="allowed",
         )
 
     def persist_raw(self, evidence: RawEvidence):
@@ -107,10 +115,14 @@ class CollectionRuntime:
         response_headers = sanitize_headers(evidence.response_headers)
         registry = load_registry(self.registry_path)
         source = registry.get(evidence.source_id) or {}
-        access_level = evidence.access_level or source.get("access") or "public"
-        rights_status = evidence.rights_status
-        if rights_status == "unknown":
-            rights_status = source.get("rights_status") or "unknown"
+        access_level = (
+            evidence.access_level or source.get("access") or "unknown"
+        )
+        rights_status = (
+            evidence.rights_status
+            or source.get("rights_status")
+            or "unknown"
+        )
         attribution_required = evidence.attribution_required or bool(
             source.get("attribution_required")
         )
@@ -133,7 +145,7 @@ class CollectionRuntime:
             cursor = conn.execute(
                 """
                 INSERT INTO raw_fetches (
-                    source_id, request_url, final_url, source_url,
+                    source_id, run_id, request_url, final_url, source_url,
                     long_term_url, detail_url, detail_url_status, fetch_url,
                     locator,
                     request_headers, status_code, content_type,
@@ -143,10 +155,11 @@ class CollectionRuntime:
                     error_message, started_at, retrieved_at, metadata_json,
                     created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     evidence.source_id,
+                    evidence.run_id or "legacy",
                     evidence.request_url,
                     evidence.final_url,
                     source_url,
@@ -220,27 +233,101 @@ class CollectionRuntime:
         payload = validate_item(item)
         now = payload.get("retrieved_at") or _now()
         payload["retrieved_at"] = now
-        decision = admission or evaluate_admission(
-            item, registry_path=self.registry_path
-        )
         conn = self.database.connect()
         try:
+            raw = conn.execute(
+                """
+                SELECT robots_decision, run_id, rights_status, access_level
+                FROM raw_fetches WHERE id = ?
+                """,
+                (raw_evidence_id,),
+            ).fetchone()
+            if raw is None:
+                conn.commit()
+                return {
+                    "candidate_status": "blocked",
+                    "candidate_reason": "raw_evidence:missing",
+                }
+            else:
+                robots = RobotsFact(raw[0] or "unknown")
+                internal = evaluate_admission(
+                    payload,
+                    registry_path=self.registry_path,
+                    robots=robots,
+                )
+                if raw[2] in NON_RUNNABLE_RIGHTS:
+                    internal = type(
+                        "Decision",
+                        (),
+                        {
+                            "allowed": False,
+                            "status": "blocked",
+                            "reason": f"raw_rights:{raw[2]}",
+                        },
+                    )()
+                elif raw[3] in NON_RUNNABLE_ACCESS:
+                    internal = type(
+                        "Decision",
+                        (),
+                        {
+                            "allowed": False,
+                            "status": "blocked",
+                            "reason": f"raw_access:{raw[3]}",
+                        },
+                    )()
+                decision = (
+                    admission
+                    if admission is not None and not admission.allowed
+                    else internal
+                )
+                if raw[1] and raw[1] != "legacy":
+                    payload["run_id"] = raw[1]
+            if not payload.get("content_hash"):
+                payload["content_hash"] = sha256_bytes(
+                    json.dumps(
+                        {
+                            "source_id": payload["source_id"],
+                            "source_item_id": payload["source_item_id"],
+                            "title": payload.get("title"),
+                            "body_text": payload.get("body_text"),
+                            "extra": payload.get("extra") or {},
+                        },
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ).encode("utf-8")
+                )
             conn.execute(
                 """
                 INSERT INTO stage_source_items (
-                    raw_fetch_id, source_id, source_item_id, source_url,
+                    raw_fetch_id, source_id, run_id, source_item_id, source_url,
                     long_term_url, detail_url, detail_url_status, fetch_url,
                     locator, rights_status, attribution_required,
                     attribution_text, rights_evidence_url, title,
                     retrieved_at, content_hash, parser_version, extra
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(raw_fetch_id, source_item_id) DO UPDATE SET
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(source_id, source_item_id) DO UPDATE SET
+                    raw_fetch_id=excluded.raw_fetch_id,
+                    run_id=excluded.run_id,
+                    source_url=excluded.source_url,
+                    long_term_url=excluded.long_term_url,
+                    detail_url=excluded.detail_url,
+                    detail_url_status=excluded.detail_url_status,
+                    fetch_url=excluded.fetch_url,
+                    locator=excluded.locator,
+                    rights_status=excluded.rights_status,
+                    attribution_required=excluded.attribution_required,
+                    attribution_text=excluded.attribution_text,
+                    rights_evidence_url=excluded.rights_evidence_url,
                     title=excluded.title,
+                    retrieved_at=excluded.retrieved_at,
+                    content_hash=excluded.content_hash,
+                    parser_version=excluded.parser_version,
                     extra=excluded.extra
                 """,
                 (
                     raw_evidence_id,
                     payload["source_id"],
+                    payload["run_id"],
                     payload["source_item_id"],
                     payload["source_url"],
                     payload["long_term_url"],
@@ -254,7 +341,7 @@ class CollectionRuntime:
                     payload["rights_evidence_url"],
                     payload["title"] or payload["source_item_id"],
                     payload["retrieved_at"],
-                    payload["content_hash"] or payload["source_item_id"],
+                    payload["content_hash"],
                     payload["parser_version"],
                     json.dumps(payload["extra"], ensure_ascii=False),
                 ),
@@ -272,175 +359,4 @@ class CollectionRuntime:
         return {"candidate_status": "candidate", "candidate_reason": None}
 
     def _upsert_candidate(self, conn, item, *, now):
-        source_id = item["source_id"]
-        if source_id in {"aqsc-moa", "cnipa"}:
-            table = "std_agri_products"
-            fields = (
-                "cert_type",
-                "product_name",
-                "normalized_name",
-            )
-            values = (
-                item["extra"].get("cert_type", "公告"),
-                item["title"],
-                item["title"],
-            )
-        elif source_id in {"nzrc", "nongmuhr"}:
-            table = "std_jobs"
-            fields = ("title",)
-            values = (item["title"],)
-        elif source_id == "dialect-org":
-            table = "std_dialect_points"
-            fields = ("region_raw",)
-            values = (item["extra"].get("region_raw", "未知地区"),)
-        elif source_id == "cass-linguistics":
-            table = "std_research_articles"
-            fields = ("title", "body_access")
-            values = (item["title"], "public")
-        elif source_id == "feiyiw":
-            table = "std_ich_articles"
-            fields = ("title",)
-            values = (item["title"],)
-        else:
-            table = "std_ich_projects"
-            fields = ("name",)
-            values = (item["title"],)
-
-        common_fields = (
-            "source_id",
-            "source_item_id",
-            "source_url",
-            "long_term_url",
-            "detail_url",
-            "detail_url_status",
-            "locator",
-            "rights_status",
-            "attribution_required",
-            "attribution_text",
-            "rights_evidence_url",
-            "content_hash",
-            "confidence",
-            "license_or_usage",
-            "publish_status",
-            "candidate_status",
-            "candidate_reason",
-            "retrieved_at",
-            "first_seen_at",
-            "last_seen_at",
-        )
-        common_values = (
-            item["source_id"],
-            item["source_item_id"],
-            item["source_url"],
-            item["long_term_url"],
-            item["detail_url"],
-            item["detail_url_status"],
-            item["locator"],
-            item["rights_status"],
-            1 if item["attribution_required"] else 0,
-            item["attribution_text"],
-            item["rights_evidence_url"],
-            item["content_hash"] or item["source_item_id"],
-            "medium",
-            item["rights_status"],
-            "draft",
-            item.get("candidate_status") or "candidate",
-            item.get("candidate_reason"),
-            now,
-            now,
-            now,
-        )
-        columns = common_fields + fields
-        placeholders = ", ".join("?" for _ in columns)
-        updates = ", ".join(
-            f"{name}=excluded.{name}"
-            for name in columns
-            if name not in {"source_id", "source_item_id", "first_seen_at"}
-        )
-        conn.execute(
-            f"""
-            INSERT INTO {table} ({", ".join(columns)})
-            VALUES ({placeholders})
-            ON CONFLICT(source_id, source_item_id) DO UPDATE SET {updates}
-            """,
-            common_values + values,
-        )
-        if source_id == "dialect-org":
-            lexeme = item["extra"].get("lexeme") or {}
-            point_id = conn.execute(
-                "SELECT id FROM std_dialect_points "
-                "WHERE source_id = ? AND source_item_id = ?",
-                (item["source_id"], item["source_item_id"]),
-            ).fetchone()[0]
-            conn.execute(
-                """
-                INSERT INTO std_dialect_lexemes (
-                    point_id, source_id, source_item_id, source_url,
-                    long_term_url, detail_url, detail_url_status, fetch_url,
-                    locator, lemma, phonetic, definition, example, audio_url,
-                    audio_status, rights_status, attribution_required,
-                    attribution_text, rights_evidence_url, confidence,
-                    license_or_usage, publish_status, candidate_status,
-                    candidate_reason, retrieved_at, content_hash, extra
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(point_id, lemma) DO UPDATE SET
-                    phonetic=excluded.phonetic,
-                    definition=excluded.definition,
-                    audio_url=excluded.audio_url,
-                    audio_status=excluded.audio_status,
-                    candidate_status=excluded.candidate_status,
-                    retrieved_at=excluded.retrieved_at,
-                    extra=excluded.extra
-                """,
-                (
-                    point_id,
-                    item["source_id"],
-                    lexeme.get("source_item_id") or item["source_item_id"],
-                    lexeme.get("source_url") or item["source_url"],
-                    lexeme.get("long_term_url") or item["long_term_url"],
-                    lexeme.get("detail_url") or item["detail_url"],
-                    lexeme.get("detail_url_status")
-                    or item["detail_url_status"],
-                    lexeme.get("fetch_url"),
-                    lexeme.get("locator") or item["locator"],
-                    lexeme["lemma"],
-                    lexeme.get("phonetic"),
-                    lexeme.get("definition"),
-                    lexeme.get("example"),
-                    lexeme.get("audio_url"),
-                    lexeme.get("audio_status") or "missing",
-                    lexeme.get("rights_status") or item["rights_status"],
-                    1
-                    if (
-                        lexeme.get("attribution_required")
-                        or item["attribution_required"]
-                    )
-                    else 0,
-                    lexeme.get("attribution_text")
-                    or item["attribution_text"],
-                    lexeme.get("rights_evidence_url")
-                    or item["rights_evidence_url"],
-                    lexeme.get("confidence") or "medium",
-                    lexeme.get("license_or_usage")
-                    or item["rights_status"],
-                    "draft",
-                    item.get("candidate_status") or "candidate",
-                    item.get("candidate_reason"),
-                    now,
-                    lexeme.get("content_hash")
-                    or item["content_hash"]
-                    or sha256_bytes(
-                        json.dumps(
-                            {
-                                "lemma": lexeme["lemma"],
-                                "definition": lexeme.get("definition"),
-                                "audio_url": lexeme.get("audio_url"),
-                            },
-                            ensure_ascii=False,
-                            sort_keys=True,
-                        ).encode("utf-8")
-                    ),
-                    json.dumps(lexeme.get("extra") or {}, ensure_ascii=False),
-                ),
-            )
+        self.candidate_writer(conn, item, now=now)

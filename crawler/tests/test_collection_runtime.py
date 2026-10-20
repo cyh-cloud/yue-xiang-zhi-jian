@@ -53,6 +53,7 @@ class CollectionRuntimeTest(unittest.TestCase):
             "body": b"<html>fixture</html>",
             "content_type": "text/html",
             "run_id": "run-1",
+            "robots_decision": "allowed",
             "request_headers": {
                 "User-Agent": "test",
                 "Authorization": "secret",

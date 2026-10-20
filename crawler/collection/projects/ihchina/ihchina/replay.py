@@ -9,6 +9,7 @@ from pathlib import Path
 from crawler.collection.shared.crawler_collection.replay import (
     replay_fixture,
 )
+from .candidate import write_candidate
 
 
 def replay_ihchina_fixture(*, fixture_dir, database_path, download_root,
@@ -56,4 +57,5 @@ def replay_ihchina_fixture(*, fixture_dir, database_path, download_root,
             database_path=database_path,
             download_root=download_root,
             registry_path=registry_path,
+            candidate_writer=write_candidate,
         )

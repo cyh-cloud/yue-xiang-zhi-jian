@@ -3,13 +3,15 @@ import scrapy
 from crawler.collection.shared.crawler_collection.items import (
     item_from_mapping,
 )
+from crawler.collection.shared.crawler_collection.spiders import (
+    CollectionSpiderMixin,
+)
 from ..parsers import parse_article_detail, parse_article_list
 
 
-class CassLinguisticsSpider(scrapy.Spider):
+class CassLinguisticsSpider(CollectionSpiderMixin, scrapy.Spider):
     name = "cass-linguistics"
     source_id = "cass-linguistics"
-    run_id = "live"
     allowed_domains = ["ling.cass.cn"]
     start_urls = ["http://ling.cass.cn/news/bensuo/"]
 
@@ -20,6 +22,14 @@ class CassLinguisticsSpider(scrapy.Spider):
                 item["detail_url"],
                 callback=self.parse_detail,
                 cb_kwargs={"list_item": item},
+                meta={
+                    "detail_url": item["detail_url"],
+                    "source_url": item.get("source_url") or response.url,
+                    "long_term_url": (
+                        item.get("long_term_url") or item["detail_url"]
+                    ),
+                    "locator": item.get("locator") or item["detail_url"],
+                },
             )
         if parsed["next_page"]:
             yield scrapy.Request(parsed["next_page"], callback=self.parse)

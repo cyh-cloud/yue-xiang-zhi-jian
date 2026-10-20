@@ -1,1 +1,16 @@
-{"source_id":"feiyiw","items":[]}
+{
+  "source_id": "feiyiw",
+  "items": [
+    {
+      "source_item_id": "70177",
+      "title": "文章一",
+      "published_at": "2026-10-16 15:56",
+      "body_text": "公开正文",
+      "source_url": "https://www.feiyiw.cn/index.php?app=article&act=view&article_id=70177",
+      "long_term_url": "https://www.feiyiw.cn/index.php?app=article&act=view&article_id=70177",
+      "detail_url": "https://www.feiyiw.cn/index.php?app=article&act=view&article_id=70177",
+      "detail_url_status": "direct",
+      "locator": "fixture article 70177"
+    }
+  ]
+}

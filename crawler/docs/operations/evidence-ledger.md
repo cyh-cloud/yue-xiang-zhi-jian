@@ -30,7 +30,7 @@
 | source_id | verified_at | key_urls | fixture_dir | files | bytes | sha256_index | review |
 | --- | --- | --- | --- | ---: | ---: | --- | --- |
 | `ihchina` | 2026-10-19 18:05 Asia/Shanghai | `https://www.ihchina.cn/getProject.html`；`https://www.ihchina.cn/project_details/12178.html` | `crawler/tests/fixtures/evidence/ihchina/` | 1 | 1019 | 见下方 fixture 表 | `docs/reviews/ihchina.md` |
-| `aqsc-moa` | 2026-10-19 01:29 Asia/Shanghai | `http://www.aqsc.agri.cn/tzgg/`；`http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `crawler/tests/fixtures/evidence/aqsc/` | 2 | 10757 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
+| `aqsc-moa` | 2026-10-19 01:29 Asia/Shanghai | `http://www.aqsc.agri.cn/tzgg/`；`http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 2 | 10757 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
 | `cnipa` | 2026-10-19 01:53 Asia/Shanghai | `https://ggfw.cnipa.gov.cn/dlbzsq/dbQuery`；`https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541` | `crawler/tests/fixtures/evidence/cnipa/` | 1 | 1484 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
 | `weather` | 2026-10-19 01:29 Asia/Shanghai | `https://www.weather.com.cn/`；`https://d1.weather.com.cn/sk_2d/101010100.html` | `crawler/tests/fixtures/evidence/weather/` | 2 | 407 | 下方 fixture 表 | `docs/reviews/weather.md` |
 | `open-meteo` | 2026-10-20 Asia/Shanghai | `https://open-meteo.com/`；`https://api.open-meteo.com/v1/forecast` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/open-meteo.md` |
@@ -46,7 +46,7 @@
 
 ## 当前汇总
 
-- 公开合成 fixture 共 13 个文件，总字节 15546，最大单文件 5445 字节，低于 100MB。
+- 公开合成 fixture 共 17 个文件，总字节 20472，最大单文件 5445 字节，低于 100MB。
 - 所有公开 XLSX、PDF、HTML 都带合成标记，不含真实联系人列、隐藏表单 token、原始作者元数据或嵌入附件。
 - 本地 `crawler/download/` 仍为未跟踪证据目录，不进入公开索引；没有文件时记为 0，不伪造哈希。
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
@@ -57,19 +57,23 @@
 
 | 文件 | bytes | SHA-256 |
 | --- | ---: | --- |
-| `crawler/tests/fixtures/evidence/aqsc/synthetic-mtyx-sample.xlsx` | 5445 | `c77f3a82b228f09303188eeef30d3e4beb275405fe790624d3aca49140749924` |
-| `crawler/tests/fixtures/evidence/aqsc/synthetic-tepinongpin-sample.xlsx` | 5312 | `af128ce30aea149f6ce54ef9c6b4eaab5bacc5fa1a5ded35b5224ddc0bd5038f` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/discover.json` | 1042 | `932bf54e828232c1f3377e43264eca39031cd0ab6abbe4221cf135ca00bf2c1b` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/synthetic-mtyx-sample.xlsx` | 5445 | `c77f3a82b228f09303188eeef30d3e4beb275405fe790624d3aca49140749924` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/synthetic-tepinongpin-sample.xlsx` | 5312 | `af128ce30aea149f6ce54ef9c6b4eaab5bacc5fa1a5ded35b5224ddc0bd5038f` |
+| `crawler/tests/fixtures/evidence/cass-linguistics/discover.json` | 613 | `9683fcd3a167e43c434b7c2be358d3634e9776adbe2162c0113040c77508bc8b` |
+| `crawler/tests/fixtures/evidence/cnipa/discover.json` | 528 | `845c367b6faa0597f41f7167dacf1745444f7bf219b3190a38ae4fcc798f8c37` |
 | `crawler/tests/fixtures/evidence/cnipa/synthetic-announcement-687.pdf` | 1484 | `a003e49e62921be5b06de41993ed8f55ba6faceb805521f860e2fe21c947caea` |
+| `crawler/tests/fixtures/evidence/dialect-org/discover.json` | 495 | `90fa503e21d4975f1c6ca914928eb7066fd08e0572bb474a8dfa1c05939af5b5` |
+| `crawler/tests/fixtures/evidence/feiyiw/discover.json` | 556 | `443233489783b53f804ad26da39405b2d7b71a6e3e709bdb8082aff4235f8397` |
+| `crawler/tests/fixtures/evidence/ihchina/discover.json` | 1019 | `2865d896c53bf4d87b0724eba9ec8efcebed0936af618ab9a2c800513fb2f9aa` |
+| `crawler/tests/fixtures/evidence/nongmuhr/discover.json` | 1113 | `9cc3da018da52c8d487fd9abc625a9011943d2fca6e766360c314c1f99e35337` |
 | `crawler/tests/fixtures/evidence/nongmuhr/employ-view-13519.html` | 269 | `05461e1599117ab5a294852722e9ac84b246150d36b80e2ecd6dc2ff3be297d5` |
 | `crawler/tests/fixtures/evidence/nongmuhr/employ-view-13520.html` | 269 | `a23e87237d11d244e8f625a2f73c74c045a54da97dcb10c43d532f6479245a09` |
+| `crawler/tests/fixtures/evidence/nzrc/discover.json` | 1150 | `685a2c0c75fb3e3a8c9db1c12de6971d9074cb03e4c8169919e28c5afbb544d1` |
 | `crawler/tests/fixtures/evidence/nzrc/job-detail-8235500.html` | 385 | `bba750d9e49b65942bdad7e1eaf712fce5a11f19cb859adfb64191cf35960308` |
 | `crawler/tests/fixtures/evidence/nzrc/job-detail-8240109.html` | 385 | `1b3807fdeac5fd5b4e9c68917ed3a193c6ae746cd443d77f084ce67048fe7100` |
 | `crawler/tests/fixtures/evidence/weather/sk-beijing.json` | 375 | `49f02176a74963714b173ef291b36e995783563e86a0fc1fa3acfdec8351046b` |
 | `crawler/tests/fixtures/evidence/weather/sk-beijing.response-headers.txt` | 32 | `722ab081249af11d22563126b6a2c04b67e9309cee994b5f98474c5e59f1f408` |
-| `crawler/tests/fixtures/evidence/dialect-org/discover.json` | 495 | `90fa503e21d4975f1c6ca914928eb7066fd08e0572bb474a8dfa1c05939af5b5` |
-| `crawler/tests/fixtures/evidence/cass-linguistics/discover.json` | 43 | `8f35c29b4d5a89489bf028319bc996606f73510435eeced169f1b3752359cbb9` |
-| `crawler/tests/fixtures/evidence/feiyiw/discover.json` | 33 | `aa167dfb71107818ff8aba37b062b00d152bd4e4b7535c350bed3c5b637788ab` |
-| `crawler/tests/fixtures/evidence/ihchina/discover.json` | 1019 | `2865d896c53bf4d87b0724eba9ec8efcebed0936af618ab9a2c800513fb2f9aa` |
 
 ## 维护规则
 

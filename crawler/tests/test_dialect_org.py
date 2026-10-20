@@ -7,7 +7,9 @@ from pathlib import Path
 from crawler.pipeline import RunConfig, run_source
 
 
-FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "dialect-org"
+FIXTURE_ROOT = (
+    Path(__file__).resolve().parent / "fixtures" / "evidence" / "dialect-org"
+)
 
 
 class DialectOrgSourceTest(unittest.TestCase):

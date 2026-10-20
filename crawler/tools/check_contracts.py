@@ -11,6 +11,13 @@ from pathlib import Path
 
 DOCS = Path(__file__).resolve().parents[1] / "docs"
 PIPELINE = Path(__file__).resolve().parents[1] / "pipeline"
+SCHEMA_SOURCE = (
+    Path(__file__).resolve().parents[1]
+    / "collection"
+    / "shared"
+    / "crawler_collection"
+    / "schema.py"
+)
 TOOLS = Path(__file__).resolve().parent
 SOURCES = DOCS / "sources.json"
 
@@ -287,7 +294,7 @@ def check_schema_names() -> list[str]:
     std_text = _read(DOCS / "schema" / "std-entities.md")
     schema_text = _read(DOCS / "schema" / "crawler-db.md")
     converter_text = _read(DOCS / "schema" / "converter.md")
-    database_text = _read(PIPELINE / "database.py")
+    database_text = _read(SCHEMA_SOURCE)
     entities = set(re.findall(r"^### `(std_[a-z0-9_]+)`", std_text, re.MULTILINE))
     tables = set(re.findall(r"^#### (std_[a-z0-9_]+)", schema_text, re.MULTILINE))
     services = REQUIRED_SERVICE_TABLES
@@ -375,7 +382,7 @@ def _function_block(text: str, name: str) -> str:
 
 def check_implementation_contract() -> list[str]:
     errors: list[str] = []
-    database_text = _read(PIPELINE / "database.py")
+    database_text = _read(SCHEMA_SOURCE)
     evidence_text = _read(PIPELINE / "evidence.py")
     run_source_text = _read(PIPELINE / "run_source.py")
     converter_text = _read(PIPELINE / "converter.py")
