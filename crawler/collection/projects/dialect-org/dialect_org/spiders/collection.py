@@ -24,6 +24,7 @@ class DialectOrgSpider(scrapy.Spider):
     def parse_detail(self, response, list_item):
         parsed = parse_dialect_detail(response)
         parsed["point"]["extra"].update(list_item.get("extra", {}))
+        parsed["point"]["extra"]["lexeme"] = parsed["lexeme"]
         yield item_from_mapping(
             parsed["point"], source_id=self.source_id, response=response,
             list_item=list_item,

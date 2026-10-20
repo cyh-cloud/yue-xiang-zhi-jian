@@ -1,6 +1,7 @@
 import unittest
 from pathlib import Path
 import sys
+import tempfile
 
 from scrapy.http import HtmlResponse, TextResponse
 
@@ -19,6 +20,9 @@ from dialect_org.parsers import (
 )
 from dialect_org.spiders.collection import (
     DialectOrgSpider,
+)
+from crawler.collection.shared.crawler_collection.runtime import (
+    CollectionRuntime,
 )
 
 
@@ -74,6 +78,52 @@ class DialectOrgScrapyTest(unittest.TestCase):
         self.assertEqual(spider.name, "dialect-org")
         self.assertEqual(spider.source_id, "dialect-org")
         self.assertEqual(spider.allowed_domains, ["dialect.org.cn"])
+
+    def test_pipeline_runtime_persists_point_and_lexeme(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            runtime = CollectionRuntime(
+                database_path=root / "crawler.db",
+                download_root=root / "downloads",
+                registry_path=(
+                    Path(__file__).resolve().parents[1]
+                    / "docs"
+                    / "sources.json"
+                ),
+            )
+            parsed = parse_dialect_detail(
+                HtmlResponse(
+                    url="https://dialect.org.cn/dialect/1",
+                    body=(
+                        '<main><div class="detail-header">'
+                        '<span class="card-tag">广东广州</span></div>'
+                        '<h1 class="detail-word">食饭</h1>'
+                        '<div class="detail-phonetic">Sik6 faan6</div>'
+                        '<div class="card"><p>粤语：吃饭</p></div></main>'
+                    ).encode("utf-8"),
+                    encoding="utf-8",
+                )
+            )
+            point = dict(parsed["point"])
+            point["extra"] = {
+                **point["extra"],
+                "lexeme": parsed["lexeme"],
+            }
+            point.setdefault("run_id", "test")
+            point.setdefault("mode", "live")
+            raw_id = runtime.persist_raw(
+                runtime.evidence_from_fixture(
+                    source_id="dialect-org",
+                    body=b"<html/>",
+                    request_url="https://dialect.org.cn/dialect/1",
+                    content_type="text/html",
+                    run_id="test",
+                )
+            )
+
+            result = runtime.write_item(point, raw_evidence_id=raw_id)
+
+            self.assertEqual(result["candidate_status"], "candidate")
 
 
 if __name__ == "__main__":

@@ -42,7 +42,15 @@ def parse_article_list(response):
                 "detail_url": url,
             }
         )
-    return items
+    next_link = soup.select_one("a.next[href], .page a.next[href]")
+    return {
+        "items": items,
+        "next_page": (
+            urljoin(BASE_URL, next_link.get("href"))
+            if next_link is not None
+            else None
+        ),
+    }
 
 
 def parse_article_detail(response):

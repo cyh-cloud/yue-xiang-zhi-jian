@@ -42,7 +42,8 @@ class CassLinguisticsScrapyTest(unittest.TestCase):
             encoding="utf-8",
         )
 
-        items = parse_article_list(response)
+        parsed = parse_article_list(response)
+        items = parsed["items"]
 
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["source_item_id"], "6066095")

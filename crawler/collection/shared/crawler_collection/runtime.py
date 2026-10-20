@@ -365,3 +365,82 @@ class CollectionRuntime:
             """,
             common_values + values,
         )
+        if source_id == "dialect-org":
+            lexeme = item["extra"].get("lexeme") or {}
+            point_id = conn.execute(
+                "SELECT id FROM std_dialect_points "
+                "WHERE source_id = ? AND source_item_id = ?",
+                (item["source_id"], item["source_item_id"]),
+            ).fetchone()[0]
+            conn.execute(
+                """
+                INSERT INTO std_dialect_lexemes (
+                    point_id, source_id, source_item_id, source_url,
+                    long_term_url, detail_url, detail_url_status, fetch_url,
+                    locator, lemma, phonetic, definition, example, audio_url,
+                    audio_status, rights_status, attribution_required,
+                    attribution_text, rights_evidence_url, confidence,
+                    license_or_usage, publish_status, candidate_status,
+                    candidate_reason, retrieved_at, content_hash, extra
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(point_id, lemma) DO UPDATE SET
+                    phonetic=excluded.phonetic,
+                    definition=excluded.definition,
+                    audio_url=excluded.audio_url,
+                    audio_status=excluded.audio_status,
+                    candidate_status=excluded.candidate_status,
+                    retrieved_at=excluded.retrieved_at,
+                    extra=excluded.extra
+                """,
+                (
+                    point_id,
+                    item["source_id"],
+                    lexeme.get("source_item_id") or item["source_item_id"],
+                    lexeme.get("source_url") or item["source_url"],
+                    lexeme.get("long_term_url") or item["long_term_url"],
+                    lexeme.get("detail_url") or item["detail_url"],
+                    lexeme.get("detail_url_status")
+                    or item["detail_url_status"],
+                    lexeme.get("fetch_url"),
+                    lexeme.get("locator") or item["locator"],
+                    lexeme["lemma"],
+                    lexeme.get("phonetic"),
+                    lexeme.get("definition"),
+                    lexeme.get("example"),
+                    lexeme.get("audio_url"),
+                    lexeme.get("audio_status") or "missing",
+                    lexeme.get("rights_status") or item["rights_status"],
+                    1
+                    if (
+                        lexeme.get("attribution_required")
+                        or item["attribution_required"]
+                    )
+                    else 0,
+                    lexeme.get("attribution_text")
+                    or item["attribution_text"],
+                    lexeme.get("rights_evidence_url")
+                    or item["rights_evidence_url"],
+                    lexeme.get("confidence") or "medium",
+                    lexeme.get("license_or_usage")
+                    or item["rights_status"],
+                    "draft",
+                    item.get("candidate_status") or "candidate",
+                    item.get("candidate_reason"),
+                    now,
+                    lexeme.get("content_hash")
+                    or item["content_hash"]
+                    or sha256_bytes(
+                        json.dumps(
+                            {
+                                "lemma": lexeme["lemma"],
+                                "definition": lexeme.get("definition"),
+                                "audio_url": lexeme.get("audio_url"),
+                            },
+                            ensure_ascii=False,
+                            sort_keys=True,
+                        ).encode("utf-8")
+                    ),
+                    json.dumps(lexeme.get("extra") or {}, ensure_ascii=False),
+                ),
+            )
