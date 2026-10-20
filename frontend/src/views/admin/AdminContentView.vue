@@ -323,3 +323,5 @@ onMounted(loadContent);
     </Teleport>
   </section>
 </template>
+
+<style src="./admin.css"></style>
