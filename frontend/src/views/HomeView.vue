@@ -286,3 +286,5 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
+
+<style src="./home/home.css"></style>

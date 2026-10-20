@@ -1,0 +1,86 @@
+/*
+ * Login page domain styles. Shared button and field primitives remain in
+ * components.css; this file owns only the login/register panel arrangement.
+ */
+
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  background: var(--surface-muted);
+}
+
+.login-card {
+  display: grid;
+  width: min(420px, 90vw);
+  gap: 12px;
+  padding: 36px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+}
+
+.login-card h1 {
+  margin: 0 0 12px;
+  color: var(--color-brand);
+  font-size: 1.5rem;
+}
+
+.login-card label {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.login-card input,
+.login-card select {
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-xs);
+  background: var(--surface-raised);
+  font: inherit;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.auth-tabs button {
+  margin: 0;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.auth-tabs button.active {
+  background: var(--color-brand-tint);
+  color: var(--color-brand);
+}
+
+.login-card > button[type="submit"] {
+  margin-top: 8px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: var(--color-brand);
+  color: var(--color-text-inverse);
+  font: inherit;
+  cursor: pointer;
+}
+
+.login-card > button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.login-error {
+  margin: 0;
+  color: var(--state-error);
+  font-size: 0.875rem;
+}
