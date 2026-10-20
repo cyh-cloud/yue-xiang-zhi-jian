@@ -343,40 +343,4 @@ onMounted(loadPolicies);
   </section>
 </template>
 
-<style scoped>
-.government-policy-form-page {
-  max-width: 1040px;
-}
-
-.government-policy-form {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.government-policy-form .bo-field textarea {
-  width: 100%;
-  min-height: 84px;
-  padding: 9px 10px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 8px;
-  background: var(--bo-input-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.84rem;
-  line-height: 1.6;
-  resize: vertical;
-}
-
-.government-policy-form .bo-field textarea:focus {
-  border-color: var(--bo-accent);
-  box-shadow: 0 0 0 3px var(--bo-accent-soft);
-  outline: none;
-}
-
-.government-policy-form-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-</style>
+<style src="./government.css"></style>

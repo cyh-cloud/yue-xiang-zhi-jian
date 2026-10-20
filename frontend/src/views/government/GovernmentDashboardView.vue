@@ -190,20 +190,4 @@ onMounted(loadOverview);
   </section>
 </template>
 
-<style scoped>
-.government-case-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.government-case-chips span {
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-muted);
-  font-size: 0.75rem;
-  line-height: 1.45;
-}
-</style>
+<style src="./government.css"></style>
