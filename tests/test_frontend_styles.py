@@ -5,6 +5,7 @@
 空跑用例，保证当前过渡期的旧样式 import 被显式允许，而不是靠忽略目录通过。
 """
 
+import re
 import subprocess
 import sys
 import tempfile
@@ -51,6 +52,7 @@ class CheckFrontendStylesTest(unittest.TestCase):
         for relative in (
             "frontend/src/styles/tokens.css",
             "frontend/src/styles/base.css",
+            "frontend/src/styles/components.css",
         ):
             self.write(
                 relative,
@@ -63,6 +65,7 @@ class CheckFrontendStylesTest(unittest.TestCase):
             "frontend/src/main.ts",
             'import "./styles/tokens.css";\n'
             'import "./styles/base.css";\n'
+            'import "./styles/components.css";\n'
             'import "./styles/legacy-public.css";\n'
             'import "./styles/public-shell.css";\n',
         )
@@ -78,6 +81,7 @@ class CheckFrontendStylesTest(unittest.TestCase):
             "frontend/src/main.ts",
             'import "./styles/tokens.css";\n'
             'import "./styles/base.css";\n'
+            'import "./styles/components.css";\n'
             'import "./styles/legacy-public.css";\n',
         )
         self.write(
@@ -310,9 +314,13 @@ class CheckFrontendStylesTest(unittest.TestCase):
         )
         tokens_index = main.index('"./styles/tokens.css"')
         base_index = main.index('"./styles/base.css"')
+        components_index = main.index('"./styles/components.css"')
         legacy_index = main.index('"./styles/legacy-public.css"')
         self.assertLess(tokens_index, legacy_index)
         self.assertLess(base_index, legacy_index)
+        self.assertLess(tokens_index, components_index)
+        self.assertLess(base_index, components_index)
+        self.assertLess(components_index, legacy_index)
 
         legacy = (styles / "legacy-public.css").read_text(encoding="utf-8")
         self.assertNotRegex(legacy, r"(?m)^\s*:root\s*\{")
@@ -323,11 +331,84 @@ class CheckFrontendStylesTest(unittest.TestCase):
         self.assertNotRegex(legacy, r"(?m)^\s*html\[data-large-text\]\s*\{")
         self.assertNotIn('data-large-font="true"', legacy)
 
+    def test_shared_component_layer_owns_controls_and_feedback(self):
+        style_path = (
+            REPO_ROOT / "frontend" / "src" / "styles" / "components.css"
+        )
+        self.assertTrue(style_path.is_file(), "缺少共享组件样式层")
+        styles = style_path.read_text(encoding="utf-8")
+
+        for marker in (
+            ".bo-button",
+            ".bo-field",
+            ".bo-card",
+            ".bo-table",
+            ".bo-feedback",
+            ".bo-state",
+            ".bo-modal",
+            ".tag",
+            ".empty-state",
+            ".loading-state",
+            ".error-state",
+            ".msg-center-wrap",
+            ".msg-dropdown",
+            ".conversation-send",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, styles)
+
+        self.assertNotRegex(styles, r"\[\s*data-role\b")
+        self.assertNotRegex(styles, r"(?m)^\s*:root\s*\{")
+        self.assertNotRegex(styles, r"(?m)^\s*html\[data-large-text\]\s*\{")
+        self.assertNotIn("!important", styles)
+
+    def test_shared_component_values_are_tokens(self):
+        style_path = (
+            REPO_ROOT / "frontend" / "src" / "styles" / "components.css"
+        )
+        styles = style_path.read_text(encoding="utf-8")
+        declarations = checker.strip_css_comments(styles)
+        for property_name in (
+            "color",
+            "background",
+            "background-color",
+            "border",
+            "border-color",
+            "box-shadow",
+        ):
+            pattern = re.compile(
+                rf"(?m)^[ \t]*{re.escape(property_name)}\s*:\s*"
+                r"(#[0-9a-f]{3,8}|rgba?\()",
+                re.IGNORECASE,
+            )
+            with self.subTest(property=property_name):
+                self.assertNotRegex(declarations, pattern)
+        self.assertRegex(styles, r"var\(--")
+
+    def test_shared_component_layer_consumes_root_tokens(self):
+        styles = (
+            REPO_ROOT / "frontend" / "src" / "styles" / "components.css"
+        ).read_text(encoding="utf-8")
+        self.assertNotRegex(styles, r"(?m)^\s*:root\s*\{")
+        self.assertRegex(styles, r"var\(--bo-")
+
+    def test_shared_component_layer_does_not_redefine_legacy_primitives(self):
+        style_path = (
+            REPO_ROOT / "frontend" / "src" / "styles" / "components.css"
+        )
+        styles = style_path.read_text(encoding="utf-8")
+        self.assertNotRegex(styles, r"(?m)^\s*\.btn\s*\{")
+        self.assertNotRegex(styles, r"(?m)^\s*\.btn-primary\s*\{")
+        self.assertNotRegex(styles, r"(?m)^\s*\.form-group\s*\{")
+        self.assertNotRegex(styles, r"(?m)^\s*\.data-table\s*\{")
+        self.assertNotRegex(styles, r"(?m)^\s*\.modal-overlay\s*\{")
+
     def test_checker_requires_token_and_base_contract_for_active_entry(self):
         self.write(
             "frontend/src/main.ts",
             'import "./styles/tokens.css";\n'
             'import "./styles/base.css";\n'
+            'import "./styles/components.css";\n'
             'import "./styles/legacy-public.css";\n',
         )
         self.write("frontend/src/styles/legacy-public.css", "/* active */\n")
@@ -336,6 +417,21 @@ class CheckFrontendStylesTest(unittest.TestCase):
 
         self.assertIn("token-contract", self.kinds(report))
         self.assertIn("base-ownership", self.kinds(report))
+
+    def test_checker_requires_shared_layer_before_transitional_sheet(self):
+        self.write_style_contract()
+        self.write(
+            "frontend/src/main.ts",
+            'import "./styles/tokens.css";\n'
+            'import "./styles/base.css";\n'
+            'import "./styles/legacy-public.css";\n'
+            'import "./styles/components.css";\n',
+        )
+        self.write("frontend/src/styles/legacy-public.css", "/* active */\n")
+
+        report = self.check()
+
+        self.assertIn("shared-layer-order", self.kinds(report))
 
     def test_transitional_sheet_cannot_own_global_tokens_or_reset(self):
         self.write(

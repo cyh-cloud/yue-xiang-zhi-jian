@@ -53,9 +53,11 @@ BASE_LAYER_FILES = frozenset(
 )
 BASE_LAYER_PREFIXES = ("frontend/src/styles/base/",)
 TOKEN_LAYER_FILES = frozenset({"frontend/src/styles/tokens.css"})
+COMPONENT_LAYER_FILES = frozenset({"frontend/src/styles/components.css"})
 ACTIVE_ENTRY = "frontend/src/main.ts"
 TOKENS_SHEET = "frontend/src/styles/tokens.css"
 BASE_SHEET = "frontend/src/styles/base.css"
+COMPONENTS_SHEET = "frontend/src/styles/components.css"
 SHELL_LAYER_FILES = frozenset(
     {
         "frontend/src/styles/public-shell.css",
@@ -89,6 +91,7 @@ KIND_GLOBAL_OVERRIDE = "universal-global-override"
 KIND_RAW_ROLE_SELECTOR = "raw-role-selector"
 KIND_TOKEN_CONTRACT = "token-contract"
 KIND_BASE_OWNERSHIP = "base-ownership"
+KIND_SHARED_LAYER_ORDER = "shared-layer-order"
 
 KIND_ORDER = {
     KIND_LEGACY_IMPORT: 0,
@@ -98,7 +101,25 @@ KIND_ORDER = {
     KIND_RAW_ROLE_SELECTOR: 4,
     KIND_TOKEN_CONTRACT: 5,
     KIND_BASE_OWNERSHIP: 6,
+    KIND_SHARED_LAYER_ORDER: 7,
 }
+
+SHARED_COMPONENT_MARKERS = (
+    ".bo-button",
+    ".bo-field",
+    ".bo-card",
+    ".bo-table",
+    ".bo-feedback",
+    ".bo-state",
+    ".bo-modal",
+    ".tag",
+    ".empty-state",
+    ".loading-state",
+    ".error-state",
+    ".msg-center-wrap",
+    ".msg-dropdown",
+    ".conversation-send",
+)
 
 TOKEN_REQUIRED_GROUPS = {
     "brand": (
@@ -488,6 +509,10 @@ def is_token_layer(relative: str) -> bool:
     return relative in TOKEN_LAYER_FILES
 
 
+def is_component_layer(relative: str) -> bool:
+    return relative in COMPONENT_LAYER_FILES
+
+
 def is_shell_layer(relative: str) -> bool:
     return relative in SHELL_LAYER_FILES or relative.startswith(SHELL_LAYER_PREFIXES)
 
@@ -671,11 +696,66 @@ def check_style_contract(root: Path, report: Report) -> None:
                     )
                 )
 
+    components_path = root / COMPONENTS_SHEET
+    if not components_path.is_file():
+        report.violations.append(
+            Violation(
+                KIND_SHARED_LAYER_ORDER,
+                COMPONENTS_SHEET,
+                1,
+                "活动 SPA 缺少共享组件样式层",
+            )
+        )
+    else:
+        components_text = strip_css_comments(read_text(components_path))
+        for marker in SHARED_COMPONENT_MARKERS:
+            if marker not in components_text:
+                report.violations.append(
+                    Violation(
+                        KIND_SHARED_LAYER_ORDER,
+                        COMPONENTS_SHEET,
+                        1,
+                        "共享组件层缺少 %s 原语" % marker,
+                    )
+                )
+        if ROLE_SELECTOR_RE.search(components_text):
+            report.violations.append(
+                Violation(
+                    KIND_SHARED_LAYER_ORDER,
+                    COMPONENTS_SHEET,
+                    1,
+                    "共享组件层不得包含裸角色选择器",
+                )
+            )
+        if token_definitions(components_text):
+            report.violations.append(
+                Violation(
+                    KIND_SHARED_LAYER_ORDER,
+                    COMPONENTS_SHEET,
+                    1,
+                    "共享组件层不得重新定义 token；组件只消费 token",
+                )
+            )
+        if "!important" in components_text:
+            report.violations.append(
+                Violation(
+                    KIND_SHARED_LAYER_ORDER,
+                    COMPONENTS_SHEET,
+                    1,
+                    "共享组件层不得依赖 !important",
+                )
+            )
+
     entry_text = read_text(entry_path)
     positions = {}
     for index, ref in enumerate(extract_imports(ACTIVE_ENTRY, entry_text)):
         target = resolve_specifier(ACTIVE_ENTRY, ref.specifier)
-        if target in {TOKENS_SHEET, BASE_SHEET, TRANSITIONAL_LEGACY_SHEET}:
+        if target in {
+            TOKENS_SHEET,
+            BASE_SHEET,
+            COMPONENTS_SHEET,
+            TRANSITIONAL_LEGACY_SHEET,
+        }:
             positions.setdefault(target, index)
 
     for target, label in (
@@ -696,6 +776,22 @@ def check_style_contract(root: Path, report: Report) -> None:
     legacy_position = positions.get(TRANSITIONAL_LEGACY_SHEET)
     token_position = positions.get(TOKENS_SHEET)
     base_position = positions.get(BASE_SHEET)
+    components_position = positions.get(COMPONENTS_SHEET)
+    for target, label in (
+        (TOKENS_SHEET, "tokens.css"),
+        (BASE_SHEET, "base.css"),
+        (COMPONENTS_SHEET, "components.css"),
+    ):
+        if target not in positions:
+            report.violations.append(
+                Violation(
+                    KIND_SHARED_LAYER_ORDER,
+                    ACTIVE_ENTRY,
+                    1,
+                    "main.ts 必须显式导入 %s" % label,
+                    target,
+                )
+            )
     if legacy_position is not None:
         if token_position is not None and token_position > legacy_position:
             report.violations.append(
@@ -715,6 +811,31 @@ def check_style_contract(root: Path, report: Report) -> None:
                     "base.css 必须早于过渡期 legacy-public.css 导入",
                 )
             )
+        if (
+            components_position is not None
+            and components_position > legacy_position
+        ):
+            report.violations.append(
+                Violation(
+                    KIND_SHARED_LAYER_ORDER,
+                    ACTIVE_ENTRY,
+                    1,
+                    "components.css 必须早于过渡期 legacy-public.css 导入",
+                )
+            )
+    if (
+        components_position is not None
+        and base_position is not None
+        and components_position < base_position
+    ):
+        report.violations.append(
+            Violation(
+                KIND_SHARED_LAYER_ORDER,
+                ACTIVE_ENTRY,
+                1,
+                "components.css 必须晚于 base.css 导入",
+            )
+        )
     if (
         token_position is not None
         and base_position is not None
@@ -800,6 +921,7 @@ def check_style_blocks(
         return
     base_layer = is_base_layer(relative)
     token_layer = is_token_layer(relative)
+    component_layer = is_component_layer(relative)
     shell_layer = is_shell_layer(relative)
     for block in blocks:
         text = strip_css_comments(block.text)
@@ -823,7 +945,7 @@ def check_style_blocks(
                     )
                 if not is_global_override(selector):
                     continue
-                if base_layer or token_layer:
+                if base_layer or token_layer or component_layer:
                     continue
                 if shell_layer and is_shell_scoped_selector(selector):
                     continue

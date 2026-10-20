@@ -47,6 +47,34 @@
   --focus-ring-color: rgba(31, 94, 67, 0.5);
   --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
+  /* Component-state surfaces derived from semantic brand and status tokens. */
+  --state-success-bg: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  --state-error: #b3382f;
+  --state-error-bg: color-mix(in srgb, var(--state-error) 12%, transparent);
+  --state-error-border: color-mix(
+    in srgb,
+    var(--state-error) 24%,
+    transparent
+  );
+  --state-info-bg: color-mix(
+    in srgb,
+    var(--color-accent-gold) 12%,
+    transparent
+  );
+  --state-info-text: var(--color-accent-gold-strong);
+  /* Backoffice primitives get neutral defaults here; role roots override. */
+  --bo-accent-soft: color-mix(in srgb, var(--color-brand-mid) 12%, transparent);
+  --bo-card-bg: var(--surface-raised);
+  --bo-card-border: var(--border-default);
+  --bo-text: var(--color-text-primary);
+  --bo-muted: var(--color-text-secondary);
+  --bo-input-bg: var(--surface-raised);
+  --bo-input-border: var(--border-default);
+  --bo-danger: #b3382f;
+  --bo-success: #1f6b42;
+  --bo-status-error-text: var(--bo-danger);
+  --bo-accent: var(--color-brand-mid);
+  --bo-accent-strong: var(--color-brand);
 
   /* Spacing */
   --space-1: 4px;
@@ -199,6 +227,23 @@
   --shadow-lg: 0 10px 25px rgba(0,0,0,0.4), 0 20px 48px rgba(0,0,0,0.5);
   --shadow-xl: 0 20px 25px rgba(0,0,0,0.5), 0 40px 60px rgba(0,0,0,0.6);
   --accent-blue-light: var(--color-brand-strong);
+  --state-success-bg: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  --state-error: #f09595;
+  --state-error-bg: color-mix(in srgb, var(--state-error) 12%, transparent);
+  --state-error-border: color-mix(
+    in srgb,
+    var(--state-error) 32%,
+    transparent
+  );
+  --bo-card-bg: #1b2c25;
+  --bo-card-border: #33473d;
+  --bo-text: #e4ebe6;
+  --bo-muted: #9aaca1;
+  --bo-input-bg: #10201a;
+  --bo-input-border: #4a5b52;
+  --bo-danger: #f09595;
+  --bo-success: #8fd3ae;
+  --bo-status-error-text: #f28b82;
 }
 
 html[data-large-text] {

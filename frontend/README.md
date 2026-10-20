@@ -42,8 +42,9 @@ npm run test:e2e
 `../docs/css-visual-regression.md`。
 
 全局语义 token 在 `src/styles/tokens.css`，reset、基础元素、焦点和减少动效规则在
-`src/styles/base.css`。`src/main.ts` 先加载这两层，再加载 T13 前仍保留的
-`src/styles/legacy-public.css`。
+`src/styles/base.css`，跨页面复用的按钮、字段、标签、卡片、表格、状态、弹窗和消息
+中心原语在 `src/styles/components.css`。`src/main.ts` 依次加载 token、基础、共享
+组件三层，再加载 T13 前仍保留的 `src/styles/legacy-public.css`。
 
 ```powershell
 python tools/check_frontend_styles.py

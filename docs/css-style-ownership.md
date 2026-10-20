@@ -14,9 +14,9 @@ CSS 组件化的目标是降低样式影响面，不改变现有视觉。判断�
 | --- | --- | --- | --- |
 | token | `frontend/src/styles/tokens.css`，角色和主题覆盖在对应外壳根节点 | 语义颜色、表面、文字、边框、间距、圆角、阴影、层级、字体、动效、断点、角色主题 token | 组件选择器、页面布局、业务状态样式 |
 | 全局基础层 | `frontend/src/styles/base.css` | reset、`html` / `body` / `#app` 基础规则、全站焦点与可访问性约定、全站滚动基础 | 组件外观、页面布局、角色条件样式 |
-| 共享组件层 | `frontend/src/components/shared/`，或确有第二处复用的组件 SFC scoped 样式 | 按钮、输入、选择、标签、卡片、表格容器、空态、加载态、弹窗、消息中心 | 页面专属布局、角色选择器、跨页覆盖 |
+| 共享组件层 | `frontend/src/styles/components.css`，或确有第二处复用的组件 SFC scoped 样式 | 按钮、输入、选择、标签、卡片、表格容器、空态、加载态、弹窗、消息中心 | 页面专属布局、角色选择器、跨页覆盖、token 定义 |
 | 公开站外壳 | `frontend/src/layouts/PublicLayout.vue`、`frontend/src/components/public/`、`frontend/src/styles/public-shell.css` | 顶栏、导航、页脚、用户菜单、主题与大字开关、CDN 降级提示、公开站根布局 | 具体页面内容、教师或后台页面规则 |
-| 后台外壳 | `frontend/src/layouts/BackofficeLayout.vue`、`frontend/src/components/backoffice/`、`frontend/src/styles/backoffice.css` | 顶栏、侧栏、页面框架、连接状态、消息中心挂载点、角色根节点 token 覆盖 | 具体角色页面布局、业务表格字段样式 |
+| 后台外壳 | `frontend/src/layouts/BackofficeLayout.vue`、`frontend/src/components/backoffice/`、`frontend/src/styles/backoffice.css` | 顶栏、侧栏、页面框架、连接状态、消息中心挂载点、角色根节点 token 覆盖 | 具体角色页面布局、业务表格字段样式、共享 `bo-*` 原语 |
 | 社区外壳 | 社区外壳目标文件由社区迁移 ticket 建立；当前 `frontend/src/styles/community.css` 暂由社区页面域消费 | 社区外壳、列表与详情共享的社区级结构 | 公开站其他页面或后台页面规则 |
 | 页面域 | `frontend/src/views/<domain>/`、`frontend/src/components/<domain>/`，私有样式与 SFC 同域存放 | 页面布局、页面专属区块、领域组件样式、领域内状态排列 | 其他页面域的私有样式、全局根选择器、角色选择器 |
 | 动态状态 | 根节点 `data-theme` / `data-large-text` / `data-role`，组件状态类或语义属性，数值用 CSS 自定义属性 | 主题、大字、角色、加载、空、错误、未读、已读、选中、悬停、焦点、校验、进度与比例 | 在组件里复制角色色值、用页面选择器覆盖其他域、把静态装饰写成内联样式 |
@@ -43,8 +43,9 @@ CSS 组件化的目标是降低样式影响面，不改变现有视觉。判断�
 - `operator`
 - `admin`
 
-页面私有样式只能由同一域导入。共享样式放在 `frontend/src/styles/`，由页面或组件
-显式消费。跨域复用先判断是否真的出现第二个使用点，再决定上提为共享组件样式。
+页面私有样式只能由同一域导入。共享原语进入 `frontend/src/styles/components.css`，
+由 `main.ts` 在 `base.css` 之后、`legacy-public.css` 之前加载。跨域复用先判断是否
+真的出现第二个使用点，再决定上提为共享组件样式。
 
 ## 主题、角色与动态值
 
@@ -71,7 +72,9 @@ frontend/src/main.ts
 也不得从 `main.ts` 之外再次 import 当前旧样式。T13 删除该例外。
 
 新增规则一律进入上表的目标层，不写入 `legacy-public.css`。T2 已把全局 token 与
-基础规则收口到 `tokens.css` / `base.css`，旧样式表只保留尚未迁移的页面与组件规则。
+基础规则收口到 `tokens.css` / `base.css`。T3 把共享按钮、字段、标签/状态、卡片、
+表格、反馈/状态、弹窗和消息中心原语收口到 `components.css`，旧样式表只保留尚未
+迁移的页面与外壳规则。
 
 ## 机械检查
 
@@ -86,6 +89,8 @@ python -m unittest tests.test_frontend_styles -v
 
 - 只读旧样式 import 和过渡期唯一例外；
 - 活动入口对 `tokens.css` / `base.css` 的显式导入与顺序；
+- `components.css` 在 `base.css` 之后、过渡期旧样式之前的导入顺序；
+- 共享组件层原语覆盖、禁止 token 定义、角色选择器和 `!important`；
 - 全局语义 token 分组、明暗主题和大字模式覆盖完整性；
 - 过渡期旧样式不得重新定义全局 token、reset 或全站焦点规则；
 - 页面私有样式跨域 import；
