@@ -15,8 +15,8 @@ globals().update(
     collection_settings(
         bot_name="ihchina",
         package_name="ihchina",
-        database_path=str(CRAWLER_ROOT / "crawler.db"),
-        download_root=str(CRAWLER_ROOT / "downloads"),
+        database_path=str(CRAWLER_ROOT / "data" / "crawler.db"),
+        download_root=str(CRAWLER_ROOT / "download"),
         registry_path=str(CRAWLER_ROOT / "docs" / "sources.json"),
         candidate_writer="ihchina.candidate.write_candidate",
     )

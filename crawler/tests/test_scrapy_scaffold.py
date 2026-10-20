@@ -1,5 +1,7 @@
 import ast
 import json
+import sqlite3
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -17,7 +19,10 @@ from crawler.collection.shared.crawler_collection.items import (
 from crawler.collection.shared.crawler_collection.projects import (
     discover_projects,
 )
-from crawler.collection.shared.crawler_collection.reporting import RunReport
+from crawler.collection.shared.crawler_collection.reporting import (
+    RunReport,
+    build_run_report,
+)
 from crawler.collection.shared.crawler_collection.robots import RobotsFact
 
 
@@ -165,6 +170,74 @@ class AdmissionContractTest(unittest.TestCase):
 
 
 class RunReportContractTest(unittest.TestCase):
+    def test_live_report_has_auditable_counts_and_is_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            database_path = root / "crawler.db"
+            conn = sqlite3.connect(database_path)
+            try:
+                conn.executescript(
+                    """
+                    CREATE TABLE raw_fetches (
+                        id INTEGER PRIMARY KEY,
+                        run_id TEXT NOT NULL
+                    );
+                    CREATE TABLE stage_source_items (
+                        id INTEGER PRIMARY KEY,
+                        run_id TEXT NOT NULL
+                    );
+                    CREATE TABLE std_ich_projects (
+                        id INTEGER PRIMARY KEY,
+                        run_id TEXT NOT NULL,
+                        candidate_status TEXT NOT NULL
+                    );
+                    INSERT INTO raw_fetches (run_id) VALUES ('run-live');
+                    INSERT INTO raw_fetches (run_id) VALUES ('run-live');
+                    INSERT INTO stage_source_items (run_id) VALUES ('run-live');
+                    INSERT INTO std_ich_projects (run_id, candidate_status)
+                        VALUES ('run-live', 'candidate');
+                    """
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            report = build_run_report(
+                run_id="run-live",
+                source_id="ihchina",
+                mode="live",
+                database_path=database_path,
+                started_at="2026-10-21T01:00:00+00:00",
+                finished_at="2026-10-21T01:01:00+00:00",
+                request_count=2,
+                item_counts={
+                    "written": 1,
+                    "blocked": 1,
+                    "deferred": 0,
+                    "skipped": 0,
+                    "failed": 0,
+                },
+                errors=(),
+                evidence_path=root / "download",
+                report_root=root / "reports",
+            )
+
+            payload = report.to_dict()
+            self.assertEqual(payload["run_id"], "run-live")
+            self.assertEqual(payload["mode"], "live")
+            self.assertEqual(payload["request_count"], 2)
+            self.assertEqual(payload["raw_count"], 2)
+            self.assertEqual(payload["stage_count"], 1)
+            self.assertEqual(payload["candidate_count"], 1)
+            self.assertEqual(payload["blocked"], 1)
+            self.assertEqual(payload["deferred"], 0)
+            self.assertEqual(payload["skipped"], 0)
+            self.assertTrue(Path(report.report_path).is_file())
+            persisted = json.loads(
+                Path(report.report_path).read_text(encoding="utf-8")
+            )
+            self.assertEqual(persisted["status"], "partial")
+
     def test_partial_when_some_items_fail(self):
         report = RunReport(
             run_id="run-1",

@@ -6,6 +6,7 @@ from importlib import import_module
 from pathlib import Path
 
 from .items import validate_item
+from .reporting import record_pipeline_result
 from .runtime import CollectionRuntime
 
 
@@ -20,7 +21,7 @@ class CollectionPipeline:
         self.runtime = CollectionRuntime(
             database_path=database_path,
             download_root=download_root
-            or Path(database_path).parent / "downloads",
+            or Path(database_path).parent / "download",
             registry_path=registry_path,
             candidate_writer=candidate_writer,
         )
@@ -49,6 +50,7 @@ class CollectionPipeline:
             payload,
             raw_evidence_id=raw_evidence_id,
         )
+        record_pipeline_result(spider, result)
         if isinstance(item, dict):
             item.update(result)
         return item
@@ -87,7 +89,18 @@ def collection_settings(
         "COLLECTION_DOWNLOAD_ROOT": download_root,
         "SOURCE_REGISTRY_PATH": registry_path,
         "COLLECTION_CANDIDATE_WRITER": candidate_writer,
+        "COLLECTION_REPORT_ROOT": str(
+            Path(database_path).parent / "reports"
+        ),
+        "EXTENSIONS": {
+            "crawler.collection.shared.crawler_collection.reporting."
+            "RunReportExtension": 500,
+        },
         "DOWNLOADER_MIDDLEWARES": {
+            "scrapy.downloadermiddlewares.robotstxt."
+            "RobotsTxtMiddleware": None,
+            "crawler.collection.shared.crawler_collection.robots."
+            "RobotsEvidenceMiddleware": 100,
             "crawler.collection.shared.crawler_collection.middlewares."
             "RawEvidenceMiddleware": 543,
         },

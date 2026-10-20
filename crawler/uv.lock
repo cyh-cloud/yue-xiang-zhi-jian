@@ -1533,22 +1533,62 @@ name = "yuexiang-crawler"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "scrapy" },
+]
+
+[package.optional-dependencies]
+aqsc-moa = [
+    { name = "openpyxl" },
+]
+cass-linguistics = [
+    { name = "beautifulsoup4" },
+]
+cnipa = [
+    { name = "pypdf" },
+]
+dialect-org = [
+    { name = "beautifulsoup4" },
+]
+feiyiw = [
+    { name = "beautifulsoup4" },
+]
+ihchina = [
+    { name = "beautifulsoup4" },
+]
+nongmuhr = [
+    { name = "beautifulsoup4" },
+]
+nzrc = [
+    { name = "beautifulsoup4" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "beautifulsoup4" },
     { name = "openpyxl" },
     { name = "pypdf" },
-    { name = "scrapy" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "beautifulsoup4", marker = "extra == 'cass-linguistics'", specifier = "==4.13.4" },
+    { name = "beautifulsoup4", marker = "extra == 'dialect-org'", specifier = "==4.13.4" },
+    { name = "beautifulsoup4", marker = "extra == 'feiyiw'", specifier = "==4.13.4" },
+    { name = "beautifulsoup4", marker = "extra == 'ihchina'", specifier = "==4.13.4" },
+    { name = "beautifulsoup4", marker = "extra == 'nongmuhr'", specifier = "==4.13.4" },
+    { name = "beautifulsoup4", marker = "extra == 'nzrc'", specifier = "==4.13.4" },
+    { name = "openpyxl", marker = "extra == 'aqsc-moa'", specifier = "==3.1.5" },
+    { name = "pypdf", marker = "extra == 'cnipa'", specifier = "==6.21.1" },
+    { name = "scrapy", specifier = ">=2.13,<3" },
+]
+provides-extras = ["ihchina", "nzrc", "nongmuhr", "dialect-org", "cass-linguistics", "feiyiw", "aqsc-moa", "cnipa"]
+
+[package.metadata.requires-dev]
+dev = [
     { name = "beautifulsoup4", specifier = "==4.13.4" },
     { name = "openpyxl", specifier = "==3.1.5" },
     { name = "pypdf", specifier = "==6.21.1" },
-    { name = "scrapy", specifier = ">=2.13,<3" },
 ]
-
-[package.metadata.requires-dev]
-dev = []
 
 [[package]]
 name = "zope-interface"

@@ -149,7 +149,7 @@ class ScrapyRuntimeIntegrationTest(unittest.TestCase):
                 "long_term_url": request.url,
                 "detail_url": request.url,
                 "detail_url_status": "direct",
-                "run_id": "test",
+                "run_id": response.meta["run_id"],
                 "mode": "live",
                 "rights_status": "attribution-required",
                 "title": "苗族古歌",

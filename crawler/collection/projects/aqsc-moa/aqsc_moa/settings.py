@@ -15,8 +15,8 @@ globals().update(
     collection_settings(
         bot_name="aqsc-moa",
         package_name="aqsc_moa",
-        database_path=str(CRAWLER_ROOT / "crawler.db"),
-        download_root=str(CRAWLER_ROOT / "downloads"),
+        database_path=str(CRAWLER_ROOT / "data" / "crawler.db"),
+        download_root=str(CRAWLER_ROOT / "download"),
         registry_path=str(CRAWLER_ROOT / "docs" / "sources.json"),
         candidate_writer="aqsc_moa.candidate.write_candidate",
     )

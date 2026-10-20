@@ -13,6 +13,39 @@ SOURCES = ROOT / "docs" / "sources.json"
 
 
 class SourceRegistryTest(unittest.TestCase):
+    def test_legacy_entry_cannot_enable_a_mode_missing_from_registry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            registry = root / "sources.json"
+            registry.write_text(
+                json.dumps(
+                    {
+                        "sources": [
+                            {
+                                "id": "nzrc",
+                                "name": "NZRC",
+                                "enabled": True,
+                                "status": "approved-with-gaps",
+                                "access": "public",
+                                "rights_status": "attribution-required",
+                                "run_modes": ["fixture"],
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            config = RunConfig(
+                database_path=root / "crawler.db",
+                download_root=root / "download",
+                fixture_root=root / "fixture",
+                source_root=root / "saved",
+                registry_path=registry,
+            )
+
+            with self.assertRaises(ValueError):
+                run_source("nzrc", "saved", config)
+
     def test_registry_has_final_ids_statuses_and_rights(self):
         payload = json.loads(SOURCES.read_text(encoding="utf-8"))
         sources = {source["id"]: source for source in payload["sources"]}

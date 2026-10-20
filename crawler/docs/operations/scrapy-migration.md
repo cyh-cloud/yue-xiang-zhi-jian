@@ -73,9 +73,19 @@ crawler/
 
 ```powershell
 cd crawler
-uv lock --offline
-uv sync
+uv lock
+uv sync --group dev
 ```
+
+共享依赖只包含 Scrapy。站点依赖按项目声明为可选依赖组，例如：
+
+```powershell
+uv sync --extra ihchina
+uv sync --extra aqsc-moa
+uv sync --extra cnipa
+```
+
+`--group dev` 安装全量测试需要的 BeautifulSoup、openpyxl 和 pypdf。单个项目运行只安装自己的 extra；不要把这些站点依赖重新放回全局 `dependencies`。
 
 运行全量 crawler 测试：
 
@@ -94,7 +104,9 @@ python -m scrapy list
 python -m scrapy check
 ```
 
-所有项目共用 `CollectionPipeline` 和 `RawEvidenceMiddleware`。前者只写采集库，后者把实际响应追加为 raw 证据；项目配置同时提供数据库、下载根、来源注册表和限速参数。
+所有项目共用 `CollectionPipeline`、`RawEvidenceMiddleware`、`RobotsEvidenceMiddleware` 和 `RunReportExtension`。Pipeline 只写采集库；raw 中间件把实际响应或请求异常追加为证据；robots 中间件保存 allowed、disallowed、not-found 或 unknown 的真实结论；运行扩展为每次 live crawl 生成结构化 JSON 报告。项目配置同时提供数据库、下载根、报告根、来源注册表和限速参数。
+
+一次 crawl 的 `run_id` 由 `CollectionSpiderMixin.from_crawler` 初始化，该次 crawl 的所有请求、raw、stage 和候选共用同一标识。写入 stage 前必须确认 raw 的 `source_id` 和 `run_id` 与 Item 一致，跨来源或跨运行引用会被阻断。
 
 `crawler/pyproject.toml` 和 `crawler/uv.lock` 是唯一依赖声明和锁文件，所有项目在同一 uv 环境中运行。项目自己的目录、settings、Spider 和测试入口仍然隔离，不复制根锁文件。fixture 统一放在 `crawler/tests/fixtures/evidence/<source_id>/`，现有证据原地保留，每个项目只引用自己的子目录。
 
@@ -112,6 +124,8 @@ python -m scrapy check
 共享包不导入任何站点模块，不感知业务库，不包含转换器。Scrapy 项目不复制共享实现，不打开业务库，不调用转换器。
 
 Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以检查 rights、robots、必需字段和证据完整性，但检查不通过时只能把候选标记为 `blocked`、`deferred`，或者跳过候选写入，不能发布业务实体。业务发布门禁位于转换和审核链路。
+
+运行产物固定落在 crawler 根下：数据库为 `crawler/data/crawler.db`，raw 文件为 `crawler/download/`，运行报告为 `crawler/data/reports/`。这些路径都在 `.gitignore` 覆盖范围内。
 
 ## 每个项目的职责
 

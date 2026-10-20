@@ -8,6 +8,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import scrapy
+from scrapy.crawler import CrawlerProcess
+from scrapy.exceptions import IgnoreRequest
 from scrapy.http import HtmlResponse, Request
 from scrapy.settings import Settings
 
@@ -23,6 +26,9 @@ from crawler.collection.shared.crawler_collection.middlewares import (
     RawEvidenceMiddleware,
 )
 from crawler.collection.shared.crawler_collection.robots import RobotsFact
+from crawler.collection.shared.crawler_collection.robots import (
+    robots_fact_from_status,
+)
 from crawler.collection.shared.crawler_collection.runtime import CollectionRuntime
 from crawler.collection.shared.crawler_collection.spiders import (
     CollectionSpiderMixin,
@@ -68,7 +74,21 @@ class ProjectSettingsPathTest(unittest.TestCase):
 
             self.assertEqual(Path(settings.CRAWLER_ROOT), ROOT)
             self.assertEqual(Path(settings.REPO_ROOT), ROOT.parent)
-            self.assertEqual(database_path.parent, ROOT, project_root.name)
+            self.assertEqual(
+                database_path,
+                ROOT / "data" / "crawler.db",
+                project_root.name,
+            )
+            self.assertEqual(
+                Path(settings.COLLECTION_DOWNLOAD_ROOT),
+                ROOT / "download",
+                project_root.name,
+            )
+            self.assertEqual(
+                Path(settings.COLLECTION_REPORT_ROOT),
+                ROOT / "data" / "reports",
+                project_root.name,
+            )
             self.assertEqual(registry_path, REGISTRY, project_root.name)
             self.assertTrue(registry_path.is_file(), project_root.name)
 
@@ -154,6 +174,80 @@ class AdmissionRegressionTest(unittest.TestCase):
 
 
 class RawEvidenceRegressionTest(unittest.TestCase):
+    def test_robots_status_maps_to_auditable_facts(self):
+        cases = (
+            (200, True, "allowed"),
+            (200, False, "disallowed"),
+            (404, True, "not-found"),
+            (503, True, "unknown"),
+        )
+        for status, parser_allows, expected in cases:
+            with self.subTest(status=status, parser_allows=parser_allows):
+                fact = robots_fact_from_status(
+                    status,
+                    parser_allows=parser_allows,
+                    evidence_url="https://example.test/robots.txt",
+                )
+                self.assertEqual(fact.decision, expected)
+                self.assertEqual(fact.status_code, status)
+
+    def test_robots_rejection_leaves_raw_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = Settings(
+                {
+                    "COLLECTION_DATABASE_PATH": str(root / "crawler.db"),
+                    "COLLECTION_DOWNLOAD_ROOT": str(root / "downloads"),
+                    "SOURCE_REGISTRY_PATH": str(REGISTRY),
+                }
+            )
+            crawler = type("Crawler", (), {"settings": settings})()
+            middleware = RawEvidenceMiddleware.from_crawler(crawler)
+            request = Request(
+                "https://example.test/denied",
+                meta={
+                    "run_id": "run-robots-denied",
+                    "robots_decision": "disallowed",
+                    "robots_status_code": 200,
+                    "robots_evidence_url": (
+                        "https://example.test/robots.txt"
+                    ),
+                    "locator": "denied request",
+                },
+            )
+            spider = type(
+                "Spider",
+                (),
+                {"source_id": "ihchina", "run_id": "run-robots-denied"},
+            )()
+
+            middleware.process_exception(
+                request,
+                IgnoreRequest("Forbidden by robots.txt"),
+                spider,
+            )
+
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                row = conn.execute(
+                    """
+                    SELECT request_url, robots_decision, fetch_status,
+                           error_message, run_id, metadata_json
+                    FROM raw_fetches
+                    """
+                ).fetchone()
+            finally:
+                conn.close()
+
+            self.assertEqual(row[0], "https://example.test/denied")
+            self.assertEqual(row[1], "disallowed")
+            self.assertEqual(row[2], "error")
+            self.assertIn("robots", row[3].lower())
+            self.assertEqual(row[4], "run-robots-denied")
+            self.assertEqual(
+                json.loads(row[5])["robots_status_code"], 200
+            )
+
     def test_detail_response_uses_actual_url_status_and_content_hash(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -251,7 +345,10 @@ class RuntimeRegressionTest(unittest.TestCase):
         item = _item(content_hash="content-hash-1")
 
         self.runtime.write_item(item, raw_evidence_id=first_raw)
-        self.runtime.write_item(item, raw_evidence_id=second_raw)
+        self.runtime.write_item(
+            _item(content_hash="content-hash-1", run_id="run-2"),
+            raw_evidence_id=second_raw,
+        )
 
         conn = sqlite3.connect(self.db_path)
         try:
@@ -291,19 +388,75 @@ class RuntimeRegressionTest(unittest.TestCase):
         self.assertEqual(result["candidate_status"], "blocked")
         self.assertEqual(result["candidate_reason"], "robots:unknown")
 
+    def test_raw_from_another_source_is_rejected_before_stage(self):
+        raw_id = self.runtime.persist_raw(self._evidence())
+        item = _item(
+            source_id="nzrc",
+            source_url="https://example.test/job/1",
+            long_term_url="https://example.test/job/1",
+            detail_url="https://example.test/job/1",
+        )
+
+        result = self.runtime.write_item(item, raw_evidence_id=raw_id)
+
+        self.assertEqual(result["candidate_status"], "blocked")
+        self.assertIn("raw_source_mismatch", result["candidate_reason"])
+        conn = sqlite3.connect(self.db_path)
+        try:
+            stage_count = conn.execute(
+                "SELECT COUNT(*) FROM stage_source_items"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(stage_count, 0)
+
+    def test_item_run_id_must_match_raw_evidence_run_id(self):
+        raw_id = self.runtime.persist_raw(self._evidence(run_id="run-1"))
+
+        result = self.runtime.write_item(
+            _item(run_id="run-2"), raw_evidence_id=raw_id
+        )
+
+        self.assertEqual(result["candidate_status"], "blocked")
+        self.assertIn("raw_run_mismatch", result["candidate_reason"])
+        conn = sqlite3.connect(self.db_path)
+        try:
+            stage_count = conn.execute(
+                "SELECT COUNT(*) FROM stage_source_items"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+        self.assertEqual(stage_count, 0)
+
 
 class LifecycleRegressionTest(unittest.TestCase):
-    def test_spider_run_ids_are_unique_per_crawl(self):
-        class Spider(CollectionSpiderMixin):
+    def test_two_requests_in_one_crawl_share_a_run_id(self):
+        class Spider(CollectionSpiderMixin, scrapy.Spider):
+            name = "run-id-contract"
             source_id = "ihchina"
 
-        first = Spider()
-        second = Spider()
-        first.open_spider()
-        second.open_spider()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = Settings(
+                {
+                    "COLLECTION_DATABASE_PATH": str(root / "crawler.db"),
+                    "COLLECTION_DOWNLOAD_ROOT": str(root / "download"),
+                    "SOURCE_REGISTRY_PATH": str(REGISTRY),
+                    "ROBOTSTXT_OBEY": False,
+                }
+            )
+            crawler = CrawlerProcess(settings).create_crawler(Spider)
+            spider = Spider.from_crawler(crawler)
+            middleware = RawEvidenceMiddleware.from_crawler(crawler)
+            first = Request("https://example.test/one")
+            second = Request("https://example.test/two")
 
-        self.assertNotEqual(first.run_id, second.run_id)
-        self.assertTrue(first.run_id.startswith("ihchina-"))
+            middleware.process_request(first, spider)
+            middleware.process_request(second, spider)
+
+            self.assertTrue(spider.run_id.startswith("ihchina-"))
+            self.assertEqual(first.meta["run_id"], spider.run_id)
+            self.assertEqual(second.meta["run_id"], spider.run_id)
 
     def test_old_stage_key_is_migrated_to_source_item_key(self):
         with tempfile.TemporaryDirectory() as tmp:

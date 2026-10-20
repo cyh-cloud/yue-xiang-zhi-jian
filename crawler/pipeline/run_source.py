@@ -24,21 +24,30 @@ DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
 _TEST_SOURCE_MODES = {
     "fixture-source": frozenset({"fixture"}),
 }
-_SOURCE_MODES = {
-    source_id: source_registry.run_modes(source)
-    for source_id, source in source_registry.load_registry().items()
+# Legacy CLI names translate to a canonical registry mode before validation.
+# The registry still decides whether the canonical mode is executable.
+_LEGACY_MODE_ALIASES = {
+    ("aqsc-moa", "xlsx"): "fixture",
+    ("cnipa", "pdf"): "fixture",
+    ("cnipa", "announcement-fixture"): "fixture",
+    ("nzrc", "saved"): "live",
+    ("nongmuhr", "saved"): "live",
 }
-_LEGACY_SOURCE_MODES = {
-    "aqsc-moa": frozenset({"xlsx"}),
-    "cnipa": frozenset({"pdf", "announcement-fixture"}),
-    "nzrc": frozenset({"saved"}),
-    "nongmuhr": frozenset({"saved"}),
-}
-for source_id, modes in _LEGACY_SOURCE_MODES.items():
-    _SOURCE_MODES[source_id] = modes
-_SOURCE_MODES.update(_TEST_SOURCE_MODES)
+_LEGACY_UNSUPPORTED_MODES = {("cnipa", "fixture")}
 RUN_MODES = tuple(
-    sorted({mode for modes in _SOURCE_MODES.values() for mode in modes})
+    sorted(
+        {
+            mode
+            for source in source_registry.load_registry().values()
+            for mode in source_registry.run_modes(source)
+        }
+        | {legacy for _, legacy in _LEGACY_MODE_ALIASES}
+        | {
+            mode
+            for modes in _TEST_SOURCE_MODES.values()
+            for mode in modes
+        }
+    )
 )
 
 _AQSC_FILES = {
@@ -1580,12 +1589,15 @@ def run_source(source_id, mode, config):
                 failed_count=0,
                 errors=(source_decision.reason or "source_blocked",),
             )
-        allowed_modes = _SOURCE_MODES.get(
-            source_id, source_registry.run_modes(source)
-        )
+        allowed_modes = source_registry.run_modes(source)
     else:
         allowed_modes = _TEST_SOURCE_MODES[source_id]
-    if mode not in allowed_modes:
+    if (source_id, mode) in _LEGACY_UNSUPPORTED_MODES:
+        raise ValueError(f"mode {mode} is not implemented for {source_id}")
+    canonical_mode = _LEGACY_MODE_ALIASES.get(
+        (source_id, mode), mode
+    )
+    if canonical_mode not in allowed_modes:
         raise ValueError(f"mode {mode} is not implemented for {source_id}")
 
     retrieved_at = _now()

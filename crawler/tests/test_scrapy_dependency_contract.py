@@ -15,6 +15,51 @@ class ScrapyDependencyContractTest(unittest.TestCase):
 
         self.assertTrue(any(dep.startswith("scrapy") for dep in dependencies))
         self.assertTrue((ROOT / "uv.lock").is_file())
+        for package in ("beautifulsoup4", "openpyxl", "pypdf"):
+            self.assertFalse(
+                any(dep.startswith(package) for dep in dependencies),
+                package,
+            )
+
+    def test_site_dependencies_are_declared_by_project(self):
+        payload = tomllib.loads(
+            (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        optional = payload["project"]["optional-dependencies"]
+        dev = payload["dependency-groups"]["dev"]
+
+        for project in (
+            "ihchina",
+            "nzrc",
+            "nongmuhr",
+            "dialect-org",
+            "cass-linguistics",
+            "feiyiw",
+        ):
+            self.assertTrue(
+                any(
+                    dependency.startswith("beautifulsoup4")
+                    for dependency in optional[project]
+                ),
+                project,
+            )
+        self.assertTrue(
+            any(
+                dependency.startswith("openpyxl")
+                for dependency in optional["aqsc-moa"]
+            )
+        )
+        self.assertTrue(
+            any(
+                dependency.startswith("pypdf")
+                for dependency in optional["cnipa"]
+            )
+        )
+        for package in ("beautifulsoup4", "openpyxl", "pypdf"):
+            self.assertTrue(
+                any(dependency.startswith(package) for dependency in dev),
+                package,
+            )
 
     def test_projects_do_not_copy_lockfiles(self):
         projects = ROOT / "collection" / "projects"

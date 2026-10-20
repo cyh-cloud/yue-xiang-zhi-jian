@@ -36,6 +36,13 @@ def _insert_sql(table, values):
     )
 
 
+def _safe_path_component(value):
+    return "".join(
+        "_" if character in '<>:"/\\|?*' else character
+        for character in str(value)
+    )
+
+
 class CollectionRuntime:
     def __init__(
         self,
@@ -77,7 +84,9 @@ class CollectionRuntime:
         self.download_root.mkdir(parents=True, exist_ok=True)
         body = bytes(evidence.body)
         digest = sha256_bytes(body)
-        host = urlparse(evidence.request_url).netloc or "fixture.local"
+        host = _safe_path_component(
+            urlparse(evidence.request_url).netloc or "fixture.local"
+        )
         domain_dir = self.download_root / host
         domain_dir.mkdir(parents=True, exist_ok=True)
         file_name = evidence.metadata.get("file_name") or (
@@ -237,7 +246,8 @@ class CollectionRuntime:
         try:
             raw = conn.execute(
                 """
-                SELECT robots_decision, run_id, rights_status, access_level
+                SELECT source_id, robots_decision, run_id, rights_status,
+                       access_level
                 FROM raw_fetches WHERE id = ?
                 """,
                 (raw_evidence_id,),
@@ -249,30 +259,51 @@ class CollectionRuntime:
                     "candidate_reason": "raw_evidence:missing",
                 }
             else:
-                robots = RobotsFact(raw[0] or "unknown")
+                if raw[0] != payload["source_id"]:
+                    conn.commit()
+                    return {
+                        "candidate_status": "blocked",
+                        "candidate_reason": (
+                            f"raw_source_mismatch:{raw[0]}"
+                        ),
+                    }
+                raw_run_id = raw[2]
+                if (
+                    raw_run_id
+                    and raw_run_id != "legacy"
+                    and payload["run_id"] != raw_run_id
+                ):
+                    conn.commit()
+                    return {
+                        "candidate_status": "blocked",
+                        "candidate_reason": (
+                            f"raw_run_mismatch:{raw_run_id}"
+                        ),
+                    }
+                robots = RobotsFact(raw[1] or "unknown")
                 internal = evaluate_admission(
                     payload,
                     registry_path=self.registry_path,
                     robots=robots,
                 )
-                if raw[2] in NON_RUNNABLE_RIGHTS:
+                if raw[3] in NON_RUNNABLE_RIGHTS:
                     internal = type(
                         "Decision",
                         (),
                         {
                             "allowed": False,
                             "status": "blocked",
-                            "reason": f"raw_rights:{raw[2]}",
+                            "reason": f"raw_rights:{raw[3]}",
                         },
                     )()
-                elif raw[3] in NON_RUNNABLE_ACCESS:
+                elif raw[4] in NON_RUNNABLE_ACCESS:
                     internal = type(
                         "Decision",
                         (),
                         {
                             "allowed": False,
                             "status": "blocked",
-                            "reason": f"raw_access:{raw[3]}",
+                            "reason": f"raw_access:{raw[4]}",
                         },
                     )()
                 decision = (
@@ -280,8 +311,8 @@ class CollectionRuntime:
                     if admission is not None and not admission.allowed
                     else internal
                 )
-                if raw[1] and raw[1] != "legacy":
-                    payload["run_id"] = raw[1]
+                if raw_run_id and raw_run_id != "legacy":
+                    payload["run_id"] = raw_run_id
             if not payload.get("content_hash"):
                 payload["content_hash"] = sha256_bytes(
                     json.dumps(

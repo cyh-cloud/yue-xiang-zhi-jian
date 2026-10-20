@@ -91,6 +91,8 @@ desktop.ini
 crawler/data/
 crawler/.tmp-test/
 crawler/docs/private/
+crawler/crawler.db
+crawler/downloads/
 # Raw evidence can contain page content, attachments, and session headers.
 # Keep the entire local evidence store out of the public repository.
 crawler/download/

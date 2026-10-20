@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .items import CollectionItem
 from .run_id import new_run_id
-from .reporting import RunReport
+from .reporting import RunReport, build_run_report
 from .runtime import CollectionRuntime
 
 
@@ -21,7 +22,9 @@ def replay_fixture(
     run_id=None,
     item_builder=None,
     candidate_writer=None,
+    report_root=None,
 ):
+    started_at = datetime.now(timezone.utc).isoformat()
     fixture_dir = Path(fixture_dir)
     fixture_path = fixture_dir / "discover.json"
     if not fixture_path.is_file():
@@ -63,7 +66,10 @@ def replay_fixture(
     )
     written = 0
     blocked = 0
+    deferred = 0
+    skipped = 0
     failed = 0
+    errors = []
     for index, raw in enumerate(raw_items):
         try:
             payload = (
@@ -80,19 +86,35 @@ def replay_fixture(
             result = runtime.write_item(item, raw_evidence_id=raw_id)
             if result["candidate_status"] == "candidate":
                 written += 1
+            elif result["candidate_status"] == "deferred":
+                deferred += 1
+            elif result["candidate_status"] == "skipped":
+                skipped += 1
             else:
                 blocked += 1
         except Exception as exc:
             failed += 1
+            errors.append(f"{index}: {type(exc).__name__}: {exc}")
 
-    return RunReport(
+    return build_run_report(
         run_id=run_id,
         source_id=source_id,
         mode="fixture",
-        discovered=len(raw_items),
-        written=written,
-        blocked=blocked,
-        failed=failed,
+        database_path=database_path,
+        started_at=started_at,
+        finished_at=datetime.now(timezone.utc).isoformat(),
+        request_count=1,
+        item_counts={
+            "discovered": len(raw_items),
+            "written": written,
+            "blocked": blocked,
+            "deferred": deferred,
+            "skipped": skipped,
+            "failed": failed,
+        },
+        errors=errors,
+        evidence_path=download_root,
+        report_root=report_root,
     )
 
 

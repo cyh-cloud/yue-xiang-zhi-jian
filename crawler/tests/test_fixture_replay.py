@@ -70,6 +70,12 @@ class FixtureReplayTest(unittest.TestCase):
         self.assertEqual(raw_count, 2)
         self.assertEqual(stage_count, 1)
         self.assertEqual(candidate_count, 1)
+        self.assertEqual(first.stage_count, 1)
+        self.assertEqual(second.stage_count, 1)
+        self.assertEqual(second.candidate_count, 1)
+        self.assertNotEqual(first.report_path, second.report_path)
+        self.assertTrue(Path(first.report_path).is_file())
+        self.assertTrue(Path(second.report_path).is_file())
 
     def test_empty_fixture_is_failed_not_succeeded(self):
         (self.fixture / "discover.json").write_text(
