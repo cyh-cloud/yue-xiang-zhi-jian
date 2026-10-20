@@ -1,0 +1,144 @@
+/*
+ * Enterprise page styles. Shared backoffice primitives remain in
+ * components.css; shell layout and role themes remain in backoffice.css.
+ */
+
+.enterprise-job-form {
+  display: grid;
+  gap: 14px;
+}
+
+.enterprise-job-form textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 9px 10px;
+  border: 1px solid var(--bo-input-border);
+  border-radius: 8px;
+  background: var(--bo-input-bg);
+  color: var(--bo-text);
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.enterprise-job-form textarea:focus {
+  border-color: var(--bo-accent);
+  box-shadow: 0 0 0 3px var(--bo-accent-soft);
+  outline: none;
+}
+
+.review-pill {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.review-pill.is-approved {
+  background: rgba(31, 107, 66, 0.12);
+  color: var(--bo-success);
+}
+
+.review-pill.is-pending {
+  background: rgba(186, 117, 23, 0.13);
+  color: #9a6413;
+}
+
+.review-pill.is-rejected {
+  background: rgba(179, 56, 47, 0.12);
+  color: var(--bo-danger);
+}
+
+.review-reason {
+  max-width: 260px;
+  color: var(--bo-danger);
+  line-height: 1.45;
+}
+
+[data-theme="dark"] .review-pill.is-pending {
+  color: #efc75e;
+}
+
+.status-summary {
+  display: flex;
+  gap: 18px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--bo-card-border);
+  color: var(--bo-muted);
+  font-size: 0.76rem;
+}
+
+.application-pill {
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.application-pill.is-pending {
+  background: rgba(186, 117, 23, 0.13);
+  color: #9a6413;
+}
+
+.application-pill.is-interview {
+  background: rgba(74, 111, 165, 0.13);
+  color: #3a5780;
+}
+
+.application-pill.is-approved {
+  background: rgba(31, 107, 66, 0.12);
+  color: var(--bo-success);
+}
+
+.application-pill.is-rejected {
+  background: rgba(179, 56, 47, 0.12);
+  color: var(--bo-danger);
+}
+
+.resume-row > td {
+  background: color-mix(in srgb, var(--bo-page-bg) 55%, var(--bo-card-bg));
+}
+
+.resume-row .resume-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.resume-row .resume-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  font-size: 0.82rem;
+}
+
+.resume-row .resume-block h3 {
+  margin: 0 0 4px;
+  color: var(--bo-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.resume-row .resume-block p,
+.resume-row .resume-empty {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.resume-row .resume-empty {
+  color: var(--bo-muted);
+}
+
+[data-theme="dark"] .application-pill.is-pending {
+  color: #efc75e;
+}
+
+[data-theme="dark"] .application-pill.is-interview {
+  color: #9cb8e5;
+}

@@ -608,26 +608,4 @@ onMounted(async () => {
   </section>
 </template>
 
-<style scoped>
-.operator-filter-check {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.operator-filter-check input {
-  width: auto;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-</style>
+<style src="./operator.css"></style>

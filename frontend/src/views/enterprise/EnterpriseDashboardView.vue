@@ -186,3 +186,5 @@ onMounted(loadStats);
     </BackofficeCard>
   </section>
 </template>
+
+<style src="./enterprise.css"></style>
