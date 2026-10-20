@@ -53,6 +53,9 @@ BASE_LAYER_FILES = frozenset(
 )
 BASE_LAYER_PREFIXES = ("frontend/src/styles/base/",)
 TOKEN_LAYER_FILES = frozenset({"frontend/src/styles/tokens.css"})
+ACTIVE_ENTRY = "frontend/src/main.ts"
+TOKENS_SHEET = "frontend/src/styles/tokens.css"
+BASE_SHEET = "frontend/src/styles/base.css"
 SHELL_LAYER_FILES = frozenset(
     {
         "frontend/src/styles/public-shell.css",
@@ -84,6 +87,8 @@ KIND_REFERENCE_HEADER = "legacy-reference-header"
 KIND_CROSS_PAGE_STYLE = "cross-page-style-import"
 KIND_GLOBAL_OVERRIDE = "universal-global-override"
 KIND_RAW_ROLE_SELECTOR = "raw-role-selector"
+KIND_TOKEN_CONTRACT = "token-contract"
+KIND_BASE_OWNERSHIP = "base-ownership"
 
 KIND_ORDER = {
     KIND_LEGACY_IMPORT: 0,
@@ -91,6 +96,117 @@ KIND_ORDER = {
     KIND_CROSS_PAGE_STYLE: 2,
     KIND_GLOBAL_OVERRIDE: 3,
     KIND_RAW_ROLE_SELECTOR: 4,
+    KIND_TOKEN_CONTRACT: 5,
+    KIND_BASE_OWNERSHIP: 6,
+}
+
+TOKEN_REQUIRED_GROUPS = {
+    "brand": (
+        "--color-brand",
+        "--color-brand-strong",
+        "--color-brand-soft",
+        "--color-brand-tint",
+    ),
+    "accent": (
+        "--color-accent-gold",
+        "--color-accent-clay",
+        "--color-accent-indigo",
+        "--gradient-brand",
+    ),
+    "surface": (
+        "--surface-canvas",
+        "--surface-raised",
+        "--surface-muted",
+        "--surface-inverse",
+        "--surface-inverse-strong",
+    ),
+    "text": (
+        "--color-text-primary",
+        "--color-text-secondary",
+        "--color-text-muted",
+        "--color-text-inverse",
+    ),
+    "border": (
+        "--border-default",
+        "--border-subtle",
+        "--focus-ring-color",
+    ),
+    "spacing": tuple("--space-%d" % index for index in range(1, 8)),
+    "radius": (
+        "--radius-xs",
+        "--radius-sm",
+        "--radius",
+        "--radius-full",
+    ),
+    "shadow": tuple("--shadow-%s" % size for size in ("xs", "sm", "md", "lg", "xl")),
+    "layering": (
+        "--z-base",
+        "--z-navigation",
+        "--z-dropdown",
+        "--z-overlay",
+        "--z-modal",
+        "--z-toast",
+    ),
+    "typography": (
+        "--font-family-display",
+        "--font-family-ui",
+        "--font-family-serif",
+        "--font-size-root",
+        "--font-size-body",
+        "--line-height-body",
+        "--text-base",
+    ),
+    "motion": (
+        "--duration-fast",
+        "--duration-normal",
+        "--duration-slow",
+        "--ease-out",
+        "--ease-in-out",
+        "--transition",
+    ),
+    "breakpoint": (
+        "--breakpoint-xs",
+        "--breakpoint-sm",
+        "--breakpoint-md",
+        "--breakpoint-lg",
+        "--breakpoint-xl",
+        "--breakpoint-2xl",
+        "--breakpoint-content",
+    ),
+    "compatibility": (
+        "--brand",
+        "--bg-primary",
+        "--text-primary",
+        "--border",
+        "--font",
+        "--app-font",
+        "--transition",
+    ),
+}
+
+DARK_THEME_REQUIRED_TOKENS = (
+    "--color-brand",
+    "--surface-canvas",
+    "--surface-raised",
+    "--color-text-primary",
+    "--border-default",
+    "--shadow-md",
+)
+
+LARGE_TEXT_REQUIRED_TOKENS = (
+    "--font-size-root",
+    "--font-size-body",
+    "--line-height-body",
+)
+
+BASE_REQUIRED_MARKERS = {
+    "reset": (r"\*,\s*\*::before,\s*\*::after", "reset 选择器"),
+    "app root": (r"#app", "#app 基础规则"),
+    "focus": (r":focus-visible", "全站焦点规则"),
+    "reduced motion": (r"prefers-reduced-motion", "减少动效规则"),
+    "root font": (r"var\(--font-size-root\)", "根字号 token 消费"),
+    "body font": (r"var\(--font-size-body\)", "正文字号 token 消费"),
+    "body line height": (r"var\(--line-height-body\)", "正文行高 token 消费"),
 }
 
 TS_IMPORT_RE = re.compile(
@@ -113,6 +229,23 @@ ATTR_RE = re.compile(
 )
 SELECTOR_RE = re.compile(r"([^{}]+)\{")
 ROLE_SELECTOR_RE = re.compile(r"\[\s*data-role\b[^\]]*\]", re.IGNORECASE)
+TOKEN_DEFINITION_RE = re.compile(r"(--[a-zA-Z0-9_-]+)\s*:")
+TRANSITIONAL_GLOBAL_SELECTOR_PATTERNS = (
+    (re.compile(r"(?m)^\s*:root\s*\{"), "全局 token"),
+    (
+        re.compile(r"""(?m)^\s*\[data-theme\s*=\s*["']dark["']\]\s*\{"""),
+        "暗色主题 token",
+    ),
+    (
+        re.compile(r"(?m)^\s*html\[data-large-text\]\s*\{"),
+        "大字模式 token",
+    ),
+    (
+        re.compile(r"(?m)^\s*\*\s*,\s*\*::before\s*,\s*\*::after\s*\{"),
+        "全局 reset",
+    ),
+    (re.compile(r"(?m)^\s*\*:focus-visible\s*\{"), "全局焦点规则"),
+)
 
 
 @dataclass(frozen=True)
@@ -191,6 +324,19 @@ def strip_css_comments(text: str) -> str:
         return re.sub(r"[^\n]", " ", match.group(0))
 
     return re.sub(r"/\*.*?\*/", blank, text, flags=re.DOTALL)
+
+
+def selector_block_body(text: str, selector: str) -> str | None:
+    pattern = re.compile(
+        r"(?m)^[ \t]*" + re.escape(selector) + r"\s*\{(?P<body>.*?)^[ \t]*\}",
+        re.DOTALL,
+    )
+    match = pattern.search(text)
+    return match.group("body") if match else None
+
+
+def token_definitions(text: str) -> set[str]:
+    return set(TOKEN_DEFINITION_RE.findall(strip_css_comments(text)))
 
 
 def attrs_from_tag(attrs: str) -> dict[str, str]:
@@ -414,6 +560,193 @@ def check_reference_header(root: Path, report: Report) -> None:
         )
 
 
+def check_style_contract(root: Path, report: Report) -> None:
+    entry_path = root / ACTIVE_ENTRY
+    if not entry_path.is_file():
+        return
+
+    tokens_path = root / TOKENS_SHEET
+    if not tokens_path.is_file():
+        report.violations.append(
+            Violation(
+                KIND_TOKEN_CONTRACT,
+                TOKENS_SHEET,
+                1,
+                "活动 SPA 缺少全局语义 token 源",
+            )
+        )
+    else:
+        tokens_text = read_text(tokens_path)
+        definitions = token_definitions(tokens_text)
+        for group, required in TOKEN_REQUIRED_GROUPS.items():
+            missing = [name for name in required if name not in definitions]
+            if missing:
+                report.violations.append(
+                    Violation(
+                        KIND_TOKEN_CONTRACT,
+                        TOKENS_SHEET,
+                        1,
+                        "语义 token 分组缺少 %s：%s"
+                        % (group, "、".join(missing)),
+                    )
+                )
+
+        dark_body = selector_block_body(tokens_text, '[data-theme="dark"]')
+        if dark_body is None:
+            report.violations.append(
+                Violation(
+                    KIND_TOKEN_CONTRACT,
+                    TOKENS_SHEET,
+                    1,
+                    "缺少暗色主题 token 覆盖",
+                )
+            )
+        else:
+            dark_tokens = token_definitions(dark_body)
+            missing = [
+                name
+                for name in DARK_THEME_REQUIRED_TOKENS
+                if name not in dark_tokens
+            ]
+            if missing:
+                report.violations.append(
+                    Violation(
+                        KIND_TOKEN_CONTRACT,
+                        TOKENS_SHEET,
+                        1,
+                        "暗色主题缺少 token：%s" % "、".join(missing),
+                    )
+                )
+
+        large_text_body = selector_block_body(
+            tokens_text,
+            "html[data-large-text]",
+        )
+        if large_text_body is None:
+            report.violations.append(
+                Violation(
+                    KIND_TOKEN_CONTRACT,
+                    TOKENS_SHEET,
+                    1,
+                    "缺少大字模式 token 覆盖",
+                )
+            )
+        else:
+            large_text_tokens = token_definitions(large_text_body)
+            missing = [
+                name
+                for name in LARGE_TEXT_REQUIRED_TOKENS
+                if name not in large_text_tokens
+            ]
+            if missing:
+                report.violations.append(
+                    Violation(
+                        KIND_TOKEN_CONTRACT,
+                        TOKENS_SHEET,
+                        1,
+                        "大字模式缺少 token：%s" % "、".join(missing),
+                    )
+                )
+
+    base_path = root / BASE_SHEET
+    if not base_path.is_file():
+        report.violations.append(
+            Violation(
+                KIND_BASE_OWNERSHIP,
+                BASE_SHEET,
+                1,
+                "活动 SPA 缺少全局基础层",
+            )
+        )
+    else:
+        base_text = read_text(base_path)
+        for label, (pattern, description) in BASE_REQUIRED_MARKERS.items():
+            if not re.search(pattern, strip_css_comments(base_text)):
+                report.violations.append(
+                    Violation(
+                        KIND_BASE_OWNERSHIP,
+                        BASE_SHEET,
+                        1,
+                        "基础层缺少%s（%s）" % (description, label),
+                    )
+                )
+
+    entry_text = read_text(entry_path)
+    positions = {}
+    for index, ref in enumerate(extract_imports(ACTIVE_ENTRY, entry_text)):
+        target = resolve_specifier(ACTIVE_ENTRY, ref.specifier)
+        if target in {TOKENS_SHEET, BASE_SHEET, TRANSITIONAL_LEGACY_SHEET}:
+            positions.setdefault(target, index)
+
+    for target, label in (
+        (TOKENS_SHEET, "tokens.css"),
+        (BASE_SHEET, "base.css"),
+    ):
+        if target not in positions:
+            report.violations.append(
+                Violation(
+                    KIND_BASE_OWNERSHIP,
+                    ACTIVE_ENTRY,
+                    1,
+                    "main.ts 必须显式导入 %s" % label,
+                    target,
+                )
+            )
+
+    legacy_position = positions.get(TRANSITIONAL_LEGACY_SHEET)
+    token_position = positions.get(TOKENS_SHEET)
+    base_position = positions.get(BASE_SHEET)
+    if legacy_position is not None:
+        if token_position is not None and token_position > legacy_position:
+            report.violations.append(
+                Violation(
+                    KIND_BASE_OWNERSHIP,
+                    ACTIVE_ENTRY,
+                    1,
+                    "tokens.css 必须早于过渡期 legacy-public.css 导入",
+                )
+            )
+        if base_position is not None and base_position > legacy_position:
+            report.violations.append(
+                Violation(
+                    KIND_BASE_OWNERSHIP,
+                    ACTIVE_ENTRY,
+                    1,
+                    "base.css 必须早于过渡期 legacy-public.css 导入",
+                )
+            )
+    if (
+        token_position is not None
+        and base_position is not None
+        and token_position > base_position
+    ):
+        report.violations.append(
+            Violation(
+                KIND_BASE_OWNERSHIP,
+                ACTIVE_ENTRY,
+                1,
+                "tokens.css 必须早于 base.css 导入",
+            )
+        )
+
+
+def check_transitional_sheet_ownership(root: Path, report: Report) -> None:
+    path = root / TRANSITIONAL_LEGACY_SHEET
+    if not path.is_file():
+        return
+    text = strip_css_comments(read_text(path))
+    for pattern, label in TRANSITIONAL_GLOBAL_SELECTOR_PATTERNS:
+        for match in pattern.finditer(text):
+            report.violations.append(
+                Violation(
+                    KIND_BASE_OWNERSHIP,
+                    TRANSITIONAL_LEGACY_SHEET,
+                    text.count("\n", 0, match.start()) + 1,
+                    "%s属于 token 或基础层，不能留在过渡期旧样式表中" % label,
+                )
+            )
+
+
 def check_imports(
     relative: str,
     text: str,
@@ -514,6 +847,9 @@ def check(root: Path = REPO_ROOT) -> Report:
         report.active_files += 1
         check_imports(relative, text, report)
         check_style_blocks(relative, style_blocks(relative, text), report)
+
+    check_style_contract(root, report)
+    check_transitional_sheet_ownership(root, report)
 
     reference_files = list(iter_reference_files(root))
     report.reference_files = len(reference_files)

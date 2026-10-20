@@ -47,29 +47,44 @@ class CheckFrontendStylesTest(unittest.TestCase):
             marker + ".legacy { color: #123456; }\n",
         )
 
+    def write_style_contract(self):
+        for relative in (
+            "frontend/src/styles/tokens.css",
+            "frontend/src/styles/base.css",
+        ):
+            self.write(
+                relative,
+                (REPO_ROOT / relative).read_text(encoding="utf-8"),
+            )
+
     def test_transitional_legacy_import_from_main_is_allowed(self):
+        self.write_style_contract()
         self.write(
             "frontend/src/main.ts",
+            'import "./styles/tokens.css";\n'
+            'import "./styles/base.css";\n'
             'import "./styles/legacy-public.css";\n'
-            'import "./styles/global.css";\n',
+            'import "./styles/public-shell.css";\n',
         )
-        self.write("frontend/src/styles/legacy-public.css", ":root {}\n")
-        self.write("frontend/src/styles/global.css", "* { box-sizing: border-box; }\n")
+        self.write("frontend/src/styles/legacy-public.css", "/* active */\n")
 
         report = self.check()
 
         self.assertTrue(report.ok, checker.format_report(report))
 
     def test_second_import_of_transitional_legacy_sheet_is_rejected(self):
+        self.write_style_contract()
         self.write(
             "frontend/src/main.ts",
+            'import "./styles/tokens.css";\n'
+            'import "./styles/base.css";\n'
             'import "./styles/legacy-public.css";\n',
         )
         self.write(
             "frontend/src/extra.ts",
             'import "./styles/legacy-public.css";\n',
         )
-        self.write("frontend/src/styles/legacy-public.css", ":root {}\n")
+        self.write("frontend/src/styles/legacy-public.css", "/* active */\n")
 
         report = self.check()
 
@@ -249,6 +264,93 @@ class CheckFrontendStylesTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, stdout)
         self.assertIn("CSS 样式检查通过", stdout)
+
+    def test_token_source_covers_semantic_groups_and_modes(self):
+        tokens_path = REPO_ROOT / "frontend" / "src" / "styles" / "tokens.css"
+        self.assertTrue(tokens_path.is_file(), "缺少全局语义 token 源")
+
+        tokens = tokens_path.read_text(encoding="utf-8")
+        for prefix in (
+            "--color-brand-",
+            "--color-accent-",
+            "--surface-",
+            "--color-text-",
+            "--border-",
+            "--space-",
+            "--radius-",
+            "--shadow-",
+            "--z-",
+            "--font-",
+            "--duration-",
+            "--breakpoint-",
+        ):
+            with self.subTest(prefix=prefix):
+                self.assertRegex(tokens, rf"{prefix}[a-z0-9-]+\s*:")
+
+        self.assertIn('[data-theme="dark"]', tokens)
+        self.assertIn("html[data-large-text]", tokens)
+
+    def test_base_layer_owns_reset_accessibility_and_entry_order(self):
+        styles = REPO_ROOT / "frontend" / "src" / "styles"
+        base_path = styles / "base.css"
+        self.assertTrue(base_path.is_file(), "缺少全局基础层")
+
+        base = base_path.read_text(encoding="utf-8")
+        self.assertRegex(base, r"\*,\s*\*::before,\s*\*::after")
+        self.assertIn("box-sizing: border-box", base)
+        self.assertIn("#app", base)
+        self.assertIn(":focus-visible", base)
+        self.assertIn("prefers-reduced-motion", base)
+        self.assertIn("var(--font-size-root)", base)
+        self.assertIn("var(--font-size-body)", base)
+        self.assertIn("var(--line-height-body)", base)
+
+        main = (REPO_ROOT / "frontend" / "src" / "main.ts").read_text(
+            encoding="utf-8"
+        )
+        tokens_index = main.index('"./styles/tokens.css"')
+        base_index = main.index('"./styles/base.css"')
+        legacy_index = main.index('"./styles/legacy-public.css"')
+        self.assertLess(tokens_index, legacy_index)
+        self.assertLess(base_index, legacy_index)
+
+        legacy = (styles / "legacy-public.css").read_text(encoding="utf-8")
+        self.assertNotRegex(legacy, r"(?m)^\s*:root\s*\{")
+        self.assertNotRegex(
+            legacy,
+            r'(?m)^\s*\[data-theme="dark"\]\s*\{',
+        )
+        self.assertNotRegex(legacy, r"(?m)^\s*html\[data-large-text\]\s*\{")
+        self.assertNotIn('data-large-font="true"', legacy)
+
+    def test_checker_requires_token_and_base_contract_for_active_entry(self):
+        self.write(
+            "frontend/src/main.ts",
+            'import "./styles/tokens.css";\n'
+            'import "./styles/base.css";\n'
+            'import "./styles/legacy-public.css";\n',
+        )
+        self.write("frontend/src/styles/legacy-public.css", "/* active */\n")
+
+        report = self.check()
+
+        self.assertIn("token-contract", self.kinds(report))
+        self.assertIn("base-ownership", self.kinds(report))
+
+    def test_transitional_sheet_cannot_own_global_tokens_or_reset(self):
+        self.write(
+            "frontend/src/styles/legacy-public.css",
+            ":root { --brand: #123456; }\n"
+            '[data-theme="dark"] { --brand: #abcdef; }\n'
+            "*, *::before, *::after { margin: 0; }\n",
+        )
+
+        report = self.check()
+
+        self.assertEqual(
+            self.kinds(report),
+            ["base-ownership", "base-ownership", "base-ownership"],
+        )
 
 
 if __name__ == "__main__":

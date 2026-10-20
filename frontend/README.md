@@ -41,6 +41,10 @@ npm run test:e2e
 `../docs/css-style-ownership.md`。视觉矩阵的基线库准备、运行方式与更新规则见
 `../docs/css-visual-regression.md`。
 
+全局语义 token 在 `src/styles/tokens.css`，reset、基础元素、焦点和减少动效规则在
+`src/styles/base.css`。`src/main.ts` 先加载这两层，再加载 T13 前仍保留的
+`src/styles/legacy-public.css`。
+
 ```powershell
 python tools/check_frontend_styles.py
 npm run test:visual:matrix

@@ -13,7 +13,7 @@ CSS 组件化的目标是降低样式影响面，不改变现有视觉。判断�
 | 层 | 目标位置 | 允许职责 | 不允许 |
 | --- | --- | --- | --- |
 | token | `frontend/src/styles/tokens.css`，角色和主题覆盖在对应外壳根节点 | 语义颜色、表面、文字、边框、间距、圆角、阴影、层级、字体、动效、断点、角色主题 token | 组件选择器、页面布局、业务状态样式 |
-| 全局基础层 | `frontend/src/styles/global.css`，后续可拆 `base.css` / `reset.css` | reset、`html` / `body` / `#app` 基础规则、全站焦点与可访问性约定、全站滚动基础 | 组件外观、页面布局、角色条件样式 |
+| 全局基础层 | `frontend/src/styles/base.css` | reset、`html` / `body` / `#app` 基础规则、全站焦点与可访问性约定、全站滚动基础 | 组件外观、页面布局、角色条件样式 |
 | 共享组件层 | `frontend/src/components/shared/`，或确有第二处复用的组件 SFC scoped 样式 | 按钮、输入、选择、标签、卡片、表格容器、空态、加载态、弹窗、消息中心 | 页面专属布局、角色选择器、跨页覆盖 |
 | 公开站外壳 | `frontend/src/layouts/PublicLayout.vue`、`frontend/src/components/public/`、`frontend/src/styles/public-shell.css` | 顶栏、导航、页脚、用户菜单、主题与大字开关、CDN 降级提示、公开站根布局 | 具体页面内容、教师或后台页面规则 |
 | 后台外壳 | `frontend/src/layouts/BackofficeLayout.vue`、`frontend/src/components/backoffice/`、`frontend/src/styles/backoffice.css` | 顶栏、侧栏、页面框架、连接状态、消息中心挂载点、角色根节点 token 覆盖 | 具体角色页面布局、业务表格字段样式 |
@@ -70,8 +70,8 @@ frontend/src/main.ts
 “历史参照，禁止活动代码引用”。任何活动代码都不得 import `legacy/reference/`，
 也不得从 `main.ts` 之外再次 import 当前旧样式。T13 删除该例外。
 
-新增规则一律进入上表的目标层，不写入 `legacy-public.css`。当前 token 和基础规则
-仍有一部分位于旧样式与 `global.css`，由 T2 收口。
+新增规则一律进入上表的目标层，不写入 `legacy-public.css`。T2 已把全局 token 与
+基础规则收口到 `tokens.css` / `base.css`，旧样式表只保留尚未迁移的页面与组件规则。
 
 ## 机械检查
 
@@ -85,6 +85,9 @@ python -m unittest tests.test_frontend_styles -v
 检查器负责：
 
 - 只读旧样式 import 和过渡期唯一例外；
+- 活动入口对 `tokens.css` / `base.css` 的显式导入与顺序；
+- 全局语义 token 分组、明暗主题和大字模式覆盖完整性；
+- 过渡期旧样式不得重新定义全局 token、reset 或全站焦点规则；
 - 页面私有样式跨域 import；
 - 基础层与外壳之外的万能全局选择器；
 - 外壳与 token 层之外的 `[data-role]` 选择器；
