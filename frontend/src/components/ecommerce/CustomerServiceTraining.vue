@@ -302,9 +302,9 @@ async function submit(): Promise<void> {
       和不同性格的 AI 客户对话，实时评分并获得回复提示
     </p>
 
-    <div class="cs-panel">
-      <div class="cs-config">
-        <div class="cs-config-row">
+    <div class="cs-panel customer-service-panel">
+      <div class="cs-config customer-service-config">
+        <div class="cs-config-row customer-service-config-row">
           <div class="form-group">
             <label for="cs-scenario">
               <i
@@ -369,7 +369,7 @@ async function submit(): Promise<void> {
             </select>
           </div>
         </div>
-        <div class="cs-config-row">
+        <div class="cs-config-row customer-service-config-row">
           <div class="form-group">
             <label for="cs-product">
               <i
@@ -384,9 +384,9 @@ async function submit(): Promise<void> {
               autocomplete="off"
             >
           </div>
-          <div class="form-group cs-actions-group">
-            <span class="cs-action-label">操作</span>
-            <div class="cs-actions">
+          <div class="form-group cs-actions-group customer-service-actions-group">
+            <span class="cs-action-label customer-service-action-label">操作</span>
+            <div class="cs-actions customer-service-actions">
               <button
                 type="button"
                 class="btn btn-primary btn-sm"
@@ -431,28 +431,28 @@ async function submit(): Promise<void> {
 
       <div
         v-if="started"
-        class="cs-mission-card"
+        class="cs-mission-card customer-service-mission-card"
       >
-        <div class="cs-mission-row">
-          <span class="cs-mission-tag">{{ scenario }}</span>
-          <span class="cs-mission-tag">{{ personality }}</span>
-          <span class="cs-mission-tag">{{ difficulty }}</span>
+        <div class="cs-mission-row customer-service-mission-row">
+          <span class="cs-mission-tag customer-service-mission-tag">{{ scenario }}</span>
+          <span class="cs-mission-tag customer-service-mission-tag">{{ personality }}</span>
+          <span class="cs-mission-tag customer-service-mission-tag">{{ difficulty }}</span>
         </div>
-        <div class="cs-mission-goal">
+        <div class="cs-mission-goal customer-service-mission-goal">
           <i
             class="fas fa-flag-checkered"
             aria-hidden="true"
           />
           你的目标：{{ missionText }}
         </div>
-        <div class="cs-mission-persona">
+        <div class="cs-mission-persona customer-service-mission-persona">
           {{ personaText }}
         </div>
       </div>
 
       <p
         v-if="degradedNotice"
-        class="cs-degraded-note"
+        class="cs-degraded-note customer-service-degraded-note"
         data-testid="cs-degraded"
         role="status"
       >
@@ -463,28 +463,28 @@ async function submit(): Promise<void> {
         {{ degradedNotice }}
       </p>
 
-      <div class="cs-chat-area">
-        <div class="cs-chat-main">
+      <div class="cs-chat-area customer-service-chat-area">
+        <div class="cs-chat-main customer-service-chat-main">
           <div
             v-if="review"
-            class="cs-review-card"
+            class="cs-review-card customer-service-review-card"
           >
-            <div class="cs-review-head">
+            <div class="cs-review-head customer-service-review-head">
               <i
                 class="fas fa-flag-checkered"
                 aria-hidden="true"
               />
               <span>训练复盘</span>
             </div>
-            <div class="cs-review-overall">
-              <div class="cs-review-score">
+            <div class="cs-review-overall customer-service-review-overall">
+              <div class="cs-review-score customer-service-review-score">
                 {{ review.overall }}
               </div>
-              <div class="cs-review-meta">
-                <div class="cs-review-grade">
+              <div class="cs-review-meta customer-service-review-meta">
+                <div class="cs-review-grade customer-service-review-grade">
                   {{ review.overall >= 70 ? "良好" : "继续练习" }}
                 </div>
-                <div class="cs-review-note">
+                <div class="cs-review-note customer-service-review-note">
                   整场 {{ review.rounds }} 轮，{{ review.scoredRounds }} 轮已评分
                 </div>
               </div>
@@ -492,12 +492,12 @@ async function submit(): Promise<void> {
           </div>
 
           <div
-            class="cs-messages"
+            class="cs-messages customer-service-messages"
             data-testid="cs-messages"
           >
             <div
               v-if="!messages.length"
-              class="cs-welcome"
+              class="cs-welcome customer-service-welcome"
             >
               <i
                 class="fas fa-headset"
@@ -508,10 +508,10 @@ async function submit(): Promise<void> {
             <div
               v-for="message in messages"
               :key="message.id"
-              class="cs-msg"
+              class="cs-msg customer-service-msg"
               :class="message.role"
             >
-              <div class="cs-msg-avatar">
+              <div class="cs-msg-avatar customer-service-msg-avatar">
                 <i
                   class="fas"
                   :class="message.role === 'customer'
@@ -522,8 +522,8 @@ async function submit(): Promise<void> {
                   aria-hidden="true"
                 />
               </div>
-              <div class="cs-msg-content">
-                <div class="cs-msg-label">
+              <div class="cs-msg-content customer-service-msg-content">
+                <div class="cs-msg-label customer-service-msg-label">
                   {{ message.role === "customer"
                     ? "客户"
                     : message.role === "agent"
@@ -531,15 +531,15 @@ async function submit(): Promise<void> {
                       : "系统提示" }}
                   <span
                     v-if="message.score !== undefined"
-                    class="cs-msg-score"
+                    class="cs-msg-score customer-service-msg-score"
                   >{{ message.score }}分</span>
                 </div>
-                <div class="cs-msg-bubble">
+                <div class="cs-msg-bubble customer-service-msg-bubble">
                   {{ message.content }}
                 </div>
                 <div
                   v-if="message.tips?.length"
-                  class="cs-msg-reason"
+                  class="cs-msg-reason customer-service-msg-reason"
                 >
                   {{ message.tips[0] }}
                 </div>
@@ -547,7 +547,7 @@ async function submit(): Promise<void> {
             </div>
           </div>
 
-          <div class="cs-input-bar">
+          <div class="cs-input-bar customer-service-input-bar">
             <label
               class="sr-only"
               for="cs-input"
@@ -576,9 +576,9 @@ async function submit(): Promise<void> {
 
           <div
             v-if="hint?.templates?.length"
-            class="cs-quick-chips"
+            class="cs-quick-chips customer-service-quick-chips"
           >
-            <span class="cs-quick-chips-label">
+            <span class="cs-quick-chips-label customer-service-quick-chips-label">
               <i
                 class="fas fa-bolt"
                 aria-hidden="true"
@@ -589,7 +589,7 @@ async function submit(): Promise<void> {
               v-for="template in hint.templates"
               :key="template"
               type="button"
-              class="cs-quick-chip"
+              class="cs-quick-chip customer-service-quick-chip"
               @click="useTemplate(template)"
             >
               {{ template }}
@@ -597,8 +597,8 @@ async function submit(): Promise<void> {
           </div>
         </div>
 
-        <aside class="cs-sidebar">
-          <div class="cs-score-card">
+        <aside class="cs-sidebar customer-service-sidebar">
+          <div class="cs-score-card customer-service-score-card">
             <h4>
               <i
                 class="fas fa-chart-radar"
@@ -606,23 +606,23 @@ async function submit(): Promise<void> {
               />
               实时评分
             </h4>
-            <div class="cs-score-note">
+            <div class="cs-score-note customer-service-score-note">
               规则关键词评分，逐句分析
             </div>
             <div
-              class="cs-score-overall"
+              class="cs-score-overall customer-service-score-overall"
               data-testid="cs-score-overall"
             >
               {{ currentScore ? currentScore.total : "-" }}
             </div>
-            <div class="cs-score-label">
+            <div class="cs-score-label customer-service-score-label">
               本轮得分
             </div>
-            <div class="cs-score-bars">
+            <div class="cs-score-bars customer-service-score-bars">
               <div
                 v-for="detail in scoreDetails"
                 :key="detail.label"
-                class="cs-score-bar"
+                class="cs-score-bar customer-service-score-bar"
               >
                 <span>{{ detail.label }}</span>
                 <div class="progress-bar">
@@ -637,7 +637,7 @@ async function submit(): Promise<void> {
           </div>
 
           <div
-            class="cs-tips-card"
+            class="cs-tips-card customer-service-tips-card"
             data-testid="cs-hint"
           >
             <h4>
@@ -649,30 +649,30 @@ async function submit(): Promise<void> {
             </h4>
             <div
               v-if="hint"
-              class="cs-tips-list"
+              class="cs-tips-list customer-service-tips-list"
             >
               <div
                 v-if="hint.analysis"
-                class="cs-hint-analysis"
+                class="cs-hint-analysis customer-service-hint-analysis"
               >
                 {{ hint.analysis }}
               </div>
               <div
                 v-if="hint.strategy"
-                class="cs-hint-strategy"
+                class="cs-hint-strategy customer-service-hint-strategy"
               >
                 策略：{{ hint.strategy }}
               </div>
-              <div class="cs-hint-section">
-                <div class="cs-hint-title">
+              <div class="cs-hint-section customer-service-hint-section">
+                <div class="cs-hint-title customer-service-hint-title">
                   话术参考
                 </div>
-                <div class="cs-hint-templates">
+                <div class="cs-hint-templates customer-service-hint-templates">
                   <button
                     v-for="template in hint.templates"
                     :key="template"
                     type="button"
-                    class="cs-hint-tpl"
+                    class="cs-hint-tpl customer-service-hint-tpl"
                     @click="useTemplate(template)"
                   >
                     {{ template }}
@@ -681,15 +681,15 @@ async function submit(): Promise<void> {
               </div>
               <div
                 v-if="hint.tips?.length"
-                class="cs-hint-section"
+                class="cs-hint-section customer-service-hint-section"
               >
-                <div class="cs-hint-title">
+                <div class="cs-hint-title customer-service-hint-title">
                   注意事项
                 </div>
                 <div
                   v-for="tip in hint.tips"
                   :key="tip"
-                  class="cs-tip-item"
+                  class="cs-tip-item customer-service-tip-item"
                 >
                   <i
                     class="fas fa-info-circle"
@@ -700,22 +700,22 @@ async function submit(): Promise<void> {
               </div>
               <p
                 v-if="hintDegraded"
-                class="cs-degraded-note"
+                class="cs-degraded-note customer-service-degraded-note"
               >
                 以下为系统内置建议，非 AI 生成
               </p>
             </div>
             <div
               v-else
-              class="cs-tips-list"
+              class="cs-tips-list customer-service-tips-list"
             >
-              <div class="cs-tip-item">
+              <div class="cs-tip-item customer-service-tip-item">
                 开始对话后可获取建议
               </div>
             </div>
           </div>
 
-          <div class="cs-sentiment-card">
+          <div class="cs-sentiment-card customer-service-sentiment-card">
             <h4>
               <i
                 class="fas fa-smile"
@@ -723,21 +723,21 @@ async function submit(): Promise<void> {
               />
               客户情绪
             </h4>
-            <div class="cs-sentiment-label">
+            <div class="cs-sentiment-label customer-service-sentiment-label">
               {{ sentiment.label }}
             </div>
-            <div class="cs-sentiment-track">
+            <div class="cs-sentiment-track customer-service-sentiment-track">
               <div
-                class="cs-sentiment-fill"
+                class="cs-sentiment-fill customer-service-sentiment-fill"
                 :style="{ width: `${sentiment.level}%` }"
               />
             </div>
-            <div class="cs-sentiment-scale">
+            <div class="cs-sentiment-scale customer-service-sentiment-scale">
               <span>不满</span><span>满意</span>
             </div>
           </div>
 
-          <div class="cs-history-card">
+          <div class="cs-history-card customer-service-history-card">
             <h4>
               <i
                 class="fas fa-history"
@@ -745,12 +745,12 @@ async function submit(): Promise<void> {
               />
               对话轮次
             </h4>
-            <div class="cs-round-count">
+            <div class="cs-round-count customer-service-round-count">
               {{ Math.floor(transcript.length / 2) }} 轮
             </div>
             <button
               type="button"
-              class="btn btn-outline btn-sm cs-submit-button"
+              class="btn btn-outline btn-sm cs-submit-button customer-service-submit-button"
               :disabled="submitting"
               @click="submit"
             >

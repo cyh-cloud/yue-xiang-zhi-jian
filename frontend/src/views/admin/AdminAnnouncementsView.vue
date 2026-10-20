@@ -109,8 +109,8 @@ onMounted(loadAnnouncements);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="bo-page backoffice-page">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -120,7 +120,7 @@ onMounted(loadAnnouncements);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadAnnouncements"
       >
@@ -153,7 +153,7 @@ onMounted(loadAnnouncements);
           kind="error"
           :message="publishError"
         />
-        <label class="bo-field">
+        <label class="bo-field backoffice-field">
           <span>公告标题</span>
           <input
             v-model="title"
@@ -161,7 +161,7 @@ onMounted(loadAnnouncements);
             autocomplete="off"
           >
         </label>
-        <label class="bo-field">
+        <label class="bo-field backoffice-field">
           <span>公告内容</span>
           <textarea
             v-model="content"
@@ -179,7 +179,7 @@ onMounted(loadAnnouncements);
           </label>
           <button
             type="submit"
-            class="bo-button"
+            class="bo-button backoffice-button"
             :disabled="publishing"
           >
             {{ publishing ? "发布中..." : "发布公告" }}
@@ -209,7 +209,7 @@ onMounted(loadAnnouncements);
         >
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             @click="loadAnnouncements"
           >
             重试
@@ -254,7 +254,7 @@ onMounted(loadAnnouncements);
             <small>发布人 {{ announcement.created_by || "未知" }}</small>
             <button
               type="button"
-              class="bo-button is-small is-danger"
+              class="bo-button backoffice-button is-small is-danger"
               @click="askDelete(announcement)"
             >
               删除
@@ -267,31 +267,31 @@ onMounted(loadAnnouncements);
     <Teleport to="body">
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="bo-modal backoffice-modal is-confirm"
           data-testid="admin-announcement-delete-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="删除系统公告"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>删除系统公告</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="bo-modal-body backoffice-modal-body">
+            <p class="bo-confirm-copy backoffice-confirm-copy">
               确定删除「{{ deleteTarget.title }}」？删除后所有用户的消息中心会立即停止展示这条公告。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -299,7 +299,7 @@ onMounted(loadAnnouncements);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="bo-button backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >

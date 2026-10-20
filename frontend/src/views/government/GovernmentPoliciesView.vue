@@ -115,10 +115,10 @@ onMounted(loadPolicies);
 
 <template>
   <section
-    class="bo-page"
+    class="bo-page backoffice-page"
     data-testid="government-policies"
   >
-    <header class="bo-page-header">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>政务工作</p>
         <h1 data-testid="backoffice-page-title">
@@ -128,7 +128,7 @@ onMounted(loadPolicies);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadPolicies"
       >
@@ -161,7 +161,7 @@ onMounted(loadPolicies);
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadPolicies"
       >
         重试
@@ -191,12 +191,12 @@ onMounted(loadPolicies);
           <header>
             <div>
               <h2>{{ policy.title || "(无标题)" }}</h2>
-              <span class="bo-status is-active government-policy-category">
+              <span class="bo-status backoffice-status is-active government-policy-category">
                 {{ policy.category || "综合" }}
               </span>
             </div>
             <span
-              class="bo-status"
+              class="bo-status backoffice-status"
               :class="isPublished(policy) ? 'is-active' : 'is-suspended'"
             >
               {{ isPublished(policy) ? "已上线" : "已下架" }}
@@ -222,10 +222,10 @@ onMounted(loadPolicies);
           >
             {{ policyPreview(policy) }}
           </p>
-          <footer class="bo-row-actions">
+          <footer class="bo-row-actions backoffice-row-actions">
             <button
               type="button"
-              class="bo-button is-small is-secondary"
+              class="bo-button backoffice-button is-small is-secondary"
               data-testid="government-policy-toggle"
               :disabled="busyPolicyId === policy.id"
               @click="togglePolicy(policy)"
@@ -234,7 +234,7 @@ onMounted(loadPolicies);
             </button>
             <button
               type="button"
-              class="bo-button is-small is-secondary"
+              class="bo-button backoffice-button is-small is-secondary"
               data-testid="government-policy-edit"
               :disabled="busyPolicyId === policy.id"
               @click="editPolicy(policy)"
@@ -243,7 +243,7 @@ onMounted(loadPolicies);
             </button>
             <button
               type="button"
-              class="bo-button is-small is-danger"
+              class="bo-button backoffice-button is-small is-danger"
               data-testid="government-policy-delete"
               :disabled="busyPolicyId === policy.id"
               @click="removePolicy(policy)"

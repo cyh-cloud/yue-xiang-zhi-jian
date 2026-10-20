@@ -610,7 +610,7 @@ function sourceNote(entry: ChatEntry): string {
           <template v-if="entry.role === 'bot'">
             <div
               v-if="entry.result"
-              class="msg-dialect-tag"
+              class="msg-dialect-tag message-dialect-tag"
             >
               {{ entry.result.dialect_name }}助手
             </div>
@@ -662,7 +662,7 @@ function sourceNote(entry: ChatEntry): string {
             </div>
             <div
               v-if="entry.result?.suggestions.length"
-              class="msg-suggestions"
+              class="msg-suggestions message-suggestions"
             >
               <button
                 v-for="suggestion in entry.result.suggestions"

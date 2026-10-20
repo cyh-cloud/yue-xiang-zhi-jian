@@ -122,8 +122,8 @@ onMounted(loadTrainings);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="bo-page backoffice-page">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>实训提交</h1>
@@ -131,7 +131,7 @@ onMounted(loadTrainings);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadTrainings"
       >
@@ -172,7 +172,7 @@ onMounted(loadTrainings);
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadTrainings"
       >
         重试
@@ -188,8 +188,8 @@ onMounted(loadTrainings);
       v-else
       flush
     >
-      <div class="bo-table-wrap">
-        <table class="bo-table teacher-training-table">
+      <div class="bo-table-wrap backoffice-table-wrap">
+        <table class="bo-table backoffice-table teacher-training-table">
           <thead>
             <tr>
               <th>学员</th>
@@ -250,7 +250,7 @@ onMounted(loadTrainings);
               <td>
                 <button
                   type="button"
-                  class="bo-button is-small is-secondary"
+                  class="bo-button backoffice-button is-small is-secondary"
                   data-testid="teacher-training-open"
                   @click="openGrade(training)"
                 >
@@ -266,25 +266,25 @@ onMounted(loadTrainings);
     <Teleport to="body">
       <div
         v-if="selected"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeGrade"
       >
         <form
-          class="bo-modal teacher-grade-modal"
+          class="bo-modal backoffice-modal teacher-grade-modal"
           data-testid="teacher-grade-dialog"
           role="dialog"
           aria-modal="true"
           :aria-label="selectedTitle"
           @submit.prevent="submitGrade"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>实训批改</p>
               <h2>{{ selectedTitle }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="bo-icon-button backoffice-icon-button"
               aria-label="关闭"
               @click="closeGrade"
             >
@@ -294,7 +294,7 @@ onMounted(loadTrainings);
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="bo-modal-body backoffice-modal-body">
             <p class="teacher-grade-meta">
               学员：<strong>{{ selected.student_name || selected.student_id }}</strong>
               · 第 {{ selected.attempts || 1 }} 次提交

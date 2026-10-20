@@ -556,10 +556,10 @@ onMounted(async () => {
 
 <template>
   <section
-    class="bo-page operator-farming"
+    class="bo-page backoffice-page operator-farming"
     data-testid="operator-farming"
   >
-    <header class="bo-page-header">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>农业内容</p>
         <h1 data-testid="backoffice-page-title">
@@ -569,7 +569,7 @@ onMounted(async () => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading || tasksLoading"
         @click="reloadAll()"
       >
@@ -602,7 +602,7 @@ onMounted(async () => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="reloadAll()"
       >
         重试
@@ -617,7 +617,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             @click="openTask(null)"
           >
             <i

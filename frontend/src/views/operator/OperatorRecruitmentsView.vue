@@ -322,10 +322,10 @@ onMounted(async () => {
 
 <template>
   <section
-    class="bo-page operator-recruitments"
+    class="bo-page backoffice-page operator-recruitments"
     data-testid="operator-recruitments"
   >
-    <header class="bo-page-header">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -335,7 +335,7 @@ onMounted(async () => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadRecruitments()"
       >
@@ -368,7 +368,7 @@ onMounted(async () => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadRecruitments()"
       >
         重试
@@ -383,7 +383,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             @click="openRecruitment(null)"
           >
             <i

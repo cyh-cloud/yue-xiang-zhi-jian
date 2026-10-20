@@ -103,8 +103,8 @@ onMounted(loadContent);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="bo-page backoffice-page">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -114,7 +114,7 @@ onMounted(loadContent);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadContent"
       >
@@ -150,7 +150,7 @@ onMounted(loadContent);
       >
         <button
           type="button"
-          class="bo-button"
+          class="bo-button backoffice-button"
           @click="loadContent"
         >
           重试
@@ -181,9 +181,9 @@ onMounted(loadContent);
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -210,7 +210,7 @@ onMounted(loadContent);
                 <td>
                   <button
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="bo-button backoffice-button is-small is-danger"
                     @click="askDeleteDiscussion(discussion)"
                   >
                     删除帖子
@@ -234,9 +234,9 @@ onMounted(loadContent);
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="bo-table-wrap backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="bo-table backoffice-table">
             <thead>
               <tr>
                 <th>评论内容</th>
@@ -263,7 +263,7 @@ onMounted(loadContent);
                 <td>
                   <button
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="bo-button backoffice-button is-small is-danger"
                     @click="askDeleteComment(comment)"
                   >
                     删除评论

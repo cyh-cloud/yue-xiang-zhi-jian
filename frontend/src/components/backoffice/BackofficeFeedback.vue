@@ -9,7 +9,7 @@ defineProps<{
 <template>
   <div
     v-if="message"
-    class="bo-feedback"
+    class="bo-feedback backoffice-feedback"
     :class="`is-${kind}`"
     :data-testid="testid"
     :role="kind === 'error' ? 'alert' : 'status'"

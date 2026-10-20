@@ -602,28 +602,28 @@ function externalVideoUrl(video: CraftVideo): string {
         </div>
         <div
           v-else
-          class="craft-grid"
+          class="craft-grid crafts-grid"
         >
           <button
             v-for="craft in crafts"
             :key="craft.id"
             type="button"
-            class="craft-card"
+            class="craft-card crafts-card"
             :class="{ active: craft.id === selectedCraftId }"
             :aria-pressed="craft.id === selectedCraftId"
             @click="selectCraft(craft.id)"
           >
-            <span class="craft-visual">
+            <span class="craft-visual crafts-visual">
               <i
                 class="fas fa-hands"
                 aria-hidden="true"
               />
             </span>
-            <span class="craft-info">
-              <strong class="craft-card-name">{{ craft.name }}</strong>
+            <span class="craft-info crafts-info">
+              <strong class="craft-card-name crafts-card-name">{{ craft.name }}</strong>
               <span
                 v-if="craft.origin"
-                class="craft-card-desc"
+                class="craft-card-desc crafts-card-desc"
               >{{ craft.origin }}</span>
               <span
                 v-if="craft.level"
@@ -661,21 +661,21 @@ function externalVideoUrl(video: CraftVideo): string {
       </div>
       <div
         v-else-if="detail"
-        class="craft-intro"
+        class="craft-intro crafts-intro"
       >
-        <div class="craft-intro-card">
-          <div class="craft-intro-icon">
+        <div class="craft-intro-card crafts-intro-card">
+          <div class="craft-intro-icon crafts-intro-icon">
             <i
               class="fas fa-landmark"
               aria-hidden="true"
             />
           </div>
-          <div class="craft-intro-body">
-            <div class="craft-intro-head">
+          <div class="craft-intro-body crafts-intro-body">
+            <div class="craft-intro-head crafts-intro-head">
               <h2>{{ detail.name }}</h2>
               <span
                 v-if="detail.origin"
-                class="craft-intro-origin"
+                class="craft-intro-origin crafts-intro-origin"
               >
                 <i
                   class="fas fa-map-marker-alt"
@@ -738,10 +738,10 @@ function externalVideoUrl(video: CraftVideo): string {
         <template v-else>
           <div
             v-if="selectedVideo"
-            class="craft-video-stage"
+            class="craft-video-stage crafts-video-stage"
           >
-            <div class="craft-video-stage-bar">
-              <span class="craft-video-stage-title">{{ selectedVideo.title }}</span>
+            <div class="craft-video-stage-bar crafts-video-stage-bar">
+              <span class="craft-video-stage-title crafts-video-stage-title">{{ selectedVideo.title }}</span>
               <button
                 type="button"
                 class="icon-btn"
@@ -755,10 +755,10 @@ function externalVideoUrl(video: CraftVideo): string {
                 />
               </button>
             </div>
-            <div class="craft-video-frame">
+            <div class="craft-video-frame crafts-video-frame">
               <div
                 v-if="videoState !== 'ready'"
-                class="craft-video-placeholder"
+                class="craft-video-placeholder crafts-video-placeholder"
                 role="status"
               >
                 <i
@@ -781,7 +781,7 @@ function externalVideoUrl(video: CraftVideo): string {
               </div>
               <iframe
                 v-if="videoEmbedUrl"
-                class="craft-video-iframe"
+                class="craft-video-iframe crafts-video-iframe"
                 :class="{ 'is-hidden': videoState !== 'ready' }"
                 :src="videoEmbedUrl"
                 :title="selectedVideo.title || '手工艺教学演示视频'"
@@ -796,20 +796,20 @@ function externalVideoUrl(video: CraftVideo): string {
             </div>
           </div>
 
-          <div class="craft-video-grid">
+          <div class="craft-video-grid crafts-video-grid">
             <article
               v-for="(video, index) in detail.videos"
               :key="video.id"
-              class="craft-video-card"
+              class="craft-video-card crafts-video-card"
               :class="{ 'is-playing': index === selectedVideoIndex }"
             >
               <button
                 type="button"
-                class="craft-video-card-select"
+                class="craft-video-card-select crafts-video-card-select"
                 :aria-label="`播放视频：${video.title}`"
                 @click="selectVideo(index)"
               >
-                <span class="craft-video-card-cover">
+                <span class="craft-video-card-cover crafts-video-card-cover">
                   <img
                     v-if="video.cover && !failedCoverIds.has(video.id)"
                     :src="video.cover"
@@ -820,40 +820,40 @@ function externalVideoUrl(video: CraftVideo): string {
                   >
                   <span
                     v-else
-                    class="craft-video-card-cover-fallback"
+                    class="craft-video-card-cover-fallback crafts-video-card-cover-fallback"
                   >
                     <i
                       class="fas fa-film"
                       aria-hidden="true"
                     />
                   </span>
-                  <span class="craft-video-card-stats">
-                    <span class="craft-video-card-stat">
+                  <span class="craft-video-card-stats crafts-video-card-stats">
+                    <span class="craft-video-card-stat crafts-video-card-stat">
                       <i
                         class="fas fa-play-circle"
                         aria-hidden="true"
                       />
                       {{ formatVideoCount(video.view) }}
                     </span>
-                    <span class="craft-video-card-stat">
+                    <span class="craft-video-card-stat crafts-video-card-stat">
                       <i
                         class="fas fa-comment-dots"
                         aria-hidden="true"
                       />
                       {{ formatVideoCount(video.danmaku) }}
                     </span>
-                    <span class="craft-video-card-stat">
+                    <span class="craft-video-card-stat crafts-video-card-stat">
                       <i
                         class="fas fa-thumbs-up"
                         aria-hidden="true"
                       />
                       {{ formatVideoCount(video.like) }}
                     </span>
-                    <span class="craft-video-card-duration">
+                    <span class="craft-video-card-duration crafts-video-card-duration">
                       {{ formatVideoDuration(video.duration) }}
                     </span>
                   </span>
-                  <span class="craft-video-card-play">
+                  <span class="craft-video-card-play crafts-video-card-play">
                     <i
                       class="fas fa-play"
                       aria-hidden="true"
@@ -861,13 +861,13 @@ function externalVideoUrl(video: CraftVideo): string {
                   </span>
                 </span>
                 <span
-                  class="craft-video-card-title"
+                  class="craft-video-card-title crafts-video-card-title"
                   :title="video.title"
                 >
                   {{ video.title }}
                 </span>
-                <span class="craft-video-card-meta">
-                  <span class="craft-video-card-author">
+                <span class="craft-video-card-meta crafts-video-card-meta">
+                  <span class="craft-video-card-author crafts-video-card-author">
                     <i
                       class="fas fa-user"
                       aria-hidden="true"
@@ -877,7 +877,7 @@ function externalVideoUrl(video: CraftVideo): string {
                 </span>
               </button>
               <a
-                class="craft-video-card-external"
+                class="craft-video-card-external crafts-video-card-external"
                 :href="externalVideoUrl(video)"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -891,7 +891,7 @@ function externalVideoUrl(video: CraftVideo): string {
               </a>
             </article>
           </div>
-          <p class="craft-video-source">
+          <p class="craft-video-source crafts-video-source">
             视频来源：哔哩哔哩，共 {{ detail.videos.length }} 条；网络不佳时可点封面右下角「在新窗口打开」。
           </p>
         </template>

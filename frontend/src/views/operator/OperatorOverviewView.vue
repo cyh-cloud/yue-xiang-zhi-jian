@@ -118,10 +118,10 @@ onMounted(loadOverview);
 
 <template>
   <section
-    class="bo-page operator-overview"
+    class="bo-page backoffice-page operator-overview"
     data-testid="operator-overview"
   >
-    <header class="bo-page-header">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -131,7 +131,7 @@ onMounted(loadOverview);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadOverview"
       >
@@ -157,7 +157,7 @@ onMounted(loadOverview);
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadOverview"
       >
         重试
@@ -169,9 +169,9 @@ onMounted(loadOverview);
         title="内容与待复核"
         description="超 183 天未重新复核的内容会和从未复核内容一起进入待办。"
       >
-        <div class="bo-stat-grid">
+        <div class="bo-stat-grid backoffice-stat-grid">
           <article
-            class="bo-stat-card"
+            class="bo-stat-card backoffice-stat-card"
             data-testid="operator-stat-tasks"
           >
             <strong>{{ tasks.length }}</strong>
@@ -179,7 +179,7 @@ onMounted(loadOverview);
             <small>{{ inventorySummary }}</small>
           </article>
           <article
-            class="bo-stat-card is-alert"
+            class="bo-stat-card backoffice-stat-card is-alert"
             data-testid="operator-stat-overdue-tasks"
           >
             <strong>{{ overdueTasks.length }}</strong>
@@ -187,7 +187,7 @@ onMounted(loadOverview);
             <small>超 183 天或从未复核</small>
           </article>
           <article
-            class="bo-stat-card"
+            class="bo-stat-card backoffice-stat-card"
             data-testid="operator-stat-entries"
           >
             <strong>{{ entries.length }}</strong>
@@ -195,7 +195,7 @@ onMounted(loadOverview);
             <small>{{ pestInventorySummary }}</small>
           </article>
           <article
-            class="bo-stat-card is-alert"
+            class="bo-stat-card backoffice-stat-card is-alert"
             data-testid="operator-stat-overdue-entries"
           >
             <strong>{{ overdueEntries.length }}</strong>
@@ -274,7 +274,7 @@ onMounted(loadOverview);
         </div>
       </BackofficeCard>
 
-      <p class="bo-note">
+      <p class="bo-note backoffice-note">
         口径说明：只统计当前数据库真实存在的农时与病虫害内容。运营负责内容维护与复核，
         用户管理和发布前审核属于超级管理员职责，本工作台不提供这两个入口。
       </p>

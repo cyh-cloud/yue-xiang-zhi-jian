@@ -358,8 +358,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="bo-page model-page">
-    <header class="bo-page-header">
+  <section class="bo-page backoffice-page model-page">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>3D 模型</h1>
@@ -379,18 +379,18 @@ onBeforeUnmount(() => {
     <CdnFallbackNotice />
 
     <form
-      class="bo-card model-upload-card"
+      class="bo-card backoffice-card model-upload-card"
       data-testid="teacher-model-upload"
       @submit.prevent="submitUpload"
     >
-      <header class="bo-card-head">
+      <header class="bo-card-head backoffice-card-head">
         <div>
           <h2>上传模型</h2>
           <p>文件通过真实 multipart 请求上传，保存后立即出现在下方列表。</p>
         </div>
       </header>
       <div class="model-form-grid">
-        <label class="bo-field is-wide">
+        <label class="bo-field backoffice-field is-wide">
           <span>模型文件</span>
           <input
             id="model-file"
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
         >
           已选择：{{ selectedFileSummary }}
         </p>
-        <label class="bo-field">
+        <label class="bo-field backoffice-field">
           <span>标题</span>
           <input
             id="model-title"
@@ -415,7 +415,7 @@ onBeforeUnmount(() => {
             placeholder="默认使用文件名"
           >
         </label>
-        <label class="bo-field">
+        <label class="bo-field backoffice-field">
           <span>技艺类型</span>
           <select
             id="model-craft"
@@ -438,7 +438,7 @@ onBeforeUnmount(() => {
             </option>
           </select>
         </label>
-        <label class="bo-field is-wide">
+        <label class="bo-field backoffice-field is-wide">
           <span>描述</span>
           <textarea
             id="model-description"
@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
       <div class="model-upload-actions">
         <button
           type="submit"
-          class="bo-button"
+          class="bo-button backoffice-button"
           :disabled="uploading"
         >
           <i
@@ -472,7 +472,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button
           type="button"
-          class="bo-button is-secondary is-small"
+          class="bo-button backoffice-button is-secondary is-small"
           :disabled="loading"
           @click="loadModels"
         >

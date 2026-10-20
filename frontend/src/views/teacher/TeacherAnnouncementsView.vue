@@ -127,8 +127,8 @@ onMounted(loadAnnouncements);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="bo-page backoffice-page">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>通知公告</h1>
@@ -136,7 +136,7 @@ onMounted(loadAnnouncements);
       </div>
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="openEditor"
       >
         <i
@@ -167,7 +167,7 @@ onMounted(loadAnnouncements);
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadAnnouncements"
       >
         重试
@@ -186,7 +186,7 @@ onMounted(loadAnnouncements);
       <article
         v-for="announcement in announcements"
         :key="announcement.id"
-        class="bo-card teacher-announcement-card"
+        class="bo-card backoffice-card teacher-announcement-card"
         :class="{ 'is-pinned': announcement.pinned }"
         data-testid="teacher-announcement-card"
         :data-announcement-id="announcement.id"
@@ -206,7 +206,7 @@ onMounted(loadAnnouncements);
           </div>
           <button
             type="button"
-            class="bo-button is-small is-danger"
+            class="bo-button backoffice-button is-small is-danger"
             data-testid="teacher-announcement-delete"
             @click="askDelete(announcement)"
           >
@@ -221,25 +221,25 @@ onMounted(loadAnnouncements);
     <Teleport to="body">
       <div
         v-if="editorOpen"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeEditor"
       >
         <form
-          class="bo-modal"
+          class="bo-modal backoffice-modal"
           data-testid="teacher-announcement-editor"
           role="dialog"
           aria-modal="true"
           aria-label="发布通知"
           @submit.prevent="publish"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>通知公告</p>
               <h2>发布通知</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="bo-icon-button backoffice-icon-button"
               aria-label="关闭"
               @click="closeEditor"
             >
@@ -249,14 +249,14 @@ onMounted(loadAnnouncements);
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="bo-modal-body backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="teacher-announcement-editor-error"
             />
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>标题</span>
               <input
                 v-model="form.title"
@@ -264,7 +264,7 @@ onMounted(loadAnnouncements);
                 autocomplete="off"
               >
             </label>
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>分类</span>
               <select v-model="form.category">
                 <option value="通知">
@@ -278,7 +278,7 @@ onMounted(loadAnnouncements);
                 </option>
               </select>
             </label>
-            <label class="bo-field">
+            <label class="bo-field backoffice-field">
               <span>内容</span>
               <textarea
                 v-model="form.content"
@@ -294,10 +294,10 @@ onMounted(loadAnnouncements);
               置顶显示
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="editorSaving"
               @click="closeEditor"
             >
@@ -305,7 +305,7 @@ onMounted(loadAnnouncements);
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="bo-button backoffice-button"
               :disabled="editorSaving"
             >
               {{ editorSaving ? "发布中..." : "发布" }}
@@ -316,31 +316,31 @@ onMounted(loadAnnouncements);
 
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="bo-modal-overlay backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="bo-modal backoffice-modal is-confirm"
           data-testid="teacher-confirm-delete"
           role="dialog"
           aria-modal="true"
           aria-label="确认删除通知"
         >
-          <header class="bo-modal-head">
+          <header class="bo-modal-head backoffice-modal-head">
             <div>
               <p>确认删除</p>
               <h2>删除通知</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="bo-modal-body backoffice-modal-body">
+            <p class="bo-confirm-copy backoffice-confirm-copy">
               确定删除通知「{{ deleteTarget.title }}」吗？删除后学员端将不再展示这条公告。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="bo-modal-actions backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="bo-button backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -348,7 +348,7 @@ onMounted(loadAnnouncements);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="bo-button backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >

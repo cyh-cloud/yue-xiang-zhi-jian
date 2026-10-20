@@ -681,7 +681,7 @@ function safeType(type: string): string {
 <template>
   <div
     ref="root"
-    class="msg-center-wrap message-center"
+    class="msg-center-wrap message-center-wrap message-center"
   >
     <button
       type="button"
@@ -704,22 +704,22 @@ function safeType(type: string): string {
 
     <section
       v-if="panelOpen"
-      class="msg-dropdown show message-center-panel"
+      class="msg-dropdown message-dropdown show message-center-panel"
       data-testid="message-center-panel"
       role="dialog"
       aria-label="消息中心"
       @click.stop
     >
-      <header class="msg-dropdown-header">
+      <header class="msg-dropdown-header message-dropdown-header">
         <h4>消息中心</h4>
         <div
           v-if="session.isAuthenticated && notificationEnabled"
-          class="msg-dropdown-actions"
+          class="msg-dropdown-actions message-dropdown-actions"
         >
           <button
             v-if="unreadItems.length"
             type="button"
-            class="msg-unread-jump"
+            class="msg-unread-jump message-unread-jump"
             data-testid="message-center-unread-jump"
             :aria-label="`查看 ${unreadItems.length} 条未读`"
             @click="jumpToUnread"
@@ -757,7 +757,7 @@ function safeType(type: string): string {
 
       <div
         v-if="!session.isAuthenticated"
-        class="msg-empty"
+        class="msg-empty message-empty"
         data-testid="message-center-anonymous"
       >
         <i
@@ -776,7 +776,7 @@ function safeType(type: string): string {
 
       <div
         v-else-if="!notificationEnabled"
-        class="msg-empty"
+        class="msg-empty message-empty"
         data-testid="message-center-disabled"
       >
         <i
@@ -795,10 +795,10 @@ function safeType(type: string): string {
       </div>
 
       <template v-else>
-        <div class="msg-dropdown-tabs">
+        <div class="msg-dropdown-tabs message-dropdown-tabs">
           <button
             type="button"
-            class="msg-tab-btn"
+            class="msg-tab-btn message-tab-btn"
             :class="{ active: activeTab === 'unread' }"
             data-testid="message-center-tab-unread"
             @click="selectTab('unread')"
@@ -810,7 +810,7 @@ function safeType(type: string): string {
           </button>
           <button
             type="button"
-            class="msg-tab-btn"
+            class="msg-tab-btn message-tab-btn"
             :class="{ active: activeTab === 'read' }"
             data-testid="message-center-tab-read"
             @click="selectTab('read')"
@@ -822,7 +822,7 @@ function safeType(type: string): string {
           </button>
           <button
             type="button"
-            class="msg-tab-btn"
+            class="msg-tab-btn message-tab-btn"
             :class="{ active: activeTab === 'messages' }"
             data-testid="message-center-tab-messages"
             @click="selectTab('messages')"
@@ -845,11 +845,11 @@ function safeType(type: string): string {
 
         <div
           v-if="activeTab === 'messages'"
-          class="msg-dropdown-body"
+          class="msg-dropdown-body message-dropdown-body"
         >
           <div
             v-if="loading"
-            class="msg-empty"
+            class="msg-empty message-empty"
           >
             <i
               class="fas fa-spinner fa-spin"
@@ -859,7 +859,7 @@ function safeType(type: string): string {
           </div>
           <div
             v-else-if="inboxFailed"
-            class="msg-empty"
+            class="msg-empty message-empty"
             data-testid="message-center-conversation-error"
           >
             <i
@@ -877,7 +877,7 @@ function safeType(type: string): string {
           </div>
           <div
             v-else-if="!inbox.length"
-            class="msg-empty"
+            class="msg-empty message-empty"
           >
             <i
               class="fas fa-envelope-open"
@@ -889,7 +889,7 @@ function safeType(type: string): string {
             <div
               v-for="message in inbox"
               :key="`${message.other_id}:${message.id}`"
-              class="msg-item is-clickable"
+              class="msg-item message-item is-clickable"
               :class="{ unread: !message.is_read && !message.is_mine }"
               data-testid="message-center-conversation-item"
               role="button"
@@ -898,20 +898,20 @@ function safeType(type: string): string {
               @keydown.enter.prevent="openConversation(message.other_id, message.other_name || '对方')"
               @keydown.space.prevent="openConversation(message.other_id, message.other_name || '对方')"
             >
-              <div class="msg-item-avatar">
+              <div class="msg-item-avatar message-item-avatar">
                 <i
                   class="fas fa-user"
                   aria-hidden="true"
                 />
               </div>
-              <div class="msg-item-text">
-                <div class="msg-item-title">
+              <div class="msg-item-text message-item-text">
+                <div class="msg-item-title message-item-title">
                   {{ message.other_name || message.other_id }}
                 </div>
-                <div class="msg-item-preview">
+                <div class="msg-item-preview message-item-preview">
                   {{ message.is_mine ? `我：${message.content}` : message.content }}
                 </div>
-                <div class="msg-item-time">
+                <div class="msg-item-time message-item-time">
                   {{ formatTimeAgo(message.created_at) }}
                 </div>
               </div>

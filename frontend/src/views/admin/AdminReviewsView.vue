@@ -243,8 +243,8 @@ onMounted(loadReviews);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="bo-page backoffice-page">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -254,7 +254,7 @@ onMounted(loadReviews);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadReviews"
       >
@@ -299,7 +299,7 @@ onMounted(loadReviews);
         </div>
 
         <div class="admin-review-filters">
-          <label class="bo-field">
+          <label class="bo-field backoffice-field">
             <span>内容类型</span>
             <select v-model="contentType">
               <option
@@ -311,7 +311,7 @@ onMounted(loadReviews);
               </option>
             </select>
           </label>
-          <label class="bo-field">
+          <label class="bo-field backoffice-field">
             <span>排序</span>
             <select v-model="sort">
               <option value="modified">
@@ -341,7 +341,7 @@ onMounted(loadReviews);
         >
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             @click="loadReviews"
           >
             重试

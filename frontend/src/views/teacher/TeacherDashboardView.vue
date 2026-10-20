@@ -415,10 +415,10 @@ onBeforeUnmount(() => {
 
 <template>
   <section
-    class="bo-page teacher-dashboard"
+    class="bo-page backoffice-page teacher-dashboard"
     data-testid="teacher-dashboard"
   >
-    <header class="bo-page-header">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>教师工作台</h1>
@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading || rosterLoading"
         @click="loadDashboard"
       >
@@ -447,13 +447,13 @@ onBeforeUnmount(() => {
     />
 
     <div
-      class="bo-stat-grid teacher-stat-grid"
+      class="bo-stat-grid backoffice-stat-grid teacher-stat-grid"
       data-testid="teacher-stat-grid"
     >
       <article
         v-for="card in statCards"
         :key="card.label"
-        class="bo-stat-card"
+        class="bo-stat-card backoffice-stat-card"
         :data-testid="card.testid"
       >
         <strong>{{ card.value }}</strong>
@@ -469,7 +469,7 @@ onBeforeUnmount(() => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadStats"
       >
         重试
@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button
           type="button"
-          class="bo-button"
+          class="bo-button backoffice-button"
           @click="openAdd"
         >
           <i

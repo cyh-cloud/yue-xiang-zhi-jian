@@ -518,10 +518,10 @@ function formatDuration(seconds: number): string {
 
 <template>
   <section
-    class="bo-page operator-crafts"
+    class="bo-page backoffice-page operator-crafts"
     data-testid="operator-crafts"
   >
-    <header class="bo-page-header">
+    <header class="bo-page-header backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -531,7 +531,7 @@ function formatDuration(seconds: number): string {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="bo-button backoffice-button is-secondary"
         :disabled="loading"
         @click="loadCrafts()"
       >
@@ -564,7 +564,7 @@ function formatDuration(seconds: number): string {
     >
       <button
         type="button"
-        class="bo-button"
+        class="bo-button backoffice-button"
         @click="loadCrafts()"
       >
         重试
@@ -579,7 +579,7 @@ function formatDuration(seconds: number): string {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="bo-button backoffice-button"
             :disabled="loading"
             @click="openCreateCraft"
           >

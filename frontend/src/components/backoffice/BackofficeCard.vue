@@ -8,12 +8,12 @@ defineProps<{
 
 <template>
   <section
-    class="bo-card"
+    class="bo-card backoffice-card"
     :class="{ 'is-flush': flush }"
   >
     <header
       v-if="title || $slots.actions"
-      class="bo-card-head"
+      class="bo-card-head backoffice-card-head"
     >
       <div>
         <h2 v-if="title">
@@ -25,7 +25,7 @@ defineProps<{
       </div>
       <div
         v-if="$slots.actions"
-        class="bo-card-actions"
+        class="bo-card-actions backoffice-card-actions"
       >
         <slot name="actions" />
       </div>

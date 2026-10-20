@@ -199,8 +199,8 @@ async function submit(): Promise<void> {
     </p>
 
     <div class="copywriting-panel">
-      <div class="copy-config">
-        <div class="copy-config-row">
+      <div class="copy-config copywriting-config">
+        <div class="copy-config-row copywriting-config-row">
           <div class="form-group">
             <label for="copy-product">
               <i
@@ -264,7 +264,7 @@ async function submit(): Promise<void> {
         </div>
       </div>
 
-      <div class="copy-formats">
+      <div class="copy-formats copywriting-formats">
         <span class="form-label">
           <i
             class="fas fa-file-alt"
@@ -289,7 +289,7 @@ async function submit(): Promise<void> {
         </div>
       </div>
 
-      <div class="copy-actions">
+      <div class="copy-actions copywriting-actions">
         <button
           type="button"
           class="btn btn-primary"
@@ -330,11 +330,11 @@ async function submit(): Promise<void> {
 
       <div
         v-if="generatedCopy"
-        class="copy-result"
+        class="copy-result copywriting-result"
         data-testid="copy-result"
       >
-        <div class="copy-result-header">
-          <span class="copy-result-tag">
+        <div class="copy-result-header copywriting-result-header">
+          <span class="copy-result-tag copywriting-result-tag">
             <i
               class="fas fa-file-alt"
               aria-hidden="true"
@@ -343,7 +343,7 @@ async function submit(): Promise<void> {
           </span>
           <span
             v-if="degraded"
-            class="copy-degraded-tag"
+            class="copy-degraded-tag copywriting-degraded-tag"
             data-testid="copy-degraded"
           >
             <i
@@ -352,7 +352,7 @@ async function submit(): Promise<void> {
             />
             系统内置示例，非 AI 生成
           </span>
-          <div class="copy-result-actions">
+          <div class="copy-result-actions copywriting-result-actions">
             <button
               type="button"
               class="btn btn-outline btn-sm"
@@ -366,7 +366,7 @@ async function submit(): Promise<void> {
             </button>
           </div>
         </div>
-        <div class="copy-result-body">
+        <div class="copy-result-body copywriting-result-body">
           <template
             v-for="(block, index) in blocks"
             :key="`${index}-${block.text}`"
@@ -376,7 +376,7 @@ async function submit(): Promise<void> {
             </h3>
             <p
               v-else
-              class="copy-result-line"
+              class="copy-result-line copywriting-result-line"
             >
               <span v-if="block.type === 'list'">• </span>{{ block.text }}
             </p>

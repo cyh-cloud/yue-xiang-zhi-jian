@@ -752,11 +752,11 @@ function isIntentRegistered(key: string): boolean {
         </p>
 
         <form
-          class="emp-search-bar"
+          class="emp-search-bar employment-search-bar"
           role="search"
           @submit.prevent="loadJobs"
         >
-          <div class="emp-search-input-wrap">
+          <div class="emp-search-input-wrap employment-search-input-wrap">
             <i
               class="fas fa-search"
               aria-hidden="true"
@@ -839,13 +839,13 @@ function isIntentRegistered(key: string): boolean {
         </form>
 
         <div
-          class="emp-tabs"
+          class="emp-tabs employment-tabs"
           role="tablist"
           aria-label="就业信息分类"
         >
           <button
             type="button"
-            class="emp-tab"
+            class="emp-tab employment-tab"
             :class="{ active: activeTab === 'jobs' }"
             role="tab"
             :aria-selected="activeTab === 'jobs'"
@@ -855,7 +855,7 @@ function isIntentRegistered(key: string): boolean {
           </button>
           <button
             type="button"
-            class="emp-tab"
+            class="emp-tab employment-tab"
             :class="{ active: activeTab === 'resume' }"
             role="tab"
             :aria-selected="activeTab === 'resume'"
@@ -865,7 +865,7 @@ function isIntentRegistered(key: string): boolean {
           </button>
           <button
             type="button"
-            class="emp-tab"
+            class="emp-tab employment-tab"
             :class="{ active: activeTab === 'applications' }"
             role="tab"
             :aria-selected="activeTab === 'applications'"
@@ -875,7 +875,7 @@ function isIntentRegistered(key: string): boolean {
           </button>
           <button
             type="button"
-            class="emp-tab"
+            class="emp-tab employment-tab"
             :class="{ active: activeTab === 'saved' }"
             role="tab"
             :aria-selected="activeTab === 'saved'"
@@ -897,12 +897,12 @@ function isIntentRegistered(key: string): boolean {
 
         <div
           v-if="activeTab === 'jobs'"
-          class="emp-panel active"
+          class="emp-panel employment-panel active"
           role="tabpanel"
         >
           <div
             v-if="jobsLoading"
-            class="emp-empty"
+            class="emp-empty employment-empty"
             role="status"
           >
             <i
@@ -913,7 +913,7 @@ function isIntentRegistered(key: string): boolean {
           </div>
           <div
             v-else-if="jobsError"
-            class="emp-empty"
+            class="emp-empty employment-empty"
             role="alert"
           >
             <i
@@ -930,11 +930,11 @@ function isIntentRegistered(key: string): boolean {
             </button>
           </div>
           <template v-else>
-            <div class="emp-job-count">
+            <div class="emp-job-count employment-job-count">
               共 {{ visibleCount }} 条信息
               <span
                 v-if="visibleCount"
-                class="emp-job-count-detail"
+                class="emp-job-count-detail employment-job-count-detail"
               >
                 （企业岗位 {{ visibleJobs.length }} · 公开招聘 {{ visibleRecruitments.length }}）
               </span>
@@ -942,7 +942,7 @@ function isIntentRegistered(key: string): boolean {
 
             <div
               v-if="salary && recruitHiddenBySalary > 0"
-              class="emp-filter-note"
+              class="emp-filter-note employment-filter-note"
               role="status"
             >
               <i
@@ -961,49 +961,49 @@ function isIntentRegistered(key: string): boolean {
             >
               <h2
                 id="active-recruit-title"
-                class="emp-list-section-title"
+                class="emp-list-section-title employment-list-section-title"
               >
                 <i
                   class="fas fa-bullhorn"
                   aria-hidden="true"
                 />
                 公开招聘信息
-                <span class="emp-list-section-note">官方公告汇编 · 点卡片查看公告原文</span>
+                <span class="emp-list-section-note employment-list-section-note">官方公告汇编 · 点卡片查看公告原文</span>
               </h2>
               <article
                 v-for="recruitment in activeRecruitments"
                 :key="recruitment.key"
-                class="emp-job-card emp-recruit-card"
+                class="emp-job-card employment-job-card emp-recruit-card employment-recruit-card"
                 :class="{ 'is-closed': recruitment.status === 'closed' }"
               >
-                <div class="emp-job-card-left">
-                  <div class="emp-company-logo emp-recruit-logo">
+                <div class="emp-job-card-left employment-job-card-left">
+                  <div class="emp-company-logo employment-company-logo emp-recruit-logo employment-recruit-logo">
                     <i
                       class="fas fa-bullhorn"
                       aria-hidden="true"
                     />
                   </div>
                 </div>
-                <div class="emp-job-card-body">
-                  <div class="emp-job-header">
+                <div class="emp-job-card-body employment-job-card-body">
+                  <div class="emp-job-header employment-job-header">
                     <button
                       type="button"
-                      class="emp-job-title emp-job-title-button"
+                      class="emp-job-title employment-job-title emp-job-title-button employment-job-title-button"
                       @click="openRecruitment(recruitment)"
                     >
                       {{ recruitment.title }}
                     </button>
                     <span
-                      class="emp-recruit-status"
+                      class="emp-recruit-status employment-recruit-status"
                       :class="`rec-${recruitment.status}`"
                     >
                       {{ recruitment.status_label }}
                     </span>
                   </div>
-                  <div class="emp-job-company">
+                  <div class="emp-job-company employment-job-company">
                     {{ recruitment.org }}
                     <template v-if="recruitment.region">
-                      <span class="emp-dot">·</span>{{ recruitment.region }}
+                      <span class="emp-dot employment-dot">·</span>{{ recruitment.region }}
                     </template>
                     <template v-if="recruitment.job_type">
                       <span class="emp-dot">·</span>{{ recruitment.job_type }}
