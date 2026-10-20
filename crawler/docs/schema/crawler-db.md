@@ -141,6 +141,7 @@
 ## Physical DDL
 
 ```sql
+
 CREATE TABLE IF NOT EXISTS raw_fetches (
     id INTEGER PRIMARY KEY,
     source_id TEXT NOT NULL,
@@ -316,6 +317,9 @@ CREATE TABLE IF NOT EXISTS std_agri_products (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -452,6 +456,9 @@ CREATE TABLE IF NOT EXISTS std_ich_projects (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -644,6 +651,9 @@ CREATE TABLE IF NOT EXISTS std_jobs (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -765,6 +775,9 @@ CREATE TABLE IF NOT EXISTS std_dialect_points (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -813,6 +826,9 @@ CREATE TABLE IF NOT EXISTS std_dialect_lexemes (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     extra TEXT NOT NULL DEFAULT '{}',
@@ -893,6 +909,9 @@ CREATE TABLE IF NOT EXISTS std_ich_articles (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -938,6 +957,9 @@ CREATE TABLE IF NOT EXISTS std_research_articles (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,

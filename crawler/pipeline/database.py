@@ -180,6 +180,9 @@ CREATE TABLE IF NOT EXISTS std_agri_products (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -316,6 +319,9 @@ CREATE TABLE IF NOT EXISTS std_ich_projects (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -508,6 +514,9 @@ CREATE TABLE IF NOT EXISTS std_jobs (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -629,6 +638,9 @@ CREATE TABLE IF NOT EXISTS std_dialect_points (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -677,6 +689,9 @@ CREATE TABLE IF NOT EXISTS std_dialect_lexemes (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     content_hash TEXT NOT NULL,
     extra TEXT NOT NULL DEFAULT '{}',
@@ -757,6 +772,9 @@ CREATE TABLE IF NOT EXISTS std_ich_articles (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -802,6 +820,9 @@ CREATE TABLE IF NOT EXISTS std_research_articles (
     confidence TEXT NOT NULL,
     license_or_usage TEXT NOT NULL,
     publish_status TEXT NOT NULL,
+    candidate_status TEXT NOT NULL DEFAULT 'candidate'
+        CHECK (candidate_status IN ('candidate', 'blocked', 'deferred')),
+    candidate_reason TEXT,
     retrieved_at TEXT NOT NULL,
     first_seen_at TEXT NOT NULL,
     last_seen_at TEXT NOT NULL,
@@ -976,6 +997,11 @@ def _ensure_columns(conn):
             "locator": "TEXT",
             "announcement_year": "INTEGER",
             "is_active": "INTEGER NOT NULL DEFAULT 1",
+            "candidate_status": (
+                "TEXT NOT NULL DEFAULT 'candidate' "
+                "CHECK (candidate_status IN ('candidate', 'blocked', 'deferred'))"
+            ),
+            "candidate_reason": "TEXT",
         },
         "std_ich_inheritors": {
             "long_term_url": "TEXT NOT NULL DEFAULT ''",
@@ -1013,6 +1039,32 @@ def _ensure_columns(conn):
         "std_jobs": {
             "locator": "TEXT",
             "is_active": "INTEGER NOT NULL DEFAULT 1",
+            "candidate_status": (
+                "TEXT NOT NULL DEFAULT 'candidate' "
+                "CHECK (candidate_status IN ('candidate', 'blocked', 'deferred'))"
+            ),
+            "candidate_reason": "TEXT",
+        },
+        "std_agri_products": {
+            "candidate_status": (
+                "TEXT NOT NULL DEFAULT 'candidate' "
+                "CHECK (candidate_status IN ('candidate', 'blocked', 'deferred'))"
+            ),
+            "candidate_reason": "TEXT",
+        },
+        "std_ich_articles": {
+            "candidate_status": (
+                "TEXT NOT NULL DEFAULT 'candidate' "
+                "CHECK (candidate_status IN ('candidate', 'blocked', 'deferred'))"
+            ),
+            "candidate_reason": "TEXT",
+        },
+        "std_research_articles": {
+            "candidate_status": (
+                "TEXT NOT NULL DEFAULT 'candidate' "
+                "CHECK (candidate_status IN ('candidate', 'blocked', 'deferred'))"
+            ),
+            "candidate_reason": "TEXT",
         },
         "std_job_sources": {
             "long_term_url": "TEXT NOT NULL DEFAULT ''",
@@ -1040,6 +1092,11 @@ def _ensure_columns(conn):
         "std_dialect_points": {
             "locator": "TEXT",
             "is_active": "INTEGER NOT NULL DEFAULT 1",
+            "candidate_status": (
+                "TEXT NOT NULL DEFAULT 'candidate' "
+                "CHECK (candidate_status IN ('candidate', 'blocked', 'deferred'))"
+            ),
+            "candidate_reason": "TEXT",
         },
         "std_dialect_lexemes": {
             "source_id": "TEXT",
