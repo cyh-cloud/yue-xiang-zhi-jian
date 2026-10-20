@@ -17,7 +17,7 @@ CSS 组件化的目标是降低样式影响面，不改变现有视觉。判断�
 | 共享组件层 | `frontend/src/styles/components.css`，或确有第二处复用的组件 SFC scoped 样式 | 按钮、输入、选择、标签、卡片、表格容器、空态、加载态、弹窗、消息中心 | 页面专属布局、角色选择器、跨页覆盖、token 定义 |
 | 公开站外壳 | `frontend/src/layouts/PublicLayout.vue`、`frontend/src/components/public/`、`frontend/src/styles/public-shell.css` | 顶栏、导航、页脚、用户菜单、主题与大字开关、CDN 降级提示、公开站根布局 | 具体页面内容、教师或后台页面规则 |
 | 后台外壳 | `frontend/src/layouts/BackofficeLayout.vue`、`frontend/src/components/backoffice/`、`frontend/src/styles/backoffice.css` | 顶栏、侧栏、页面框架、连接状态、消息中心挂载点、角色根节点 token 覆盖 | 具体角色页面布局、业务表格字段样式、共享 `bo-*` 原语 |
-| 社区外壳 | 社区外壳目标文件由社区迁移 ticket 建立；当前 `frontend/src/styles/community.css` 暂由社区页面域消费 | 社区外壳、列表与详情共享的社区级结构 | 公开站其他页面或后台页面规则 |
+| 社区外壳 | `frontend/src/views/community/community.css`，由社区列表与详情共同消费 | 社区外壳、列表与详情共享的社区级结构 | 公开站其他页面或后台页面规则 |
 | 页面域 | `frontend/src/views/<domain>/`、`frontend/src/components/<domain>/`，私有样式与 SFC 同域存放 | 页面布局、页面专属区块、领域组件样式、领域内状态排列 | 其他页面域的私有样式、全局根选择器、角色选择器 |
 | 动态状态 | 根节点 `data-theme` / `data-large-text` / `data-role`，组件状态类或语义属性，数值用 CSS 自定义属性 | 主题、大字、角色、加载、空、错误、未读、已读、选中、悬停、焦点、校验、进度与比例 | 在组件里复制角色色值、用页面选择器覆盖其他域、把静态装饰写成内联样式 |
 
