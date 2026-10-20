@@ -8,6 +8,12 @@
 
 基于 AI 实训的农村本土人才赋能平台：Flask 单体后端 + 多页面前端，服务学员、教师、企业、政府与管理员五类角色。后端已按领域拆分，改代码前先读下面的「后端结构」。
 
+## 团队协作
+
+默认由前端开发者负责前端交付。`backend/` 与数据库属于受保护范围，其他成员先读 `docs/team/README.md`，按其中的讨论与功能分支流程执行。新功能先讨论并记录范围；纯前端小功能可在当前分支直接提交和推送。涉及后端接口或数据库结构时，从 `main` 新开功能分支，只在已确认范围内修改。
+
+`docs/adr/` 是开发宪法，所有任务遵循。现有 ADR 只读，任何成员不得修改、重命名、移动或删除；实现与裁决冲突时停止并上报项目负责人。详见 `docs/team/adr-constitution.md`。
+
 ## Commands
 
 只写非标准命令，标准命令 agent 自己找得到。
@@ -52,7 +58,7 @@
 
 ## 技能流程
 
-首次进入工程流程前跑一次 `/setup-matt-pocock-skills`；不知道用哪个技能敲 `/ask-matt`；想改进这套环境跑 `/retro`。技能之间靠显式点名 Skill 工具，不丢裸 `/name`。
+项目技能在 `.agents/skills/`，入口见 `docs/team/project-skills.md`。首次进入工程流程前跑一次 `/setup-matt-pocock-skills`；不知道用哪个技能敲 `/ask-matt`；想改进这套环境跑 `/retro`。技能之间靠显式点名 Skill 工具，不丢裸 `/name`。
 
 tracker 与标签词汇见 `docs/agents/`；grilling 的提问纪律与阶段边界处理见 mattpocock-skills 自带的 `ask-matt` / `grilling` 说明，本文件不复述。
 
@@ -60,29 +66,13 @@ tracker 与标签词汇见 `docs/agents/`；grilling 的提问纪律与阶段边
 
 | 找什么 | 去哪 |
 | --- | --- |
+| 团队开发规范 | `docs/team/README.md` |
 | 领域词汇 | `GLOSSARY.md`（多上下文先读 `GLOSSARY-MAP.md`） |
-| 历史决策 | `docs/adr/` |
+| 开发宪法（ADR，只读） | `docs/adr/` |
 | tracker / 标签 / 领域文档配置 | `docs/agents/` |
+| 项目技能 | `.agents/skills/`（入口：`docs/team/project-skills.md`） |
 | 编码规范（审查期读取） | `CODING_STANDARDS.md` |
 | 被拒绝的需求 | `.out-of-scope/` |
 | 本地 tracker 的 spec 与票据 | `.scratch/<feature>/` |
 | 架构巡检报告 | `<OS-TMP>/architecture-review-<ts>.html`（不在仓库） |
 | 原型 | `prototype/<name>` 分支（不在工作树） |
-
-<!--
-拆坏了的 AGENTS.md 怎么修？如果您开始担心仓库中 AGENTS.md 文件的重组，需按 progressive disclosure：
-
-I want you to refactor my AGENTS.md file to follow progressive disclosure principles.
-
-Follow these steps:
-
-1. **Find contradictions**: Identify any instructions that conflict with each other, and for each conflict ask me which version to keep.
-2. **Identify the essentials**: Extract only what belongs in AGENTS.md:
-   - One-sentence project description
-   - Package manager (if not npm)
-   - Non-standard build/typecheck commands
-   - Anything truly relevant to every task
-3. **Group the rest**: Arrange the remaining instructions into logical categories (TypeScript conventions, testing patterns, API design, Git workflow), each in its own file.
-4. **Create the file structure**: a minimal AGENTS.md with links; one file per group; a suggested docs/ tree.
-5. **Flag for deletion**: instructions that are redundant, too vague, or obvious to the agent.
--->
