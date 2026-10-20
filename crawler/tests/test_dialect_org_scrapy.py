@@ -1,0 +1,80 @@
+import unittest
+from pathlib import Path
+import sys
+
+from scrapy.http import HtmlResponse, TextResponse
+
+
+PROJECT_ROOT = (
+    Path(__file__).resolve().parents[1]
+    / "collection"
+    / "projects"
+    / "dialect-org"
+)
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from dialect_org.parsers import (
+    parse_dialect_detail,
+    parse_dialect_list,
+)
+from dialect_org.spiders.collection import (
+    DialectOrgSpider,
+)
+
+
+class DialectOrgScrapyTest(unittest.TestCase):
+    def test_list_parser_keeps_dialect_source_urls(self):
+        response = TextResponse(
+            url="https://dialect.org.cn/",
+            body=(
+                '<a href="/dialect/1">食饭</a>'
+                '<a href="https://dialect.org.cn/dialect/1">duplicate</a>'
+                '<a href="/dialect/2">饮茶</a>'
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        items = parse_dialect_list(response)
+
+        self.assertEqual(
+            [item["source_item_id"] for item in items], ["1", "2"]
+        )
+        self.assertEqual(
+            items[0]["detail_url"],
+            "https://dialect.org.cn/dialect/1",
+        )
+
+    def test_detail_parser_preserves_region_and_audio_status(self):
+        response = HtmlResponse(
+            url="https://dialect.org.cn/dialect/1",
+            body=(
+                '<main><div class="detail-header">'
+                '<span class="card-tag">广东广州</span></div>'
+                '<h1 class="detail-word">食饭</h1>'
+                '<div class="detail-phonetic">Sik6 faan6</div>'
+                '<div class="audio-box"><audio src='
+                '"https://你的OSS bucket.oss-cn-hangzhou.aliyuncs.com/a.mp3">'
+                "</audio></div>"
+                '<div class="card"><p>粤语：吃饭</p></div></main>'
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        parsed = parse_dialect_detail(response)
+
+        self.assertEqual(parsed["point"]["source_item_id"], "1")
+        self.assertEqual(parsed["lexeme"]["lemma"], "食饭")
+        self.assertEqual(parsed["lexeme"]["audio_status"], "invalid")
+        self.assertEqual(parsed["point"]["province"], "广东")
+        self.assertEqual(parsed["point"]["city"], "广州")
+        self.assertTrue(parsed["point"]["extra"]["rights_risk"])
+
+    def test_spider_is_site_specific(self):
+        spider = DialectOrgSpider()
+        self.assertEqual(spider.name, "dialect-org")
+        self.assertEqual(spider.source_id, "dialect-org")
+        self.assertEqual(spider.allowed_domains, ["dialect.org.cn"])
+
+
+if __name__ == "__main__":
+    unittest.main()
