@@ -33,6 +33,18 @@ class CollectionRuntime:
         conn = crawler_database.connect(self.database_path)
         conn.close()
 
+    def evidence_from_fixture(
+        self, *, source_id, body, request_url, content_type, run_id
+    ):
+        return RawEvidence(
+            source_id=source_id,
+            request_url=request_url,
+            final_url=request_url,
+            body=body,
+            content_type=content_type,
+            run_id=run_id,
+        )
+
     def persist_raw(self, evidence: RawEvidence):
         self.download_root.mkdir(parents=True, exist_ok=True)
         body = bytes(evidence.body)
