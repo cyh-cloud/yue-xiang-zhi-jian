@@ -1,11 +1,15 @@
 import scrapy
 
+from crawler.collection.shared.crawler_collection.items import (
+    item_from_mapping,
+)
 from ..parsers import parse_list_page, parse_project_detail
 
 
 class IhchinaSpider(scrapy.Spider):
     name = "ihchina"
     source_id = "ihchina"
+    run_id = "live"
     allowed_domains = ["www.ihchina.cn"]
     start_urls = [
         "https://www.ihchina.cn/getProject.html?"
@@ -33,4 +37,7 @@ class IhchinaSpider(scrapy.Spider):
             **list_item.get("extra", {}),
             **parsed.get("extra", {}),
         }
-        yield parsed
+        yield item_from_mapping(
+            parsed, source_id=self.source_id, response=response,
+            list_item=list_item,
+        )

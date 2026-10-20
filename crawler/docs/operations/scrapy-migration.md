@@ -80,6 +80,16 @@ python -m unittest discover -s crawler/tests -p "test_*.py" -t .
 
 单独运行站点项目时，在该项目目录使用其 `scrapy.cfg`。fixture 项目（`aqsc-moa`、`cnipa`）没有 live 入口，只运行站点测试和 fixture 接口验证。
 
+项目设置会自行把 crawler 包根加入 `sys.path`，因此可以直接从任一项目目录运行：
+
+```powershell
+cd crawler/collection/projects/ihchina
+python -m scrapy list
+python -m scrapy check
+```
+
+所有项目共用 `CollectionPipeline` 和 `RawEvidenceMiddleware`。前者只写采集库，后者把实际响应追加为 raw 证据；项目配置同时提供数据库、下载根、来源注册表和限速参数。
+
 `crawler/pyproject.toml` 和 `crawler/uv.lock` 是唯一依赖声明和锁文件，所有项目在同一 uv 环境中运行。项目自己的目录、settings、Spider 和测试入口仍然隔离，不复制根锁文件。fixture 统一放在 `crawler/tests/fixtures/evidence/<source_id>/`，现有证据原地保留，每个项目只引用自己的子目录。
 
 `crawler/pipeline/converter.py` 保持在 Scrapy 项目树之外。旧的手写来源实现和 `run_source.py` 在迁移期保留，直到对应来源完成切换。

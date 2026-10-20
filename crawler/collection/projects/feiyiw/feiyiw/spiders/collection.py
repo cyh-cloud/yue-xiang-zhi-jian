@@ -1,11 +1,15 @@
 import scrapy
 
+from crawler.collection.shared.crawler_collection.items import (
+    item_from_mapping,
+)
 from ..parsers import parse_article_detail, parse_article_list
 
 
 class FeiyiwSpider(scrapy.Spider):
     name = "feiyiw"
     source_id = "feiyiw"
+    run_id = "live"
     allowed_domains = ["www.feiyiw.cn"]
     start_urls = [
         "https://www.feiyiw.cn/index.php?app=article&cate_id=4"
@@ -27,4 +31,7 @@ class FeiyiwSpider(scrapy.Spider):
         item.setdefault("extra", {}).update(
             list_item.get("extra", {})
         )
-        yield item
+        yield item_from_mapping(
+            item, source_id=self.source_id, response=response,
+            list_item=list_item,
+        )

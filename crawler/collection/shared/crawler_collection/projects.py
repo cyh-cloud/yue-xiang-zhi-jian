@@ -29,6 +29,18 @@ class ProjectInfo:
 def discover_projects(root):
     base = Path(root)
     projects = {}
+    actual_ids = {
+        path.name
+        for path in base.iterdir()
+        if path.is_dir()
+        and path.name != "__pycache__"
+        and (path / "scrapy.cfg").is_file()
+    }
+    if actual_ids != set(PROJECT_IDS):
+        raise ValueError(
+            "Scrapy project list does not match the frozen eight-project scope: "
+            + ", ".join(sorted(actual_ids))
+        )
     for source_id in PROJECT_IDS:
         project_root = base / source_id
         package_name = source_id.replace("-", "_")

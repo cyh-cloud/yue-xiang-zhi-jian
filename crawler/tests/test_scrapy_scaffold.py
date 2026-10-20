@@ -220,20 +220,14 @@ class SharedPackageBoundaryTest(unittest.TestCase):
 
     def test_fixture_paths_stay_under_evidence_root(self):
         fixture_root = ROOT / "tests" / "fixtures" / "evidence"
-        exceptions = json.loads(
-            (
-                ROOT
-                / "collection"
-                / "shared"
-                / "fixture_exceptions.json"
-            ).read_text(encoding="utf-8")
-        )
-
-        self.assertEqual(set(exceptions), {"aqsc"})
-        self.assertEqual(exceptions["aqsc"]["source_id"], "aqsc-moa")
         self.assertTrue(fixture_root.is_dir())
         for child in fixture_root.iterdir():
             self.assertTrue(child.is_dir())
+        for project in discover_projects(PROJECTS).values():
+            expected = fixture_root / project.source_id
+            if project.source_id == "aqsc-moa":
+                expected = fixture_root / "aqsc"
+            self.assertTrue(expected.is_dir(), project.source_id)
 
     def test_fixture_root_is_not_created_inside_projects(self):
         for project in discover_projects(PROJECTS).values():

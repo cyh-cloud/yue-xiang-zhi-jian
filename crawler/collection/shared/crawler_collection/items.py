@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -43,8 +44,52 @@ class CollectionItem:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
+def item_from_mapping(payload, *, source_id, response, list_item=None):
+    merged = dict(list_item or {})
+    merged.update(payload or {})
+    merged.setdefault("source_id", source_id)
+    merged.setdefault("run_id", "live")
+    merged.setdefault("mode", "live")
+    merged.setdefault("rights_status", "attribution-required")
+    merged.setdefault("retrieved_at", datetime.now(timezone.utc).isoformat())
+    merged.setdefault(
+        "raw_evidence_id", response.meta.get("raw_evidence_id")
+    )
+    merged.setdefault(
+        "content_hash", response.meta.get("raw_evidence_id")
+    )
+    known = {field.name for field in fields(CollectionItem)}
+    extra = dict(merged.get("extra") or {})
+    unknown = {
+        key: value
+        for key, value in merged.items()
+        if key not in known and key != "extra"
+    }
+    extra.update(unknown)
+    merged = {key: value for key, value in merged.items() if key in known}
+    merged["extra"] = extra
+    return CollectionItem(**merged)
+
+
 def validate_item(item: CollectionItem | dict) -> dict[str, Any]:
     payload = asdict(item) if isinstance(item, CollectionItem) else dict(item)
+    payload.setdefault("candidate_status", "candidate")
+    payload.setdefault("candidate_reason", None)
+    payload.setdefault("parser_version", "1")
+    payload.setdefault("extra", {})
+    payload.setdefault("locator", None)
+    payload.setdefault("fetch_url", None)
+    payload.setdefault("title", None)
+    payload.setdefault("body_text", None)
+    payload.setdefault("published_at", None)
+    payload.setdefault("attribution_required", False)
+    payload.setdefault("attribution_text", None)
+    payload.setdefault("rights_evidence_url", None)
+    payload.setdefault("content_type", None)
+    payload.setdefault("content_hash", None)
+    payload.setdefault("retrieved_at", None)
+    payload.setdefault("source_index", None)
+    payload.setdefault("raw_evidence_id", None)
     required = (
         "source_id",
         "source_item_id",

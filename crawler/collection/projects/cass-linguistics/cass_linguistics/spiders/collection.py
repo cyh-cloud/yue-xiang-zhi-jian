@@ -1,11 +1,15 @@
 import scrapy
 
+from crawler.collection.shared.crawler_collection.items import (
+    item_from_mapping,
+)
 from ..parsers import parse_article_detail, parse_article_list
 
 
 class CassLinguisticsSpider(scrapy.Spider):
     name = "cass-linguistics"
     source_id = "cass-linguistics"
+    run_id = "live"
     allowed_domains = ["ling.cass.cn"]
     start_urls = ["http://ling.cass.cn/news/bensuo/"]
 
@@ -23,4 +27,7 @@ class CassLinguisticsSpider(scrapy.Spider):
             **list_item,
             **item.get("extra", {}),
         }
-        yield item
+        yield item_from_mapping(
+            item, source_id=self.source_id, response=response,
+            list_item=list_item,
+        )

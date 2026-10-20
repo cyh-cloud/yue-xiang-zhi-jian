@@ -1,0 +1,67 @@
+"""Persist actual Scrapy responses as raw evidence before item processing."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from .evidence import RawEvidence
+from .runtime import CollectionRuntime
+
+
+class RawEvidenceMiddleware:
+    def __init__(self, database_path, download_root, registry_path=None):
+        self.runtime = CollectionRuntime(
+            database_path=database_path,
+            download_root=download_root,
+            registry_path=registry_path,
+        )
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        settings = crawler.settings
+        database_path = settings.get("COLLECTION_DATABASE_PATH")
+        if not database_path:
+            raise ValueError("COLLECTION_DATABASE_PATH is required")
+        return cls(
+            database_path,
+            settings.get("COLLECTION_DOWNLOAD_ROOT")
+            or str(Path(database_path).parent / "downloads"),
+            settings.get("SOURCE_REGISTRY_PATH"),
+        )
+
+    def process_response(self, request, response, spider):
+        body = response.body
+        file_name = Path(response.url.split("?", 1)[0]).name
+        raw_id = self.runtime.persist_raw(
+            RawEvidence(
+                source_id=spider.source_id,
+                request_url=request.url,
+                final_url=response.url,
+                source_url=request.meta.get("source_url") or request.url,
+                long_term_url=(
+                    request.meta.get("long_term_url") or response.url
+                ),
+                detail_url=request.meta.get("detail_url"),
+                detail_url_status=(
+                    "direct"
+                    if request.meta.get("detail_url")
+                    else "missing"
+                ),
+                fetch_url=request.url,
+                locator=request.meta.get("locator") or request.url,
+                body=body,
+                content_type=response.headers.get(
+                    "Content-Type", b"application/octet-stream"
+                ).decode("latin-1"),
+                status_code=response.status,
+                request_headers=dict(request.headers),
+                response_headers=dict(response.headers),
+                robots_decision=request.meta.get(
+                    "robots_decision", "unknown"
+                ),
+                run_id=spider.run_id,
+                metadata={"file_name": file_name or "response.bin"},
+            )
+        )
+        response.meta["raw_evidence_id"] = raw_id
+        return response

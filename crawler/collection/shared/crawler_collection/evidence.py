@@ -39,12 +39,37 @@ class RawEvidence:
     body: bytes
     content_type: str
     status_code: int | None = 200
+    source_url: str | None = None
+    long_term_url: str | None = None
+    detail_url: str | None = None
+    detail_url_status: str = "missing"
+    fetch_url: str | None = None
+    locator: str | None = None
+    access_level: str = "public"
+    rights_status: str = "unknown"
+    attribution_required: bool = False
+    attribution_text: str | None = None
+    rights_evidence_url: str | None = None
+    retrieved_at: str | None = None
+    started_at: str | None = None
+    fetch_status: str = "ok"
+    error_message: str | None = None
     request_headers: dict = field(default_factory=dict)
     response_headers: dict = field(default_factory=dict)
     robots_decision: str = "unknown"
     run_id: str | None = None
     declared_size: int | None = None
     metadata: dict = field(default_factory=dict)
+
+    def __post_init__(self):
+        if self.detail_url_status == "direct" and not (
+            self.detail_url or ""
+        ).strip():
+            raise ValueError("detail_url is required when status is direct")
+        if self.detail_url_status == "missing" and not (
+            self.locator or self.request_url
+        ).strip():
+            raise ValueError("locator is required when status is missing")
 
     @property
     def sha256(self):

@@ -2,14 +2,76 @@
 
 from __future__ import annotations
 
-from .database import CollectionDatabase
+from pathlib import Path
+
 from .items import validate_item
+from .runtime import CollectionRuntime
 
 
 class CollectionPipeline:
-    def __init__(self, database_path):
-        self.database = CollectionDatabase(database_path)
+    def __init__(
+        self,
+        database_path,
+        download_root=None,
+        registry_path=None,
+    ):
+        self.runtime = CollectionRuntime(
+            database_path=database_path,
+            download_root=download_root
+            or Path(database_path).parent / "downloads",
+            registry_path=registry_path,
+        )
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        settings = crawler.settings
+        database_path = settings.get("COLLECTION_DATABASE_PATH")
+        if not database_path:
+            raise ValueError("COLLECTION_DATABASE_PATH is required")
+        return cls(
+            database_path,
+            download_root=settings.get("COLLECTION_DOWNLOAD_ROOT"),
+            registry_path=settings.get("SOURCE_REGISTRY_PATH"),
+        )
 
     def process_item(self, item, spider):
-        validate_item(item)
+        payload = validate_item(item)
+        raw_evidence_id = payload.get("raw_evidence_id")
+        if not raw_evidence_id:
+            raise ValueError("raw_evidence_id is required before persistence")
+        result = self.runtime.write_item(
+            payload,
+            raw_evidence_id=raw_evidence_id,
+        )
+        if isinstance(item, dict):
+            item.update(result)
         return item
+
+
+def collection_settings(*, bot_name, package_name, database_path,
+                        download_root, registry_path):
+    return {
+        "BOT_NAME": bot_name,
+        "SPIDER_MODULES": [f"{package_name}.spiders"],
+        "NEWSPIDER_MODULE": f"{package_name}.spiders",
+        "ROBOTSTXT_OBEY": True,
+        "USER_AGENT": (
+            "yuexiang-crawler/0.1 "
+            "(competition; noncommercial; contact: local)"
+        ),
+        "DOWNLOAD_DELAY": 1,
+        "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
+        "DOWNLOAD_TIMEOUT": 30,
+        "RETRY_TIMES": 2,
+        "COLLECTION_DATABASE_PATH": database_path,
+        "COLLECTION_DOWNLOAD_ROOT": download_root,
+        "SOURCE_REGISTRY_PATH": registry_path,
+        "DOWNLOADER_MIDDLEWARES": {
+            "crawler.collection.shared.crawler_collection.middlewares."
+            "RawEvidenceMiddleware": 543,
+        },
+        "ITEM_PIPELINES": {
+            "crawler.collection.shared.crawler_collection.pipelines."
+            "CollectionPipeline": 300,
+        },
+    }

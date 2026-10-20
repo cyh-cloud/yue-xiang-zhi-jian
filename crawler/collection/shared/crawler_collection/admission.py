@@ -20,7 +20,17 @@ class AdmissionDecision:
 
 
 def evaluate_admission(item, *, registry_path=None, robots=None):
-    source = load_registry(registry_path).get(item.source_id)
+    source_id = (
+        item.get("source_id")
+        if isinstance(item, dict)
+        else item.source_id
+    )
+    detail_url_status = (
+        item.get("detail_url_status")
+        if isinstance(item, dict)
+        else item.detail_url_status
+    )
+    source = load_registry(registry_path).get(source_id)
     if source is None:
         return AdmissionDecision(False, "blocked", "source_not_registered")
     if not source.get("enabled"):
@@ -42,7 +52,7 @@ def evaluate_admission(item, *, registry_path=None, robots=None):
         return AdmissionDecision(
             False, "blocked", f"robots:{robots.decision}"
         )
-    if item.detail_url_status != "direct":
+    if detail_url_status != "direct":
         return AdmissionDecision(
             False, "blocked", "detail_url:missing"
         )

@@ -1,11 +1,15 @@
 import scrapy
 
+from crawler.collection.shared.crawler_collection.items import (
+    item_from_mapping,
+)
 from ..parsers import parse_job_detail, parse_job_list
 
 
 class NongmuhrSpider(scrapy.Spider):
     name = "nongmuhr"
     source_id = "nongmuhr"
+    run_id = "live"
     allowed_domains = ["nongmuhr.com"]
     start_urls = ["http://nongmuhr.com/Employ.aspx"]
 
@@ -23,4 +27,7 @@ class NongmuhrSpider(scrapy.Spider):
             **list_item.get("extra", {}),
             **item.get("extra", {}),
         }
-        yield item
+        yield item_from_mapping(
+            item, source_id=self.source_id, response=response,
+            list_item=list_item,
+        )
