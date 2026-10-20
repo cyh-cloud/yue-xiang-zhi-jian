@@ -881,3 +881,12 @@
     right: -8px;
   }
 }
+
+/* Shared comment rows used by the public community and live simulation. */
+.comment-item {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: var(--text-sm);
+}
+
+.comment-item strong { color: var(--accent-green); }

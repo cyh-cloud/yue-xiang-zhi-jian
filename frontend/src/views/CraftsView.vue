@@ -1340,6 +1340,8 @@ function externalVideoUrl(video: CraftVideo): string {
   </section>
 </template>
 
+<style src="./crafts/crafts.css"></style>
+
 <style scoped>
 .crafts-view {
   min-height: 70vh;

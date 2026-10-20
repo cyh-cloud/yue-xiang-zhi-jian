@@ -372,4 +372,4 @@ function formatTime(value: string): string {
   </section>
 </template>
 
-<style src="@/styles/community.css"></style>
+<style src="./community/community.css"></style>

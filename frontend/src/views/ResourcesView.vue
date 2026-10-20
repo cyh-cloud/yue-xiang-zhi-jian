@@ -43,6 +43,8 @@ import ResourcePolicies from "@/components/resources/ResourcePolicies.vue";
   </section>
 </template>
 
+<style src="./resources/resources.css"></style>
+
 <style scoped>
 .resources-community-link {
   display: inline-flex;
