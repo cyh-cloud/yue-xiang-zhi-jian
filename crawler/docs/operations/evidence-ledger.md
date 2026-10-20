@@ -29,7 +29,7 @@
 
 | source_id | verified_at | key_urls | fixture_dir | files | bytes | sha256_index | review |
 | --- | --- | --- | --- | ---: | ---: | --- | --- |
-| `ihchina` | 2026-10-19 18:05 Asia/Shanghai | `https://www.ihchina.cn/getProject.html`；`https://www.ihchina.cn/project_details/12178.html` | `crawler/tests/fixtures/evidence/ihchina/` | 1 | 985 | 见下方 fixture 表 | `docs/reviews/ihchina.md` |
+| `ihchina` | 2026-10-19 18:05 Asia/Shanghai | `https://www.ihchina.cn/getProject.html`；`https://www.ihchina.cn/project_details/12178.html` | `crawler/tests/fixtures/evidence/ihchina/` | 1 | 1019 | 见下方 fixture 表 | `docs/reviews/ihchina.md` |
 | `aqsc-moa` | 2026-10-19 01:29 Asia/Shanghai | `http://www.aqsc.agri.cn/tzgg/`；`http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `crawler/tests/fixtures/evidence/aqsc/` | 2 | 10757 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
 | `cnipa` | 2026-10-19 01:53 Asia/Shanghai | `https://ggfw.cnipa.gov.cn/dlbzsq/dbQuery`；`https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541` | `crawler/tests/fixtures/evidence/cnipa/` | 1 | 1484 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
 | `weather` | 2026-10-19 01:29 Asia/Shanghai | `https://www.weather.com.cn/`；`https://d1.weather.com.cn/sk_2d/101010100.html` | `crawler/tests/fixtures/evidence/weather/` | 2 | 407 | 下方 fixture 表 | `docs/reviews/weather.md` |
@@ -46,7 +46,7 @@
 
 ## 当前汇总
 
-- 公开合成 fixture 共 10 个文件，总字节 14941，最大单文件 5445 字节，低于 100MB。
+- 公开合成 fixture 共 10 个文件，总字节 14975，最大单文件 5445 字节，低于 100MB。
 - 所有公开 XLSX、PDF、HTML 都带合成标记，不含真实联系人列、隐藏表单 token、原始作者元数据或嵌入附件。
 - 本地 `crawler/download/` 仍为未跟踪证据目录，不进入公开索引；没有文件时记为 0，不伪造哈希。
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
@@ -66,7 +66,7 @@
 | `crawler/tests/fixtures/evidence/nzrc/job-detail-8240109.html` | 385 | `1b3807fdeac5fd5b4e9c68917ed3a193c6ae746cd443d77f084ce67048fe7100` |
 | `crawler/tests/fixtures/evidence/weather/sk-beijing.json` | 375 | `49f02176a74963714b173ef291b36e995783563e86a0fc1fa3acfdec8351046b` |
 | `crawler/tests/fixtures/evidence/weather/sk-beijing.response-headers.txt` | 32 | `722ab081249af11d22563126b6a2c04b67e9309cee994b5f98474c5e59f1f408` |
-| `crawler/tests/fixtures/evidence/ihchina/discover.json` | 985 | `3c9c4a974ae46ce4b09f49dd22646c91fa0ff94ef45d8f4366901b04ac219df5` |
+| `crawler/tests/fixtures/evidence/ihchina/discover.json` | 1019 | `2865d896c53bf4d87b0724eba9ec8efcebed0936af618ab9a2c800513fb2f9aa` |
 
 ## 维护规则
 
