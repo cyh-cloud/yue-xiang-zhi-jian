@@ -121,7 +121,7 @@ onMounted(loadPolicies);
     <header class="backoffice-page-header">
       <div>
         <p>政务工作</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           政策管理
         </h1>
         <span>编辑、上架或下架政策；状态变化立即影响学员端可见列表。</span>

@@ -113,7 +113,7 @@ onMounted(loadAnnouncements);
     <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           系统公告
         </h1>
         <span>发布后立即进入所有登录用户的共享消息中心。</span>

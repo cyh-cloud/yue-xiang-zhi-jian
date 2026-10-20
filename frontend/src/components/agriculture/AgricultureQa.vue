@@ -191,12 +191,12 @@ function isAbortError(error: unknown): boolean {
 
 <template>
   <section
-    id="agriculture-qa-section"
+    id="qa-section"
     class="card-section"
-    aria-labelledby="agriculture-qa-title"
+    aria-labelledby="qa-title"
   >
     <h3
-      id="agriculture-qa-title"
+      id="qa-title"
       class="card-section-title"
     >
       <i
@@ -246,7 +246,7 @@ function isAbortError(error: unknown): boolean {
           <div
             v-if="round.answer"
             class="agriculture-qa-message bot"
-            data-testid="agriculture-qa-answer"
+            data-testid="qa-answer"
           >
             <div
               class="message-avatar"

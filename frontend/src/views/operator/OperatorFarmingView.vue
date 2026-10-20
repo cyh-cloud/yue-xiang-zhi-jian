@@ -562,7 +562,7 @@ onMounted(async () => {
     <header class="backoffice-page-header">
       <div>
         <p>农业内容</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           农时日历
         </h1>
         <span>维护作物、物候期、任务、来源与分类，并记录每次复核。</span>

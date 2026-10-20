@@ -283,13 +283,13 @@ async function submit(): Promise<void> {
 
 <template>
   <section
-    id="customer-service-training"
+    id="cs-training"
     class="card-section"
-    data-testid="customer-service-training"
-    aria-labelledby="customer-service-title"
+    data-testid="cs-training"
+    aria-labelledby="cs-title"
   >
     <h3
-      id="customer-service-title"
+      id="cs-title"
       class="card-section-title"
     >
       <i
@@ -306,7 +306,7 @@ async function submit(): Promise<void> {
       <div class="customer-service-config">
         <div class="customer-service-config-row">
           <div class="form-group">
-            <label for="customer-service-scenario">
+            <label for="cs-scenario">
               <i
                 class="fas fa-theater-masks"
                 aria-hidden="true"
@@ -314,7 +314,7 @@ async function submit(): Promise<void> {
               模拟场景
             </label>
             <select
-              id="customer-service-scenario"
+              id="cs-scenario"
               v-model="scenario"
             >
               <option
@@ -327,7 +327,7 @@ async function submit(): Promise<void> {
             </select>
           </div>
           <div class="form-group">
-            <label for="customer-service-personality">
+            <label for="cs-personality">
               <i
                 class="fas fa-user"
                 aria-hidden="true"
@@ -335,7 +335,7 @@ async function submit(): Promise<void> {
               客户性格
             </label>
             <select
-              id="customer-service-personality"
+              id="cs-personality"
               v-model="personality"
             >
               <option
@@ -348,7 +348,7 @@ async function submit(): Promise<void> {
             </select>
           </div>
           <div class="form-group">
-            <label for="customer-service-difficulty">
+            <label for="cs-difficulty">
               <i
                 class="fas fa-signal"
                 aria-hidden="true"
@@ -356,7 +356,7 @@ async function submit(): Promise<void> {
               难度
             </label>
             <select
-              id="customer-service-difficulty"
+              id="cs-difficulty"
               v-model="difficulty"
             >
               <option
@@ -371,7 +371,7 @@ async function submit(): Promise<void> {
         </div>
         <div class="customer-service-config-row">
           <div class="form-group">
-            <label for="customer-service-product">
+            <label for="cs-product">
               <i
                 class="fas fa-box"
                 aria-hidden="true"
@@ -379,7 +379,7 @@ async function submit(): Promise<void> {
               客服产品
             </label>
             <input
-              id="customer-service-product"
+              id="cs-product"
               v-model="product"
               autocomplete="off"
             >
@@ -453,7 +453,7 @@ async function submit(): Promise<void> {
       <p
         v-if="degradedNotice"
         class="customer-service-degraded-note"
-        data-testid="customer-service-degraded"
+        data-testid="cs-degraded"
         role="status"
       >
         <i
@@ -493,7 +493,7 @@ async function submit(): Promise<void> {
 
           <div
             class="customer-service-messages"
-            data-testid="customer-service-messages"
+            data-testid="cs-messages"
           >
             <div
               v-if="!messages.length"
@@ -550,10 +550,10 @@ async function submit(): Promise<void> {
           <div class="customer-service-input-bar">
             <label
               class="sr-only"
-              for="customer-service-input"
+              for="cs-input"
             >客服回复</label>
             <input
-              id="customer-service-input"
+              id="cs-input"
               v-model="reply"
               :disabled="!started || sending"
               placeholder="作为客服回复客户..."
@@ -611,7 +611,7 @@ async function submit(): Promise<void> {
             </div>
             <div
               class="customer-service-score-overall"
-              data-testid="customer-service-score-overall"
+              data-testid="cs-score-overall"
             >
               {{ currentScore ? currentScore.total : "-" }}
             </div>
@@ -638,7 +638,7 @@ async function submit(): Promise<void> {
 
           <div
             class="customer-service-tips-card"
-            data-testid="customer-service-hint"
+            data-testid="cs-hint"
           >
             <h4>
               <i
@@ -769,7 +769,7 @@ async function submit(): Promise<void> {
         v-if="statusMessage"
         class="training-submit-info ec-status"
         :class="`is-${statusKind}`"
-        data-testid="customer-service-status"
+        data-testid="cs-status"
         role="status"
       >
         {{ statusMessage }}
@@ -779,7 +779,7 @@ async function submit(): Promise<void> {
     <TrainingHistory
       kind="cs"
       title="我的客服实训记录"
-      test-id="customer-service-records"
+      test-id="cs-records"
       :refresh-token="historyRefresh"
     />
   </section>

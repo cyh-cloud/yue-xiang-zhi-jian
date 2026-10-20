@@ -732,9 +732,9 @@ function isIntentRegistered(key: string): boolean {
 
 <template>
   <section
-    id="employment-tab"
+    id="emp-tab"
     class="tab-content active employment-view"
-    aria-labelledby="employment-title"
+    aria-labelledby="emp-title"
   >
     <div class="container">
       <div class="employment-container">
@@ -742,7 +742,7 @@ function isIntentRegistered(key: string): boolean {
           Employment
         </div>
         <h1
-          id="employment-title"
+          id="emp-title"
           class="section-title"
         >
           就业对接
@@ -890,7 +890,7 @@ function isIntentRegistered(key: string): boolean {
           class="employment-feedback"
           :class="`is-${feedback.kind}`"
           :role="feedback.kind === 'error' ? 'alert' : 'status'"
-          data-testid="employment-feedback"
+          data-testid="emp-feedback"
         >
           {{ feedback.text }}
         </div>
@@ -1228,7 +1228,7 @@ function isIntentRegistered(key: string): boolean {
             <div
               v-if="visibleCount === 0"
               class="employment-empty"
-              data-testid="employment-empty"
+              data-testid="emp-empty"
             >
               <i
                 class="fas fa-search"
@@ -1617,7 +1617,7 @@ function isIntentRegistered(key: string): boolean {
     <div
       v-if="detailOpen"
       class="modal-overlay detail-modal"
-      data-testid="employment-detail"
+      data-testid="emp-detail"
       @click.self="closeDetail"
     >
       <div

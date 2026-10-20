@@ -336,7 +336,7 @@ onBeforeUnmount(() => {
     class="backoffice-shell"
     :class="{ 'is-collapsed': collapsed }"
     :data-role="role"
-    data-testid="backoffice-shell"
+    data-testid="bo-shell"
   >
     <a
       href="#backoffice-main"
@@ -349,7 +349,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="backoffice-sidebar-toggle"
-          data-testid="backoffice-sidebar-toggle"
+          data-testid="bo-sidebar-toggle"
           :aria-label="collapsed ? '展开侧栏' : '收起侧栏'"
           :aria-expanded="!collapsed"
           :aria-controls="`backoffice-sidebar-${role}`"
@@ -376,7 +376,7 @@ onBeforeUnmount(() => {
         </RouterLink>
         <span
           class="backoffice-role-chip"
-          data-testid="backoffice-role"
+          data-testid="bo-role"
         >{{ config.label }}</span>
       </div>
 
@@ -466,7 +466,7 @@ onBeforeUnmount(() => {
         :id="`backoffice-sidebar-${role}`"
         class="backoffice-sidebar"
         :class="{ open: drawerOpen }"
-        data-testid="backoffice-sidebar"
+        data-testid="bo-sidebar"
       >
         <div class="backoffice-sidebar-head">
           <span class="backoffice-sidebar-mark">{{ config.label.slice(0, 1) }}</span>
@@ -524,7 +524,7 @@ onBeforeUnmount(() => {
           <span
             class="backoffice-connection"
             :class="{ 'is-offline': connectionLost }"
-            data-testid="backoffice-connection"
+            data-testid="bo-connection"
             aria-live="polite"
           >
             <i
@@ -535,10 +535,10 @@ onBeforeUnmount(() => {
           </span>
         </div>
         <main
-          id="backoffice-main"
+          id="bo-main"
           ref="mainRef"
           class="backoffice-content"
-          data-testid="backoffice-main"
+          data-testid="bo-main"
           tabindex="-1"
         >
           <RouterView />

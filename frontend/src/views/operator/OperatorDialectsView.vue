@@ -338,7 +338,7 @@ async function removeDetail(
     <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           方言知识
         </h1>
         <span>维护方言介绍、特色标签、短语与快捷问题。</span>

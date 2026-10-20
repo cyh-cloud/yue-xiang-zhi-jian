@@ -497,7 +497,7 @@ onMounted(async () => {
     <header class="backoffice-page-header">
       <div>
         <p>农业内容</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           病虫害知识
         </h1>
         <span>维护条目、多值字段、来源、实拍图与复核记录。</span>

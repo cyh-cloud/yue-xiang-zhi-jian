@@ -107,7 +107,7 @@ onMounted(loadContent);
     <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           内容监管
         </h1>
         <span>查看并删除违规讨论帖与评论，删除结果立即影响公开页面。</span>

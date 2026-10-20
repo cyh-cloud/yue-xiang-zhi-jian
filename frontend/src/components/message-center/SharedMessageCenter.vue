@@ -578,7 +578,7 @@ function mergeConversationMessages(
 async function scrollConversationToBottom(): Promise<void> {
   await nextTick();
   const box = document.querySelector<HTMLElement>(
-    '[data-testid="message-center-conversation-messages"]',
+    '[data-testid="msg-center-conversation-messages"]',
   );
   if (box) box.scrollTop = box.scrollHeight;
 }
@@ -686,7 +686,7 @@ function safeType(type: string): string {
     <button
       type="button"
       class="icon-btn"
-      data-testid="message-center-trigger"
+      data-testid="msg-center-trigger"
       aria-label="消息通知"
       :aria-expanded="panelOpen"
       @click.stop="togglePanel"
@@ -698,14 +698,14 @@ function safeType(type: string): string {
       <span
         v-if="session.isAuthenticated && notificationEnabled && badgeCount > 0"
         class="badge"
-        data-testid="message-center-badge"
+        data-testid="msg-center-badge"
       >{{ badgeCount }}</span>
     </button>
 
     <section
       v-if="panelOpen"
       class="message-dropdown show message-center-panel"
-      data-testid="message-center-panel"
+      data-testid="msg-center-panel"
       role="dialog"
       aria-label="消息中心"
       @click.stop
@@ -720,7 +720,7 @@ function safeType(type: string): string {
             v-if="unreadItems.length"
             type="button"
             class="message-unread-jump"
-            data-testid="message-center-unread-jump"
+            data-testid="msg-center-unread-jump"
             :aria-label="`查看 ${unreadItems.length} 条未读`"
             @click="jumpToUnread"
           >
@@ -728,7 +728,7 @@ function safeType(type: string): string {
           </button>
           <button
             type="button"
-            data-testid="message-center-mark-all"
+            data-testid="msg-center-mark-all"
             aria-label="全部标记已读"
             title="全部标记已读"
             :disabled="actionBusy"
@@ -741,7 +741,7 @@ function safeType(type: string): string {
           </button>
           <button
             type="button"
-            data-testid="message-center-clear-read"
+            data-testid="msg-center-clear-read"
             aria-label="清除已读"
             title="清除已读"
             :disabled="actionBusy"
@@ -758,7 +758,7 @@ function safeType(type: string): string {
       <div
         v-if="!session.isAuthenticated"
         class="message-empty"
-        data-testid="message-center-anonymous"
+        data-testid="msg-center-anonymous"
       >
         <i
           class="fas fa-user-lock"
@@ -777,7 +777,7 @@ function safeType(type: string): string {
       <div
         v-else-if="!notificationEnabled"
         class="message-empty"
-        data-testid="message-center-disabled"
+        data-testid="msg-center-disabled"
       >
         <i
           class="fas fa-bell-slash"
@@ -787,7 +787,7 @@ function safeType(type: string): string {
         <button
           type="button"
           class="btn btn-text btn-sm"
-          data-testid="message-center-enable"
+          data-testid="msg-center-enable"
           @click="enableNotifications"
         >
           开启通知
@@ -800,7 +800,7 @@ function safeType(type: string): string {
             type="button"
             class="message-tab-btn"
             :class="{ active: activeTab === 'unread' }"
-            data-testid="message-center-tab-unread"
+            data-testid="msg-center-tab-unread"
             @click="selectTab('unread')"
           >
             <i
@@ -812,7 +812,7 @@ function safeType(type: string): string {
             type="button"
             class="message-tab-btn"
             :class="{ active: activeTab === 'read' }"
-            data-testid="message-center-tab-read"
+            data-testid="msg-center-tab-read"
             @click="selectTab('read')"
           >
             <i
@@ -824,7 +824,7 @@ function safeType(type: string): string {
             type="button"
             class="message-tab-btn"
             :class="{ active: activeTab === 'messages' }"
-            data-testid="message-center-tab-messages"
+            data-testid="msg-center-tab-messages"
             @click="selectTab('messages')"
           >
             <i
@@ -860,7 +860,7 @@ function safeType(type: string): string {
           <div
             v-else-if="inboxFailed"
             class="message-empty"
-            data-testid="message-center-conversation-error"
+            data-testid="msg-center-conversation-error"
           >
             <i
               class="fas fa-triangle-exclamation"
@@ -891,7 +891,7 @@ function safeType(type: string): string {
               :key="`${message.other_id}:${message.id}`"
               class="message-item is-clickable"
               :class="{ unread: !message.is_read && !message.is_mine }"
-              data-testid="message-center-conversation-item"
+              data-testid="msg-center-conversation-item"
               role="button"
               tabindex="0"
               @click="openConversation(message.other_id, message.other_name || '对方')"
@@ -926,7 +926,7 @@ function safeType(type: string): string {
           <div
             v-if="partialFailureText && !allSourcesFailed"
             class="message-center-notice"
-            data-testid="message-center-partial"
+            data-testid="msg-center-partial"
             role="status"
           >
             <i
@@ -948,7 +948,7 @@ function safeType(type: string): string {
           <div
             v-else-if="allSourcesFailed"
             class="message-empty"
-            data-testid="message-center-error"
+            data-testid="msg-center-error"
           >
             <i
               class="fas fa-exclamation-triangle"
@@ -958,7 +958,7 @@ function safeType(type: string): string {
             <button
               type="button"
               class="btn btn-text btn-sm"
-              data-testid="message-center-retry"
+              data-testid="msg-center-retry"
               @click="loadData"
             >
               重试
@@ -967,7 +967,7 @@ function safeType(type: string): string {
           <div
             v-else-if="!activeItems.length"
             class="message-empty"
-            data-testid="message-center-empty"
+            data-testid="msg-center-empty"
           >
             <i
               class="fas fa-envelope-open"
@@ -981,7 +981,7 @@ function safeType(type: string): string {
               :key="item.key"
               class="message-item is-clickable"
               :class="{ unread: !item.isRead, 'has-reply': item.replyId }"
-              data-testid="message-center-item"
+              data-testid="msg-center-item"
               :data-unread="item.isRead ? 'false' : 'true'"
               role="button"
               tabindex="0"
@@ -1025,7 +1025,7 @@ function safeType(type: string): string {
         <footer class="message-dropdown-footer">
           <button
             type="button"
-            data-testid="message-center-disable"
+            data-testid="msg-center-disable"
             aria-label="关闭消息通知"
             @click="disableNotifications"
           >
@@ -1047,7 +1047,7 @@ function safeType(type: string): string {
       >
         <div
           class="modal-content"
-          data-testid="message-center-detail"
+          data-testid="msg-center-detail"
           role="dialog"
           aria-modal="true"
           :aria-label="detailItem.title"
@@ -1119,7 +1119,7 @@ function safeType(type: string): string {
             <div class="conversation-modal">
               <div
                 class="conversation-messages"
-                data-testid="message-center-conversation-messages"
+                data-testid="msg-center-conversation-messages"
               >
                 <div
                   v-if="conversation.loading"
@@ -1164,7 +1164,7 @@ function safeType(type: string): string {
                     :key="conversationMessageKey(message)"
                     class="message-bubble"
                     :class="message.sender_id === session.user?.id ? 'mine' : 'theirs'"
-                    data-testid="message-center-bubble"
+                    data-testid="msg-center-bubble"
                   >
                     <div class="message-bubble-content">
                       {{ message.content }}

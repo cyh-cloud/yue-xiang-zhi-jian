@@ -524,7 +524,7 @@ function formatDuration(seconds: number): string {
     <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           手工技艺
         </h1>
         <span>维护技艺、制作步骤、教学视频与材料采购指南。</span>

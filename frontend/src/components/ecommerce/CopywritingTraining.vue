@@ -179,13 +179,13 @@ async function submit(): Promise<void> {
 
 <template>
   <section
-    id="copywriting-training"
+    id="copy-training"
     class="card-section"
-    data-testid="copywriting-training"
-    aria-labelledby="copywriting-title"
+    data-testid="copy-training"
+    aria-labelledby="copy-title"
   >
     <h3
-      id="copywriting-title"
+      id="copy-title"
       class="card-section-title"
     >
       <i
@@ -202,7 +202,7 @@ async function submit(): Promise<void> {
       <div class="copywriting-config">
         <div class="copywriting-config-row">
           <div class="form-group">
-            <label for="copywriting-product">
+            <label for="copy-product">
               <i
                 class="fas fa-box"
                 aria-hidden="true"
@@ -211,14 +211,14 @@ async function submit(): Promise<void> {
               <span class="hint">（限平台支持的农产品）</span>
             </label>
             <input
-              id="copywriting-product"
+              id="copy-product"
               v-model="product"
               autocomplete="off"
               placeholder="例如：荔枝"
             >
           </div>
           <div class="form-group">
-            <label for="copywriting-audience">
+            <label for="copy-audience">
               <i
                 class="fas fa-users"
                 aria-hidden="true"
@@ -226,7 +226,7 @@ async function submit(): Promise<void> {
               目标人群
             </label>
             <select
-              id="copywriting-audience"
+              id="copy-audience"
               v-model="audience"
             >
               <option value="">
@@ -248,7 +248,7 @@ async function submit(): Promise<void> {
           </div>
         </div>
         <div class="form-group">
-          <label for="copywriting-points">
+          <label for="copy-points">
             <i
               class="fas fa-star"
               aria-hidden="true"
@@ -257,7 +257,7 @@ async function submit(): Promise<void> {
             <span class="hint">（用逗号分隔，留空自动生成）</span>
           </label>
           <input
-            id="copywriting-points"
+            id="copy-points"
             v-model="sellingPoints"
             placeholder="例如：甜度高、果肉厚、核小"
           >
@@ -322,7 +322,7 @@ async function submit(): Promise<void> {
         v-if="statusMessage"
         class="training-submit-info ec-status"
         :class="`is-${statusKind}`"
-        data-testid="copywriting-status"
+        data-testid="copy-status"
         role="status"
       >
         {{ statusMessage }}
@@ -331,7 +331,7 @@ async function submit(): Promise<void> {
       <div
         v-if="generatedCopy"
         class="copywriting-result"
-        data-testid="copywriting-result"
+        data-testid="copy-result"
       >
         <div class="copywriting-result-header">
           <span class="copywriting-result-tag">
@@ -344,7 +344,7 @@ async function submit(): Promise<void> {
           <span
             v-if="degraded"
             class="copywriting-degraded-tag"
-            data-testid="copywriting-degraded"
+            data-testid="copy-degraded"
           >
             <i
               class="fas fa-exclamation-triangle"
@@ -396,10 +396,10 @@ async function submit(): Promise<void> {
         </div>
         <label
           class="sr-only"
-          for="copywriting-mine"
+          for="copy-mine"
         >文案我的稿</label>
         <textarea
-          id="copywriting-mine"
+          id="copy-mine"
           v-model="myCopy"
           class="script-input"
           rows="8"
@@ -457,7 +457,7 @@ async function submit(): Promise<void> {
         <div class="copywriting-feedback-head">
           <span
             class="copywriting-feedback-overall"
-            data-testid="copywriting-score-overall"
+            data-testid="copy-score-overall"
           >{{ feedback.overall_score }}</span>
           <span class="copywriting-feedback-label">文案评分（规则 · 可复现）</span>
         </div>
@@ -504,7 +504,7 @@ async function submit(): Promise<void> {
     <TrainingHistory
       kind="copy"
       title="我的文案实训记录"
-      test-id="copywriting-records"
+      test-id="copy-records"
       :refresh-token="historyRefresh"
     />
   </section>

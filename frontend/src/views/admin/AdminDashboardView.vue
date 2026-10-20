@@ -108,7 +108,7 @@ onMounted(loadOverview);
     <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           系统管理后台
         </h1>
         <span>账号、审核与内容治理的真实运行概览。</span>

@@ -430,7 +430,7 @@ onMounted(async () => {
     <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           成功案例
         </h1>
         <span>维护案例正文、指标、里程碑、来源与借鉴点，审核通过后公开。</span>

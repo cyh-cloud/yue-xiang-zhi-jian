@@ -124,7 +124,7 @@ onMounted(loadOverview);
     <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           运营工作台
         </h1>
         <span>农时与病虫害内容的真实存量、复核状态和待办提醒。</span>

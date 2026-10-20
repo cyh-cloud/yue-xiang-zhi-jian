@@ -542,16 +542,16 @@ function externalVideoUrl(video: CraftVideo): string {
 
 <template>
   <section
-    id="crafts-tab"
+    id="craft-tab"
     class="tab-content active crafts-view"
-    aria-labelledby="crafts-title"
+    aria-labelledby="craft-title"
   >
     <div class="container">
       <div class="section-label">
         Heritage Crafts
       </div>
       <h1
-        id="crafts-title"
+        id="craft-title"
         class="section-title"
       >
         非遗手工技能传承
@@ -562,10 +562,10 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="crafts-select-title"
+        aria-labelledby="craft-select-title"
       >
         <h3
-          id="crafts-select-title"
+          id="craft-select-title"
           class="card-section-title"
         >
           <i
@@ -693,10 +693,10 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="crafts-video-title"
+        aria-labelledby="craft-video-title"
       >
         <h3
-          id="crafts-video-title"
+          id="craft-video-title"
           class="card-section-title"
         >
           <i
@@ -899,11 +899,11 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="crafts-3d-title"
+        aria-labelledby="craft-3d-title"
       >
         <div class="panel-header">
           <h3
-            id="crafts-3d-title"
+            id="craft-3d-title"
             class="card-section-title"
           >
             <i
@@ -1149,10 +1149,10 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="crafts-materials-title"
+        aria-labelledby="craft-materials-title"
       >
         <h3
-          id="crafts-materials-title"
+          id="craft-materials-title"
           class="card-section-title"
         >
           <i

@@ -620,7 +620,7 @@ function saveProduct(productId: string): void {
       </div>
 
       <div
-        id="farming-calendar-section"
+        id="fdn-calendar-section"
         class="card-section"
       >
         <h3 class="card-section-title">
@@ -680,7 +680,7 @@ function saveProduct(productId: string): void {
                   type="button"
                   class="farming-toggle"
                   :aria-expanded="sourceListOpen"
-                  aria-controls="farming-date-notice-sources"
+                  aria-controls="fdn-date-notice-sources"
                   @click="sourceListOpen = !sourceListOpen"
                 >
                   {{ sourceListOpen ? "收起数据依据" : "查看数据依据" }}
@@ -692,7 +692,7 @@ function saveProduct(productId: string): void {
                 </button>
                 <ul
                   v-show="sourceListOpen"
-                  id="farming-date-notice-sources"
+                  id="fdn-date-notice-sources"
                   class="farming-sources"
                 >
                   <li

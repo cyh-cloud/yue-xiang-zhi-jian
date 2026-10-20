@@ -301,7 +301,7 @@ onBeforeUnmount(() => {
     <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           用户管理
         </h1>
         <span>编辑账号资料与角色，停用、恢复或删除用户。</span>

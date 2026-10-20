@@ -51,7 +51,7 @@ onMounted(loadOverview);
     <header class="backoffice-page-header">
       <div>
         <p>政务工作</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           政府工作台
         </h1>
         <span>只呈现政务侧产生、可核对的政策与本地案例信息。</span>

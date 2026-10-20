@@ -247,7 +247,7 @@ onMounted(loadReviews);
     <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           内容审核
         </h1>
         <span>课程、岗位、案例与 3D 模型通过审核后才对学员公开。</span>

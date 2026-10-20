@@ -328,7 +328,7 @@ onMounted(async () => {
     <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           招募公告
         </h1>
         <span>维护公告正文与来源，公开就业页读取同一份内容。</span>

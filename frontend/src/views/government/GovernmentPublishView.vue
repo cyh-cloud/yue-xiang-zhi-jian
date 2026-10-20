@@ -213,7 +213,7 @@ onMounted(loadPolicies);
     <header class="backoffice-page-header">
       <div>
         <p>政务工作</p>
-        <h1 data-testid="backoffice-page-title">
+        <h1 data-testid="bo-page-title">
           {{ formTitle }}
         </h1>
         <span>
