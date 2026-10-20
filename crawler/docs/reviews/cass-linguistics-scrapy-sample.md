@@ -2,7 +2,9 @@
 
 日期: 2026-10-21
 
-结果: blocked
+验收结论: blocked
+
+运行结果: partial
 
 ## 列表
 
@@ -28,11 +30,12 @@
 - stage: 5
 - 候选标准实体: 0
 - blocked: 5
-- failed: 0
+- failed/failure_count: 4
+- failure_reason: 4 条详情返回 HTTP 404
 
 ## 失败摘要
 
-`http://ling.cass.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。采集侧准入按保守策略阻断 5 条候选，失败原因统一为 `robots:not-found`。另有 4 条详情返回 `404`，未写成成功样本。只访问 `ling.cass.cn` 公开页面，没有请求登录后语料资源。
+`http://ling.cass.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。采集侧准入按保守策略阻断 5 条候选，阻断原因统一为 `robots:not-found`。另有 4 条详情返回 HTTP 404，计入 `failure_count`，所以运行结果是 `partial`；验收结论仍是 `blocked`，因为本次没有可发布候选。只访问 `ling.cass.cn` 公开页面，没有请求登录后语料资源。
 
 证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-cass-783a606ae8334c5db6d8077f477abc6b\download`。
 

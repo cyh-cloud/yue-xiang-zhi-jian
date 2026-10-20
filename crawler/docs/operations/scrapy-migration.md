@@ -104,7 +104,7 @@ python -m scrapy list
 python -m scrapy check
 ```
 
-所有项目共用 `CollectionPipeline`、`RawEvidenceMiddleware`、`RobotsEvidenceMiddleware` 和 `RunReportExtension`。Pipeline 只写采集库；raw 中间件把实际响应或请求异常追加为证据；robots 中间件保存 allowed、disallowed、not-found 或 unknown 的真实结论；运行扩展为每次 live crawl 生成结构化 JSON 报告。项目配置同时提供数据库、下载根、报告根、来源注册表和限速参数。
+所有项目共用 `CollectionPipeline`、`RawEvidenceMiddleware`、`RobotsEvidenceMiddleware` 和 `RunReportExtension`。Pipeline 只写采集库；raw 中间件把实际响应或请求异常追加为证据；robots 中间件保存 allowed、disallowed、not-found 或 unknown 的真实结论；运行扩展为每次 live crawl 生成结构化 JSON 报告，报告中的 `failure_count` 统计解析异常、HTTP 4xx/5xx 和下载异常，`failure_reason` 保存对应摘要。项目配置同时提供数据库、下载根、报告根、来源注册表和限速参数。
 
 一次 crawl 的 `run_id` 由 `CollectionSpiderMixin.from_crawler` 初始化，该次 crawl 的所有请求、raw、stage 和候选共用同一标识。写入 stage 前必须确认 raw 的 `source_id` 和 `run_id` 与 Item 一致，跨来源或跨运行引用会被阻断。
 

@@ -66,9 +66,30 @@ class SourceRegistryTest(unittest.TestCase):
         self.assertEqual(sources["open-meteo"]["status"], "draft")
         self.assertEqual(sources["qweather"]["status"], "draft")
         self.assertEqual(sources["ihchina"]["run_modes"], ["fixture", "live"])
+        self.assertEqual(sources["aqsc-moa"]["run_modes"], ["fixture"])
+        self.assertEqual(sources["cnipa"]["run_modes"], ["fixture"])
         self.assertEqual(sources["cnopendata"]["run_modes"], [])
         self.assertTrue(sources["cnipa"]["attribution_required"])
         self.assertTrue(sources["cnipa"]["rights_evidence_url"])
+
+    def test_legacy_entry_only_accepts_registry_declared_modes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = RunConfig(
+                database_path=root / "crawler.db",
+                download_root=root / "download",
+                fixture_root=root / "fixture",
+                source_root=root / "saved",
+                xlsx_root=root / "xlsx",
+                pdf_root=root / "pdf",
+                registry_path=SOURCES,
+            )
+
+            cnipa = run_source("cnipa", "fixture", config)
+            aqsc = run_source("aqsc-moa", "fixture", config)
+
+            self.assertEqual(cnipa.status, "failed")
+            self.assertEqual(aqsc.status, "failed")
 
     def test_blocked_registry_source_does_not_run(self):
         with tempfile.TemporaryDirectory() as tmp:

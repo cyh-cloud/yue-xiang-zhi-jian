@@ -33,7 +33,6 @@ _LEGACY_MODE_ALIASES = {
     ("nzrc", "saved"): "live",
     ("nongmuhr", "saved"): "live",
 }
-_LEGACY_UNSUPPORTED_MODES = {("cnipa", "fixture")}
 RUN_MODES = tuple(
     sorted(
         {
@@ -1592,8 +1591,6 @@ def run_source(source_id, mode, config):
         allowed_modes = source_registry.run_modes(source)
     else:
         allowed_modes = _TEST_SOURCE_MODES[source_id]
-    if (source_id, mode) in _LEGACY_UNSUPPORTED_MODES:
-        raise ValueError(f"mode {mode} is not implemented for {source_id}")
     canonical_mode = _LEGACY_MODE_ALIASES.get(
         (source_id, mode), mode
     )

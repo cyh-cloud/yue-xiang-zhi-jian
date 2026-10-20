@@ -74,16 +74,17 @@ class ScrapyIntegrationTest(unittest.TestCase):
 
     def test_required_site_sample_records_exist(self):
         expected = {
-            "ihchina-scrapy-sample.md": "blocked",
-            "nzrc-scrapy-sample.md": "blocked",
-            "nongmuhr-scrapy-sample.md": "blocked",
-            "dialect-org-scrapy-sample.md": "blocked",
-            "cass-linguistics-scrapy-sample.md": "blocked",
-            "feiyiw-scrapy-sample.md": "blocked",
+            "ihchina-scrapy-sample.md": ("blocked", "partial"),
+            "nzrc-scrapy-sample.md": ("blocked", "partial"),
+            "nongmuhr-scrapy-sample.md": ("blocked", "failed"),
+            "dialect-org-scrapy-sample.md": ("blocked", "partial"),
+            "cass-linguistics-scrapy-sample.md": ("blocked", "partial"),
+            "feiyiw-scrapy-sample.md": ("blocked", "partial"),
         }
-        for name, status in expected.items():
+        for name, (conclusion, run_status) in expected.items():
             text = (REVIEWS / name).read_text(encoding="utf-8")
-            self.assertIn(f"结果: {status}", text, name)
+            self.assertIn(f"验收结论: {conclusion}", text, name)
+            self.assertIn(f"运行结果: {run_status}", text, name)
 
     def test_file_only_sites_have_no_live_enabled(self):
         sources = {

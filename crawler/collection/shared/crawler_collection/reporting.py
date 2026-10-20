@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,10 +43,15 @@ class RunReport:
     stage_count: int = 0
     evidence_path: str | None = None
     report_path: str | None = None
+    failure_reason: str | None = None
 
     @property
     def candidate_count(self):
         return self.written
+
+    @property
+    def failure_count(self):
+        return self.failed
 
     @property
     def status(self):
@@ -59,6 +65,7 @@ class RunReport:
         return {
             **asdict(self),
             "candidate_count": self.candidate_count,
+            "failure_count": self.failure_count,
             "status": self.status,
         }
 
@@ -118,6 +125,17 @@ def _report_path(report_root, run_id):
     return Path(report_root) / f"{safe_name}.json"
 
 
+def _failure_reason(reasons):
+    if not reasons:
+        return None
+    counts = Counter(reasons)
+    parts = [
+        f"{reason} (x{count})" if count > 1 else reason
+        for reason, count in counts.items()
+    ]
+    return "; ".join(parts)
+
+
 def write_run_report(report, report_root):
     path = _report_path(report_root, report.run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -139,6 +157,7 @@ def build_run_report(
     request_count=0,
     item_counts=None,
     errors=(),
+    failure_reason=None,
     evidence_path=None,
     report_root=None,
 ):
@@ -171,6 +190,7 @@ def build_run_report(
         stage_count=counts["stage_count"],
         evidence_path=str(evidence_path) if evidence_path else None,
         report_path=str(path),
+        failure_reason=failure_reason or _failure_reason(errors),
     )
     write_run_report(report, report_root)
     return report
@@ -200,12 +220,20 @@ class RunReportExtension:
         self.started_at = None
         self.request_count = 0
         self.errors = []
+        self._failed_requests = set()
+        self._failure_reasons = []
+        self._item_failures = 0
+        self._unattributed_spider_failures = 0
         crawler.signals.connect(self.spider_opened, signal=signals.spider_opened)
         crawler.signals.connect(self.spider_closed, signal=signals.spider_closed)
         crawler.signals.connect(
             self.request_scheduled, signal=signals.request_scheduled
         )
+        crawler.signals.connect(
+            self.response_received, signal=signals.response_received
+        )
         crawler.signals.connect(self.spider_error, signal=signals.spider_error)
+        crawler.signals.connect(self.item_error, signal=signals.item_error)
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -218,13 +246,36 @@ class RunReportExtension:
         if not request.meta.get("dont_obey_robotstxt"):
             self.request_count += 1
 
+    def response_received(self, response, request, spider):
+        if request.meta.get("dont_obey_robotstxt"):
+            return
+        if response.status >= 400:
+            self._failed_requests.add(request)
+            self._failure_reasons.append(
+                f"HTTP {response.status}: {response.url}"
+            )
+
     def spider_error(self, failure, response, spider):
-        self.errors.append(f"{type(failure.value).__name__}: {failure.value}")
+        message = f"{type(failure.value).__name__}: {failure.value}"
+        self.errors.append(message)
+        self._failure_reasons.append(message)
+        request = getattr(response, "request", None)
+        if request is not None:
+            self._failed_requests.add(request)
+        else:
+            self._unattributed_spider_failures += 1
+
+    def item_error(self, item, response, spider, failure):
+        self._item_failures += 1
+        self._failure_reasons.append(
+            f"pipeline: {type(failure.value).__name__}: {failure.value}"
+        )
 
     def spider_closed(self, spider, reason):
         if not getattr(spider, "run_id", None):
             return
         stats = self.crawler.stats
+        downloader_failures = 0
         for key, value in (stats.get_stats() if stats else {}).items():
             if (
                 key.startswith("downloader/exception_count/")
@@ -232,6 +283,24 @@ class RunReportExtension:
                 or key == "robotstxt/forbidden"
             ) and value:
                 self.errors.append(f"{key}={value}")
+            if key.startswith("downloader/exception_count/") and value:
+                downloader_failures += int(value)
+                self._failure_reasons.append(
+                    f"{key}={value}"
+                )
+        item_counts = dict(getattr(spider, "_collection_counts", {}))
+        pipeline_failures = int(item_counts.get("failed", 0))
+        request_failures = len(self._failed_requests)
+        failed = (
+            pipeline_failures
+            + request_failures
+            + self._item_failures
+            + self._unattributed_spider_failures
+            + downloader_failures
+        )
+        item_counts["failed"] = failed
+        if failed and not self._failure_reasons:
+            self._failure_reasons.append("pipeline_failure")
         database_path = self.settings["COLLECTION_DATABASE_PATH"]
         report = build_run_report(
             run_id=spider.run_id,
@@ -241,8 +310,9 @@ class RunReportExtension:
             started_at=self.started_at,
             finished_at=datetime.now(timezone.utc).isoformat(),
             request_count=self.request_count,
-            item_counts=getattr(spider, "_collection_counts", {}),
+            item_counts=item_counts,
             errors=self.errors,
+            failure_reason=_failure_reason(self._failure_reasons),
             evidence_path=self.settings.get("COLLECTION_DOWNLOAD_ROOT"),
             report_root=self.settings.get("COLLECTION_REPORT_ROOT"),
         )

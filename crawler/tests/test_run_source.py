@@ -32,7 +32,7 @@ class RunSourceContractTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 run_source("aqsc-moa", "pdf", config)
             with self.assertRaises(ValueError):
-                run_source("cnipa", "fixture", config)
+                run_source("cnipa", "saved", config)
 
     def test_fixture_source_runs_through_all_layers_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:

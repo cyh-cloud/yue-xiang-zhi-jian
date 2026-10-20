@@ -2,7 +2,9 @@
 
 日期: 2026-10-21
 
-结果: blocked
+验收结论: blocked
+
+运行结果: failed
 
 ## 列表
 
@@ -31,11 +33,12 @@
 - stage: 0
 - 候选标准实体: 0
 - blocked: 0
-- failed: 10
+- failed/failure_count: 10
+- failure_reason: `AttributeError: 'NoneType' object has no attribute 'select'`（10 次）
 
 ## 失败摘要
 
-10 条详情均返回 `200`，但 `#project_L` 容器不存在，`parse_job_detail` 访问字段容器时触发 `AttributeError: 'NoneType' object has no attribute 'select'`。运行报告状态为 `failed`，不是成功，也不能把导航菜单的 `li` 当作岗位字段。
+10 条详情均返回 `200`，但 `#project_L` 容器不存在，`parse_job_detail` 访问字段容器时触发 `AttributeError: 'NoneType' object has no attribute 'select'`。验收结论是 `blocked`，因为本次没有可发布候选；运行报告状态是 `failed`，因为 10 次解析异常都计入 `failure_count`。这不是 robots 合规阻断，也不能把导航菜单的 `li` 当作岗位字段。
 
 证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-nongmuhr-2907e74ff22a4579bd820034a29d05e0\download`。
 

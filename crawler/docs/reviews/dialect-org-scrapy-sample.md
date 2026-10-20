@@ -2,7 +2,9 @@
 
 日期: 2026-10-21
 
-结果: blocked
+验收结论: blocked
+
+运行结果: partial
 
 ## 列表
 

@@ -17,16 +17,16 @@
 
 ## 验证结果
 
-| 项目 | fixture/骨架 | 联网小样本 | 结论 |
-| --- | --- | --- | --- |
-| ihchina | 通过 | 2 页列表 + 20 详情，robots 404，候选 0，blocked 20 | blocked |
-| nzrc | 通过 | 19 详情，robots 404，候选 0，blocked 19 | blocked |
-| nongmuhr | 通过 | 10 详情 HTTP 200，但详情解析 10 次失败，候选 0 | blocked |
-| dialect-org | 通过 | 15 详情，robots 404，候选 0，blocked 15 | blocked |
-| cass-linguistics | 通过 | 9 详情，其中 4 条 404；robots 404，候选 0，blocked 5 | blocked |
-| feiyiw | 通过 | 17 详情，robots 404，候选 0，blocked 17 | blocked |
-| aqsc-moa | 通过 | 不执行 | approved-with-gaps |
-| cnipa | 通过 | 不执行 | approved-with-gaps |
+| 项目 | fixture/骨架 | 联网小样本 | 运行结果 | 验收结论 |
+| --- | --- | --- | --- | --- |
+| ihchina | 通过 | 2 页列表 + 20 详情，robots 404，候选 0，blocked 20 | partial | blocked |
+| nzrc | 通过 | 19 详情，robots 404，候选 0，blocked 19 | partial | blocked |
+| nongmuhr | 通过 | 10 详情 HTTP 200，但详情解析 10 次失败，候选 0 | failed（failure_count 10） | blocked |
+| dialect-org | 通过 | 15 详情，robots 404，候选 0，blocked 15 | partial | blocked |
+| cass-linguistics | 通过 | 9 详情，其中 4 条 404；robots 404，候选 0，blocked 5 | partial（failure_count 4） | blocked |
+| feiyiw | 通过 | 17 详情，robots 404，候选 0，blocked 17 | partial | blocked |
+| aqsc-moa | 通过 | 不执行 | 不适用 | approved-with-gaps |
+| cnipa | 通过 | 不执行 | 不适用 | approved-with-gaps |
 
 ## 边界核对
 
@@ -34,12 +34,13 @@
 - 天气不在 Scrapy 项目中；`open-meteo` 和 `qweather` 没有 Spider。
 - `5ajob`、`zhongguoyuyan`、`cnopendata` 没有新项目。
 - `aqsc-moa` 和 `cnipa` 没有 live 请求或真实文件采集。
-- 全量 crawler 测试通过，共 182 项。
+- 全量 crawler 测试通过，共 186 项。
 - 每个项目都有独立 fixture 回放入口；连续两次回放时 raw 追加，stage 和候选按来源自然键幂等。
 - 8 个项目的 fixture 回放均经过各自项目入口，并断言候选数量、状态和连续两次幂等。
 - `aqsc-moa` 和 `cnipa` 的 fixture 回放把真实 XLSX/PDF 写入 `raw_files`，不是只回放 `discover.json`。
 - 候选标准实体保留站点标准字段、`run_id` 和实际内容哈希。
 - live crawl 生成结构化运行报告，包含请求、raw、stage、候选状态和错误摘要。
+- 运行报告的 `failed` 与 `failure_count` 使用同一计数，`failure_reason` 记录解析异常或 HTTP 4xx/5xx 摘要；`blocked` 是验收结论，不是 `RunReport.status` 的枚举。
 - robots 结论覆盖 allowed、disallowed、not-found 和 unknown，拒绝请求保留 raw 证据。
 - 8 个项目统一使用 `crawler/download/` 和 `crawler/data/crawler.db`。
 

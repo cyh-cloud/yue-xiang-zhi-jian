@@ -52,6 +52,7 @@
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
 - `ihchina` 2026-10-19 的分页全量校验只保存统计结果，见 `operations/validation.md`。详情 HTML 与 raw 快照尚未落盘。
 - `cnipa` 的短期签名 URL 不进入账本。长期入口使用检索详情页或公告页，文件本体用本地 SHA-256 标识。
+- live 小样本的运行结果、`failure_count` 和阻断原因以 `reviews/` 与 `scrapy-migration-validation.md` 为准，本账本不复制这些计数。
 
 ## 公开 fixture 索引
 
