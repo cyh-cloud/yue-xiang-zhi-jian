@@ -1,8 +1,14 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-import { signIn } from "./auth-route";
+import {
+  ROLE_ACCOUNTS,
+  expectApiDenied,
+  expectCrossRoleFallback,
+  rolePortal,
+  signIn,
+} from "./auth-route";
 
-const GOVERNMENT = { username: "gov_demo", password: "123456" };
+const GOVERNMENT = ROLE_ACCOUNTS.government;
 
 async function loginWithRequest(request: APIRequestContext): Promise<string> {
   const response = await request.post("/api/auth/login", {
@@ -316,28 +322,31 @@ test.describe("government dashboard and policy management", () => {
     page,
     request,
   }) => {
-    await signIn(page, "student_demo", "123456");
-    await expect(page).toHaveURL(/\/agriculture\/?$/);
-    await page.goto("/government/policies");
-    await expect(page).toHaveURL(/\/agriculture\/?$/);
+    for (const role of [
+      "student",
+      "teacher",
+      "enterprise",
+      "operator",
+    ] as const) {
+      await expectCrossRoleFallback(page, ROLE_ACCOUNTS[role], "government");
+    }
 
-    const accounts = [
-      { username: "student_demo", password: "123456" },
-      { username: "teacher_demo", password: "123456" },
-      { username: "enterprise_demo", password: "123456" },
-      { username: "operator_demo", password: "123456" },
-      { username: "admin_demo", password: "admin123" },
-    ];
-    for (const account of accounts) {
-      const loginResponse = await request.post("/api/auth/login", {
-        data: account,
-      });
-      expect(loginResponse.ok()).toBeTruthy();
-      const body = (await loginResponse.json()) as { session_id: string };
+    for (const role of [
+      "student",
+      "teacher",
+      "enterprise",
+      "operator",
+      "super_admin",
+    ] as const) {
+      await expectApiDenied(
+        request,
+        ROLE_ACCOUNTS[role],
+        rolePortal("government").api,
+      );
+      const body = (await (
+        await request.post("/api/auth/login", { data: ROLE_ACCOUNTS[role] })
+      ).json()) as { session_id: string };
       const headers = { "X-Session-Id": body.session_id };
-
-      const list = await request.get("/api/government/policies", { headers });
-      expect(list.status()).toBe(403);
       const create = await request.post("/api/government/policies", {
         headers,
         data: { title: "越权探针", content: "不应创建" },
