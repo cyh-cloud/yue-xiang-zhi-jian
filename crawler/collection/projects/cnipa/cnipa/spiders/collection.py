@@ -9,16 +9,41 @@ import scrapy
 from crawler.collection.shared.crawler_collection.items import (
     item_from_mapping,
 )
+from crawler.collection.shared.crawler_collection.registry import (
+    load_registry,
+)
 from crawler.collection.shared.crawler_collection.spiders import (
     CollectionSpiderMixin,
 )
 from ..parsers import parse_pdf_rows
 
 
+def _source_domains(source_id):
+    source = load_registry().get(source_id) or {}
+    domains = [
+        str(value).strip().lower()
+        for value in source.get("domains") or []
+        if str(value).strip()
+    ]
+    if not domains:
+        raise RuntimeError(
+            f"source registry has no allowed domains for {source_id}"
+        )
+    return domains
+
+
+def _url_host(url):
+    return (urlparse(url).hostname or "").lower()
+
+
+class DisallowedUrl(ValueError):
+    pass
+
+
 class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
     name = "cnipa"
     source_id = "cnipa"
-    allowed_domains = []
+    allowed_domains = _source_domains("cnipa")
     start_urls = []
     live_enabled = True
     max_download_bytes = 100 * 1024 * 1024
@@ -26,9 +51,16 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
     def __init__(self, *args, start_urls=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.start_urls = list(start_urls or [])
+        self.allowed_domains = list(type(self).allowed_domains)
+        for url in self.start_urls:
+            host = _url_host(url)
+            if host in {"127.0.0.1", "localhost"}:
+                if host not in self.allowed_domains:
+                    self.allowed_domains.append(host)
 
     def start_requests(self):
         for url in self.start_urls:
+            self._require_allowed_url(url)
             yield scrapy.Request(
                 url,
                 callback=self.parse,
@@ -53,6 +85,16 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
             for item in payload.get("items") or []:
                 carrier_url = item.get("carrier_url")
                 if not carrier_url:
+                    continue
+                try:
+                    self._require_allowed_url(carrier_url)
+                except DisallowedUrl as exc:
+                    yield self._blocked_item(
+                        response,
+                        str(exc),
+                        source_url=carrier_url,
+                        locator=carrier_url,
+                    )
                     continue
                 meta = {
                     **{
@@ -110,7 +152,11 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
             "long_term_url": response.meta.get("long_term_url")
             or response.url,
         }
-        file_url = self._attachment_url(response)
+        try:
+            file_url = self._attachment_url(response)
+        except DisallowedUrl as exc:
+            yield self._blocked_item(response, str(exc), meta=meta)
+            return
         if file_url is None:
             yield self._blocked_item(
                 response, "carrier:attachment-link-missing", meta=meta
@@ -140,6 +186,7 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
             for key in (
                 "announcement_id",
                 "announcement_no",
+                "batch",
                 "cert_type",
                 "published_at",
                 "source_url",
@@ -166,6 +213,7 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
 
     def _file_request(self, response, file_url, meta=None):
         file_url = urljoin(response.url, file_url)
+        self._require_allowed_url(file_url)
         query = parse_qs(urlparse(file_url).query)
         file_name = (
             (query.get("showname") or query.get("filename") or [None])[0]
@@ -190,8 +238,7 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
             },
         )
 
-    @staticmethod
-    def _attachment_url(response):
+    def _attachment_url(self, response):
         selectors = (
             ".index_art_con a[href]::attr(href)",
             "a.attachment[href]::attr(href)",
@@ -201,7 +248,9 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
             for href in response.css(selector).getall():
                 path = href.split("#", 1)[0].lower()
                 if path.endswith(".pdf"):
-                    return urljoin(response.url, href)
+                    url = urljoin(response.url, href)
+                    self._require_allowed_url(url)
+                    return url
         return None
 
     @staticmethod
@@ -214,32 +263,57 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
                     return text
         return None
 
-    def _blocked_item(self, response, reason, *, meta=None):
-        meta = meta or response.meta
+    def _require_allowed_url(self, url):
+        host = _url_host(url)
+        if not host:
+            raise DisallowedUrl(f"url:invalid:{url}")
+        allowed = any(
+            host == domain or host.endswith(f".{domain}")
+            for domain in self.allowed_domains
+        )
+        if not allowed:
+            raise DisallowedUrl(f"url:domain_not_allowed:{host}")
+
+    def _blocked_item(
+        self,
+        response,
+        reason,
+        *,
+        meta=None,
+        source_url=None,
+        locator=None,
+    ):
+        if meta is None:
+            try:
+                meta = response.meta
+            except AttributeError:
+                meta = {}
         long_term_url = meta.get("long_term_url") or response.url
+        failure_url = source_url or response.url
         source_key = hashlib.sha1(
-            response.url.encode("utf-8")
+            failure_url.encode("utf-8")
         ).hexdigest()[:12]
         payload = {
             "source_item_id": (
                 meta.get("announcement_id") or f"blocked:{source_key}"
             ),
-            "title": meta.get("title")
-            or response.css("title::text").get()
-            or response.url,
-            "source_url": response.url,
+            "title": (
+                meta.get("title")
+                or self._response_title(response)
+                or failure_url
+            ),
+            "source_url": failure_url,
             "long_term_url": long_term_url,
             "detail_url": None,
             "detail_url_status": "missing",
-            "locator": (
-                f"carrier={long_term_url}; status={response.status}"
-            ),
+            "locator": locator
+            or f"carrier={long_term_url}; status={response.status}",
             "candidate_status": "blocked",
             "candidate_reason": reason,
             "mode": meta.get("mode", "live"),
             "extra": {
                 "status_code": response.status,
-                "failure_url": response.url,
+                "failure_url": failure_url,
                 "release_condition": (
                     "the carrier must expose a PDF attachment with a "
                     "text layer"
@@ -251,3 +325,10 @@ class CnipaSpider(CollectionSpiderMixin, scrapy.Spider):
             source_id=self.source_id,
             response=response,
         )
+
+    @staticmethod
+    def _response_title(response):
+        try:
+            return response.css("title::text").get()
+        except Exception:
+            return None

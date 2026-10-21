@@ -2,7 +2,7 @@
 
 状态: active
 
-日期: 2026-10-21
+日期: 2026-10-22
 
 本文是采集证据的单一索引。账本只记录位置、规模、哈希和审核入口，不复制样本正文。本地下载目录的逐文件哈希以 `download/SHA256SUMS.txt` 为机器可读索引；公开 fixture 的哈希以下方专用表为准，人工说明以本表和来源审核记录为准。
 
@@ -30,7 +30,7 @@
 | source_id | verified_at | key_urls | fixture_dir | files | bytes | sha256_index | review |
 | --- | --- | --- | --- | ---: | ---: | --- | --- |
 | `ihchina` | 2026-10-19 18:05 Asia/Shanghai | `https://www.ihchina.cn/getProject.html`；`https://www.ihchina.cn/project_details/12178.html` | `crawler/tests/fixtures/evidence/ihchina/` | 3 | 3250 | 见下方 fixture 表 | `docs/reviews/ihchina.md` |
-| `aqsc-moa` | 2026-10-21 23:05 Asia/Shanghai | `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm`；`http://www.aqsc.agri.cn/tzgg/202508/t20250806_463294.htm`；`http://www.aqsc.agri.cn/tzgg/202508/P020250821548932446299.xlsx` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 3 | 12116 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
+| `aqsc-moa` | 2026-10-21 23:05 Asia/Shanghai | `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm`；`http://www.aqsc.agri.cn/tzgg/202508/t20250806_463294.htm`；`http://www.aqsc.agri.cn/tzgg/202508/P020250821548932446299.xlsx` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 7 | 16363 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
 | `cnipa` | 2026-10-21 23:05 Asia/Shanghai | `https://www.cnipa.gov.cn/art/2026/8/12/art_1400_207705.html`；`https://www.cnipa.gov.cn/module/download/downfile.jsp` | `crawler/tests/fixtures/evidence/cnipa/` | 2 | 2338 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
 | `weather` | 2026-10-19 01:29 Asia/Shanghai | `https://www.weather.com.cn/`；`https://d1.weather.com.cn/sk_2d/101010100.html` | `crawler/tests/fixtures/evidence/weather/` | 2 | 405 | 下方 fixture 表 | `docs/reviews/weather.md` |
 | `open-meteo` | 2026-10-20 Asia/Shanghai | `https://open-meteo.com/`；`https://api.open-meteo.com/v1/forecast` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/open-meteo.md` |
@@ -46,7 +46,7 @@
 
 ## 当前汇总
 
-- 公开合成 fixture 共 19 个文件，总字节 26355，最大单文件 5445 字节，低于 100MB。
+- 公开合成 fixture 共 23 个文件，总字节 30602，最大单文件 5445 字节，低于 100MB。
 - 所有公开 XLSX、PDF、HTML 都带合成标记，不含真实联系人列、隐藏表单 token、原始作者元数据或嵌入附件。
 - 本地 `crawler/download/` 仍为未跟踪证据目录，不进入公开索引；没有文件时记为 0，不伪造哈希。
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
@@ -68,7 +68,11 @@
 
 | 文件 | bytes | SHA-256 |
 | --- | ---: | --- |
+| `crawler/tests/fixtures/evidence/aqsc-moa/details-con-embedded.html` | 1451 | `74ebdd7719f78ea5dafb469edfcc68f63c45fe416f7316ec6d5f75efe8ae12ea` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/details-con-priority.html` | 1462 | `c4d64d589a2014e0417f29abcf3471e8f5c6888cf9b5596d5b2ce4e5e9e079c3` |
 | `crawler/tests/fixtures/evidence/aqsc-moa/discover.json` | 1359 | `734becbadb8820129b1e1e2bc23b82eac4fb5c9a091533f2342153e88cedc1b5` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/embedded.json` | 656 | `d6cf18730817abe5bf3955f9f9ca37d010254035eb6aba7ddd29fe837d81aa8a` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/priority.json` | 678 | `f147af7b96a1c6fca2a95b1dbb0751d2a8a2ed84b88cf79d19d204ed5c5639ef` |
 | `crawler/tests/fixtures/evidence/aqsc-moa/synthetic-mtyx-sample.xlsx` | 5445 | `c77f3a82b228f09303188eeef30d3e4beb275405fe790624d3aca49140749924` |
 | `crawler/tests/fixtures/evidence/aqsc-moa/synthetic-tepinongpin-sample.xlsx` | 5312 | `af128ce30aea149f6ce54ef9c6b4eaab5bacc5fa1a5ded35b5224ddc0bd5038f` |
 | `crawler/tests/fixtures/evidence/cass-linguistics/discover.json` | 613 | `9683fcd3a167e43c434b7c2be358d3634e9776adbe2162c0113040c77508bc8b` |

@@ -1,3 +1,5 @@
+import hashlib
+
 import scrapy
 
 from crawler.collection.shared.crawler_collection.items import (
@@ -16,7 +18,19 @@ class NongmuhrSpider(CollectionSpiderMixin, scrapy.Spider):
     start_urls = ["http://nongmuhr.com/Employ.aspx"]
 
     def parse(self, response):
-        for item in parse_job_list(response):
+        try:
+            items = parse_job_list(response)
+        except Exception as exc:
+            self.logger.exception("nongmuhr list parsing failed")
+            yield self._blocked_item(
+                response,
+                "parse:job_list",
+                exc,
+                source_item_id=self._blocked_id(response.url),
+                locator=f"list={response.url}",
+            )
+            return
+        for item in items:
             yield scrapy.Request(
                 item["detail_url"],
                 callback=self.parse_detail,
@@ -32,7 +46,30 @@ class NongmuhrSpider(CollectionSpiderMixin, scrapy.Spider):
             )
 
     def parse_detail(self, response, list_item):
-        item = parse_job_detail(response)
+        try:
+            item = parse_job_detail(
+                response,
+                list_extra=list_item.get("extra"),
+            )
+        except Exception as exc:
+            self.logger.exception(
+                "nongmuhr detail parsing failed: %s", response.url
+            )
+            yield self._blocked_item(
+                response,
+                "parse:job_detail",
+                exc,
+                source_item_id=(
+                    list_item.get("source_item_id")
+                    or self._blocked_id(response.url)
+                ),
+                title=list_item.get("title"),
+                locator=(
+                    list_item.get("locator")
+                    or f"detail={response.url}"
+                ),
+            )
+            return
         item["extra"] = {
             **list_item.get("extra", {}),
             **item.get("extra", {}),
@@ -40,4 +77,55 @@ class NongmuhrSpider(CollectionSpiderMixin, scrapy.Spider):
         yield item_from_mapping(
             item, source_id=self.source_id, response=response,
             list_item=list_item,
+        )
+
+    @staticmethod
+    def _blocked_id(url):
+        digest = hashlib.sha1(url.encode("utf-8")).hexdigest()[:12]
+        return f"blocked:{digest}"
+
+    def _blocked_item(
+        self,
+        response,
+        reason,
+        error,
+        *,
+        source_item_id,
+        title=None,
+        locator=None,
+    ):
+        detail_url = response.meta.get("detail_url") or response.url
+        long_term_url = response.meta.get("long_term_url") or detail_url
+        payload = {
+            "source_item_id": source_item_id,
+            "title": (
+                title
+                or response.css("title::text").get()
+                or response.url
+            ),
+            "source_url": response.url,
+            "long_term_url": long_term_url,
+            "detail_url": detail_url,
+            "detail_url_status": "direct",
+            "fetch_url": response.url,
+            "locator": locator or f"detail={response.url}",
+            "candidate_status": "blocked",
+            "candidate_reason": (
+                f"{reason}:{type(error).__name__}:{error}"
+            ),
+            "mode": response.meta.get("mode", "live"),
+            "extra": {
+                "failure_url": response.url,
+                "error_type": type(error).__name__,
+                "error_message": str(error),
+                "release_condition": (
+                    "the job detail page must match the current table "
+                    "structure"
+                ),
+            },
+        }
+        return item_from_mapping(
+            payload,
+            source_id=self.source_id,
+            response=response,
         )

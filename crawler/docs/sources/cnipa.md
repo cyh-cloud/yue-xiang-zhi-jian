@@ -228,7 +228,7 @@
 
 | 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| 公告 ID | `std_agri_product_sources.source_item_id` | `agri_product_sources.source_item_id` | 保留检索系统 ID，去掉签名参数 |
+| 公告 ID / 文件行自然键 | `std_agri_product_sources.source_item_id` | `agri_product_sources.source_item_id` | 公告元数据保留检索系统 ID；产品行使用 `batch + product_name + province + county + applicant`，去掉签名参数 |
 | 公告标题 | `std_agri_product_sources.source_title` | `agri_product_sources.source_title` | 原样保存 |
 | 公告文号或日期 | `std_agri_product_sources.announcement_no` | `agri_product_sources.announcement_no` | 旧公告用 `2009年第89号`，新公告用 `第687号` |
 | 栏目发布日期 | `std_agri_product_sources.published_at` | `agri_product_sources.published_at` | 与认定日期分开 |
@@ -251,6 +251,7 @@
 - `source_id=cnipa`。
 - 同一产品多次公告时保留最新有效记录，旧公告进入来源历史。
 - 人工修改字段不自动覆盖。
+- 文件行 `source_item_id` 使用稳定自然键 `batch + product_name + province + county + applicant`。PDF 页码、页内行号和序号只进入 locator，文件内行重排不改变记录身份。
 
 ## 数据量与更新
 
@@ -306,4 +307,6 @@
 - 2026-10-21 真实 live 样本通过公告页发现附件 1，下载并解析 58 条产品行。raw 2、PDF 文件 1、stage 58、deferred 候选 58，候选原因 `robots:not-found`，failure_count 0。原始证据位置见 `docs/reviews/cnipa-scrapy-sample.md`。
 - PDF 文字层解析结果按 UTF-8 写入采集库；候选仍只能作为低置信度候选，必须经过发布审核，不能直接发布。
 - `pdf` 模式遍历所有已映射的本地 PDF，每份文件独立保存 raw 文件和产品行 locator；不再只处理第 687 号。
+- 2026-10-22 Spider 允许域名从 `sources.json` 派生，公告页、附件链接和 manifest 承载链接在发请求前校验；不在注册域名内的链接写 blocked Item，不发起请求。
+- 2026-10-22 文件行改用稳定自然键，并增加产品行重排 fixture 回归；重排后 locator 可以变化，`source_item_id` 保持不变。
 - 全量 537 条公告、PDF 表格重建和扫描件 OCR 仍未完成。解除条件是完成全量运行、OCR 抽样和产品级对账。

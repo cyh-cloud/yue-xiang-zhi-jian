@@ -10,6 +10,50 @@ from bs4 import BeautifulSoup
 
 BASE_URL = "http://nongmuhr.com/"
 _SPACE = re.compile(r"\s+")
+_LOCATION_SPLIT = re.compile(r"[|｜]")
+_INVALID_LOCATIONS = frozenset({"不限", "不限地点", "全国"})
+_PROVINCES = (
+    "北京",
+    "天津",
+    "上海",
+    "重庆",
+    "河北",
+    "山西",
+    "辽宁",
+    "吉林",
+    "黑龙江",
+    "江苏",
+    "浙江",
+    "安徽",
+    "福建",
+    "江西",
+    "山东",
+    "河南",
+    "湖北",
+    "湖南",
+    "广东",
+    "海南",
+    "四川",
+    "贵州",
+    "云南",
+    "陕西",
+    "甘肃",
+    "青海",
+    "台湾",
+    "内蒙古自治区",
+    "广西壮族自治区",
+    "西藏自治区",
+    "宁夏回族自治区",
+    "新疆维吾尔自治区",
+    "内蒙古",
+    "广西",
+    "西藏",
+    "宁夏",
+    "新疆",
+    "香港",
+    "澳门",
+)
+_PROVINCE_SUFFIXES = ("特别行政区", "自治区", "省", "市")
 
 
 def _text(node):
@@ -99,6 +143,118 @@ def _company_meta(soup):
     }
 
 
+def _province_prefix(text):
+    compact = _SPACE.sub("", text or "")
+    for province in sorted(_PROVINCES, key=len, reverse=True):
+        if not compact.startswith(province):
+            continue
+        remainder = compact[len(province):]
+        suffix = next(
+            (
+                value
+                for value in _PROVINCE_SUFFIXES
+                if remainder.startswith(value)
+            ),
+            "",
+        )
+        return province + suffix, remainder[len(suffix):]
+    return None, compact
+
+
+def _normalized_location(value, *, fallback_region=None, source):
+    raw = _text_value(value)
+    if not raw or raw in _INVALID_LOCATIONS:
+        return None
+    province, remainder = _province_prefix(raw)
+    fallback_province, _ = _province_prefix(fallback_region)
+    if province is None:
+        province = fallback_province
+    remainder = remainder.lstrip("省市")
+    city = remainder or None
+    county = city if city and city.endswith(("县", "区", "旗")) else None
+    return {
+        "location_raw": raw,
+        "province": province,
+        "city": city,
+        "county": county,
+        "extra": {
+            "source": source,
+            "company_region": fallback_region,
+        },
+    }
+
+
+def _text_value(value):
+    return _SPACE.sub(" ", str(value or "")).strip() or None
+
+
+def _normalized_locations(extra):
+    company_region = _text_value(extra.get("company_region"))
+    reported_raw = _text_value(extra.get("location_raw"))
+    raw_locations = [
+        part
+        for part in _LOCATION_SPLIT.split(reported_raw or "")
+        if _text_value(part)
+    ]
+    locations = []
+    seen = set()
+    for raw in raw_locations:
+        location = _normalized_location(
+            raw,
+            fallback_region=company_region,
+            source="work_location",
+        )
+        if location is None:
+            continue
+        key = (
+            location["location_raw"],
+            location["province"],
+            location["city"],
+            location["county"],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        locations.append(location)
+    if not locations:
+        location = _normalized_location(
+            company_region,
+            fallback_region=company_region,
+            source="company_region",
+        )
+        if location is not None:
+            locations.append(location)
+    return reported_raw, locations
+
+
+def _apply_location_fields(extra):
+    reported_raw, locations = _normalized_locations(extra)
+    extra["reported_location_raw"] = reported_raw
+    extra["locations"] = locations
+    if not locations:
+        extra["location_raw"] = None
+        extra["province"] = None
+        extra["city"] = None
+        extra["county"] = None
+        extra["location_normalization"] = {
+            "status": "unresolved",
+            "requires_review": True,
+        }
+        return extra
+    primary = locations[0]
+    extra["location_raw"] = primary["location_raw"]
+    extra["province"] = primary["province"]
+    extra["city"] = primary["city"]
+    extra["county"] = primary["county"]
+    extra["location_normalization"] = {
+        "status": "resolved" if primary["province"] else "partial",
+        "source": primary["extra"]["source"],
+        "reported_location_raw": reported_raw,
+        "requires_review": not bool(primary["province"]),
+    }
+    return extra
+
+
 def parse_job_list(response):
     soup = BeautifulSoup(response.text, "html.parser")
     items = []
@@ -160,8 +316,9 @@ def parse_job_list(response):
     return items
 
 
-def parse_job_detail(response):
+def parse_job_detail(response, *, list_extra=None):
     soup = BeautifulSoup(response.text, "html.parser")
+    list_extra = list_extra or {}
     title = _text(soup.select_one("#joblist .joblistonelf"))
     if not title:
         raise ValueError("nongmuhr job title container not found")
@@ -172,18 +329,16 @@ def parse_job_detail(response):
         else None
     )
     meta = _company_meta(soup)
-    return {
-        "source_item_id": _job_id(response.url),
-        "title": title,
-        "source_url": response.url,
-        "long_term_url": response.url,
-        "detail_url": response.url,
-        "detail_url_status": "direct",
-        "body_text": _description(soup),
-        "extra": {
+    if not meta.get("company_region"):
+        meta["company_region"] = list_extra.get("company_region")
+    work_location = _field(soup, "工作地点")
+    if not work_location:
+        work_location = list_extra.get("location_raw")
+    extra = _apply_location_fields(
+        {
             "company_name": _text(company),
             "company_url": company_url,
-            "location_raw": _field(soup, "工作地点"),
+            "location_raw": work_location,
             "employment_type": _field(soup, "工作性质"),
             "department": _field(soup, "部门"),
             "headcount": _int_field(soup, "招聘人数"),
@@ -198,5 +353,19 @@ def parse_job_detail(response):
                 "status": "attribution-required",
                 "notice": "只采集公开岗位字段，不采集登录后联系方式。",
             },
-        },
+        }
+    )
+    item = {
+        "source_item_id": _job_id(response.url),
+        "title": title,
+        "source_url": response.url,
+        "long_term_url": response.url,
+        "detail_url": response.url,
+        "detail_url_status": "direct",
+        "body_text": _description(soup),
+        "extra": extra,
     }
+    if not extra["locations"]:
+        item["candidate_status"] = "blocked"
+        item["candidate_reason"] = "location:unavailable"
+    return item

@@ -50,3 +50,10 @@
 - 本次未打开公司详情页字段；岗位字段不依赖公司详情页时，可作为后续补充项。
 - robots 只禁止 `/P_ResumeView.aspx?*`；人才求职入口和简历相关路径应继续按个人隐私边界排除。
 - 联系方式中的模板占位符需要实现层统一置空，并在业务库默认不展示联系人、电话和邮箱。
+
+## 2026-10-22 最终审查修复
+
+- 分页起点统一为 `page=0`，并保留“旧文档曾写从 1 开始”的历史声明。
+- `company_region` 和 `工作地点` 文本进入地点归一化字段；详情地点缺失时可用列表地点兜底，`不限地点` 等无效值不生成地点关系。
+- `std_jobs`、`std_job_sources`、`std_job_locations` 在同一事务写入；`nongmuhr` 无可用地点时写 `candidate_status=blocked`，原因 `location:unavailable`，共享关系写入不再静默跳过。
+- 详情解析异常在 Spider 边界转换为带 URL、locator 和 raw evidence 的 blocked Item，不再只留下 failed 计数。

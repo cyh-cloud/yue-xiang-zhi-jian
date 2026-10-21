@@ -5,10 +5,20 @@ from __future__ import annotations
 import json
 
 
-def upsert_job_relations(conn, job_id, item, *, now):
-    """Persist the source and every available location for one job."""
+def upsert_job_relations(
+    conn,
+    job_id,
+    item,
+    *,
+    now,
+    require_location=False,
+):
+    """Persist the source and locations, optionally rejecting empty location."""
     _upsert_job_source(conn, job_id, item, now=now)
-    for index, location in enumerate(_job_locations(item)):
+    locations = _job_locations(item)
+    if not locations and require_location:
+        raise ValueError("job location is required")
+    for index, location in enumerate(locations):
         _upsert_job_location(
             conn,
             job_id,

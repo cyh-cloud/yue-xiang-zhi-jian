@@ -32,7 +32,7 @@
 | --- | --- | --- | --- |
 | 首页 | `http://nongmuhr.com/` | GET | 返回 200 |
 | 列表页 | `http://nongmuhr.com/Employ.aspx` | GET | 返回 200，每页 10 条 |
-| 列表分页 | `http://nongmuhr.com/Employ.aspx?pubtime=-1&experience=-1&page={page}` | GET | `page` 从 1 开始，第二页已实测 |
+| 列表分页 | `http://nongmuhr.com/Employ.aspx?pubtime=-1&experience=-1&page={page}` | GET | `page` 从 0 开始；默认列表为 `page=0`，`page=1` 是第二页，均已实测 |
 | 岗位详情模式 | `http://nongmuhr.com/EmployView.aspx?id={job_id}` | GET | 例如 `id=13520`、`id=13519`，均返回 200 |
 | 企业详情模式 | `http://nongmuhr.com/CompanyView.aspx?Id={company_id}` | GET | 详情页公司链接，例如 `Id=2333` |
 | robots | `http://nongmuhr.com/robots.txt` | GET | 返回 200 |
@@ -57,6 +57,8 @@
 - 登录要求: 公开列表和详情无需登录
 
 分页链接由 `jquery.pagination.js` 生成，模板为 `?pubtime=-1&experience=-1&page=__id__`。`page` 从 0 开始。后续采集只需保留筛选参数并替换 `page`，不需要处理 ASP.NET 的 `__VIEWSTATE`。
+
+历史声明: 2026-10-19 前的文档曾写“`page` 从 1 开始”，该说法与页面实测不符，已废弃。当前事实以默认页 `page=0`、`page=1` 为第二页为准，审核记录保留这次修正过程。
 
 ## 字段定位
 
@@ -289,4 +291,5 @@
 - 2026-10-21 使用真实结构更新 parser、replay 和脱敏 fixture；旧 `#project_L` 选择器已移除。
 - 2026-10-21 Scrapy live 运行：列表 10 条，详情 10 条均解析成功，raw 11、stage 10、候选 10、failure_count 0。
 - 长期详情 URL 使用 `EmployView.aspx?Id={id}`。零基分页按本文记录，后续实现分页时从 `page=0` 开始。
+- 2026-10-22 岗位地点写入统一使用 `工作地点` 原文和 `company_region` 兜底归一化；每条岗位同时写 `std_jobs`、`std_job_sources` 和 `std_job_locations`。`不限地点` 等无可用地点文本不再静默跳过，缺少可用地点时写 `candidate_status=blocked`，原因 `location:unavailable`。
 

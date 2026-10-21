@@ -249,6 +249,44 @@ class JobRelationWriteTest(unittest.TestCase):
             conn.close()
         self.assertEqual(counts, (0, 0, 0, 0))
 
+    def test_missing_location_aborts_relation_write_instead_of_skipping(self):
+        item = _job_item(
+            source_id="nongmuhr",
+            source_item_id="13519",
+            source_url="https://example.test/nongmuhr/13519",
+            long_term_url="https://example.test/nongmuhr/13519",
+            detail_url="https://example.test/nongmuhr/13519",
+            extra={
+                "company_name": "示例农牧公司",
+                "location_raw": None,
+                "province": None,
+                "city": None,
+                "county": None,
+            },
+        )
+        conn = self.database.connect()
+        try:
+            with self.assertRaisesRegex(
+                ValueError, "job location is required"
+            ):
+                write_nongmuhr_candidate(conn, item, now=NOW)
+        finally:
+            conn.close()
+
+        conn = self.database.connect()
+        try:
+            counts = tuple(
+                conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in (
+                    "std_jobs",
+                    "std_job_sources",
+                    "std_job_locations",
+                )
+            )
+        finally:
+            conn.close()
+        self.assertEqual(counts, (0, 0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

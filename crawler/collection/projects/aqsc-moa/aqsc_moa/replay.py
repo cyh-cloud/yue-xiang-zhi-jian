@@ -38,46 +38,58 @@ def _require_fixture_dir(fixture_dir):
     return expected
 
 
-def _manifest_url(fixture_dir, server):
+def _manifest_url(fixture_dir, server, manifest_name="discover.json"):
     payload = json.loads(
-        (fixture_dir / "discover.json").read_text(encoding="utf-8")
+        (fixture_dir / manifest_name).read_text(encoding="utf-8")
     )
     items = []
     for item in payload.get("items") or []:
         file_name = item.get("file_name")
-        if not file_name:
-            raise ValueError("fixture item is missing file_name")
-        file_path = fixture_dir / file_name
-        file_route = f"/files/{file_name}"
         carrier_route = f"/carriers/{item['source_item_id']}.html"
-        server.add_route(
-            file_route,
-            file_path.read_bytes(),
-            content_type=XLSX_MIME_TYPE,
-        )
-        carrier_html = (
-            "<!doctype html><html><head><meta charset=\"utf-8\">"
-            "<meta name=\"fixture-origin\" content=\"synthetic-fixture\">"
-            f"<title>{item.get('title') or item['source_item_id']}</title>"
-            "</head><body>"
-            f"<h1>{item.get('title') or item['source_item_id']}</h1>"
-            f"<a class=\"attachment\" href=\"{file_route}\">"
-            f"{file_name}</a>"
-            "</body></html>"
-        )
+        if file_name:
+            file_path = fixture_dir / file_name
+            file_route = f"/files/{file_name}"
+            server.add_route(
+                file_route,
+                file_path.read_bytes(),
+                content_type=XLSX_MIME_TYPE,
+            )
+        else:
+            file_route = None
+
+        carrier_file = item.get("carrier_file")
+        if carrier_file:
+            carrier_html = (fixture_dir / carrier_file).read_text(
+                encoding="utf-8"
+            )
+        else:
+            if not file_name:
+                raise ValueError(
+                    "fixture item needs file_name or carrier_file"
+                )
+            carrier_html = (
+                "<!doctype html><html><head><meta charset=\"utf-8\">"
+                "<meta name=\"fixture-origin\" content=\"synthetic-fixture\">"
+                f"<title>{item.get('title') or item['source_item_id']}</title>"
+                "</head><body>"
+                f"<h1>{item.get('title') or item['source_item_id']}</h1>"
+                f"<a class=\"attachment\" href=\"{file_route}\">"
+                f"{file_name}</a>"
+                "</body></html>"
+            )
         server.add_route(
             carrier_route,
             carrier_html.encode("utf-8"),
             content_type="text/html; charset=utf-8",
         )
-        items.append(
-            {
-                **item,
-                "carrier_url": server.url(carrier_route),
-                "file_url": server.url(file_route),
-                "file_source_url": item.get("source_url"),
-            }
-        )
+        replay_item = {
+            **item,
+            "carrier_url": server.url(carrier_route),
+            "file_source_url": item.get("source_url"),
+        }
+        if file_route:
+            replay_item["file_url"] = server.url(file_route)
+        items.append(replay_item)
     manifest = {**payload, "items": items}
     server.add_route(
         "/discover.json",
@@ -94,7 +106,9 @@ def _run_fixture_process(args):
     registry_path = Path(args.registry_path).resolve()
     report_root = Path(args.report_root).resolve()
     with FixtureHTTPServer() as server:
-        start_url = _manifest_url(fixture_dir, server)
+        start_url = _manifest_url(
+            fixture_dir, server, args.manifest_name
+        )
         settings = Settings()
         settings.setmodule(project_settings)
         settings.set("COLLECTION_DATABASE_PATH", str(database_path))
@@ -132,6 +146,7 @@ def replay_aqsc_fixture(
     registry_path,
     run_id=None,
     report_root=None,
+    manifest_name="discover.json",
 ):
     """Replay aqsc-moa fixtures through Spider, middleware, and Pipeline."""
 
@@ -170,6 +185,8 @@ def replay_aqsc_fixture(
             str(report_root),
             "--run-id",
             run_id,
+            "--manifest-name",
+            manifest_name,
         ],
         cwd=PROJECT_ROOT,
         env=env,
@@ -200,6 +217,9 @@ def main(argv=None):
     parser.add_argument("--registry-path", required=True)
     parser.add_argument("--report-root", required=True)
     parser.add_argument("--run-id", required=True)
+    parser.add_argument(
+        "--manifest-name", default="discover.json"
+    )
     args = parser.parse_args(argv)
     if not args.run_fixture:
         parser.error("--run-fixture is required")
