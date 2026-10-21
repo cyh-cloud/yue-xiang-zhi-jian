@@ -242,6 +242,7 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
             "<p>示例农业企业公开岗位摘要。</p>",
         ),
         encoding="utf-8",
+        newline="\n",
     )
     (root / "nongmuhr" / "employ-view-13520.html").write_text(
         _html(
@@ -250,6 +251,7 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
             "<p>示例农业企业公开岗位摘要。</p>",
         ),
         encoding="utf-8",
+        newline="\n",
     )
     (root / "nzrc" / "job-detail-8235500.html").write_text(
         _html(
@@ -261,6 +263,7 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
             job_title="示例种植技术员",
         ),
         encoding="utf-8",
+        newline="\n",
     )
     (root / "nzrc" / "job-detail-8240109.html").write_text(
         _html(
@@ -272,6 +275,7 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
             job_title="示例农业技术员",
         ),
         encoding="utf-8",
+        newline="\n",
     )
 
     (root / "weather" / "sk-beijing.json").write_text(
@@ -284,10 +288,12 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
         '"weathercode":"d00","limitnumber":"不限行",'
         '"date":"10月19日(星期一)"}\n',
         encoding="utf-8",
+        newline="\n",
     )
     (root / "weather" / "sk-beijing.response-headers.txt").write_text(
         "content-type: application/json\n",
         encoding="utf-8",
+        newline="\n",
     )
 
 

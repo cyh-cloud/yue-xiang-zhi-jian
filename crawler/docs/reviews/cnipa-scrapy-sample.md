@@ -2,6 +2,8 @@
 
 日期: 2026-10-21
 
+run_id: `crawler-132-cnipa-live-20261021`
+
 验收结论: approved-with-gaps
 
 运行结果: partial
@@ -48,7 +50,7 @@
 - locator 覆盖 `page=1; row=1; seq=1` 和 `page=2; row=1; seq=2`
 - 临时签名 URL 不进入 stage 或候选长期字段
 
-证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-cnipa-c7a51b28e5234207918a50973292bdc8\download`。
+证据位置：`../crawler-live-evidence/issue-133-20261021/cnipa/`。公开索引为 `crawler/docs/operations/live-evidence-index.json`。
 
 ## 剩余风险
 

@@ -52,8 +52,17 @@
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
 - `ihchina` 2026-10-19 的分页全量校验只保存统计结果，见 `operations/validation.md`。详情 HTML 已落为公开合成 fixture，原始 live raw 快照未提交。
 - `cnipa` 的短期签名 URL 不进入账本。长期入口使用检索详情页或公告页，文件本体用本地 SHA-256 标识。
-- `aqsc-moa` live 被 403 阻断；`cnipa` live 使用 www 公告页和 428298 bytes PDF，产生 58 条 deferred 候选。原始证据留在临时目录，摘要见 `reviews/*-scrapy-sample.md`。
+- `aqsc-moa` live 被 403 阻断；`cnipa` live 使用 www 公告页和 428298 bytes PDF，产生 58 条 deferred 候选。原始证据进入稳定归档目录，摘要见 `reviews/*-scrapy-sample.md`。
 - live 小样本的运行结果、`failure_count` 和阻断原因以 `reviews/` 与 `scrapy-migration-validation.md` 为准，本账本不复制这些计数。
+
+## Live 证据归档
+
+- 归档根: `../crawler-live-evidence/issue-133-20261021/`，相对于仓库根，不在 `%TEMP%`。
+- 公开索引: `crawler/docs/operations/live-evidence-index.json`。
+- 索引覆盖 8 个来源、8 次实际运行，包含 URL、取得时间、HTTP 状态、Content-Type、响应哈希、七类计数、失败摘要、阻断原因和验收记录指针。
+- 原始响应正文、个人信息、凭据、Cookie 和签名 URL 只保留在归档目录，不进入公开仓库。
+- 重建索引: `python -m crawler.tools.build_live_evidence_index --archive-root ../crawler-live-evidence/issue-133-20261021`。
+- 只校验已提交索引: `python -m crawler.tools.build_live_evidence_index --validate-only`。
 
 ## 公开 fixture 索引
 

@@ -2,43 +2,41 @@
 
 日期: 2026-10-21
 
-验收结论: blocked（当前代码尚未按新口径重跑）
+验收结论: approved-with-gaps
 
 运行结果: partial
 
-## 列表
+## 实际重跑
 
-- URL: `https://dialect.org.cn/`
-- 取得时间: `2026-10-21T05:12:24+08:00`
+- run_id: `dialect-org-e7265be7d9d14059a9c086f13150c883`
+- 归档位置: `../crawler-live-evidence/issue-133-20261021/dialect-org/`
+- 列表 URL: `https://dialect.org.cn/`
+- 取得时间: `2026-10-21 23:29:11 Asia/Shanghai`
 - HTTP: `200`
-- 详情请求: 15 条
+- robots: `https://dialect.org.cn/robots.txt` 返回 `404`，结论为 `not-found`
+- 详情请求: 15 条，均返回 `200`
 - 样本 ID: `14`、`9`、`7`、`13`、`2`
-
-## 详情
-
-前 5 条详情 URL 均返回 `200`：
-
-- `https://dialect.org.cn/dialect/14`
-- `https://dialect.org.cn/dialect/9`
-- `https://dialect.org.cn/dialect/7`
-- `https://dialect.org.cn/dialect/13`
-- `https://dialect.org.cn/dialect/2`
 
 ## 计数
 
 - raw: 16
 - stage: 15
-- 候选标准实体: 0
-- 当前代码 blocked: 15
-- 目标口径 deferred: 15
-- failed: 0
+- candidate: 0
+- deferred: 15
+- blocked: 0
+- failed/failure_count: 0
+- skipped: 0
+- candidate_reason: `robots:not-found`
 
-## 失败摘要
+15 条完整候选按新口径写为 `deferred`，不再写成历史 `blocked`。音频未下载，缺失与非法音频源仍分开记录。
 
-`https://dialect.org.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。按最新裁决，`robots:not-found` 不阻断采集和采集库写入；raw、stage 保留，候选应写为 `deferred`，原因 `robots:not-found`。当前分支的 blocked 15 是现有代码按旧 robots 策略产生的计数，尚未按新口径重跑。404 仍不表示获得授权。音频未下载，缺失与非法音频源仍分开记录。
+## 证据
 
-证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-dialect-31f84c7464164cbd9e0f292d1d776233\download`。
+- 公开索引: `crawler/docs/operations/live-evidence-index.json`
+- 运行报告: `dialect-org/reports/dialect-org-e7265be7d9d14059a9c086f13150c883.json`
+- 原始响应正文留在归档目录，不进入公开仓库。
 
-## 重试条件
+## 剩余风险
 
-项目负责人已裁决 `not-found` 不阻断采集。解除条件改为：按新口径重跑 5 条列表加 5 条详情，确认候选状态为 `deferred`，并保留 `robots:not-found` 原因。
+- 本轮只验证默认列表页和 15 条详情，没有全量遍历。
+- robots 404 只表示没有取得允许规则，不构成发布授权。

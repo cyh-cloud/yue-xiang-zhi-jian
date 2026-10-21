@@ -550,6 +550,23 @@ def check_history_baseline() -> list[str]:
     return []
 
 
+def check_live_evidence_index() -> list[str]:
+    try:
+        from crawler.tools.build_live_evidence_index import (
+            validate_live_evidence_index,
+        )
+    except ImportError:
+        try:
+            from build_live_evidence_index import (
+                validate_live_evidence_index,
+            )
+        except ImportError as exc:
+            return [f"live evidence index: cannot import validator: {exc}"]
+    return validate_live_evidence_index(
+        DOCS / "operations" / "live-evidence-index.json"
+    )
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -568,6 +585,7 @@ def main(argv=None) -> int:
     errors.extend(check_implementation_contract())
     errors.extend(check_issue_counts())
     errors.extend(check_history_baseline())
+    errors.extend(check_live_evidence_index())
     if args.scan_history:
         errors.extend(check_history_hygiene())
     if errors:

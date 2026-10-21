@@ -16,7 +16,6 @@ from crawler.tools.public_hygiene import (
 
 ROOT = Path(__file__).resolve().parents[2]
 DOWNLOAD_PREFIX = "crawler/download/"
-EVIDENCE_FIXTURES = ROOT / "crawler" / "tests" / "fixtures" / "evidence"
 EVIDENCE_LEDGER = (
     ROOT / "crawler" / "docs" / "operations" / "evidence-ledger.md"
 )
@@ -30,6 +29,33 @@ def _git(*args: str) -> subprocess.CompletedProcess[bytes]:
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
+
+
+def _tracked_evidence_files():
+    result = _git(
+        "ls-files",
+        "-z",
+        "--",
+        "crawler/tests/fixtures/evidence",
+    )
+    if result.returncode != 0:
+        raise AssertionError(result.stderr.decode(errors="replace"))
+    return sorted(
+        path.decode("utf-8")
+        for path in result.stdout.split(b"\0")
+        if path
+    )
+
+
+def _canonical_blob(relative: str) -> bytes:
+    """Return the committed blob bytes, without checkout line-ending filters."""
+    result = _git("cat-file", "blob", f"HEAD:{relative}")
+    if result.returncode != 0:
+        raise AssertionError(
+            f"cannot read canonical Git blob for {relative}: "
+            f"{result.stderr.decode(errors='replace')}"
+        )
+    return result.stdout
 
 
 class PublicRepositoryHygieneTest(unittest.TestCase):
@@ -63,36 +89,49 @@ class PublicRepositoryHygieneTest(unittest.TestCase):
         self.assertEqual(exposed, [], "tracked headers must not contain Set-Cookie")
 
     def test_public_evidence_fixtures_are_small_and_sanitized(self):
-        files = [path for path in EVIDENCE_FIXTURES.rglob("*") if path.is_file()]
+        files = _tracked_evidence_files()
         self.assertTrue(files, "public evidence fixtures must be present")
+        contents = {
+            relative: _canonical_blob(relative) for relative in files
+        }
         self.assertLessEqual(
-            sum(path.stat().st_size for path in files),
+            sum(len(body) for body in contents.values()),
             MAX_FIXTURE_TOTAL_BYTES,
         )
-        for path in files:
-            with self.subTest(path=path.relative_to(ROOT)):
-                findings = scan_fixture_bytes(path, path.read_bytes())
-                self.assertEqual(findings, [], f"{path}: {findings}")
+        for relative, body in contents.items():
+            with self.subTest(path=relative):
+                findings = scan_fixture_bytes(relative, body)
+                self.assertEqual(findings, [], f"{relative}: {findings}")
+
+    def test_canonical_text_fixtures_use_lf_line_endings(self):
+        files = _tracked_evidence_files()
+        text_files = [
+            relative
+            for relative in files
+            if Path(relative).suffix.lower() in {".html", ".json", ".txt"}
+        ]
+        self.assertTrue(text_files)
+        for relative in text_files:
+            with self.subTest(path=relative):
+                self.assertNotIn(b"\r\n", _canonical_blob(relative))
 
     def test_evidence_ledger_matches_fixture_sizes_and_hashes(self):
         ledger = EVIDENCE_LEDGER.read_text(encoding="utf-8")
-        files = [
-            path
-            for path in EVIDENCE_FIXTURES.rglob("*")
-            if path.is_file()
-        ]
+        files = _tracked_evidence_files()
+        contents = {
+            relative: _canonical_blob(relative) for relative in files
+        }
         self.assertIn(
-            f"总字节 {sum(path.stat().st_size for path in files)}",
+            f"总字节 {sum(len(body) for body in contents.values())}",
             ledger,
         )
         self.assertIn(
-            f"最大单文件 {max(path.stat().st_size for path in files)} 字节",
+            f"最大单文件 {max(len(body) for body in contents.values())} 字节",
             ledger,
         )
-        for path in sorted(files):
-            relative = path.relative_to(ROOT).as_posix()
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            row = f"| `{relative}` | {path.stat().st_size} | `{digest}` |"
+        for relative, body in sorted(contents.items()):
+            digest = hashlib.sha256(body).hexdigest()
+            row = f"| `{relative}` | {len(body)} | `{digest}` |"
             self.assertIn(row, ledger, relative)
 
     def test_fixture_generator_is_deterministic(self):
@@ -110,6 +149,18 @@ class PublicRepositoryHygieneTest(unittest.TestCase):
                 if path.is_file()
             }
             self.assertEqual(first_files, second_files)
+
+    def test_fixture_generator_uses_canonical_line_endings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            generated_root = Path(tmp)
+            generate_public_fixtures(generated_root)
+            for path in generated_root.rglob("*"):
+                if not path.is_file():
+                    continue
+                if path.suffix.lower() not in {".html", ".json", ".txt"}:
+                    continue
+                with self.subTest(path=path.name):
+                    self.assertNotIn(b"\r\n", path.read_bytes())
 
     def test_scanner_rejects_hidden_form_state_and_contact_data(self):
         html = (
