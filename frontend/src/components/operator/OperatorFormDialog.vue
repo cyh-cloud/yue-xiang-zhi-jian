@@ -222,13 +222,13 @@ function updateString(
     >
       <section
         ref="dialog"
-        class="bo-modal operator-dialog"
+        class="backoffice-modal operator-dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="operator-dialog-title"
         data-testid="operator-record-dialog"
       >
-        <header class="bo-modal-head">
+        <header class="backoffice-modal-head">
           <div>
             <p>{{ eyebrow }}</p>
             <h2 id="operator-dialog-title">
@@ -237,7 +237,7 @@ function updateString(
           </div>
           <button
             type="button"
-            class="bo-icon-button"
+            class="backoffice-icon-button"
             aria-label="关闭"
             :disabled="busy"
             @click="emit('close')"
@@ -250,12 +250,12 @@ function updateString(
         </header>
 
         <form
-          class="bo-modal-body operator-dialog-form"
+          class="backoffice-modal-body operator-dialog-form"
           @submit.prevent="submit"
         >
           <div
             v-if="error"
-            class="bo-feedback is-error"
+            class="backoffice-feedback is-error"
             role="alert"
             data-testid="operator-dialog-error"
           >
@@ -268,7 +268,7 @@ function updateString(
           >
             <label
               v-if="field.type === 'select'"
-              class="bo-field"
+              class="backoffice-field"
             >
               <span>{{ field.label }}{{ field.required ? " *" : "" }}</span>
               <select
@@ -297,7 +297,7 @@ function updateString(
 
             <label
               v-else-if="field.type === 'textarea' || field.type === 'list' || field.type === 'chem'"
-              class="bo-field"
+              class="backoffice-field"
             >
               <span>{{ field.label }}{{ field.required ? " *" : "" }}</span>
               <textarea
@@ -364,7 +364,7 @@ function updateString(
 
             <label
               v-else
-              class="bo-field"
+              class="backoffice-field"
             >
               <span>{{ field.label }}{{ field.required ? " *" : "" }}</span>
               <input
@@ -386,10 +386,10 @@ function updateString(
             </label>
           </template>
 
-          <footer class="bo-modal-actions operator-dialog-actions">
+          <footer class="backoffice-modal-actions operator-dialog-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="busy"
               @click="emit('close')"
             >
@@ -397,7 +397,7 @@ function updateString(
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="backoffice-button"
               :disabled="busy"
             >
               <i
@@ -414,84 +414,3 @@ function updateString(
   </Teleport>
 </template>
 
-<style scoped>
-.operator-dialog-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 2600;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(6, 18, 12, 0.52);
-  backdrop-filter: blur(3px);
-}
-
-.operator-dialog {
-  width: min(720px, calc(100vw - 48px));
-}
-
-.operator-dialog-form {
-  max-height: calc(100vh - 180px);
-  overflow-y: auto;
-}
-
-.operator-dialog-form textarea {
-  width: 100%;
-  min-height: 90px;
-  padding: 9px 10px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 8px;
-  background: var(--bo-input-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.82rem;
-  line-height: 1.55;
-  resize: vertical;
-}
-
-.operator-dialog-form textarea:focus {
-  border-color: var(--bo-accent);
-  box-shadow: 0 0 0 3px var(--bo-accent-soft);
-  outline: none;
-}
-
-.operator-field-hint {
-  color: var(--bo-muted);
-  font-size: 0.68rem;
-  line-height: 1.45;
-}
-
-.operator-checkboxes {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 9px;
-}
-
-.operator-checkboxes legend {
-  padding: 0 5px;
-  color: var(--bo-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.operator-checkboxes label,
-.operator-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.8rem;
-}
-
-.operator-checkboxes input,
-.operator-checkbox input {
-  width: auto;
-}
-
-.operator-dialog-actions {
-  padding: 4px 0 0;
-}
-</style>

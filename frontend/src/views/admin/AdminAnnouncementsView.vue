@@ -109,8 +109,8 @@ onMounted(loadAnnouncements);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -120,7 +120,7 @@ onMounted(loadAnnouncements);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadAnnouncements"
       >
@@ -153,7 +153,7 @@ onMounted(loadAnnouncements);
           kind="error"
           :message="publishError"
         />
-        <label class="bo-field">
+        <label class="backoffice-field">
           <span>公告标题</span>
           <input
             v-model="title"
@@ -161,7 +161,7 @@ onMounted(loadAnnouncements);
             autocomplete="off"
           >
         </label>
-        <label class="bo-field">
+        <label class="backoffice-field">
           <span>公告内容</span>
           <textarea
             v-model="content"
@@ -179,7 +179,7 @@ onMounted(loadAnnouncements);
           </label>
           <button
             type="submit"
-            class="bo-button"
+            class="backoffice-button"
             :disabled="publishing"
           >
             {{ publishing ? "发布中..." : "发布公告" }}
@@ -209,7 +209,7 @@ onMounted(loadAnnouncements);
         >
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             @click="loadAnnouncements"
           >
             重试
@@ -254,7 +254,7 @@ onMounted(loadAnnouncements);
             <small>发布人 {{ announcement.created_by || "未知" }}</small>
             <button
               type="button"
-              class="bo-button is-small is-danger"
+              class="backoffice-button is-small is-danger"
               @click="askDelete(announcement)"
             >
               删除
@@ -267,31 +267,31 @@ onMounted(loadAnnouncements);
     <Teleport to="body">
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="admin-announcement-delete-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="删除系统公告"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>删除系统公告</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               确定删除「{{ deleteTarget.title }}」？删除后所有用户的消息中心会立即停止展示这条公告。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -299,7 +299,7 @@ onMounted(loadAnnouncements);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >
@@ -312,76 +312,4 @@ onMounted(loadAnnouncements);
   </section>
 </template>
 
-<style scoped>
-.admin-announcement-form {
-  display: grid;
-  gap: 12px;
-}
-
-.admin-announcement-form-foot,
-.admin-announcement-row header,
-.admin-announcement-row footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.admin-announcement-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--bo-muted);
-  font-size: 0.84rem;
-}
-
-.admin-announcement-list {
-  display: grid;
-}
-
-.admin-announcement-row {
-  padding: 16px;
-  border-bottom: 1px solid var(--bo-card-border);
-}
-
-.admin-announcement-row:last-child {
-  border-bottom: 0;
-}
-
-.admin-announcement-row h2 {
-  margin: 10px 0 6px;
-  font-size: 0.98rem;
-}
-
-.admin-announcement-row p {
-  margin: 0;
-  color: var(--bo-muted);
-  font-size: 0.84rem;
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-.admin-announcement-row time,
-.admin-announcement-row small {
-  color: var(--bo-muted);
-  font-size: 0.72rem;
-}
-
-.admin-announcement-row footer {
-  margin-top: 12px;
-}
-
-.admin-announcement-pin {
-  display: inline-flex;
-  margin-right: 6px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.admin-announcement-pin {
-  background: #fff2cf;
-  color: #835d00;
-}
-</style>
+<style src="./admin.css"></style>

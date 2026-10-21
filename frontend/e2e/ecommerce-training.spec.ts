@@ -126,8 +126,8 @@ test.describe("ecommerce AI training", () => {
     );
     await copy.getByRole("button", { name: "AI生成文案" }).click();
     expect((await copyGenerated).status()).toBe(200);
-    await expect(copy.getByTestId("copy-degraded")).toContainText("非 AI 生成");
-    await expect(copy.getByTestId("copy-result")).toContainText("荔枝");
+    await expect(copy.getByTestId("copywriting-degraded")).toContainText("非 AI 生成");
+    await expect(copy.getByTestId("copywriting-result")).toContainText("荔枝");
     await copy.getByRole("button", { name: "采用到我的稿" }).click();
     await copy
       .getByLabel("文案我的稿")
@@ -142,7 +142,7 @@ test.describe("ecommerce AI training", () => {
     );
     await copy.getByRole("button", { name: "评分我的文案" }).click();
     expect((await copyScore).status()).toBe(200);
-    await expect(copy.getByTestId("copy-score-overall")).not.toHaveText("-");
+    await expect(copy.getByTestId("copywriting-score-overall")).not.toHaveText("-");
 
     const copySubmit = page.waitForResponse(
       (response) =>
@@ -151,10 +151,10 @@ test.describe("ecommerce AI training", () => {
     );
     await copy.getByRole("button", { name: "提交文案实训" }).click();
     expect((await copySubmit).status()).toBe(200);
-    await expect(copy.getByTestId("copy-status")).toContainText(
+    await expect(copy.getByTestId("copywriting-status")).toContainText(
       "已保存实训记录",
     );
-    await expect(copy.getByTestId("copy-records")).toContainText("荔枝");
+    await expect(copy.getByTestId("copywriting-records")).toContainText("荔枝");
     expect(
       (await recordsFor(page, "copy")).some(
         (record) => record.product === "荔枝" && (record.attempts ?? 0) > 0,
@@ -169,8 +169,8 @@ test.describe("ecommerce AI training", () => {
     );
     await service.getByRole("button", { name: "开始模拟" }).click();
     expect((await nextCustomer).status()).toBe(200);
-    await expect(service.getByTestId("cs-degraded")).toContainText("非 AI 生成");
-    await expect(service.getByTestId("cs-messages")).toContainText("荔枝");
+    await expect(service.getByTestId("customer-service-degraded")).toContainText("非 AI 生成");
+    await expect(service.getByTestId("customer-service-messages")).toContainText("荔枝");
 
     await service
       .getByLabel("客服回复", { exact: true })
@@ -182,8 +182,8 @@ test.describe("ecommerce AI training", () => {
     );
     await service.getByRole("button", { name: "发送客服回复" }).click();
     expect((await customerReply).status()).toBe(200);
-    await expect(service.getByTestId("cs-messages")).toContainText("你（客服）");
-    await expect(service.getByTestId("cs-score-overall")).not.toHaveText("-");
+    await expect(service.getByTestId("customer-service-messages")).toContainText("你（客服）");
+    await expect(service.getByTestId("customer-service-score-overall")).not.toHaveText("-");
 
     const hint = page.waitForResponse(
       (response) =>
@@ -192,8 +192,8 @@ test.describe("ecommerce AI training", () => {
     );
     await service.getByRole("button", { name: "获取客服提示" }).click();
     expect((await hint).status()).toBe(200);
-    await expect(service.getByTestId("cs-hint")).toContainText("话术参考");
-    await expect(service.getByTestId("cs-hint")).toContainText("非 AI 生成");
+    await expect(service.getByTestId("customer-service-hint")).toContainText("话术参考");
+    await expect(service.getByTestId("customer-service-hint")).toContainText("非 AI 生成");
 
     const serviceSubmit = page.waitForResponse(
       (response) =>
@@ -202,10 +202,10 @@ test.describe("ecommerce AI training", () => {
     );
     await service.getByRole("button", { name: "提交客服实训" }).click();
     expect((await serviceSubmit).status()).toBe(200);
-    await expect(service.getByTestId("cs-status")).toContainText(
+    await expect(service.getByTestId("customer-service-status")).toContainText(
       "已保存实训记录",
     );
-    await expect(service.getByTestId("cs-records")).toContainText("荔枝");
+    await expect(service.getByTestId("customer-service-records")).toContainText("荔枝");
     expect(
       (await recordsFor(page, "cs")).some(
         (record) => record.product === "荔枝" && (record.attempts ?? 0) > 0,
@@ -243,17 +243,17 @@ test.describe("ecommerce AI training", () => {
     const copy = page.getByTestId("copywriting-training");
     await copy.getByLabel("文案产品名称").fill("");
     await copy.getByRole("button", { name: "AI生成文案" }).click();
-    await expect(copy.getByTestId("copy-status")).toContainText(
+    await expect(copy.getByTestId("copywriting-status")).toContainText(
       "请输入产品名称",
     );
 
     await page.route("**/api/ecommerce/copywriting", (route) => route.abort());
     await copy.getByLabel("文案产品名称").fill("荔枝");
     await copy.getByRole("button", { name: "AI生成文案" }).click();
-    await expect(copy.getByTestId("copy-status")).toContainText(
+    await expect(copy.getByTestId("copywriting-status")).toContainText(
       "无法连接服务",
     );
-    await expect(copy.getByTestId("copy-result")).toHaveCount(0);
+    await expect(copy.getByTestId("copywriting-result")).toHaveCount(0);
   });
 
   test("desktop training layouts keep their legacy visual structure", async ({

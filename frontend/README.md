@@ -35,6 +35,25 @@ npm run test:e2e
 旧 `.html` 路径仍由前端路由静默重定向；它们不依赖旧页面文件，也不会回退到 Flask
 静态路由。Flask 只提供 API 与 `/uploads/`、`/images/` 媒体。
 
+## CSS 契约与视觉矩阵
+
+样式归属、旧样式退役状态和机械检查边界见
+`../docs/css-style-ownership.md`。视觉矩阵的基线库准备、运行方式与更新规则见
+`../docs/css-visual-regression.md`。
+
+全局语义 token 在 `src/styles/tokens.css`，reset、基础元素、焦点和减少动效规则在
+`src/styles/base.css`，跨页面复用的按钮、字段、标签、卡片、表格、状态、弹窗和消息
+中心原语在 `src/styles/components.css`。`src/main.ts` 只加载 token、基础、共享组件，
+以及外壳和页面域样式；旧全局样式已退出活动入口。
+
+```powershell
+python tools/check_frontend_styles.py
+npm run test:visual:matrix
+```
+
+在仓库根运行 Python 检查；第二条命令在 `frontend/` 目录运行。矩阵需要
+`data/baseline.db`，该文件不提交。
+
 ## 生产
 
 构建后由 nginx 伺服 `frontend/dist`。完整模板见仓库根

@@ -118,10 +118,10 @@ onMounted(loadOverview);
 
 <template>
   <section
-    class="bo-page operator-overview"
+    class="backoffice-page operator-overview"
     data-testid="operator-overview"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -131,7 +131,7 @@ onMounted(loadOverview);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadOverview"
       >
@@ -157,7 +157,7 @@ onMounted(loadOverview);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadOverview"
       >
         重试
@@ -169,9 +169,9 @@ onMounted(loadOverview);
         title="内容与待复核"
         description="超 183 天未重新复核的内容会和从未复核内容一起进入待办。"
       >
-        <div class="bo-stat-grid">
+        <div class="backoffice-stat-grid">
           <article
-            class="bo-stat-card"
+            class="backoffice-stat-card"
             data-testid="operator-stat-tasks"
           >
             <strong>{{ tasks.length }}</strong>
@@ -179,7 +179,7 @@ onMounted(loadOverview);
             <small>{{ inventorySummary }}</small>
           </article>
           <article
-            class="bo-stat-card is-alert"
+            class="backoffice-stat-card is-alert"
             data-testid="operator-stat-overdue-tasks"
           >
             <strong>{{ overdueTasks.length }}</strong>
@@ -187,7 +187,7 @@ onMounted(loadOverview);
             <small>超 183 天或从未复核</small>
           </article>
           <article
-            class="bo-stat-card"
+            class="backoffice-stat-card"
             data-testid="operator-stat-entries"
           >
             <strong>{{ entries.length }}</strong>
@@ -195,7 +195,7 @@ onMounted(loadOverview);
             <small>{{ pestInventorySummary }}</small>
           </article>
           <article
-            class="bo-stat-card is-alert"
+            class="backoffice-stat-card is-alert"
             data-testid="operator-stat-overdue-entries"
           >
             <strong>{{ overdueEntries.length }}</strong>
@@ -274,7 +274,7 @@ onMounted(loadOverview);
         </div>
       </BackofficeCard>
 
-      <p class="bo-note">
+      <p class="backoffice-note">
         口径说明：只统计当前数据库真实存在的农时与病虫害内容。运营负责内容维护与复核，
         用户管理和发布前审核属于超级管理员职责，本工作台不提供这两个入口。
       </p>
@@ -282,92 +282,4 @@ onMounted(loadOverview);
   </section>
 </template>
 
-<style scoped>
-.operator-overdue-columns {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.operator-overdue-criterion {
-  margin: -4px 0 14px;
-  padding: 9px 11px;
-  border-radius: 8px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-muted);
-  font-size: 0.74rem;
-  line-height: 1.55;
-}
-
-.operator-overdue-columns section {
-  padding: 15px;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 11px;
-  background: color-mix(in srgb, var(--bo-card-bg) 92%, var(--bo-page-bg));
-}
-
-.operator-overdue-columns header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.operator-overdue-columns h3,
-.operator-overdue-columns p {
-  margin: 0;
-}
-
-.operator-overdue-columns h3 {
-  font-size: 0.86rem;
-}
-
-.operator-overdue-columns a {
-  color: var(--bo-accent);
-  font-size: 0.74rem;
-  font-weight: 700;
-}
-
-.operator-overdue-columns ul {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.operator-overdue-columns li {
-  display: grid;
-  gap: 2px;
-  padding: 9px 10px;
-  border-radius: 8px;
-  background: var(--bo-accent-soft);
-}
-
-.operator-overdue-columns li strong {
-  font-size: 0.78rem;
-}
-
-.operator-overdue-columns li span,
-.operator-overdue-columns li small,
-.operator-overdue-columns p {
-  color: var(--bo-muted);
-  font-size: 0.7rem;
-  line-height: 1.45;
-}
-
-.operator-overview-empty {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--bo-muted);
-  font-size: 0.82rem;
-}
-
-@media (max-width: 900px) {
-  .operator-overdue-columns {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
+<style src="./operator.css"></style>

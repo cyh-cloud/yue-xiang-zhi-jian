@@ -66,6 +66,7 @@ tracker 与标签词汇见 `docs/agents/`；grilling 的提问纪律与阶段边
 | 领域词汇 | `GLOSSARY.md`（多上下文先读 `GLOSSARY-MAP.md`） |
 | 历史决策 | `docs/adr/` |
 | 前端重构规格 | `docs/frontend-vue-rebuild-spec.md` |
+| CSS 样式归属与视觉矩阵 | `docs/css-style-ownership.md`、`docs/css-visual-regression.md` |
 | 旧前端只读参照 | `legacy/reference/` |
 | tracker / 标签 / 领域文档配置 | `docs/agents/` |
 | 编码规范（审查期读取） | `CODING_STANDARDS.md` |

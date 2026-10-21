@@ -48,9 +48,9 @@ test.describe("crafts heritage", () => {
 
     await page.goto("/crafts", { waitUntil: "domcontentloaded" });
 
-    const card = page.locator(".craft-grid .craft-card").filter({
-      hasText: "广绣",
-    });
+    const card = page.locator(
+      '[data-testid="crafts-card"][data-craft-id="embroidery"]',
+    );
     await expect(card).toContainText("运营维护的产地");
     await expect(card).toContainText("运营维护的等级");
     await expect(card).not.toContainText("国家级非物质文化遗产");
@@ -65,18 +65,20 @@ test.describe("crafts heritage", () => {
     await expect(
       page.getByRole("heading", { name: "非遗手工技能传承" }),
     ).toBeVisible();
-    const craftButtons = page.locator(".craft-grid .craft-card");
+    const craftButtons = page.getByTestId("crafts-card");
     await expect(craftButtons).toHaveCount(4);
+    await expect(craftButtons.first()).toHaveAttribute("data-craft-id", /.+/);
 
     await expect(
       page.getByRole("heading", { name: "广绣", exact: true }),
     ).toBeVisible();
-    await expect(page.locator(".craft-intro-origin")).toHaveText("广州");
+    await expect(page.getByTestId("crafts-origin")).toHaveText("广州");
     await expect(page.getByText(/起源于唐代/)).toBeVisible();
     await expect(page.getByText(/已完成 0\/\d+ 步/)).toBeVisible();
 
-    const videoCards = page.locator(".craft-video-card");
+    const videoCards = page.getByTestId("crafts-video-card");
     await expect(videoCards).toHaveCount(4);
+    await expect(videoCards.first()).toHaveAttribute("data-video-id", /.+/);
     await expect(page.getByText(/视频来源：哔哩哔哩/)).toBeVisible();
 
     await expect(page.getByText("入门全套预算")).toBeVisible();
@@ -86,7 +88,7 @@ test.describe("crafts heritage", () => {
     await expect(page.getByText("绣线单色补充装")).toBeVisible();
 
     await page
-      .locator(".craft-grid .craft-card")
+      .getByTestId("crafts-card")
       .filter({ hasText: "潮汕木雕" })
       .click();
     await expect(
@@ -216,8 +218,9 @@ test.describe("crafts heritage", () => {
 
     await page.goto("/crafts", { waitUntil: "domcontentloaded" });
 
-    const tabs = page.locator(".craft-model-tab");
+    const tabs = page.getByTestId("crafts-model-tab");
     await expect(tabs).toHaveCount(2);
+    await expect(tabs.first()).toHaveAttribute("data-model-id", /.+/);
     await expect
       .poll(() => page.locator("model-viewer").getAttribute("src"))
       .toContain("guangxiu_xiubeng.glb");

@@ -267,6 +267,7 @@ function safeUrl(value: string): string {
       <section
         v-if="detail.sources.length"
         class="content-card case-sources"
+        data-testid="case-sources"
       >
         <h2>
           <i

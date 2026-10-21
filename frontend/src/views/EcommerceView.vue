@@ -28,6 +28,8 @@ import LiveScriptTraining from "@/components/ecommerce/LiveScriptTraining.vue";
   </section>
 </template>
 
+<style src="./ecommerce/ecommerce.css"></style>
+
 <style scoped>
 #ecommerce-tab {
   min-height: calc(100vh - 72px);
@@ -35,5 +37,9 @@ import LiveScriptTraining from "@/components/ecommerce/LiveScriptTraining.vue";
 
 #ecommerce-tab .container {
   padding-bottom: 48px;
+}
+
+#customer-service-training .customer-service-panel {
+  gap: 16px;
 }
 </style>

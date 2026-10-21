@@ -322,10 +322,10 @@ onMounted(async () => {
 
 <template>
   <section
-    class="bo-page operator-recruitments"
+    class="backoffice-page operator-recruitments"
     data-testid="operator-recruitments"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -335,7 +335,7 @@ onMounted(async () => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadRecruitments()"
       >
@@ -368,7 +368,7 @@ onMounted(async () => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadRecruitments()"
       >
         重试
@@ -383,7 +383,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             @click="openRecruitment(null)"
           >
             <i
@@ -394,8 +394,8 @@ onMounted(async () => {
           </button>
         </template>
 
-        <div class="bo-filterbar">
-          <label class="bo-field">
+        <div class="backoffice-filterbar">
+          <label class="backoffice-field">
             <span>岗位类别</span>
             <select v-model="categoryFilter">
               <option value="">
@@ -427,9 +427,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -458,10 +458,10 @@ onMounted(async () => {
                 <td>{{ item.source_count }}</td>
                 <td>{{ item.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small"
+                      class="backoffice-button is-small"
                       :class="
                         selectedKey === item.key ? 'is-secondary' : ''
                       "
@@ -471,14 +471,14 @@ onMounted(async () => {
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openRecruitment(item)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeRecruitment(item)"
                     >
                       删除
@@ -502,7 +502,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             :disabled="!selectedKey"
             @click="openSource(null)"
           >
@@ -545,9 +545,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -571,17 +571,17 @@ onMounted(async () => {
                 <td>{{ source.url }}</td>
                 <td>{{ source.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openSource(source)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeSource(source)"
                     >
                       删除
@@ -608,26 +608,4 @@ onMounted(async () => {
   </section>
 </template>
 
-<style scoped>
-.operator-filter-check {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.operator-filter-check input {
-  width: auto;
-}
-
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-</style>
+<style src="./operator.css"></style>

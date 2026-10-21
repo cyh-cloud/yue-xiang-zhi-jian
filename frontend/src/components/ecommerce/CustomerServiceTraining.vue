@@ -302,11 +302,11 @@ async function submit(): Promise<void> {
       和不同性格的 AI 客户对话，实时评分并获得回复提示
     </p>
 
-    <div class="cs-panel">
-      <div class="cs-config">
-        <div class="cs-config-row">
+    <div class="customer-service-panel">
+      <div class="customer-service-config">
+        <div class="customer-service-config-row">
           <div class="form-group">
-            <label for="cs-scenario">
+            <label for="customer-service-scenario">
               <i
                 class="fas fa-theater-masks"
                 aria-hidden="true"
@@ -314,7 +314,7 @@ async function submit(): Promise<void> {
               模拟场景
             </label>
             <select
-              id="cs-scenario"
+              id="customer-service-scenario"
               v-model="scenario"
             >
               <option
@@ -327,7 +327,7 @@ async function submit(): Promise<void> {
             </select>
           </div>
           <div class="form-group">
-            <label for="cs-personality">
+            <label for="customer-service-personality">
               <i
                 class="fas fa-user"
                 aria-hidden="true"
@@ -335,7 +335,7 @@ async function submit(): Promise<void> {
               客户性格
             </label>
             <select
-              id="cs-personality"
+              id="customer-service-personality"
               v-model="personality"
             >
               <option
@@ -348,7 +348,7 @@ async function submit(): Promise<void> {
             </select>
           </div>
           <div class="form-group">
-            <label for="cs-difficulty">
+            <label for="customer-service-difficulty">
               <i
                 class="fas fa-signal"
                 aria-hidden="true"
@@ -356,7 +356,7 @@ async function submit(): Promise<void> {
               难度
             </label>
             <select
-              id="cs-difficulty"
+              id="customer-service-difficulty"
               v-model="difficulty"
             >
               <option
@@ -369,9 +369,9 @@ async function submit(): Promise<void> {
             </select>
           </div>
         </div>
-        <div class="cs-config-row">
+        <div class="customer-service-config-row">
           <div class="form-group">
-            <label for="cs-product">
+            <label for="customer-service-product">
               <i
                 class="fas fa-box"
                 aria-hidden="true"
@@ -379,14 +379,14 @@ async function submit(): Promise<void> {
               客服产品
             </label>
             <input
-              id="cs-product"
+              id="customer-service-product"
               v-model="product"
               autocomplete="off"
             >
           </div>
-          <div class="form-group cs-actions-group">
-            <span class="cs-action-label">操作</span>
-            <div class="cs-actions">
+          <div class="form-group customer-service-actions-group">
+            <span class="customer-service-action-label">操作</span>
+            <div class="customer-service-actions">
               <button
                 type="button"
                 class="btn btn-primary btn-sm"
@@ -431,29 +431,29 @@ async function submit(): Promise<void> {
 
       <div
         v-if="started"
-        class="cs-mission-card"
+        class="customer-service-mission-card"
       >
-        <div class="cs-mission-row">
-          <span class="cs-mission-tag">{{ scenario }}</span>
-          <span class="cs-mission-tag">{{ personality }}</span>
-          <span class="cs-mission-tag">{{ difficulty }}</span>
+        <div class="customer-service-mission-row">
+          <span class="customer-service-mission-tag">{{ scenario }}</span>
+          <span class="customer-service-mission-tag">{{ personality }}</span>
+          <span class="customer-service-mission-tag">{{ difficulty }}</span>
         </div>
-        <div class="cs-mission-goal">
+        <div class="customer-service-mission-goal">
           <i
             class="fas fa-flag-checkered"
             aria-hidden="true"
           />
           你的目标：{{ missionText }}
         </div>
-        <div class="cs-mission-persona">
+        <div class="customer-service-mission-persona">
           {{ personaText }}
         </div>
       </div>
 
       <p
         v-if="degradedNotice"
-        class="cs-degraded-note"
-        data-testid="cs-degraded"
+        class="customer-service-degraded-note"
+        data-testid="customer-service-degraded"
         role="status"
       >
         <i
@@ -463,28 +463,28 @@ async function submit(): Promise<void> {
         {{ degradedNotice }}
       </p>
 
-      <div class="cs-chat-area">
-        <div class="cs-chat-main">
+      <div class="customer-service-chat-area">
+        <div class="customer-service-chat-main">
           <div
             v-if="review"
-            class="cs-review-card"
+            class="customer-service-review-card"
           >
-            <div class="cs-review-head">
+            <div class="customer-service-review-head">
               <i
                 class="fas fa-flag-checkered"
                 aria-hidden="true"
               />
               <span>训练复盘</span>
             </div>
-            <div class="cs-review-overall">
-              <div class="cs-review-score">
+            <div class="customer-service-review-overall">
+              <div class="customer-service-review-score">
                 {{ review.overall }}
               </div>
-              <div class="cs-review-meta">
-                <div class="cs-review-grade">
+              <div class="customer-service-review-meta">
+                <div class="customer-service-review-grade">
                   {{ review.overall >= 70 ? "良好" : "继续练习" }}
                 </div>
-                <div class="cs-review-note">
+                <div class="customer-service-review-note">
                   整场 {{ review.rounds }} 轮，{{ review.scoredRounds }} 轮已评分
                 </div>
               </div>
@@ -492,12 +492,12 @@ async function submit(): Promise<void> {
           </div>
 
           <div
-            class="cs-messages"
-            data-testid="cs-messages"
+            class="customer-service-messages"
+            data-testid="customer-service-messages"
           >
             <div
               v-if="!messages.length"
-              class="cs-welcome"
+              class="customer-service-welcome"
             >
               <i
                 class="fas fa-headset"
@@ -508,10 +508,10 @@ async function submit(): Promise<void> {
             <div
               v-for="message in messages"
               :key="message.id"
-              class="cs-msg"
+              class="customer-service-msg"
               :class="message.role"
             >
-              <div class="cs-msg-avatar">
+              <div class="customer-service-msg-avatar">
                 <i
                   class="fas"
                   :class="message.role === 'customer'
@@ -522,8 +522,8 @@ async function submit(): Promise<void> {
                   aria-hidden="true"
                 />
               </div>
-              <div class="cs-msg-content">
-                <div class="cs-msg-label">
+              <div class="customer-service-msg-content">
+                <div class="customer-service-msg-label">
                   {{ message.role === "customer"
                     ? "客户"
                     : message.role === "agent"
@@ -531,15 +531,15 @@ async function submit(): Promise<void> {
                       : "系统提示" }}
                   <span
                     v-if="message.score !== undefined"
-                    class="cs-msg-score"
+                    class="customer-service-msg-score"
                   >{{ message.score }}分</span>
                 </div>
-                <div class="cs-msg-bubble">
+                <div class="customer-service-msg-bubble">
                   {{ message.content }}
                 </div>
                 <div
                   v-if="message.tips?.length"
-                  class="cs-msg-reason"
+                  class="customer-service-msg-reason"
                 >
                   {{ message.tips[0] }}
                 </div>
@@ -547,13 +547,13 @@ async function submit(): Promise<void> {
             </div>
           </div>
 
-          <div class="cs-input-bar">
+          <div class="customer-service-input-bar">
             <label
               class="sr-only"
-              for="cs-input"
+              for="customer-service-input"
             >客服回复</label>
             <input
-              id="cs-input"
+              id="customer-service-input"
               v-model="reply"
               :disabled="!started || sending"
               placeholder="作为客服回复客户..."
@@ -576,9 +576,9 @@ async function submit(): Promise<void> {
 
           <div
             v-if="hint?.templates?.length"
-            class="cs-quick-chips"
+            class="customer-service-quick-chips"
           >
-            <span class="cs-quick-chips-label">
+            <span class="customer-service-quick-chips-label">
               <i
                 class="fas fa-bolt"
                 aria-hidden="true"
@@ -589,7 +589,7 @@ async function submit(): Promise<void> {
               v-for="template in hint.templates"
               :key="template"
               type="button"
-              class="cs-quick-chip"
+              class="customer-service-quick-chip"
               @click="useTemplate(template)"
             >
               {{ template }}
@@ -597,8 +597,8 @@ async function submit(): Promise<void> {
           </div>
         </div>
 
-        <aside class="cs-sidebar">
-          <div class="cs-score-card">
+        <aside class="customer-service-sidebar">
+          <div class="customer-service-score-card">
             <h4>
               <i
                 class="fas fa-chart-radar"
@@ -606,23 +606,23 @@ async function submit(): Promise<void> {
               />
               实时评分
             </h4>
-            <div class="cs-score-note">
+            <div class="customer-service-score-note">
               规则关键词评分，逐句分析
             </div>
             <div
-              class="cs-score-overall"
-              data-testid="cs-score-overall"
+              class="customer-service-score-overall"
+              data-testid="customer-service-score-overall"
             >
               {{ currentScore ? currentScore.total : "-" }}
             </div>
-            <div class="cs-score-label">
+            <div class="customer-service-score-label">
               本轮得分
             </div>
-            <div class="cs-score-bars">
+            <div class="customer-service-score-bars">
               <div
                 v-for="detail in scoreDetails"
                 :key="detail.label"
-                class="cs-score-bar"
+                class="customer-service-score-bar"
               >
                 <span>{{ detail.label }}</span>
                 <div class="progress-bar">
@@ -637,8 +637,8 @@ async function submit(): Promise<void> {
           </div>
 
           <div
-            class="cs-tips-card"
-            data-testid="cs-hint"
+            class="customer-service-tips-card"
+            data-testid="customer-service-hint"
           >
             <h4>
               <i
@@ -649,30 +649,30 @@ async function submit(): Promise<void> {
             </h4>
             <div
               v-if="hint"
-              class="cs-tips-list"
+              class="customer-service-tips-list"
             >
               <div
                 v-if="hint.analysis"
-                class="cs-hint-analysis"
+                class="customer-service-hint-analysis"
               >
                 {{ hint.analysis }}
               </div>
               <div
                 v-if="hint.strategy"
-                class="cs-hint-strategy"
+                class="customer-service-hint-strategy"
               >
                 策略：{{ hint.strategy }}
               </div>
-              <div class="cs-hint-section">
-                <div class="cs-hint-title">
+              <div class="customer-service-hint-section">
+                <div class="customer-service-hint-title">
                   话术参考
                 </div>
-                <div class="cs-hint-templates">
+                <div class="customer-service-hint-templates">
                   <button
                     v-for="template in hint.templates"
                     :key="template"
                     type="button"
-                    class="cs-hint-tpl"
+                    class="customer-service-hint-tpl"
                     @click="useTemplate(template)"
                   >
                     {{ template }}
@@ -681,15 +681,15 @@ async function submit(): Promise<void> {
               </div>
               <div
                 v-if="hint.tips?.length"
-                class="cs-hint-section"
+                class="customer-service-hint-section"
               >
-                <div class="cs-hint-title">
+                <div class="customer-service-hint-title">
                   注意事项
                 </div>
                 <div
                   v-for="tip in hint.tips"
                   :key="tip"
-                  class="cs-tip-item"
+                  class="customer-service-tip-item"
                 >
                   <i
                     class="fas fa-info-circle"
@@ -700,22 +700,22 @@ async function submit(): Promise<void> {
               </div>
               <p
                 v-if="hintDegraded"
-                class="cs-degraded-note"
+                class="customer-service-degraded-note"
               >
                 以下为系统内置建议，非 AI 生成
               </p>
             </div>
             <div
               v-else
-              class="cs-tips-list"
+              class="customer-service-tips-list"
             >
-              <div class="cs-tip-item">
+              <div class="customer-service-tip-item">
                 开始对话后可获取建议
               </div>
             </div>
           </div>
 
-          <div class="cs-sentiment-card">
+          <div class="customer-service-sentiment-card">
             <h4>
               <i
                 class="fas fa-smile"
@@ -723,21 +723,21 @@ async function submit(): Promise<void> {
               />
               客户情绪
             </h4>
-            <div class="cs-sentiment-label">
+            <div class="customer-service-sentiment-label">
               {{ sentiment.label }}
             </div>
-            <div class="cs-sentiment-track">
+            <div class="customer-service-sentiment-track">
               <div
-                class="cs-sentiment-fill"
+                class="customer-service-sentiment-fill"
                 :style="{ width: `${sentiment.level}%` }"
               />
             </div>
-            <div class="cs-sentiment-scale">
+            <div class="customer-service-sentiment-scale">
               <span>不满</span><span>满意</span>
             </div>
           </div>
 
-          <div class="cs-history-card">
+          <div class="customer-service-history-card">
             <h4>
               <i
                 class="fas fa-history"
@@ -745,12 +745,12 @@ async function submit(): Promise<void> {
               />
               对话轮次
             </h4>
-            <div class="cs-round-count">
+            <div class="customer-service-round-count">
               {{ Math.floor(transcript.length / 2) }} 轮
             </div>
             <button
               type="button"
-              class="btn btn-outline btn-sm cs-submit-button"
+              class="btn btn-outline btn-sm customer-service-submit-button"
               :disabled="submitting"
               @click="submit"
             >
@@ -769,7 +769,7 @@ async function submit(): Promise<void> {
         v-if="statusMessage"
         class="training-submit-info ec-status"
         :class="`is-${statusKind}`"
-        data-testid="cs-status"
+        data-testid="customer-service-status"
         role="status"
       >
         {{ statusMessage }}
@@ -779,25 +779,25 @@ async function submit(): Promise<void> {
     <TrainingHistory
       kind="cs"
       title="我的客服实训记录"
-      test-id="cs-records"
+      test-id="customer-service-records"
       :refresh-token="historyRefresh"
     />
   </section>
 </template>
 
 <style scoped>
-.cs-panel {
+.customer-service-panel {
   padding: 24px;
   border: 1px solid var(--border-light);
   border-radius: var(--radius);
   background: var(--bg-secondary);
 }
 
-.cs-actions-group {
+.customer-service-actions-group {
   flex: 1;
 }
 
-.cs-action-label {
+.customer-service-action-label {
   display: block;
   margin-bottom: 5px;
   color: var(--text-primary);
@@ -805,7 +805,7 @@ async function submit(): Promise<void> {
   font-weight: 600;
 }
 
-.cs-degraded-note {
+.customer-service-degraded-note {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -819,24 +819,24 @@ async function submit(): Promise<void> {
   line-height: 1.5;
 }
 
-.cs-msg.system .cs-msg-avatar {
+.customer-service-msg.system .customer-service-msg-avatar {
   background: rgba(217, 162, 39, 0.14);
   color: #a36d00;
 }
 
-.cs-msg.system .cs-msg-bubble {
+.customer-service-msg.system .customer-service-msg-bubble {
   border: 1px dashed rgba(217, 162, 39, 0.5);
   background: rgba(217, 162, 39, 0.08);
   color: #a36d00;
 }
 
-.cs-hint-tpl {
+.customer-service-hint-tpl {
   width: 100%;
   text-align: left;
 }
 
-.cs-hint-analysis,
-.cs-hint-strategy {
+.customer-service-hint-analysis,
+.customer-service-hint-strategy {
   padding: 7px 9px;
   border-radius: var(--radius-xs);
   background: var(--bg-primary);
@@ -845,7 +845,7 @@ async function submit(): Promise<void> {
   line-height: 1.5;
 }
 
-.cs-submit-button {
+.customer-service-submit-button {
   width: 100%;
   margin-top: 10px;
 }

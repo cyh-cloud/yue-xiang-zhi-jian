@@ -297,8 +297,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -308,7 +308,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadUsers"
       >
@@ -329,8 +329,8 @@ onBeforeUnmount(() => {
     />
 
     <BackofficeCard flush>
-      <div class="bo-filterbar">
-        <label class="bo-field bo-search-field">
+      <div class="backoffice-filterbar">
+        <label class="backoffice-field backoffice-search-field">
           <span>搜索用户</span>
           <input
             v-model="search"
@@ -339,7 +339,7 @@ onBeforeUnmount(() => {
             autocomplete="off"
           >
         </label>
-        <label class="bo-field">
+        <label class="backoffice-field">
           <span>筛选角色</span>
           <select v-model="roleFilter">
             <option value="">
@@ -369,7 +369,7 @@ onBeforeUnmount(() => {
       >
         <button
           type="button"
-          class="bo-button"
+          class="backoffice-button"
           @click="loadUsers"
         >
           重试
@@ -383,9 +383,9 @@ onBeforeUnmount(() => {
       />
       <div
         v-else
-        class="bo-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table">
+        <table class="backoffice-table">
           <thead>
             <tr>
               <th>用户名</th>
@@ -411,7 +411,7 @@ onBeforeUnmount(() => {
               <td>{{ roleLabel(user.role) }}</td>
               <td>
                 <span
-                  class="bo-status"
+                  class="backoffice-status"
                   :class="user.status === 'suspended' ? 'is-suspended' : 'is-active'"
                 >
                   {{ statusLabel(user.status) }}
@@ -426,14 +426,14 @@ onBeforeUnmount(() => {
                 </span>
                 <span
                   v-else
-                  class="bo-muted"
+                  class="backoffice-muted"
                 >无</span>
               </td>
               <td>
-                <div class="bo-row-actions">
+                <div class="backoffice-row-actions">
                   <button
                     type="button"
-                    class="bo-button is-small"
+                    class="backoffice-button is-small"
                     data-testid="admin-user-edit"
                     @click="openEditor(user)"
                   >
@@ -442,7 +442,7 @@ onBeforeUnmount(() => {
                   <button
                     v-if="user.can_suspend"
                     type="button"
-                    class="bo-button is-small"
+                    class="backoffice-button is-small"
                     :class="user.status === 'suspended' ? 'is-success' : 'is-secondary'"
                     data-testid="admin-user-status"
                     @click="askStatusChange(user)"
@@ -452,7 +452,7 @@ onBeforeUnmount(() => {
                   <button
                     v-if="user.can_delete"
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="backoffice-button is-small is-danger"
                     data-testid="admin-user-delete"
                     @click="askDelete(user)"
                   >
@@ -460,7 +460,7 @@ onBeforeUnmount(() => {
                   </button>
                   <span
                     v-else-if="user.block_reason"
-                    class="bo-protection"
+                    class="backoffice-protection"
                     data-testid="admin-user-protection"
                   >
                     {{ user.block_reason }}
@@ -476,26 +476,26 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="editor"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeEditor"
       >
         <form
           ref="setEditorForm"
-          class="bo-modal"
+          class="backoffice-modal"
           data-testid="admin-user-editor"
           role="dialog"
           aria-modal="true"
           :aria-label="editorTitle"
           @submit.prevent="saveEditor"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>账号资料</p>
               <h2>{{ editorTitle }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeEditor"
             >
@@ -505,14 +505,14 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="admin-user-editor-error"
             />
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>姓名</span>
               <input
                 ref="editorNameInput"
@@ -521,8 +521,8 @@ onBeforeUnmount(() => {
                 autocomplete="off"
               >
             </label>
-            <div class="bo-form-grid">
-              <label class="bo-field">
+            <div class="backoffice-form-grid">
+              <label class="backoffice-field">
                 <span>角色</span>
                 <select v-model="editor.role">
                   <option
@@ -534,7 +534,7 @@ onBeforeUnmount(() => {
                   </option>
                 </select>
               </label>
-              <label class="bo-field">
+              <label class="backoffice-field">
                 <span>状态</span>
                 <select
                   v-model="editor.status"
@@ -549,20 +549,20 @@ onBeforeUnmount(() => {
                 </select>
                 <small
                   v-if="editor.user.username === session.user?.id"
-                  class="bo-muted"
+                  class="backoffice-muted"
                 >
                   当前登录账号不能停用自己
                 </small>
               </label>
             </div>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>手机</span>
               <input
                 v-model="editor.phone"
                 autocomplete="off"
               >
             </label>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>邮箱</span>
               <input
                 v-model="editor.email"
@@ -571,10 +571,10 @@ onBeforeUnmount(() => {
               >
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="saving"
               @click="closeEditor"
             >
@@ -582,7 +582,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="backoffice-button"
               :disabled="saving"
             >
               {{ saving ? "保存中..." : "保存" }}
@@ -593,34 +593,34 @@ onBeforeUnmount(() => {
 
       <div
         v-if="confirmState"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeConfirm"
       >
         <div
           ref="setConfirmDialog"
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="admin-confirm-dialog"
           role="dialog"
           aria-modal="true"
           :aria-label="confirmLabel"
           tabindex="-1"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>{{ confirmLabel }}</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               {{ confirmMessage }}
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               ref="confirmCancelButton"
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="confirming"
               @click="closeConfirm"
             >
@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="bo-button"
+              class="backoffice-button"
               :class="confirmState.kind === 'delete' ? 'is-danger' : ''"
               :disabled="confirming"
               @click="confirmOperation"
@@ -641,3 +641,5 @@ onBeforeUnmount(() => {
     </Teleport>
   </section>
 </template>
+
+<style src="./admin.css"></style>

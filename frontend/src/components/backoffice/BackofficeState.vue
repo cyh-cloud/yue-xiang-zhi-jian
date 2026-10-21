@@ -11,7 +11,7 @@ withDefaults(
 
 <template>
   <div
-    class="bo-state"
+    class="backoffice-state"
     :class="`is-${kind}`"
     :role="kind === 'error' ? 'alert' : 'status'"
   >

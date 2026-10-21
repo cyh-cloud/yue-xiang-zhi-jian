@@ -111,6 +111,8 @@ function statChips(item: SuccessCase) {
           v-for="item in data?.cases ?? []"
           :key="item.id"
           class="case-card"
+          data-testid="case-card"
+          :data-case-id="item.id"
         >
           <div class="case-visual">
             <i

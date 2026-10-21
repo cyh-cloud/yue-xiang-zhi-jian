@@ -102,6 +102,39 @@ test.describe("public shell", () => {
     expect(background).toBe("#10201a");
   });
 
+  test("home scroll intent reveals the Hero transition and enters agriculture", async ({
+    page,
+  }) => {
+    await page.route("**/api/home/stats", (route) =>
+      route.fulfill({
+        json: {
+          success: true,
+          stats: { farmers: 128, courses: 24, jobs: 16 },
+        },
+      }),
+    );
+    await page.goto("/");
+
+    await expect(page.getByTestId("home-stat-farmers")).toHaveText("128");
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.mouse.wheel(0, 40);
+
+    await expect
+      .poll(() =>
+        page
+          .getByTestId("home-scroll-hint")
+          .evaluate((element) => getComputedStyle(element).opacity),
+      )
+      .toBe("0");
+
+    await page.mouse.wheel(0, 200);
+    await expect(page.getByTestId("home-hero")).toHaveCSS(
+      "pointer-events",
+      "none",
+    );
+    await expect(page).toHaveURL(/\/agriculture\/?$/);
+  });
+
   test("theme and large text toggles survive a reload", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: "切换主题" }).click();

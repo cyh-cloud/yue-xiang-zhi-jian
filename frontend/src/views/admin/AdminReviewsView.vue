@@ -243,8 +243,8 @@ onMounted(loadReviews);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -254,7 +254,7 @@ onMounted(loadReviews);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadReviews"
       >
@@ -299,7 +299,7 @@ onMounted(loadReviews);
         </div>
 
         <div class="admin-review-filters">
-          <label class="bo-field">
+          <label class="backoffice-field">
             <span>内容类型</span>
             <select v-model="contentType">
               <option
@@ -311,7 +311,7 @@ onMounted(loadReviews);
               </option>
             </select>
           </label>
-          <label class="bo-field">
+          <label class="backoffice-field">
             <span>排序</span>
             <select v-model="sort">
               <option value="modified">
@@ -341,7 +341,7 @@ onMounted(loadReviews);
         >
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             @click="loadReviews"
           >
             重试
@@ -419,7 +419,7 @@ onMounted(loadReviews);
           <footer class="admin-review-actions">
             <a
               v-if="modelFileUrl(review)"
-              class="bo-button is-small is-secondary"
+              class="backoffice-button is-small is-secondary"
               :href="modelFileUrl(review)"
               target="_blank"
               rel="noopener"
@@ -429,7 +429,7 @@ onMounted(loadReviews);
             <template v-if="review.status === 'pending'">
               <button
                 type="button"
-                class="bo-button is-small is-success"
+                class="backoffice-button is-small is-success"
                 :disabled="busyId !== null"
                 @click="approve(review)"
               >
@@ -437,7 +437,7 @@ onMounted(loadReviews);
               </button>
               <button
                 type="button"
-                class="bo-button is-small is-danger"
+                class="backoffice-button is-small is-danger"
                 :disabled="busyId !== null"
                 @click="openReject(review)"
               >
@@ -447,7 +447,7 @@ onMounted(loadReviews);
             <button
               v-else
               type="button"
-              class="bo-button is-small is-secondary"
+              class="backoffice-button is-small is-secondary"
               :disabled="busyId !== null"
               @click="openRevoke(review)"
             >
@@ -461,25 +461,25 @@ onMounted(loadReviews);
     <Teleport to="body">
       <div
         v-if="rejectTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeReject"
       >
         <form
-          class="bo-modal"
+          class="backoffice-modal"
           data-testid="admin-review-reject-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="驳回内容"
           @submit.prevent="confirmReject"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>审核结论</p>
               <h2>驳回 {{ reviewTitle(rejectTarget) }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeReject"
             >
@@ -489,13 +489,13 @@ onMounted(loadReviews);
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="rejectError"
               kind="error"
               :message="rejectError"
             />
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>驳回理由</span>
               <textarea
                 v-model="rejectReason"
@@ -505,10 +505,10 @@ onMounted(loadReviews);
               />
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="busyId !== null"
               @click="closeReject"
             >
@@ -516,7 +516,7 @@ onMounted(loadReviews);
             </button>
             <button
               type="submit"
-              class="bo-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="busyId !== null"
             >
               {{ busyId !== null ? "提交中..." : "确认驳回" }}
@@ -527,31 +527,31 @@ onMounted(loadReviews);
 
       <div
         v-if="revokeTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeRevoke"
       >
         <div
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="admin-review-confirm-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="撤销审核"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>撤销审核</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               确定撤销「{{ reviewTitle(revokeTarget) }}」的审核结论？内容会退回待审核并立即从公开页面下架。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="busyId !== null"
               @click="closeRevoke"
             >
@@ -559,7 +559,7 @@ onMounted(loadReviews);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="busyId !== null"
               @click="confirmRevoke"
             >
@@ -572,181 +572,4 @@ onMounted(loadReviews);
   </section>
 </template>
 
-<style scoped>
-.admin-review-toolbar {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px;
-  border-bottom: 1px solid var(--bo-card-border);
-}
-
-.admin-review-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.admin-review-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 36px;
-  padding: 6px 13px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 999px;
-  background: var(--bo-input-bg);
-  color: var(--bo-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 0.82rem;
-}
-
-.admin-review-tab span {
-  min-width: 20px;
-  padding: 1px 6px;
-  border-radius: 999px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-  font-size: 0.72rem;
-  text-align: center;
-}
-
-.admin-review-tab.is-active {
-  border-color: var(--bo-accent);
-  background: var(--bo-accent);
-  color: #fff;
-}
-
-.admin-review-tab.is-active span {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-
-.admin-review-filters {
-  display: flex;
-  gap: 10px;
-}
-
-.admin-review-list {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-}
-
-.admin-review-card {
-  padding: 16px;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 12px;
-  background: var(--bo-card-bg);
-}
-
-.admin-review-head,
-.admin-review-actions,
-.admin-review-tags {
-  display: flex;
-  align-items: center;
-}
-
-.admin-review-head {
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.admin-review-head time {
-  color: var(--bo-muted);
-  font-size: 0.74rem;
-  white-space: nowrap;
-}
-
-.admin-review-tags {
-  flex-wrap: wrap;
-  gap: 7px;
-}
-
-.admin-review-type,
-.admin-review-status,
-.admin-review-self {
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.admin-review-type {
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-}
-
-.admin-review-status.is-pending {
-  background: #fff2cf;
-  color: #835d00;
-}
-
-.admin-review-status.is-approved {
-  background: #dff2e6;
-  color: #1f6b42;
-}
-
-.admin-review-status.is-rejected {
-  background: #fde4e1;
-  color: #9b2f27;
-}
-
-.admin-review-self {
-  background: #ece6cf;
-  color: #6f5a16;
-}
-
-.admin-review-card h2 {
-  margin: 12px 0 8px;
-  font-size: 1rem;
-}
-
-.admin-review-detail {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: 5px 12px;
-  margin: 0 0 10px;
-  font-size: 0.84rem;
-}
-
-.admin-review-detail dt {
-  color: var(--bo-muted);
-}
-
-.admin-review-detail dd {
-  margin: 0;
-  color: var(--bo-text);
-}
-
-.admin-review-reason {
-  margin: 10px 0;
-  padding: 9px 11px;
-  border-left: 3px solid var(--bo-danger);
-  background: color-mix(in srgb, var(--bo-danger) 7%, transparent);
-  color: var(--bo-text);
-  font-size: 0.82rem;
-}
-
-.admin-review-meta {
-  margin: 8px 0 0;
-  color: var(--bo-muted);
-  font-size: 0.74rem;
-}
-
-.admin-review-actions {
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 14px;
-}
-
-@media (max-width: 760px) {
-  .admin-review-toolbar,
-  .admin-review-filters {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-</style>
+<style src="./admin.css"></style>

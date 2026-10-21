@@ -424,10 +424,10 @@ onMounted(async () => {
 
 <template>
   <section
-    class="bo-page operator-cases"
+    class="backoffice-page operator-cases"
     data-testid="operator-cases"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -437,7 +437,7 @@ onMounted(async () => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="refreshAll()"
       >
@@ -470,7 +470,7 @@ onMounted(async () => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadCases()"
       >
         重试
@@ -485,7 +485,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             @click="openCase(null)"
           >
             <i
@@ -504,9 +504,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -537,24 +537,24 @@ onMounted(async () => {
                 <td>{{ item.lesson_count }}</td>
                 <td>{{ item.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small"
+                      class="backoffice-button is-small"
                       @click="selectCase(item)"
                     >
                       查看内容
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openCase(item)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeCase(item)"
                     >
                       删除
@@ -576,7 +576,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             :disabled="!selectedCaseId"
             @click="openChild(null)"
           >
@@ -631,9 +631,9 @@ onMounted(async () => {
           />
           <div
             v-else
-            class="bo-table-wrap"
+            class="backoffice-table-wrap"
           >
-            <table class="bo-table">
+            <table class="backoffice-table">
               <thead>
                 <tr>
                   <th
@@ -658,17 +658,17 @@ onMounted(async () => {
                     {{ value }}
                   </td>
                   <td>
-                    <div class="bo-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openChild(row)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removeChild(row)"
                       >
                         删除
@@ -696,29 +696,4 @@ onMounted(async () => {
   </section>
 </template>
 
-<style scoped>
-.operator-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-bottom: 15px;
-}
-
-.operator-tabs button {
-  min-height: 32px;
-  padding: 5px 13px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 999px;
-  background: var(--bo-card-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.operator-tabs button.active {
-  border-color: var(--bo-accent);
-  background: var(--bo-accent);
-  color: #fff;
-}
-</style>
+<style src="./operator.css"></style>

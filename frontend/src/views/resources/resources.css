@@ -1,0 +1,698 @@
+/*
+ * Resources page domain styles for dialects, approved cases, and policy
+ * content. Imported only by ResourcesView.vue.
+ */
+
+[data-theme="dark"] .case-card { background: var(--bg-secondary); border-color: var(--border); }
+
+[data-theme="dark"] .policy-item { background: var(--bg-secondary); border-color: var(--border); }
+
+[data-theme="dark"] .voice-input-bar input { background: var(--bg-secondary); border-color: var(--border); }
+
+#resources-tab {
+    --pa: #2f6b4f; --pa-deep: #123a2a; --pa-tint: #dbe9e0; --pa-soft: rgba(18, 58, 42, 0.08);
+}
+
+[data-theme="dark"] #resources-tab   { --pa: #6fb894; --pa-deep: #9ed4b8; --pa-tint: #1c3128; --pa-soft: rgba(111, 184, 148, 0.10); }
+
+.tag-subsidy,
+.tag-ecommerce,
+.tag-heritage,
+.tag-training,
+.tag-cert,
+.tag-general {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+/* ==================== Dialect Section ==================== */
+.dialect-section { margin-bottom: 60px; }
+
+.dialect-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+}
+.dialect-card {
+    background: var(--bg-secondary);
+    border: 2px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 18px;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.dialect-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
+.dialect-card.active {
+    border-color: var(--accent-blue);
+    background: linear-gradient(135deg, rgba(31,94,67,0.04), rgba(47,107,79,0.04));
+    box-shadow: 0 0 0 3px rgba(31,94,67,0.1);
+}
+.dialect-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.dialect-emoji { font-size: 1.8rem; }
+.dialect-card-header strong { display: block; font-size: 1rem; color: var(--text-primary); }
+.dialect-card-header span { font-size: 0.78rem; color: var(--text-muted); }
+.dialect-card-meta { display: flex; flex-direction: column; gap: 4px; }
+.dialect-card-meta span { font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 5px; }
+.dialect-card-meta i { color: var(--accent-blue); font-size: 0.7rem; }
+
+.dialect-detail {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 20px;
+}
+.dialect-greeting {
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(31,94,67,0.05), rgba(47,107,79,0.05));
+    border-radius: var(--radius-sm);
+    margin-bottom: 16px;
+}
+.greeting-main {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+}
+.greeting-meaning { font-size: 0.85rem; color: var(--text-muted); }
+.dialect-features {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.feature-tag {
+    padding: 5px 14px;
+    background: rgba(31,94,67,0.06);
+    border: 1px solid rgba(31,94,67,0.12);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: var(--accent-blue);
+}
+.phrases-panel h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.phrases-panel h4 i { color: var(--accent-blue); }
+.phrases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+.phrase-item {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    transition: var(--transition);
+    border: 1px solid transparent;
+}
+.phrase-item:hover { border-color: var(--accent-blue); background: rgba(31,94,67,0.03); }
+.phrase-dialect { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
+.phrase-mandarin { font-size: 0.75rem; color: var(--text-muted); }
+.phrase-pinyin { font-size: 0.68rem; color: var(--accent-blue); opacity: 0.7; }
+
+/* Voice Chat Area */
+.voice-chat-area {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.voice-chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-light);
+}
+.voice-chat-header h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+.voice-chat-header h4 i { color: var(--accent-blue); }
+.voice-chat-messages {
+    height: 320px;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.voice-welcome {
+    text-align: center;
+    padding: 30px 20px;
+    color: var(--text-muted);
+}
+.voice-welcome i { font-size: 2rem; color: var(--accent-blue); margin-bottom: 8px; display: block; }
+.voice-welcome p { font-size: 0.85rem; }
+
+.voice-msg {
+    max-width: 80%;
+    padding: 10px 16px;
+    border-radius: 16px;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    animation: msgFadeIn 0.3s ease;
+}
+@keyframes msgFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.voice-msg.user {
+    align-self: flex-end;
+    background: var(--gradient-main);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+.voice-msg.bot {
+    align-self: flex-start;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-light);
+    border-bottom-left-radius: 4px;
+}
+.voice-msg .message-dialect-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 10px;
+    font-size: 0.68rem;
+    margin-bottom: 4px;
+}
+.voice-msg.bot .message-dialect-tag { background: rgba(31,94,67,0.1); color: var(--accent-blue); }
+.voice-msg .message-suggestions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+.voice-msg .suggestion-btn {
+    padding: 5px 12px;
+    background: rgba(31,94,67,0.08);
+    border: 1px solid rgba(31,94,67,0.2);
+    border-radius: 16px;
+    font-size: 0.72rem;
+    color: var(--accent-blue);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.voice-msg .suggestion-btn:hover { background: rgba(31,94,67,0.15); }
+
+/* 朗读按钮 + 诚实标注（P2/P3） */
+.voice-msg .voice-msg-body { margin: 2px 0; }
+.voice-msg .voice-msg-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+.voice-msg .voice-speak-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    background: rgba(31,94,67,0.1);
+    border: 1px solid rgba(31,94,67,0.25);
+    border-radius: 14px;
+    font-size: 0.72rem;
+    color: var(--accent-blue);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.voice-msg .voice-speak-btn:hover { background: rgba(31,94,67,0.18); }
+.voice-msg .voice-speak-btn.speaking {
+    background: rgba(31,94,67,0.16);
+    border-color: rgba(31,94,67,0.45);
+    color: #1f5e43;
+}
+.voice-msg .voice-speak-btn.paused {
+    background: rgba(194,65,12,0.12);
+    border-color: rgba(194,65,12,0.4);
+    color: #c2410c;
+}
+.voice-msg .voice-stop-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 12px;
+    background: rgba(194,65,12,0.1);
+    border: 1px solid rgba(194,65,12,0.3);
+    border-radius: 14px;
+    font-size: 0.72rem;
+    color: #c2410c;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.voice-msg .voice-stop-btn:hover { background: rgba(194,65,12,0.18); }
+.voice-msg .voice-msg-note {
+    font-size: 0.68rem;
+    color: var(--text-muted, #999);
+    line-height: 1.4;
+}
+
+/* 方言助手的用药提示：回答里出现用量 / 稀释倍数 / 安全间隔期时，由服务端单独下发。
+   与农技问答、病虫害诊断同一条红线，给了用量就必须给用户提示，
+   不能因为「这是方言版」就少一句免责声明。 */
+.voice-msg .voice-msg-chem {
+    margin-top: 6px;
+    padding: 8px 10px;
+    background: rgba(217,162,39,0.12);
+    border-left: 3px solid var(--accent-amber, #d9a227);
+    border-radius: 6px;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.voice-msg .voice-msg-chem i { color: var(--accent-amber, #d9a227); margin-right: 5px; }
+
+.voice-quick-questions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 0 16px 10px;
+}
+.voice-quick-btn {
+    padding: 6px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.voice-quick-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+.voice-input-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 16px 16px 18px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-primary);
+}
+.voice-input-bar input {
+    flex: 0 1 480px;          /* 收窄：不撑满整行，最大480px */
+    width: 100%;
+    min-width: 160px;
+    padding: 9px 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    outline: none;
+    transition: var(--transition);
+}
+.voice-input-bar input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(31,94,67,0.1); }
+.voice-btn-small {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #2f6b4f, #1f5e43);
+    border: none;
+    color: white;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(47,107,79,0.25);
+}
+.voice-btn-small:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 18px rgba(47,107,79,0.35); }
+.voice-btn-small:active { transform: translateY(0) scale(0.96); }
+.voice-btn-small.recording { animation: pulse-ring-green 1.2s infinite; }
+@keyframes pulse-ring-green {
+    0% { box-shadow: 0 0 0 0 rgba(47,107,79,0.45); }
+    70% { box-shadow: 0 0 0 14px rgba(47,107,79,0); }
+    100% { box-shadow: 0 0 0 0 rgba(47,107,79,0); }
+}
+.voice-send-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--gradient-main);
+    border: none;
+    color: white;
+    font-size: 1.05rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(31,94,67,0.25);
+}
+.voice-send-btn:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 18px rgba(31,94,67,0.35); }
+.voice-send-btn:active { transform: translateY(0) scale(0.96); }
+
+/* Dark mode */
+[data-theme="dark"] .dialect-card { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .dialect-card.active { background: linear-gradient(135deg, rgba(31,94,67,0.08), rgba(47,107,79,0.08)); }
+[data-theme="dark"] .dialect-detail { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .dialect-greeting { background: rgba(31,94,67,0.06); }
+[data-theme="dark"] .phrase-item { background: var(--bg-tertiary); }
+[data-theme="dark"] .voice-chat-area { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .voice-chat-header { background: var(--bg-tertiary); border-color: var(--border); }
+[data-theme="dark"] .voice-msg.bot { background: var(--bg-tertiary); border-color: var(--border); }
+[data-theme="dark"] .voice-input-bar { background: var(--bg-tertiary); border-color: var(--border); }
+[data-theme="dark"] .voice-input-bar input { background: var(--bg-secondary); border-color: var(--border); color: var(--text-primary); }
+[data-theme="dark"] .voice-quick-btn { background: var(--bg-tertiary); border-color: var(--border); color: var(--text-secondary); }
+@media (max-width: 480px) {
+    .voice-input-bar { gap: 10px; padding: 12px 10px 14px; }
+    .voice-btn-small, .voice-send-btn { width: 46px; height: 46px; font-size: 1rem; }
+    .voice-input-bar input { padding: 8px 14px; font-size: 0.8rem; }
+}
+
+/* ==================== Cases ==================== */
+.cases-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+.case-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: var(--transition);
+}
+.case-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
+.case-card:active { transform: translateY(-1px) scale(0.98); }
+.case-visual {
+    height: 80px;
+    background: linear-gradient(135deg, rgba(31,94,67,0.06), rgba(47,107,79,0.06));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--accent-blue);
+}
+.case-body { padding: 20px; }
+.case-body h4 { font-size: 1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.case-body p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; }
+.case-stats { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 14px; }
+.case-stats span { font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
+.case-stats i { color: var(--accent-blue); }
+
+/* 案例卡片：加载中 / 错误态（占满整行，不用空列表冒充"没有数据"） */
+.cases-placeholder,
+.cases-error {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+.cases-placeholder i { margin-right: 8px; color: var(--accent-blue); }
+.cases-error i { color: var(--accent-amber, #d97706); font-size: 1.4rem; display: block; margin-bottom: 10px; }
+.cases-error p { margin-bottom: 14px; }
+
+/* 案例待审核态（不是加载失败：内容存在，只是还没通过超级管理员审核） */
+.cases-pending {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 36px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+.cases-pending i { color: var(--accent-blue); font-size: 1.6rem; display: block; margin-bottom: 12px; }
+.cases-pending p { color: var(--text-primary); font-size: 0.95rem; margin-bottom: 6px; }
+.cases-pending span { font-size: 0.8rem; }
+
+/* 政策网格的加载/错误态（与案例网格同款，占满整行） */
+.policy-placeholder,
+.policies-error {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+.policy-placeholder i { margin-right: 8px; color: var(--accent-blue); }
+.policies-error i { color: var(--accent-amber, #d97706); font-size: 1.4rem; display: block; margin-bottom: 10px; }
+.policies-error p { margin-bottom: 14px; }
+
+/* ==================== Policy ==================== */
+.policy-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+.policy-filter {
+    padding: 7px 18px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.policy-filter:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.policy-filter.active { background: var(--accent-blue); color: white; border-color: transparent; }
+
+.policy-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+.policy-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 22px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+}
+.policy-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--accent-blue); }
+.policy-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+.policy-icon-lg {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(135deg, rgba(31,94,67,0.08), rgba(47,107,79,0.08));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: var(--accent-blue);
+}
+.policy-tag {
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+.tag-subsidy { background: rgba(74,138,106,0.1); color: #4a8a6a; }
+.tag-ecommerce { background: rgba(74,111,165,0.1); color: #4a6fa5; }
+.tag-heritage { background: rgba(74,111,165,0.1); color: #a855f7; }
+.tag-training { background: rgba(217,162,39,0.1); color: #d9a227; }
+.tag-cert { background: rgba(169,103,58,0.1); color: #a9673a; }
+/* 中性分类色（「综合」以及任何未知分类）。
+   未知分类绝不能回退到 tag-subsidy，否则学员会把非补贴政策看成补贴政策。 */
+.tag-general { background: rgba(107,114,128,0.12); color: #6b7280; }
+
+/* 分类筛选后一条都不剩时的空态（原实现只把卡片全部 display:none，界面一片空白） */
+.policies-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    background: var(--bg-secondary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+.policies-empty i { display: block; font-size: 1.5rem; margin-bottom: 10px; color: var(--text-muted); }
+/* 空态的第二行说明与刷新按钮（「一条都没有」和「加载失败」必须看起来是两回事） */
+.policies-empty-sub { font-size: 0.8rem; margin-top: 6px; opacity: 0.85; }
+.policies-empty .btn { margin-top: 14px; }
+.policy-card h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+.policy-card p {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    margin-bottom: 16px;
+    flex: 1;
+}
+.policy-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-light);
+}
+.policy-date { font-size: 0.72rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; }
+.policy-detail-btn {
+    font-size: 0.78rem;
+    color: var(--accent-blue);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: var(--transition);
+}
+.policy-card:hover .policy-detail-btn { gap: 8px; }
+
+/* Policy detail modal content */
+.policy-detail-content { line-height: 1.8; }
+.policy-detail-content h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent-blue);
+    margin: 20px 0 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-light);
+}
+.policy-detail-content h4:first-child { margin-top: 0; }
+.policy-detail-content p {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+.policy-detail-content ul { list-style: none; margin-bottom: 12px; }
+.policy-detail-content li {
+    padding: 4px 0 4px 18px;
+    position: relative;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.policy-detail-content li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+}
+.policy-detail-content ol { margin-bottom: 12px; padding-left: 20px; }
+.policy-detail-content ol li { padding: 3px 0; font-size: 0.85rem; color: var(--text-secondary); }
+.policy-detail-content ol li::before { display: none; }
+
+/* 政策弹窗：资料来源 + 口径说明/免责声明 */
+.policy-sources {
+    margin-top: 22px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+}
+.policy-sources h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+.policy-sources h4 i { color: var(--accent-blue); margin-right: 6px; }
+.policy-sources ul { list-style: none; margin: 0; padding: 0; }
+.policy-sources li {
+    position: relative;
+    padding: 7px 0 7px 16px;
+    font-size: 0.82rem;
+    line-height: 1.6;
+    border-bottom: 1px dashed var(--border-light);
+}
+.policy-sources li:last-child { border-bottom: none; }
+.policy-sources li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 14px;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+}
+.policy-sources a { color: var(--accent-blue); text-decoration: none; }
+.policy-sources a:hover { text-decoration: underline; }
+.policy-sources .src-meta {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+.policy-disclaimer {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 12px 14px;
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    background: var(--bg-tertiary, var(--bg-secondary));
+    border-left: 3px solid var(--accent-blue);
+    border-radius: 6px;
+}
+.policy-disclaimer i { color: var(--accent-blue); margin-top: 3px; }
+
+[data-theme="dark"] .policy-card { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .policy-filter { background: var(--bg-tertiary); border-color: var(--border); color: var(--text-secondary); }
+[data-theme="dark"] .policy-icon-lg { background: rgba(31,94,67,0.1); }
+
+.policy-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.policy-card h4 {
+  margin-bottom: var(--space-1);
+  color: var(--accent-blue);
+}
+
+@media (max-width: 768px) {
+  .cases-grid { grid-template-columns: 1fr; }
+}

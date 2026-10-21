@@ -620,7 +620,7 @@ function saveProduct(productId: string): void {
       </div>
 
       <div
-        id="farming-calendar-section"
+        id="agriculture-calendar-section"
         class="card-section"
       >
         <h3 class="card-section-title">
@@ -675,12 +675,12 @@ function saveProduct(productId: string): void {
                 class="fas fa-circle-info"
                 aria-hidden="true"
               />
-              <div class="fdn-body">
+              <div class="farming-body">
                 <button
                   type="button"
-                  class="fdn-toggle"
+                  class="farming-toggle"
                   :aria-expanded="sourceListOpen"
-                  aria-controls="farming-date-notice-sources"
+                  aria-controls="agriculture-calendar-source-list"
                   @click="sourceListOpen = !sourceListOpen"
                 >
                   {{ sourceListOpen ? "收起数据依据" : "查看数据依据" }}
@@ -692,15 +692,16 @@ function saveProduct(productId: string): void {
                 </button>
                 <ul
                   v-show="sourceListOpen"
-                  id="farming-date-notice-sources"
-                  class="fdn-sources"
+                  id="agriculture-calendar-source-list"
+                  class="farming-sources"
+                  data-testid="farming-sources"
                 >
                   <li
                     v-for="source in sources"
                     :key="source.key"
                   >
-                    <span class="fdn-src-name">{{ source.name }}</span>
-                    <span class="fdn-src-meta">
+                    <span class="farming-src-name">{{ source.name }}</span>
+                    <span class="farming-src-meta">
                       {{ sourceMeta(source) }}
                       <a
                         v-if="source.url"
@@ -945,6 +946,7 @@ function saveProduct(productId: string): void {
                   v-for="task in datedTasks"
                   :key="task.id"
                   class="task-item task-item-rich"
+                  data-testid="agriculture-task-item"
                   :class="{ expanded: isTaskExpanded(task.id) }"
                   :style="taskColorStyle(task)"
                 >
@@ -1085,6 +1087,7 @@ function saveProduct(productId: string): void {
                   v-for="task in undatedTasks"
                   :key="task.id"
                   class="task-item task-item-rich"
+                  data-testid="agriculture-task-item"
                   :class="{ expanded: isTaskExpanded(task.id) }"
                   :style="taskColorStyle(task)"
                 >
@@ -1328,6 +1331,8 @@ function saveProduct(productId: string): void {
     </Teleport>
   </section>
 </template>
+
+<style src="./agriculture/agriculture.css"></style>
 
 <style scoped>
 button.product-card {

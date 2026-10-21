@@ -103,8 +103,8 @@ onMounted(loadContent);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -114,7 +114,7 @@ onMounted(loadContent);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadContent"
       >
@@ -150,7 +150,7 @@ onMounted(loadContent);
       >
         <button
           type="button"
-          class="bo-button"
+          class="backoffice-button"
           @click="loadContent"
         >
           重试
@@ -181,9 +181,9 @@ onMounted(loadContent);
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>标题</th>
@@ -210,7 +210,7 @@ onMounted(loadContent);
                 <td>
                   <button
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="backoffice-button is-small is-danger"
                     @click="askDeleteDiscussion(discussion)"
                   >
                     删除帖子
@@ -234,9 +234,9 @@ onMounted(loadContent);
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>评论内容</th>
@@ -263,7 +263,7 @@ onMounted(loadContent);
                 <td>
                   <button
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="backoffice-button is-small is-danger"
                     @click="askDeleteComment(comment)"
                   >
                     删除评论
@@ -279,31 +279,31 @@ onMounted(loadContent);
     <Teleport to="body">
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="admin-content-delete-dialog"
           role="dialog"
           aria-modal="true"
           :aria-label="deleteTitle"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>安全确认</p>
               <h2>{{ deleteTitle }}</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               {{ deleteCopy }}
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -311,7 +311,7 @@ onMounted(loadContent);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >
@@ -323,3 +323,5 @@ onMounted(loadContent);
     </Teleport>
   </section>
 </template>
+
+<style src="./admin.css"></style>

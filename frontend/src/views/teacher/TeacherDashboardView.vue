@@ -415,10 +415,10 @@ onBeforeUnmount(() => {
 
 <template>
   <section
-    class="bo-page teacher-dashboard"
+    class="backoffice-page teacher-dashboard"
     data-testid="teacher-dashboard"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>教师工作台</h1>
@@ -426,7 +426,7 @@ onBeforeUnmount(() => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading || rosterLoading"
         @click="loadDashboard"
       >
@@ -447,13 +447,13 @@ onBeforeUnmount(() => {
     />
 
     <div
-      class="bo-stat-grid teacher-stat-grid"
+      class="backoffice-stat-grid teacher-stat-grid"
       data-testid="teacher-stat-grid"
     >
       <article
         v-for="card in statCards"
         :key="card.label"
-        class="bo-stat-card"
+        class="backoffice-stat-card"
         :data-testid="card.testid"
       >
         <strong>{{ card.value }}</strong>
@@ -469,7 +469,7 @@ onBeforeUnmount(() => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadStats"
       >
         重试
@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button
           type="button"
-          class="bo-button"
+          class="backoffice-button"
           @click="openAdd"
         >
           <i
@@ -494,8 +494,8 @@ onBeforeUnmount(() => {
         </button>
       </template>
 
-      <div class="bo-filterbar teacher-filterbar">
-        <label class="bo-field bo-search-field">
+      <div class="backoffice-filterbar teacher-filterbar">
+        <label class="backoffice-field backoffice-search-field">
           <span>搜索学员</span>
           <input
             v-model="search"
@@ -504,7 +504,7 @@ onBeforeUnmount(() => {
             autocomplete="off"
           >
         </label>
-        <span class="bo-muted">{{ students.length }} 人</span>
+        <span class="backoffice-muted">{{ students.length }} 人</span>
       </div>
 
       <BackofficeState
@@ -520,7 +520,7 @@ onBeforeUnmount(() => {
       >
         <button
           type="button"
-          class="bo-button"
+          class="backoffice-button"
           @click="loadStudents"
         >
           重试
@@ -534,9 +534,9 @@ onBeforeUnmount(() => {
       />
       <div
         v-else
-        class="bo-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table teacher-roster-table">
+        <table class="backoffice-table teacher-roster-table">
           <thead>
             <tr>
               <th>学号</th>
@@ -583,14 +583,14 @@ onBeforeUnmount(() => {
                 </template>
                 <span
                   v-else
-                  class="bo-muted"
+                  class="backoffice-muted"
                 >
                   暂无证书记录{{ student.user_id ? "" : "（未关联账号）" }}
                 </span>
               </td>
               <td>
                 <span
-                  class="bo-status"
+                  class="backoffice-status"
                   :class="student.status === 'suspended' ? 'is-suspended' : 'is-active'"
                 >
                   {{ student.status === "suspended" ? "停课" : "在读" }}
@@ -598,19 +598,19 @@ onBeforeUnmount(() => {
               </td>
               <td>
                 <template v-if="student.user_id">
-                  <span class="bo-status is-active">已关联</span>
+                  <span class="backoffice-status is-active">已关联</span>
                   <small>{{ student.user_id }}</small>
                 </template>
                 <template v-else>
-                  <span class="bo-status is-suspended">未关联</span>
+                  <span class="backoffice-status is-suspended">未关联</span>
                   <small>无法登录</small>
                 </template>
               </td>
               <td>
-                <div class="bo-row-actions">
+                <div class="backoffice-row-actions">
                   <button
                     type="button"
-                    class="bo-button is-small is-secondary"
+                    class="backoffice-button is-small is-secondary"
                     data-testid="teacher-student-view"
                     @click="openDetail(student.id)"
                   >
@@ -618,7 +618,7 @@ onBeforeUnmount(() => {
                   </button>
                   <button
                     type="button"
-                    class="bo-button is-small"
+                    class="backoffice-button is-small"
                     data-testid="teacher-student-edit"
                     @click="openEdit(student.id)"
                   >
@@ -626,7 +626,7 @@ onBeforeUnmount(() => {
                   </button>
                   <button
                     type="button"
-                    class="bo-button is-small is-danger"
+                    class="backoffice-button is-small is-danger"
                     data-testid="teacher-student-delete"
                     @click="askDelete(student)"
                   >
@@ -645,7 +645,7 @@ onBeforeUnmount(() => {
         title="AI 教学报告"
         description="AI 只根据当前名册与证书真实完成度生成报告。"
       >
-        <label class="bo-field">
+        <label class="backoffice-field">
           <span>分析需求</span>
           <textarea
             v-model="reportPrompt"
@@ -667,7 +667,7 @@ onBeforeUnmount(() => {
         <div class="teacher-card-actions">
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             :disabled="reportLoading"
             @click="generateReport"
           >
@@ -721,7 +721,7 @@ onBeforeUnmount(() => {
         </ul>
         <p
           v-else
-          class="bo-muted"
+          class="backoffice-muted"
         >
           暂无学员动态。
         </p>
@@ -731,25 +731,25 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="addOpen"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeAdd"
       >
         <form
-          class="bo-modal"
+          class="backoffice-modal"
           data-testid="teacher-student-editor"
           role="dialog"
           aria-modal="true"
           aria-label="添加学员"
           @submit.prevent="submitAdd"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>名册维护</p>
               <h2>添加学员</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeAdd"
             >
@@ -759,14 +759,14 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="teacher-student-editor-error"
             />
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>学员姓名</span>
               <input
                 ref="addNameInput"
@@ -775,8 +775,8 @@ onBeforeUnmount(() => {
                 autocomplete="off"
               >
             </label>
-            <div class="bo-form-grid">
-              <label class="bo-field">
+            <div class="backoffice-form-grid">
+              <label class="backoffice-field">
                 <span>班级</span>
                 <input
                   v-model="addForm.className"
@@ -784,7 +784,7 @@ onBeforeUnmount(() => {
                   placeholder="可选"
                 >
               </label>
-              <label class="bo-field">
+              <label class="backoffice-field">
                 <span>学习方向</span>
                 <select v-model="addForm.direction">
                   <option
@@ -797,7 +797,7 @@ onBeforeUnmount(() => {
                 </select>
               </label>
             </div>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>平台账号</span>
               <select v-model="addForm.accountMode">
                 <option value="link">关联已有学员账号</option>
@@ -807,7 +807,7 @@ onBeforeUnmount(() => {
             </label>
             <label
               v-if="addForm.accountMode === 'link'"
-              class="bo-field"
+              class="backoffice-field"
             >
               <span>选择要关联的账号</span>
               <select v-model="addForm.linkUsername">
@@ -822,15 +822,15 @@ onBeforeUnmount(() => {
                   {{ account.name || account.username }}（{{ account.username }}）
                 </option>
               </select>
-              <small class="bo-muted">
+              <small class="backoffice-muted">
                 {{ accountsError || (linkableAccounts.length ? `仅显示未被占用的学员账号，共 ${linkableAccounts.length} 个。` : "目前没有空闲的学员账号。") }}
               </small>
             </label>
             <div
               v-if="addForm.accountMode === 'create'"
-              class="bo-form-grid"
+              class="backoffice-form-grid"
             >
-              <label class="bo-field">
+              <label class="backoffice-field">
                 <span>用户名</span>
                 <input
                   v-model="addForm.newUsername"
@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
                   placeholder="登录用"
                 >
               </label>
-              <label class="bo-field">
+              <label class="backoffice-field">
                 <span>初始密码</span>
                 <input
                   v-model="addForm.newPassword"
@@ -849,15 +849,15 @@ onBeforeUnmount(() => {
             </div>
             <p
               v-if="addForm.accountMode === 'none'"
-              class="bo-note"
+              class="backoffice-note"
             >
               该学员将无法登录、收不到站内通知，之后可在编辑中关联账号。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="editorSaving"
               @click="closeAdd"
             >
@@ -865,7 +865,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="backoffice-button"
               :disabled="editorSaving"
             >
               {{ editorSaving ? "保存中..." : "确认添加" }}
@@ -876,25 +876,25 @@ onBeforeUnmount(() => {
 
       <div
         v-if="editOpen && editForm"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeEdit"
       >
         <form
-          class="bo-modal"
+          class="backoffice-modal"
           data-testid="teacher-student-editor"
           role="dialog"
           aria-modal="true"
           aria-label="编辑学员"
           @submit.prevent="submitEdit"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>名册维护</p>
               <h2>编辑学员 · {{ editForm.id }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeEdit"
             >
@@ -904,14 +904,14 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="teacher-student-editor-error"
             />
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>学员姓名</span>
               <input
                 ref="editNameInput"
@@ -920,15 +920,15 @@ onBeforeUnmount(() => {
                 autocomplete="off"
               >
             </label>
-            <div class="bo-form-grid">
-              <label class="bo-field">
+            <div class="backoffice-form-grid">
+              <label class="backoffice-field">
                 <span>班级</span>
                 <input
                   v-model="editForm.className"
                   autocomplete="off"
                 >
               </label>
-              <label class="bo-field">
+              <label class="backoffice-field">
                 <span>学习方向</span>
                 <select v-model="editForm.direction">
                   <option
@@ -941,7 +941,7 @@ onBeforeUnmount(() => {
                 </select>
               </label>
             </div>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>状态</span>
               <select v-model="editForm.status">
                 <option value="active">
@@ -952,7 +952,7 @@ onBeforeUnmount(() => {
                 </option>
               </select>
             </label>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>平台账号</span>
               <select v-model="editForm.linkUsername">
                 <option value="">
@@ -972,15 +972,15 @@ onBeforeUnmount(() => {
                   {{ account.name || account.username }}（{{ account.username }}）
                 </option>
               </select>
-              <small class="bo-muted">
+              <small class="backoffice-muted">
                 {{ accountsError || (editForm.currentAccount ? `当前已关联账号 ${editForm.currentAccount}。选择「改为不关联账号」会保留名册与历史学习数据。` : "该学员尚未关联账号，无法登录、收不到站内通知。") }}
               </small>
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="editorSaving"
               @click="closeEdit"
             >
@@ -988,7 +988,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="backoffice-button"
               :disabled="editorSaving"
             >
               {{ editorSaving ? "保存中..." : "保存修改" }}
@@ -999,24 +999,24 @@ onBeforeUnmount(() => {
 
       <div
         v-if="detailOpen"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="detailOpen = false"
       >
         <div
-          class="bo-modal"
+          class="backoffice-modal"
           data-testid="teacher-student-detail"
           role="dialog"
           aria-modal="true"
           aria-label="学员详情"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>学员详情</p>
               <h2>{{ detailStudent?.name || "加载中" }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="detailOpen = false"
             >
@@ -1026,7 +1026,7 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeState
               v-if="detailLoading"
               kind="loading"
@@ -1064,10 +1064,10 @@ onBeforeUnmount(() => {
               </dl>
             </template>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               @click="detailOpen = false"
             >
               关闭
@@ -1075,7 +1075,7 @@ onBeforeUnmount(() => {
             <button
               v-if="detailStudent"
               type="button"
-              class="bo-button"
+              class="backoffice-button"
               @click="openEdit(detailStudent.id)"
             >
               编辑信息
@@ -1086,31 +1086,31 @@ onBeforeUnmount(() => {
 
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="teacher-confirm-delete"
           role="dialog"
           aria-modal="true"
           aria-label="确认删除"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>确认删除</p>
               <h2>删除学员</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               确定要删除学员「{{ deleteTarget.name }}」吗？仅删除名册记录，平台账号不会被删除，历史学习数据仍会保留。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -1118,7 +1118,7 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >
@@ -1131,220 +1131,4 @@ onBeforeUnmount(() => {
   </section>
 </template>
 
-<style scoped>
-.teacher-stat-grid {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.teacher-filterbar {
-  padding: 0 0 14px;
-  border-bottom: 0;
-  background: transparent;
-}
-
-.teacher-filterbar .bo-search-field {
-  width: min(360px, 100%);
-}
-
-.teacher-roster-table code {
-  font-size: 0.76rem;
-}
-
-.teacher-student-id {
-  color: var(--bo-muted);
-}
-
-.teacher-direction-tag {
-  display: inline-flex;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-  font-size: 0.72rem;
-}
-
-.teacher-progress {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 160px;
-}
-
-.teacher-progress-track {
-  width: 70px;
-  height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--bo-card-border);
-}
-
-.teacher-progress-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--bo-accent);
-}
-
-.teacher-dashboard-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
-  gap: 18px;
-}
-
-.teacher-card-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-.teacher-suggestions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-top: 10px;
-}
-
-.teacher-suggestion {
-  padding: 5px 9px;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 999px;
-  background: var(--bo-card-bg);
-  color: var(--bo-muted);
-  font: inherit;
-  font-size: 0.72rem;
-  cursor: pointer;
-}
-
-.teacher-suggestion:hover {
-  border-color: var(--bo-accent);
-  color: var(--bo-accent-strong);
-}
-
-.teacher-report {
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid var(--bo-card-border);
-}
-
-.teacher-report-degraded {
-  display: grid;
-  gap: 2px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border-left: 3px solid #d9a227;
-  border-radius: 6px;
-  background: rgba(217, 162, 39, 0.12);
-  color: #7a5600;
-  font-size: 0.82rem;
-}
-
-.teacher-report h3 {
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-.teacher-report small {
-  color: var(--bo-muted);
-  font-size: 0.7rem;
-}
-
-.teacher-report p {
-  margin: 10px 0 0;
-  white-space: pre-wrap;
-  line-height: 1.7;
-}
-
-.teacher-recent-list {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.teacher-recent-list li {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--bo-card-border);
-}
-
-.teacher-recent-list li:last-child {
-  border-bottom: 0;
-}
-
-.teacher-recent-list span,
-.teacher-recent-list small {
-  display: block;
-}
-
-.teacher-recent-list small,
-.teacher-recent-list time {
-  margin-top: 3px;
-  color: var(--bo-muted);
-  font-size: 0.68rem;
-}
-
-.teacher-detail-head {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.teacher-detail-avatar {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  place-items: center;
-  border-radius: 14px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-  font-size: 1.2rem;
-  font-weight: 750;
-}
-
-.teacher-detail-head h3,
-.teacher-detail-head p {
-  margin: 0;
-}
-
-.teacher-detail-head p {
-  margin-top: 4px;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.teacher-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.teacher-detail-grid > div {
-  padding: 12px;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 9px;
-  background: var(--bo-page-bg);
-}
-
-.teacher-detail-grid dt {
-  color: var(--bo-muted);
-  font-size: 0.7rem;
-}
-
-.teacher-detail-grid dd {
-  margin: 5px 0 0;
-  font-weight: 650;
-}
-
-@media (max-width: 980px) {
-  .teacher-dashboard-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
+<style src="./teacher.css"></style>

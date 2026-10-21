@@ -63,7 +63,7 @@ test.describe("employment resume", () => {
 
     await page.getByLabel("自我评价").fill("认真负责");
     await page
-      .locator(".resume-block")
+      .getByTestId("resume-block-self_eval")
       .filter({ has: page.getByLabel("自我评价") })
       .getByRole("button", { name: "AI 起草" })
       .click();
@@ -100,7 +100,7 @@ test.describe("employment resume", () => {
     const original = "这是我本人填写的自我评价，AI 失败时不能丢。";
     await page.getByLabel("自我评价").fill(original);
     await page
-      .locator(".resume-block")
+      .getByTestId("resume-block-self_eval")
       .filter({ has: page.getByLabel("自我评价") })
       .getByRole("button", { name: "AI 起草" })
       .click();

@@ -115,10 +115,10 @@ onMounted(loadPolicies);
 
 <template>
   <section
-    class="bo-page"
+    class="backoffice-page"
     data-testid="government-policies"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>政务工作</p>
         <h1 data-testid="backoffice-page-title">
@@ -128,7 +128,7 @@ onMounted(loadPolicies);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadPolicies"
       >
@@ -161,7 +161,7 @@ onMounted(loadPolicies);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadPolicies"
       >
         重试
@@ -191,12 +191,12 @@ onMounted(loadPolicies);
           <header>
             <div>
               <h2>{{ policy.title || "(无标题)" }}</h2>
-              <span class="bo-status is-active government-policy-category">
+              <span class="backoffice-status is-active government-policy-category">
                 {{ policy.category || "综合" }}
               </span>
             </div>
             <span
-              class="bo-status"
+              class="backoffice-status"
               :class="isPublished(policy) ? 'is-active' : 'is-suspended'"
             >
               {{ isPublished(policy) ? "已上线" : "已下架" }}
@@ -222,10 +222,10 @@ onMounted(loadPolicies);
           >
             {{ policyPreview(policy) }}
           </p>
-          <footer class="bo-row-actions">
+          <footer class="backoffice-row-actions">
             <button
               type="button"
-              class="bo-button is-small is-secondary"
+              class="backoffice-button is-small is-secondary"
               data-testid="government-policy-toggle"
               :disabled="busyPolicyId === policy.id"
               @click="togglePolicy(policy)"
@@ -234,7 +234,7 @@ onMounted(loadPolicies);
             </button>
             <button
               type="button"
-              class="bo-button is-small is-secondary"
+              class="backoffice-button is-small is-secondary"
               data-testid="government-policy-edit"
               :disabled="busyPolicyId === policy.id"
               @click="editPolicy(policy)"
@@ -243,7 +243,7 @@ onMounted(loadPolicies);
             </button>
             <button
               type="button"
-              class="bo-button is-small is-danger"
+              class="backoffice-button is-small is-danger"
               data-testid="government-policy-delete"
               :disabled="busyPolicyId === policy.id"
               @click="removePolicy(policy)"
@@ -257,61 +257,4 @@ onMounted(loadPolicies);
   </section>
 </template>
 
-<style scoped>
-.government-policy-list {
-  display: grid;
-  gap: 12px;
-}
-
-.government-policy-card {
-  display: grid;
-  gap: 12px;
-  padding: 18px 20px;
-}
-
-.government-policy-card > header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.government-policy-card > header > div {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.government-policy-card h2 {
-  margin: 0;
-  font-size: 0.98rem;
-  line-height: 1.45;
-}
-
-.government-policy-category {
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-}
-
-.government-policy-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin: 0;
-  color: var(--bo-muted);
-  font-size: 0.74rem;
-  line-height: 1.55;
-}
-
-.government-policy-preview {
-  margin: 0;
-  color: var(--bo-muted);
-  font-size: 0.82rem;
-  line-height: 1.65;
-}
-
-.government-policy-card .bo-row-actions {
-  min-width: 0;
-}
-</style>
+<style src="./government.css"></style>

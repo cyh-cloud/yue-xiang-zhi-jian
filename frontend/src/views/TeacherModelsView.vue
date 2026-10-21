@@ -358,8 +358,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="bo-page model-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page model-page">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>3D 模型</h1>
@@ -379,18 +379,18 @@ onBeforeUnmount(() => {
     <CdnFallbackNotice />
 
     <form
-      class="bo-card model-upload-card"
+      class="backoffice-card model-upload-card"
       data-testid="teacher-model-upload"
       @submit.prevent="submitUpload"
     >
-      <header class="bo-card-head">
+      <header class="backoffice-card-head">
         <div>
           <h2>上传模型</h2>
           <p>文件通过真实 multipart 请求上传，保存后立即出现在下方列表。</p>
         </div>
       </header>
       <div class="model-form-grid">
-        <label class="bo-field is-wide">
+        <label class="backoffice-field is-wide">
           <span>模型文件</span>
           <input
             id="model-file"
@@ -406,7 +406,7 @@ onBeforeUnmount(() => {
         >
           已选择：{{ selectedFileSummary }}
         </p>
-        <label class="bo-field">
+        <label class="backoffice-field">
           <span>标题</span>
           <input
             id="model-title"
@@ -415,7 +415,7 @@ onBeforeUnmount(() => {
             placeholder="默认使用文件名"
           >
         </label>
-        <label class="bo-field">
+        <label class="backoffice-field">
           <span>技艺类型</span>
           <select
             id="model-craft"
@@ -438,7 +438,7 @@ onBeforeUnmount(() => {
             </option>
           </select>
         </label>
-        <label class="bo-field is-wide">
+        <label class="backoffice-field is-wide">
           <span>描述</span>
           <textarea
             id="model-description"
@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
       <div class="model-upload-actions">
         <button
           type="submit"
-          class="bo-button"
+          class="backoffice-button"
           :disabled="uploading"
         >
           <i
@@ -472,7 +472,7 @@ onBeforeUnmount(() => {
       <template #actions>
         <button
           type="button"
-          class="bo-button is-secondary is-small"
+          class="backoffice-button is-secondary is-small"
           :disabled="loading"
           @click="loadModels"
         >
@@ -498,7 +498,7 @@ onBeforeUnmount(() => {
       >
         <button
           type="button"
-          class="bo-button"
+          class="backoffice-button"
           @click="loadModels"
         >
           重试
@@ -512,9 +512,9 @@ onBeforeUnmount(() => {
       />
       <div
         v-else
-        class="bo-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table model-table">
+        <table class="backoffice-table model-table">
           <thead>
             <tr>
               <th>模型</th>
@@ -547,7 +547,7 @@ onBeforeUnmount(() => {
               </td>
               <td>
                 <span
-                  class="bo-status model-status"
+                  class="backoffice-status model-status"
                   :class="reviewStatusClass(model.review_status)"
                 >
                   {{ reviewStatusLabel(model.review_status) }}
@@ -564,18 +564,18 @@ onBeforeUnmount(() => {
                 <span>{{ model.created_at }}</span>
               </td>
               <td>
-                <div class="bo-row-actions model-actions">
+                <div class="backoffice-row-actions model-actions">
                   <button
                     v-if="canPreview(model)"
                     type="button"
-                    class="bo-button is-secondary is-small"
+                    class="backoffice-button is-secondary is-small"
                     data-testid="teacher-model-preview"
                     @click="openPreview(model)"
                   >
                     预览
                   </button>
                   <a
-                    class="bo-button is-secondary is-small"
+                    class="backoffice-button is-secondary is-small"
                     :href="resolveMediaUrl(model.file_path)"
                     target="_blank"
                     rel="noopener"
@@ -585,7 +585,7 @@ onBeforeUnmount(() => {
                   <button
                     v-if="canDelete(model)"
                     type="button"
-                    class="bo-button is-danger is-small"
+                    class="backoffice-button is-danger is-small"
                     data-testid="teacher-model-delete"
                     @click="askDelete(model)"
                   >
@@ -602,24 +602,24 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="previewModel"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closePreview"
       >
         <section
-          class="bo-modal model-preview-dialog"
+          class="backoffice-modal model-preview-dialog"
           role="dialog"
           aria-modal="true"
           aria-label="3D 模型预览"
           data-testid="teacher-model-preview-dialog"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>模型预览</p>
               <h2>{{ previewModel.title }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭预览"
               @click="closePreview"
             >
@@ -629,7 +629,7 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <div class="model-preview-meta">
               <span>{{ previewModel.file_name }}</span>
               <span>{{ formatBytes(previewModel.file_size) }}</span>
@@ -650,7 +650,7 @@ onBeforeUnmount(() => {
                 <button
                   v-if="previewState === 'error'"
                   type="button"
-                  class="bo-button is-secondary is-small"
+                  class="backoffice-button is-secondary is-small"
                   @click="retryPreview"
                 >
                   重新加载
@@ -702,7 +702,7 @@ onBeforeUnmount(() => {
             <div class="model-preview-footer">
               <span>模型预览依赖外部 model-viewer 资源。</span>
               <a
-                class="bo-button is-secondary is-small"
+                class="backoffice-button is-secondary is-small"
                 :href="previewUrl"
                 target="_blank"
                 rel="noopener"
@@ -718,24 +718,24 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <section
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           role="dialog"
           aria-modal="true"
           aria-label="删除 3D 模型"
           data-testid="teacher-model-delete-dialog"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>删除模型</p>
               <h2>{{ deleteTarget.title }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭删除确认"
               :disabled="deleting"
               @click="closeDelete"
@@ -746,7 +746,7 @@ onBeforeUnmount(() => {
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="deleteError"
               kind="error"
@@ -758,7 +758,7 @@ onBeforeUnmount(() => {
             <div class="model-delete-actions">
               <button
                 type="button"
-                class="bo-button is-secondary"
+                class="backoffice-button is-secondary"
                 :disabled="deleting"
                 @click="closeDelete"
               >
@@ -766,7 +766,7 @@ onBeforeUnmount(() => {
               </button>
               <button
                 type="button"
-                class="bo-button is-danger"
+                class="backoffice-button is-danger"
                 :disabled="deleting"
                 @click="confirmDelete"
               >
@@ -780,200 +780,4 @@ onBeforeUnmount(() => {
   </section>
 </template>
 
-<style scoped>
-.model-page {
-  max-width: 1180px;
-}
-
-.model-upload-card {
-  display: grid;
-  gap: 0;
-}
-
-.model-form-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
-  padding: 20px;
-}
-
-.model-form-grid .is-wide,
-.model-file-summary {
-  grid-column: 1 / -1;
-}
-
-.model-form-grid input,
-.model-form-grid textarea,
-.model-form-grid select {
-  width: 100%;
-  min-height: 38px;
-  padding: 8px 10px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 8px;
-  background: var(--bo-input-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.84rem;
-}
-
-.model-form-grid textarea {
-  resize: vertical;
-}
-
-.model-form-grid input:focus,
-.model-form-grid textarea:focus,
-.model-form-grid select:focus {
-  border-color: var(--bo-accent);
-  box-shadow: 0 0 0 3px var(--bo-accent-soft);
-  outline: none;
-}
-
-.model-file-summary {
-  margin: -4px 0 0;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.model-upload-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 20px 20px;
-}
-
-.model-table td strong,
-.model-table td small {
-  max-width: 280px;
-  overflow-wrap: anywhere;
-}
-
-.model-status.is-pending {
-  background: rgba(190, 122, 20, 0.14);
-  color: #9a620f;
-}
-
-.model-status.is-approved {
-  background: rgba(31, 107, 66, 0.12);
-  color: var(--bo-success);
-}
-
-.model-status.is-rejected {
-  background: rgba(179, 56, 47, 0.12);
-  color: var(--bo-danger);
-}
-
-.model-actions {
-  min-width: 230px;
-}
-
-.model-actions a {
-  text-decoration: none;
-}
-
-.model-preview-dialog {
-  width: min(920px, calc(100vw - 48px));
-}
-
-.model-preview-meta,
-.model-preview-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.model-preview-meta span {
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--bo-accent-soft);
-}
-
-.model-preview-stage {
-  display: grid;
-  min-height: 420px;
-  overflow: hidden;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 12px;
-  background:
-    radial-gradient(circle at 50% 38%, rgba(84, 139, 109, 0.2), transparent 44%),
-    #0d1813;
-}
-
-.teacher-model-viewer {
-  display: block;
-  width: 100%;
-  height: 420px;
-  background: transparent;
-}
-
-.model-review-reason {
-  display: block;
-  margin-top: 5px;
-  color: #9b2f27;
-  line-height: 1.5;
-}
-
-.model-preview-placeholder {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 12px;
-  padding: 28px;
-  color: #d7e4dc;
-  text-align: center;
-}
-
-.model-preview-placeholder i {
-  color: #8fc9a7;
-  font-size: 2rem;
-}
-
-.model-preview-placeholder strong {
-  max-width: 620px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  line-height: 1.65;
-}
-
-.model-preview-state {
-  padding: 9px 12px;
-  border-radius: 8px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-muted);
-  font-size: 0.78rem;
-}
-
-.model-preview-state.is-ready {
-  color: var(--bo-success);
-}
-
-.model-preview-footer a {
-  text-decoration: none;
-}
-
-.model-delete-copy {
-  margin: 0;
-  color: var(--bo-muted);
-  font-size: 0.84rem;
-  line-height: 1.7;
-}
-
-.model-delete-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-@media (max-width: 760px) {
-  .model-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .model-form-grid .is-wide,
-  .model-file-summary {
-    grid-column: auto;
-  }
-}
-</style>
+<style src="./teacher/teacher.css"></style>

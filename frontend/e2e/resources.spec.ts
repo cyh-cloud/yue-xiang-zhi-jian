@@ -17,7 +17,7 @@ test.describe("local resources", () => {
     await expect(
       page.getByRole("heading", { name: "本土化资源库" }),
     ).toBeVisible();
-    const dialectCards = page.locator(".dialect-card");
+    const dialectCards = page.getByTestId("dialect-card");
     await expect(dialectCards).toHaveCount(3);
 
     const dialects = [
@@ -27,11 +27,11 @@ test.describe("local resources", () => {
     ];
     for (const dialect of dialects) {
       await dialectCards.filter({ hasText: dialect.name }).click();
-      await expect(page.locator(".greeting-main")).toHaveText(
+      await expect(page.getByTestId("dialect-greeting")).toHaveText(
         dialect.greeting,
       );
-      await expect(page.locator(".phrase-item")).toHaveCount(8);
-      await expect(page.locator(".voice-quick-btn")).toHaveCount(4);
+      await expect(page.getByTestId("dialect-phrase")).toHaveCount(8);
+      await expect(page.getByTestId("dialect-quick-question")).toHaveCount(4);
       await expect(
         dialectCards.filter({ hasText: dialect.name }),
       ).toHaveAttribute("aria-pressed", "true");
@@ -57,10 +57,10 @@ test.describe("local resources", () => {
     await expect(
       page.getByText("当前浏览器不支持语音识别，请改用文字输入提问"),
     ).toBeVisible();
-    await expect(page.locator(".voice-quick-btn")).toHaveCount(4);
+    await expect(page.getByTestId("dialect-quick-question")).toHaveCount(4);
 
     const question = page
-      .locator(".voice-quick-btn")
+      .getByTestId("dialect-quick-question")
       .filter({ hasText: "荔枝" })
       .first();
     const answerResponse = page.waitForResponse(
@@ -71,10 +71,16 @@ test.describe("local resources", () => {
     await question.click();
     expect((await answerResponse).ok()).toBe(true);
 
-    await expect(page.locator(".voice-msg.user").last()).toContainText("荔枝");
-    await expect(page.locator(".voice-msg.bot").last()).toContainText(
-      "本地方言语料库回答，仅供学习参考",
-    );
+    await expect(
+      page
+        .locator('[data-testid="dialect-message"][data-message-role="user"]')
+        .last(),
+    ).toContainText("荔枝");
+    await expect(
+      page
+        .locator('[data-testid="dialect-message"][data-message-role="bot"]')
+        .last(),
+    ).toContainText("本地方言语料库回答，仅供学习参考");
   });
 
   test("approved cases open a detail page with sources and lessons", async ({
@@ -94,7 +100,7 @@ test.describe("local resources", () => {
     const firstCase = payload.cases[0];
     expect(firstCase).toBeTruthy();
     const card = page
-      .locator(".case-card")
+      .getByTestId("case-card")
       .filter({ hasText: firstCase?.title ?? "" });
     await expect(card).toBeVisible();
     await card.getByRole("link", { name: /查看详情/ }).click();
@@ -109,7 +115,9 @@ test.describe("local resources", () => {
     await expect(
       page.getByRole("heading", { name: "资料来源" }),
     ).toBeVisible();
-    await expect(page.locator(".case-sources a").first()).toBeVisible();
+    await expect(
+      page.getByTestId("case-sources").getByRole("link").first(),
+    ).toBeVisible();
   });
 
   test("pending review is shown as an audit state instead of a load failure", async ({
@@ -159,7 +167,7 @@ test.describe("local resources", () => {
     );
     expect(categories.length).toBeGreaterThan(1);
 
-    const filters = page.locator(".policy-filters");
+    const filters = page.getByTestId("policy-filters");
     for (const category of categories) {
       await expect(
         filters.getByRole("button", { name: category, exact: true }),
@@ -176,13 +184,14 @@ test.describe("local resources", () => {
     await filters
       .getByRole("button", { name: category ?? "", exact: true })
       .click();
-    await expect(page.locator(".policy-card")).not.toHaveCount(0);
+    await expect(page.getByTestId("policy-card")).not.toHaveCount(0);
     const visibleTags = await page
-      .locator(".policy-card .policy-tag")
+      .getByTestId("policy-card")
+      .getByTestId("policy-tag")
       .allTextContents();
     expect(new Set(visibleTags)).toEqual(new Set([category ?? ""]));
     await page
-      .locator(".policy-card")
+      .getByTestId("policy-card")
       .filter({ hasText: expected?.title ?? "" })
       .click();
 
@@ -193,10 +202,10 @@ test.describe("local resources", () => {
     ).toBeVisible();
     await expect(dialog).toContainText("政策概述");
     await expect(
-      dialog.locator(".policy-detail-content strong").first(),
+      dialog.getByTestId("policy-detail-content").locator("strong").first(),
     ).toBeVisible();
     await expect(
-      dialog.locator(".policy-detail-content li").first(),
+      dialog.getByTestId("policy-detail-content").locator("li").first(),
     ).toBeVisible();
     await expect(dialog).toContainText("不替代官方文件");
     await dialog.getByRole("button", { name: "关闭" }).click();
@@ -389,9 +398,9 @@ test.describe("local resources", () => {
     );
 
     await page.goto("/resources");
-    await expect(page.locator(".dialect-card")).toHaveCount(3);
-    await expect(page.locator(".case-card")).toHaveCount(2);
-    await expect(page.locator(".policy-card")).toHaveCount(3);
+    await expect(page.getByTestId("dialect-card")).toHaveCount(3);
+    await expect(page.getByTestId("case-card")).toHaveCount(2);
+    await expect(page.getByTestId("policy-card")).toHaveCount(3);
     await waitForCdnState(page);
     await expect
       .poll(

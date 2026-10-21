@@ -45,10 +45,10 @@ onMounted(loadOverview);
 
 <template>
   <section
-    class="bo-page"
+    class="backoffice-page"
     data-testid="government-dashboard"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>政务工作</p>
         <h1 data-testid="backoffice-page-title">
@@ -58,7 +58,7 @@ onMounted(loadOverview);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadOverview"
       >
@@ -84,7 +84,7 @@ onMounted(loadOverview);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadOverview"
       >
         重试
@@ -96,9 +96,9 @@ onMounted(loadOverview);
         title="政策发布情况"
         description="区分本级发布与平台预置，避免把平台整理内容计入本级政绩。"
       >
-        <div class="bo-stat-grid">
+        <div class="backoffice-stat-grid">
           <article
-            class="bo-stat-card is-alert"
+            class="backoffice-stat-card is-alert"
             data-testid="government-own-total"
           >
             <strong>{{ overview.policies.own.total }}</strong>
@@ -111,7 +111,7 @@ onMounted(loadOverview);
             </small>
           </article>
           <article
-            class="bo-stat-card"
+            class="backoffice-stat-card"
             data-testid="government-preset-total"
           >
             <strong>{{ overview.policies.preset.total }}</strong>
@@ -122,7 +122,7 @@ onMounted(loadOverview);
             </small>
           </article>
           <article
-            class="bo-stat-card"
+            class="backoffice-stat-card"
             data-testid="government-category-count"
           >
             <strong>{{ overview.policies.categories.length }}</strong>
@@ -136,9 +136,9 @@ onMounted(loadOverview);
         title="本地成功案例"
         description="只统计已通过审核的案例，与学员端可见口径一致。"
       >
-        <div class="bo-stat-grid">
+        <div class="backoffice-stat-grid">
           <article
-            class="bo-stat-card"
+            class="backoffice-stat-card"
             data-testid="government-approved-cases"
           >
             <strong>{{ overview.cases.approved }}</strong>
@@ -147,12 +147,12 @@ onMounted(loadOverview);
               共 {{ overview.cases.total }} 条，其余审核中或未通过
             </small>
           </article>
-          <article class="bo-stat-card">
+          <article class="backoffice-stat-card">
             <strong>{{ overview.cases.regions.length }}</strong>
             <span>覆盖地市</span>
             <small>{{ regionSummary }}</small>
           </article>
-          <article class="bo-stat-card">
+          <article class="backoffice-stat-card">
             <strong>{{ overview.cases.avg_sources }}</strong>
             <span>平均来源数</span>
             <small>合计 {{ overview.cases.source_total }} 条公开出处</small>
@@ -179,7 +179,7 @@ onMounted(loadOverview);
       </BackofficeCard>
 
       <p
-        class="bo-note"
+        class="backoffice-note"
         data-testid="government-dashboard-note"
       >
         口径说明：本页只呈现政务侧产生的信息，即政策发布情况与本地成功案例；
@@ -190,20 +190,4 @@ onMounted(loadOverview);
   </section>
 </template>
 
-<style scoped>
-.government-case-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.government-case-chips span {
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-muted);
-  font-size: 0.75rem;
-  line-height: 1.45;
-}
-</style>
+<style src="./government.css"></style>

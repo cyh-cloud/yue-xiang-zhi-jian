@@ -332,10 +332,10 @@ async function removeDetail(
 
 <template>
   <section
-    class="bo-page operator-dialects"
+    class="backoffice-page operator-dialects"
     data-testid="operator-dialects"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>内容运营</p>
         <h1 data-testid="backoffice-page-title">
@@ -345,7 +345,7 @@ async function removeDetail(
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadDialects()"
       >
@@ -378,7 +378,7 @@ async function removeDetail(
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadDialects()"
       >
         重试
@@ -393,7 +393,7 @@ async function removeDetail(
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             :disabled="loading"
             @click="openCreateDialect"
           >
@@ -412,9 +412,9 @@ async function removeDetail(
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>名称</th>
@@ -448,24 +448,24 @@ async function removeDetail(
                 <td>{{ dialect.question_count }}</td>
                 <td>{{ dialect.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="selectDialect(dialect.id)"
                     >
                       管理内容
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openDialect(dialect)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       :disabled="dialect.id === 'cantonese'"
                       @click="removeDialect(dialect)"
                     >
@@ -487,7 +487,7 @@ async function removeDetail(
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             :disabled="loading || detailLoading"
             @click="openCreateDetail"
           >
@@ -537,9 +537,9 @@ async function removeDetail(
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr v-if="activeTab === 'phrases'">
                 <th>方言说法</th>
@@ -567,17 +567,17 @@ async function removeDetail(
                   <td>{{ phrase.pinyin }}</td>
                   <td>{{ phrase.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openPhrase(phrase)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removePhrase(phrase)"
                       >
                         删除
@@ -596,17 +596,17 @@ async function removeDetail(
                   <td>{{ question.question }}</td>
                   <td>{{ question.sort_order }}</td>
                   <td>
-                    <div class="bo-row-actions">
+                    <div class="backoffice-row-actions">
                       <button
                         type="button"
-                        class="bo-button is-small is-secondary"
+                        class="backoffice-button is-small is-secondary"
                         @click="openQuestion(question)"
                       >
                         编辑
                       </button>
                       <button
                         type="button"
-                        class="bo-button is-small is-danger"
+                        class="backoffice-button is-small is-danger"
                         @click="removeQuestion(question)"
                       >
                         删除
@@ -634,34 +634,4 @@ async function removeDetail(
   </section>
 </template>
 
-<style scoped>
-.operator-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--bo-card-border);
-}
-
-.operator-tabs button {
-  min-height: 32px;
-  padding: 5px 13px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 999px;
-  background: var(--bo-card-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.operator-tabs button.active {
-  border-color: var(--bo-accent);
-  background: var(--bo-accent);
-  color: #fff;
-}
-
-tr.is-selected {
-  background: var(--bo-accent-soft);
-}
-</style>
+<style src="./operator.css"></style>

@@ -292,7 +292,9 @@ test.describe("operator overview and content maintenance", () => {
       await page
         .getByRole("button", { name: new RegExp(`选择${productName} 已改`) })
         .click();
-      const publicTask = page.locator(".task-item").filter({ hasText: taskTitle });
+      const publicTask = page
+        .getByTestId("agriculture-task-item")
+        .filter({ hasText: taskTitle });
       await expect(publicTask).toBeVisible();
       await expect(publicTask).toContainText("约 ");
       await expect(

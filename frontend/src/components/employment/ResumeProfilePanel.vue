@@ -460,14 +460,14 @@ function escapeHtml(value: string): string {
 <template>
   <div
     v-if="!session.isAuthenticated"
-    class="emp-empty emp-empty-inline"
+    class="employment-empty employment-empty-inline"
   >
     <i
       class="fas fa-user-lock"
       aria-hidden="true"
     />
     <p>登录后可查看能力档案并编辑在线简历</p>
-    <span class="emp-empty-sub">简历只保存到当前账号，不会展示给其他学员。</span>
+    <span class="employment-empty-sub">简历只保存到当前账号，不会展示给其他学员。</span>
     <RouterLink
       class="btn btn-primary btn-sm"
       :to="loginTarget"
@@ -478,7 +478,7 @@ function escapeHtml(value: string): string {
 
   <div
     v-else-if="loading"
-    class="emp-empty emp-empty-inline"
+    class="employment-empty employment-empty-inline"
     role="status"
   >
     <i
@@ -490,7 +490,7 @@ function escapeHtml(value: string): string {
 
   <div
     v-else-if="loadError"
-    class="emp-empty emp-empty-inline"
+    class="employment-empty employment-empty-inline"
     role="alert"
   >
     <i
@@ -733,7 +733,10 @@ function escapeHtml(value: string): string {
           </div>
         </section>
 
-        <section class="resume-block">
+        <section
+          class="resume-block"
+          data-testid="resume-block-self_eval"
+        >
           <div class="resume-block-head">
             <h2><i class="fas fa-star" />自我评价</h2>
             <div class="resume-block-actions">

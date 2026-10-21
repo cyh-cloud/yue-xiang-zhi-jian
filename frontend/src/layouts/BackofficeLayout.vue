@@ -274,7 +274,7 @@ async function logout(): Promise<void> {
 function handleDocumentClick(event: MouseEvent): void {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  if (!target.closest(".bo-user-menu")) userMenuOpen.value = false;
+  if (!target.closest(".backoffice-user-menu")) userMenuOpen.value = false;
 }
 
 function setConnectionState(
@@ -333,22 +333,22 @@ onBeforeUnmount(() => {
 
 <template>
   <div
-    class="bo-shell"
+    class="backoffice-shell"
     :class="{ 'is-collapsed': collapsed }"
     :data-role="role"
     data-testid="backoffice-shell"
   >
     <a
       href="#backoffice-main"
-      class="bo-skip-link"
+      class="backoffice-skip-link"
       @click.prevent="enterMainContent"
     >跳转到主要内容</a>
 
-    <header class="bo-topbar">
-      <div class="bo-topbar-left">
+    <header class="backoffice-topbar">
+      <div class="backoffice-topbar-left">
         <button
           type="button"
-          class="bo-sidebar-toggle"
+          class="backoffice-sidebar-toggle"
           data-testid="backoffice-sidebar-toggle"
           :aria-label="collapsed ? '展开侧栏' : '收起侧栏'"
           :aria-expanded="!collapsed"
@@ -362,11 +362,11 @@ onBeforeUnmount(() => {
           />
         </button>
         <RouterLink
-          class="bo-brand"
+          class="backoffice-brand"
           to="/"
           aria-label="粤乡智匠首页"
         >
-          <span class="bo-brand-mark">
+          <span class="backoffice-brand-mark">
             <i
               class="fas fa-seedling"
               aria-hidden="true"
@@ -375,12 +375,12 @@ onBeforeUnmount(() => {
           <span>粤乡智匠</span>
         </RouterLink>
         <span
-          class="bo-role-chip"
+          class="backoffice-role-chip"
           data-testid="backoffice-role"
         >{{ config.label }}</span>
       </div>
 
-      <div class="bo-topbar-actions">
+      <div class="backoffice-topbar-actions">
         <SharedMessageCenter />
         <button
           type="button"
@@ -408,21 +408,21 @@ onBeforeUnmount(() => {
             aria-hidden="true"
           />
         </button>
-        <div class="bo-user-menu">
+        <div class="backoffice-user-menu">
           <button
             type="button"
-            class="bo-user-trigger"
+            class="backoffice-user-trigger"
             aria-label="打开用户菜单"
             :aria-expanded="userMenuOpen"
             @click.stop="userMenuOpen = !userMenuOpen"
           >
-            <span class="bo-avatar">
+            <span class="backoffice-avatar">
               <i
                 class="fas fa-user"
                 aria-hidden="true"
               />
             </span>
-            <span class="bo-user-copy">
+            <span class="backoffice-user-copy">
               <strong>{{ session.user?.name || config.label }}</strong>
               <small>{{ config.label }}</small>
             </span>
@@ -433,9 +433,9 @@ onBeforeUnmount(() => {
           </button>
           <div
             v-if="userMenuOpen"
-            class="bo-user-dropdown"
+            class="backoffice-user-dropdown"
           >
-            <div class="bo-user-dropdown-head">
+            <div class="backoffice-user-dropdown-head">
               <strong>{{ session.user?.name }}</strong>
               <span>{{ session.user?.id }}</span>
             </div>
@@ -454,44 +454,44 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div class="bo-body">
+    <div class="backoffice-body">
       <button
         v-if="drawerOpen"
         type="button"
-        class="bo-drawer-overlay"
+        class="backoffice-drawer-overlay"
         aria-label="关闭侧栏"
         @click="drawerOpen = false"
       />
       <aside
         :id="`backoffice-sidebar-${role}`"
-        class="bo-sidebar"
+        class="backoffice-sidebar"
         :class="{ open: drawerOpen }"
         data-testid="backoffice-sidebar"
       >
-        <div class="bo-sidebar-head">
-          <span class="bo-sidebar-mark">{{ config.label.slice(0, 1) }}</span>
-          <span class="bo-sidebar-copy">
+        <div class="backoffice-sidebar-head">
+          <span class="backoffice-sidebar-mark">{{ config.label.slice(0, 1) }}</span>
+          <span class="backoffice-sidebar-copy">
             <strong>{{ config.title }}</strong>
             <small>{{ session.user?.name }}</small>
           </span>
         </div>
         <nav
-          class="bo-nav"
+          class="backoffice-nav"
           aria-label="后台导航"
         >
           <section
             v-for="group in visibleGroups"
             :key="group.label"
-            class="bo-nav-group"
+            class="backoffice-nav-group"
           >
-            <h2 class="bo-nav-group-title">
+            <h2 class="backoffice-nav-group-title">
               {{ group.label }}
             </h2>
             <RouterLink
               v-for="item in group.items"
               :key="item.to"
               :to="item.to"
-              class="bo-nav-link"
+              class="backoffice-nav-link"
               :class="{ active: isActive(item.to) }"
               :aria-current="isActive(item.to) ? 'page' : undefined"
               :title="item.label"
@@ -506,7 +506,7 @@ onBeforeUnmount(() => {
             </RouterLink>
           </section>
         </nav>
-        <div class="bo-sidebar-foot">
+        <div class="backoffice-sidebar-foot">
           <i
             class="fas fa-circle-nodes"
             aria-hidden="true"
@@ -515,14 +515,14 @@ onBeforeUnmount(() => {
         </div>
       </aside>
 
-      <div class="bo-main">
-        <div class="bo-mainbar">
+      <div class="backoffice-main">
+        <div class="backoffice-mainbar">
           <div>
             <p>{{ config.label }}</p>
             <h2>{{ pageTitle }}</h2>
           </div>
           <span
-            class="bo-connection"
+            class="backoffice-connection"
             :class="{ 'is-offline': connectionLost }"
             data-testid="backoffice-connection"
             aria-live="polite"
@@ -537,7 +537,7 @@ onBeforeUnmount(() => {
         <main
           id="backoffice-main"
           ref="mainRef"
-          class="bo-content"
+          class="backoffice-content"
           data-testid="backoffice-main"
           tabindex="-1"
         >

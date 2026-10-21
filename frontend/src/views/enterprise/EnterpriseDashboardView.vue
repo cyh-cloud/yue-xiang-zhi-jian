@@ -105,8 +105,8 @@ onMounted(loadStats);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>招聘管理</p>
         <h1>企业中心</h1>
@@ -114,7 +114,7 @@ onMounted(loadStats);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadStats"
       >
@@ -140,7 +140,7 @@ onMounted(loadStats);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadStats"
       >
         重试
@@ -152,11 +152,11 @@ onMounted(loadStats);
       title="招聘概览"
       description="只统计当前企业账号真实发布的岗位与收到的投递。"
     >
-      <div class="bo-stat-grid">
+      <div class="backoffice-stat-grid">
         <article
           v-for="card in cards"
           :key="card.testid"
-          class="bo-stat-card"
+          class="backoffice-stat-card"
           :data-testid="card.testid"
         >
           <strong>{{ card.value }}</strong>
@@ -171,11 +171,11 @@ onMounted(loadStats);
       title="投递状态"
       description="按企业当前收到的投递记录统计，状态与简历管理页一致。"
     >
-      <div class="bo-stat-grid">
+      <div class="backoffice-stat-grid">
         <article
           v-for="card in applicationStatusCards"
           :key="card.status"
-          class="bo-stat-card"
+          class="backoffice-stat-card"
           :data-testid="`enterprise-application-status-${card.status}`"
         >
           <strong>{{ card.value }}</strong>
@@ -186,3 +186,5 @@ onMounted(loadStats);
     </BackofficeCard>
   </section>
 </template>
+
+<style src="./enterprise.css"></style>

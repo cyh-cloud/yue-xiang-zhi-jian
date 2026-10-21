@@ -460,6 +460,8 @@ function sourceNote(entry: ChatEntry): string {
         :key="dialect.id"
         type="button"
         class="dialect-card"
+        data-testid="dialect-card"
+        :data-dialect-id="dialect.id"
         :class="{ active: dialect.id === selectedDialect }"
         :aria-pressed="dialect.id === selectedDialect"
         @click="selectDialect(dialect.id)"
@@ -516,7 +518,10 @@ function sourceNote(entry: ChatEntry): string {
       class="dialect-detail"
     >
       <div class="dialect-greeting">
-        <div class="greeting-main">
+        <div
+          class="greeting-main"
+          data-testid="dialect-greeting"
+        >
           {{ info.greeting }}
         </div>
         <div class="greeting-meaning">
@@ -551,6 +556,7 @@ function sourceNote(entry: ChatEntry): string {
             :key="`${phrase.dialect}-${phrase.mandarin}`"
             type="button"
             class="phrase-item"
+            data-testid="dialect-phrase"
             :title="`点击提问：${phrase.dialect}`"
             @click="selectPhrase(phrase)"
           >
@@ -606,11 +612,13 @@ function sourceNote(entry: ChatEntry): string {
           :key="entry.id"
           class="voice-msg"
           :class="entry.role"
+          data-testid="dialect-message"
+          :data-message-role="entry.role"
         >
           <template v-if="entry.role === 'bot'">
             <div
               v-if="entry.result"
-              class="msg-dialect-tag"
+              class="message-dialect-tag"
             >
               {{ entry.result.dialect_name }}助手
             </div>
@@ -662,7 +670,7 @@ function sourceNote(entry: ChatEntry): string {
             </div>
             <div
               v-if="entry.result?.suggestions.length"
-              class="msg-suggestions"
+              class="message-suggestions"
             >
               <button
                 v-for="suggestion in entry.result.suggestions"
@@ -689,6 +697,7 @@ function sourceNote(entry: ChatEntry): string {
           :key="question"
           type="button"
           class="voice-quick-btn"
+          data-testid="dialect-quick-question"
           :disabled="sending"
           @click="send(question)"
         >
@@ -773,7 +782,7 @@ function sourceNote(entry: ChatEntry): string {
   white-space: pre-wrap;
 }
 
-.msg-suggestions .suggestion-btn {
+.message-suggestions .suggestion-btn {
   font: inherit;
 }
 

@@ -199,10 +199,10 @@ async function submit(): Promise<void> {
     </p>
 
     <div class="copywriting-panel">
-      <div class="copy-config">
-        <div class="copy-config-row">
+      <div class="copywriting-config">
+        <div class="copywriting-config-row">
           <div class="form-group">
-            <label for="copy-product">
+            <label for="copywriting-product">
               <i
                 class="fas fa-box"
                 aria-hidden="true"
@@ -211,14 +211,14 @@ async function submit(): Promise<void> {
               <span class="hint">（限平台支持的农产品）</span>
             </label>
             <input
-              id="copy-product"
+              id="copywriting-product"
               v-model="product"
               autocomplete="off"
               placeholder="例如：荔枝"
             >
           </div>
           <div class="form-group">
-            <label for="copy-audience">
+            <label for="copywriting-audience">
               <i
                 class="fas fa-users"
                 aria-hidden="true"
@@ -226,7 +226,7 @@ async function submit(): Promise<void> {
               目标人群
             </label>
             <select
-              id="copy-audience"
+              id="copywriting-audience"
               v-model="audience"
             >
               <option value="">
@@ -248,7 +248,7 @@ async function submit(): Promise<void> {
           </div>
         </div>
         <div class="form-group">
-          <label for="copy-points">
+          <label for="copywriting-points">
             <i
               class="fas fa-star"
               aria-hidden="true"
@@ -257,14 +257,14 @@ async function submit(): Promise<void> {
             <span class="hint">（用逗号分隔，留空自动生成）</span>
           </label>
           <input
-            id="copy-points"
+            id="copywriting-points"
             v-model="sellingPoints"
             placeholder="例如：甜度高、果肉厚、核小"
           >
         </div>
       </div>
 
-      <div class="copy-formats">
+      <div class="copywriting-formats">
         <span class="form-label">
           <i
             class="fas fa-file-alt"
@@ -289,7 +289,7 @@ async function submit(): Promise<void> {
         </div>
       </div>
 
-      <div class="copy-actions">
+      <div class="copywriting-actions">
         <button
           type="button"
           class="btn btn-primary"
@@ -322,7 +322,7 @@ async function submit(): Promise<void> {
         v-if="statusMessage"
         class="training-submit-info ec-status"
         :class="`is-${statusKind}`"
-        data-testid="copy-status"
+        data-testid="copywriting-status"
         role="status"
       >
         {{ statusMessage }}
@@ -330,11 +330,11 @@ async function submit(): Promise<void> {
 
       <div
         v-if="generatedCopy"
-        class="copy-result"
-        data-testid="copy-result"
+        class="copywriting-result"
+        data-testid="copywriting-result"
       >
-        <div class="copy-result-header">
-          <span class="copy-result-tag">
+        <div class="copywriting-result-header">
+          <span class="copywriting-result-tag">
             <i
               class="fas fa-file-alt"
               aria-hidden="true"
@@ -343,8 +343,8 @@ async function submit(): Promise<void> {
           </span>
           <span
             v-if="degraded"
-            class="copy-degraded-tag"
-            data-testid="copy-degraded"
+            class="copywriting-degraded-tag"
+            data-testid="copywriting-degraded"
           >
             <i
               class="fas fa-exclamation-triangle"
@@ -352,7 +352,7 @@ async function submit(): Promise<void> {
             />
             系统内置示例，非 AI 生成
           </span>
-          <div class="copy-result-actions">
+          <div class="copywriting-result-actions">
             <button
               type="button"
               class="btn btn-outline btn-sm"
@@ -366,7 +366,7 @@ async function submit(): Promise<void> {
             </button>
           </div>
         </div>
-        <div class="copy-result-body">
+        <div class="copywriting-result-body">
           <template
             v-for="(block, index) in blocks"
             :key="`${index}-${block.text}`"
@@ -376,7 +376,7 @@ async function submit(): Promise<void> {
             </h3>
             <p
               v-else
-              class="copy-result-line"
+              class="copywriting-result-line"
             >
               <span v-if="block.type === 'list'">• </span>{{ block.text }}
             </p>
@@ -384,7 +384,7 @@ async function submit(): Promise<void> {
         </div>
       </div>
 
-      <div class="script-block copy-mine-block">
+      <div class="script-block copywriting-mine-block">
         <div class="script-block-title">
           <i
             class="fas fa-pen"
@@ -396,10 +396,10 @@ async function submit(): Promise<void> {
         </div>
         <label
           class="sr-only"
-          for="copy-mine"
+          for="copywriting-mine"
         >文案我的稿</label>
         <textarea
-          id="copy-mine"
+          id="copywriting-mine"
           v-model="myCopy"
           class="script-input"
           rows="8"
@@ -452,20 +452,20 @@ async function submit(): Promise<void> {
 
       <div
         v-if="feedback"
-        class="copy-feedback"
+        class="copywriting-feedback"
       >
-        <div class="copy-feedback-head">
+        <div class="copywriting-feedback-head">
           <span
-            class="copy-feedback-overall"
-            data-testid="copy-score-overall"
+            class="copywriting-feedback-overall"
+            data-testid="copywriting-score-overall"
           >{{ feedback.overall_score }}</span>
-          <span class="copy-feedback-label">文案评分（规则 · 可复现）</span>
+          <span class="copywriting-feedback-label">文案评分（规则 · 可复现）</span>
         </div>
-        <div class="copy-feedback-metrics">
+        <div class="copywriting-feedback-metrics">
           <div
             v-for="metric in scoreMetrics"
             :key="metric.label"
-            class="copy-feedback-metric"
+            class="copywriting-feedback-metric"
           >
             <label>{{ metric.label }}</label>
             <div class="progress-bar">
@@ -477,11 +477,11 @@ async function submit(): Promise<void> {
             <em>{{ metric.value }}</em>
           </div>
         </div>
-        <div class="copy-feedback-suggestions">
+        <div class="copywriting-feedback-suggestions">
           <div
             v-for="suggestion in feedback.suggestions"
             :key="suggestion"
-            class="copy-feedback-tip"
+            class="copywriting-feedback-tip"
           >
             <i
               class="fas fa-lightbulb"
@@ -504,7 +504,7 @@ async function submit(): Promise<void> {
     <TrainingHistory
       kind="copy"
       title="我的文案实训记录"
-      test-id="copy-records"
+      test-id="copywriting-records"
       :refresh-token="historyRefresh"
     />
   </section>
@@ -535,16 +535,16 @@ async function submit(): Promise<void> {
   color: #b3382f;
 }
 
-.copy-result {
+.copywriting-result {
   margin-top: 16px;
 }
 
-.copy-result-line {
+.copywriting-result-line {
   margin: 0 0 8px;
   white-space: pre-wrap;
 }
 
-.copy-mine-block {
+.copywriting-mine-block {
   margin-top: 18px;
 }
 

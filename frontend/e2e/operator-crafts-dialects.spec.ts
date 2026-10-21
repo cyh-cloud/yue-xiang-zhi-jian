@@ -211,19 +211,27 @@ test.describe("operator crafts and dialects", () => {
 
       await page.goto("/crafts");
       const publicCraft = page
-        .locator(".craft-grid .craft-card")
-        .filter({ hasText: craftName });
+        .locator(
+          `[data-testid="crafts-card"][data-craft-id="${craftId}"]`,
+        );
       await expect(publicCraft).toBeVisible();
+      await expect(publicCraft).toContainText(craftName);
       await publicCraft.click();
-      await expect(page.locator(".step").filter({ hasText: stepAChanged })).toBeVisible();
       await expect(
-        page.locator(".guide-item").filter({ hasText: itemChanged }),
+        page.getByTestId("crafts-step").filter({ hasText: stepAChanged }),
+      ).toBeVisible();
+      await expect(
+        page
+          .getByTestId("crafts-purchase-item")
+          .filter({ hasText: itemChanged }),
       ).toBeVisible();
       await expect(page.getByText("100-150 元")).toBeVisible();
       await expect(page.getByText("T21 采购建议")).toBeVisible();
-      await expect(
-        page.locator(".craft-video-card-title").filter({ hasText: videoChanged }),
-      ).toBeVisible();
+      const publicVideo = page
+        .locator('[data-testid="crafts-video-card"]')
+        .filter({ hasText: videoChanged });
+      await expect(publicVideo).toBeVisible();
+      await expect(publicVideo).toHaveAttribute("data-video-id", /.+/);
 
       const publicDetail = await request.get(
         `/api/crafts/${encodeURIComponent(craftId)}`,
@@ -388,19 +396,21 @@ test.describe("operator crafts and dialects", () => {
 
       await page.goto("/resources");
       const publicDialect = page
-        .locator(".dialect-card")
+        .getByTestId("dialect-card")
         .filter({ hasText: dialectChanged });
       await expect(publicDialect).toBeVisible();
       await publicDialect.click();
-      await expect(page.locator(".dialect-greeting")).toContainText("你好");
+      await expect(page.getByTestId("dialect-greeting")).toContainText("你好");
       await expect(
-        page.locator(".phrase-item").filter({ hasText: `${mandarinText} 已改` }),
+        page
+          .getByTestId("dialect-phrase")
+          .filter({ hasText: `${mandarinText} 已改` }),
       ).toBeVisible();
       await expect(page.getByText("T21 特色甲已改")).toBeVisible();
       await expect(
-        page.locator(".voice-quick-btn").filter({ hasText: questionA }),
+        page.getByTestId("dialect-quick-question").filter({ hasText: questionA }),
       ).toBeVisible();
-      const publicQuestions = page.locator(".voice-quick-btn");
+      const publicQuestions = page.getByTestId("dialect-quick-question");
       await expect(publicQuestions.first()).toContainText(questionA);
       await expect(publicQuestions.nth(1)).toContainText(questionB);
 

@@ -491,10 +491,10 @@ onMounted(async () => {
 
 <template>
   <section
-    class="bo-page operator-pest"
+    class="backoffice-page operator-pest"
     data-testid="operator-pest"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>农业内容</p>
         <h1 data-testid="backoffice-page-title">
@@ -504,7 +504,7 @@ onMounted(async () => {
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading || entriesLoading"
         @click="reloadAll()"
       >
@@ -537,7 +537,7 @@ onMounted(async () => {
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="reloadAll()"
       >
         重试
@@ -552,7 +552,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             @click="openEntry(null)"
           >
             <i
@@ -563,8 +563,8 @@ onMounted(async () => {
           </button>
         </template>
 
-        <div class="bo-filterbar">
-          <label class="bo-field">
+        <div class="backoffice-filterbar">
+          <label class="backoffice-field">
             <span>作物筛选</span>
             <select v-model="cropFilter">
               <option value="">
@@ -588,7 +588,7 @@ onMounted(async () => {
           </label>
           <button
             type="button"
-            class="bo-button is-secondary"
+            class="backoffice-button is-secondary"
             :disabled="entriesLoading"
             @click="loadEntries"
           >
@@ -614,9 +614,9 @@ onMounted(async () => {
         />
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>作物</th>
@@ -641,7 +641,7 @@ onMounted(async () => {
                 <td>{{ entry.kind === "pest" ? "虫害" : "病害" }}</td>
                 <td>
                   <span
-                    class="bo-status"
+                    class="backoffice-status"
                     :class="entry.is_verified ? 'is-active' : 'is-suspended'"
                   >
                     {{ entry.is_verified ? "已复核" : "待复核" }}
@@ -649,24 +649,24 @@ onMounted(async () => {
                   <small>{{ verificationText(entry) }}</small>
                 </td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-success"
+                      class="backoffice-button is-small is-success"
                       @click="verifyEntry(entry)"
                     >
                       {{ entry.is_verified ? "重新复核" : "标记已复核" }}
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="editEntry(entry)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeEntry(entry)"
                     >
                       删除
@@ -686,7 +686,7 @@ onMounted(async () => {
         <template #actions>
           <button
             type="button"
-            class="bo-button"
+            class="backoffice-button"
             @click="openCreate"
           >
             <i
@@ -720,9 +720,9 @@ onMounted(async () => {
 
         <div
           v-if="activeReferenceTab === 'crops'"
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>id</th>
@@ -743,17 +743,17 @@ onMounted(async () => {
                 <td>{{ crop.summary }}</td>
                 <td>{{ crop.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openEdit('crops', crop)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeReference('crops', crop)"
                     >
                       删除
@@ -772,9 +772,9 @@ onMounted(async () => {
 
         <div
           v-else
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>key</th>
@@ -800,17 +800,17 @@ onMounted(async () => {
                 <td>{{ source.doc_no || "待核" }}</td>
                 <td>{{ source.sort_order }}</td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="openEdit('sources', source)"
                     >
                       编辑
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       @click="removeReference('sources', source)"
                     >
                       删除
@@ -842,43 +842,4 @@ onMounted(async () => {
   </section>
 </template>
 
-<style scoped>
-.operator-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--bo-card-border);
-}
-
-.operator-tabs button {
-  min-height: 32px;
-  padding: 5px 13px;
-  border: 1px solid var(--bo-input-border);
-  border-radius: 999px;
-  background: var(--bo-card-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.operator-tabs button.active {
-  border-color: var(--bo-accent);
-  background: var(--bo-accent);
-  color: #fff;
-}
-
-.operator-filter-check {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.operator-filter-check input {
-  width: auto;
-}
-</style>
+<style src="./operator.css"></style>

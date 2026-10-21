@@ -237,6 +237,7 @@ const selectedBlocks = computed(() =>
     <template v-else>
       <div
         class="policy-filters"
+        data-testid="policy-filters"
         role="group"
         aria-label="政策分类"
       >
@@ -299,6 +300,8 @@ const selectedBlocks = computed(() =>
           :key="policy.id"
           type="button"
           class="policy-card"
+          data-testid="policy-card"
+          :data-policy-id="policy.id"
           @click="openPolicy(policy)"
         >
           <span class="policy-card-top">
@@ -311,6 +314,7 @@ const selectedBlocks = computed(() =>
             </span>
             <span
               class="policy-tag"
+              data-testid="policy-tag"
               :class="categoryStyle(policy.category).tag"
             >
               {{ policy.category }}
@@ -370,7 +374,10 @@ const selectedBlocks = computed(() =>
           </button>
         </div>
         <div class="modal-body">
-          <div class="policy-detail-content">
+          <div
+            class="policy-detail-content"
+            data-testid="policy-detail-content"
+          >
             <template
               v-for="(block, index) in selectedBlocks"
               :key="`${block.type}-${index}`"

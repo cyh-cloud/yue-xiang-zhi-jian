@@ -68,7 +68,7 @@ test.describe("agriculture calendar", () => {
 
     if (calendar.sources_all.length > 0) {
       await page.getByRole("button", { name: /查看数据依据/ }).click();
-      await expect(page.locator(".fdn-sources")).toBeVisible();
+      await expect(page.getByTestId("farming-sources")).toBeVisible();
     }
 
     const datedTask = calendar.tasks.find((task) => task.day !== null);
@@ -420,7 +420,7 @@ test.describe("agriculture AI and pest knowledge", () => {
     await page.getByLabel("输入你的农业问题").fill("荔枝叶片背面有虫怎么办？");
     await page.getByRole("button", { name: "发送" }).click();
 
-    await expect(page.getByTestId("qa-answer")).toContainText(
+    await expect(page.getByTestId("agriculture-qa-answer")).toContainText(
       "先检查叶片背面，重点看虫口密度。",
     );
     await expect(page.getByText("回答完成")).toBeVisible();
@@ -453,7 +453,7 @@ test.describe("agriculture AI and pest knowledge", () => {
     await expect(page.getByRole("alert")).toContainText(
       "AI 农技问答尚未启用",
     );
-    await expect(page.getByTestId("qa-answer")).toHaveCount(0);
+    await expect(page.getByTestId("agriculture-qa-answer")).toHaveCount(0);
   });
 
   test("pest knowledge filters and paginates on the server", async ({ page }) => {

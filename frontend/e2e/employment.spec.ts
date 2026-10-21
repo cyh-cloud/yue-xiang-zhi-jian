@@ -62,10 +62,12 @@ test.describe("employment", () => {
     await signIn(page, STUDENT.username, STUDENT.password);
     await page.goto("/employment");
 
-    const jobCard = page.locator(".emp-job-card").filter({
+    const jobCard = page.getByTestId("employment-job-card").filter({
       has: page.getByRole("button", { name: "申请职位" }),
     }).first();
-    const title = await jobCard.locator(".emp-job-title").innerText();
+    const jobId = await jobCard.getAttribute("data-job-id");
+    expect(jobId).toMatch(/^\d+$/);
+    const title = await jobCard.getByTestId("employment-job-title").innerText();
     const currentSave = jobCard.getByRole("button", { name: /收藏/ });
     if ((await currentSave.getAttribute("aria-label"))?.startsWith("取消收藏")) {
       await currentSave.click();
@@ -83,7 +85,9 @@ test.describe("employment", () => {
 
     await page.getByRole("tab", { name: "收藏职位" }).click();
     await expect(
-      page.locator(".emp-job-card").filter({ hasText: title }),
+      page.locator(
+        `[data-testid="employment-job-card"][data-job-id="${jobId}"]`,
+      ),
     ).toBeVisible();
   });
 
@@ -93,10 +97,10 @@ test.describe("employment", () => {
     await signIn(page, STUDENT.username, STUDENT.password);
     await page.goto("/employment");
 
-    const jobCard = page.locator(".emp-job-card").filter({
+    const jobCard = page.getByTestId("employment-job-card").filter({
       has: page.getByRole("button", { name: "申请职位" }),
     }).first();
-    const title = await jobCard.locator(".emp-job-title").innerText();
+    const title = await jobCard.getByTestId("employment-job-title").innerText();
     await jobCard.getByRole("button", { name: "申请职位" }).click();
     await expect(page.getByTestId("employment-feedback")).toContainText(
       /申请成功|已申请过/,
@@ -110,8 +114,12 @@ test.describe("employment", () => {
     }
 
     await page.getByRole("tab", { name: "我的求职" }).click();
-    await expect(page.locator(".emp-app-card").filter({ hasText: title })).toBeVisible();
-    await expect(page.locator(".emp-app-card").filter({ hasText: title })).toContainText(
+    const applicationCard = page
+      .getByTestId("employment-application-card")
+      .filter({ hasText: title });
+    await expect(applicationCard).toBeVisible();
+    await expect(applicationCard).toHaveAttribute("data-job-id", /.+/);
+    await expect(applicationCard).toContainText(
       /待审核|已通知面试|已通过|已拒绝/,
     );
   });
@@ -123,10 +131,16 @@ test.describe("employment", () => {
     await page.goto("/employment");
 
     const activeRecruitment = page
-      .locator(".emp-recruit-card")
+      .getByTestId("employment-recruitment-card")
       .filter({ has: page.getByRole("button", { name: "查看公告" }) })
       .first();
-    const title = await activeRecruitment.locator(".emp-job-title").innerText();
+    const recruitKey = await activeRecruitment.getAttribute(
+      "data-recruitment-key",
+    );
+    expect(recruitKey).toBeTruthy();
+    const title = await activeRecruitment
+      .getByTestId("employment-job-title")
+      .innerText();
     await activeRecruitment.getByRole("button", { name: "查看公告" }).click();
 
     const detail = page.getByTestId("employment-detail");
@@ -140,10 +154,14 @@ test.describe("employment", () => {
 
     await detail.getByLabel("关闭").click();
     await page.getByRole("tab", { name: "我的求职" }).click();
-    await expect(page.locator(".emp-intent-card").filter({ hasText: title })).toBeVisible();
-    await page.locator(".emp-intent-card").filter({ hasText: title })
+    const intentCard = page.locator(
+      `[data-testid="employment-intent-card"][data-recruitment-key="${recruitKey}"]`,
+    );
+    await expect(intentCard).toBeVisible();
+    await expect(intentCard).toContainText(title);
+    await intentCard
       .getByRole("button", { name: "取消意向" }).click();
-    await expect(page.locator(".emp-intent-card").filter({ hasText: title })).toHaveCount(0);
+    await expect(intentCard).toHaveCount(0);
   });
 
   test("jobs awaiting review stay out of the list and cannot be opened by id", async ({
@@ -172,7 +190,7 @@ test.describe("employment", () => {
     expect(jobId).toBeTruthy();
 
     await page.goto("/employment");
-    await expect(page.locator(`.emp-job-card`).filter({
+    await expect(page.getByTestId("employment-job-card").filter({
       hasText: `E2E 待审岗位`,
     })).toHaveCount(0);
     const publicDetail = await request.get(`/api/employment/jobs/${jobId}`);
@@ -196,10 +214,10 @@ test.describe("employment", () => {
     await page.getByLabel("薪资范围").selectOption("3K-5K");
     await page.getByRole("button", { name: "搜索", exact: true }).click();
 
-    await expect(page.locator(".emp-filter-note")).toContainText(
+    await expect(page.getByTestId("employment-filter-note")).toContainText(
       `${payload.recruit_hidden_by_salary} 条公开招聘公告`,
     );
-    await expect(page.locator(".emp-recruit-card")).toHaveCount(0);
+    await expect(page.getByTestId("employment-recruitment-card")).toHaveCount(0);
     await expect(page.getByLabel("职位类型").locator("optgroup")).toHaveCount(2);
 
     const recResponse = await request.get("/api/employment/jobs");
@@ -210,11 +228,11 @@ test.describe("employment", () => {
 
   test("job detail shows requirements and similar approved jobs", async ({ page }) => {
     await page.goto("/employment");
-    const jobCard = page.locator(".emp-job-card").filter({
+    const jobCard = page.getByTestId("employment-job-card").filter({
       has: page.getByRole("button", { name: "申请职位" }),
     }).first();
-    const title = await jobCard.locator(".emp-job-title").innerText();
-    await jobCard.locator(".emp-job-title").click();
+    const title = await jobCard.getByTestId("employment-job-title").innerText();
+    await jobCard.getByTestId("employment-job-title").click();
 
     const detail = page.getByTestId("employment-detail");
     await expect(detail).toContainText(title);
@@ -224,8 +242,10 @@ test.describe("employment", () => {
 
     const similarHeading = detail.getByRole("heading", { name: "相似职位推荐" });
     if (await similarHeading.count()) {
-      await expect(detail.locator(".emp-similar-job-item").first()).toBeVisible();
-      await detail.locator(".emp-similar-job-item").first().click();
+      const similarJob = detail.getByTestId("employment-similar-job").first();
+      await expect(similarJob).toBeVisible();
+      await expect(similarJob).toHaveAttribute("data-job-id", /.+/);
+      await similarJob.click();
       await expect(detail).toContainText("职位信息");
     }
   });

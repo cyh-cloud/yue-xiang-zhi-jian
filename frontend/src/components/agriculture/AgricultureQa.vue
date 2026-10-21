@@ -206,14 +206,14 @@ function isAbortError(error: unknown): boolean {
       AI农技问答
     </h3>
 
-    <div class="qa-chat-wrap">
+    <div class="agriculture-qa-chat-wrap">
       <div
-        class="qa-chat-flow"
+        class="agriculture-qa-chat-flow"
         aria-live="polite"
       >
         <div
           v-if="!rounds.length"
-          class="qa-welcome"
+          class="agriculture-qa-welcome"
         >
           <i
             class="fas fa-robot"
@@ -229,38 +229,38 @@ function isAbortError(error: unknown): boolean {
         <div
           v-for="round in rounds"
           :key="round.id"
-          class="qa-round"
+          class="agriculture-qa-round"
         >
-          <div class="qa-message user">
+          <div class="agriculture-qa-message user">
             <div
-              class="msg-avatar"
+              class="message-avatar"
               aria-hidden="true"
             >
               <i class="fas fa-user" />
             </div>
-            <div class="msg-bubble">
+            <div class="message-bubble">
               {{ round.question }}
             </div>
           </div>
 
           <div
             v-if="round.answer"
-            class="qa-message bot"
-            data-testid="qa-answer"
+            class="agriculture-qa-message bot"
+            data-testid="agriculture-qa-answer"
           >
             <div
-              class="msg-avatar"
+              class="message-avatar"
               aria-hidden="true"
             >
               <i class="fas fa-robot" />
             </div>
-            <div class="msg-bubble">
-              <div class="qa-msg-content">
+            <div class="message-bubble">
+              <div class="agriculture-qa-msg-content">
                 {{ round.answer }}
               </div>
               <p
                 v-if="round.error"
-                class="qa-inline-note"
+                class="agriculture-qa-inline-note"
                 role="status"
               >
                 回答中断：{{ round.error }}
@@ -270,18 +270,18 @@ function isAbortError(error: unknown): boolean {
 
           <div
             v-else-if="round.status === 'streaming'"
-            class="qa-message bot"
+            class="agriculture-qa-message bot"
             role="status"
           >
             <div
-              class="msg-avatar"
+              class="message-avatar"
               aria-hidden="true"
             >
               <i class="fas fa-robot" />
             </div>
-            <div class="qa-typing">
+            <div class="agriculture-qa-typing">
               <div
-                class="qa-typing-dots"
+                class="agriculture-qa-typing-dots"
                 aria-hidden="true"
               >
                 <span />
@@ -294,16 +294,16 @@ function isAbortError(error: unknown): boolean {
 
           <div
             v-else-if="round.status === 'error'"
-            class="qa-message bot qa-message-error"
+            class="agriculture-qa-message bot agriculture-qa-message-error"
             role="alert"
           >
             <div
-              class="msg-avatar"
+              class="message-avatar"
               aria-hidden="true"
             >
               <i class="fas fa-robot" />
             </div>
-            <div class="msg-bubble">
+            <div class="message-bubble">
               <div class="error-state">
                 <i
                   class="fas fa-triangle-exclamation"
@@ -323,7 +323,7 @@ function isAbortError(error: unknown): boolean {
 
           <p
             v-if="round.status === 'done'"
-            class="qa-inline-note"
+            class="agriculture-qa-inline-note"
           >
             <i
               class="fas fa-circle-check"
@@ -334,14 +334,14 @@ function isAbortError(error: unknown): boolean {
 
           <div
             v-if="round.suggestions.length"
-            class="qa-msg-suggestions"
+            class="agriculture-qa-msg-suggestions"
           >
-            <div class="qa-msg-actions">
+            <div class="agriculture-qa-msg-actions">
               <button
                 v-for="item in round.suggestions"
                 :key="item"
                 type="button"
-                class="qa-action-btn suggest-btn"
+                class="agriculture-qa-action-btn suggest-btn"
                 :disabled="isTyping"
                 @click="sendQuestion(item)"
               >
@@ -357,7 +357,7 @@ function isAbortError(error: unknown): boolean {
       </div>
 
       <div
-        class="qa-suggestions"
+        class="agriculture-qa-suggestions"
         aria-label="推荐问题"
       >
         <button
@@ -372,7 +372,7 @@ function isAbortError(error: unknown): boolean {
         </button>
       </div>
 
-      <div class="qa-input-bar">
+      <div class="agriculture-qa-input-bar">
         <textarea
           v-model="question"
           rows="1"
@@ -397,14 +397,14 @@ function isAbortError(error: unknown): boolean {
 
       <p
         v-if="inputFeedback"
-        class="qa-inline-note"
+        class="agriculture-qa-inline-note"
         role="status"
       >
         {{ inputFeedback }}
       </p>
 
       <p
-        class="qa-disclaimer"
+        class="agriculture-qa-disclaimer"
         role="note"
       >
         <i
@@ -417,10 +417,10 @@ function isAbortError(error: unknown): boolean {
         </span>
       </p>
 
-      <div class="qa-toolbar">
+      <div class="agriculture-qa-toolbar">
         <button
           type="button"
-          class="qa-toolbar-btn"
+          class="agriculture-qa-toolbar-btn"
           @click="clearConversation"
         >
           <i
@@ -435,15 +435,15 @@ function isAbortError(error: unknown): boolean {
 </template>
 
 <style scoped>
-.qa-msg-content {
+.agriculture-qa-msg-content {
   white-space: pre-wrap;
 }
 
-.qa-inline-note {
+.agriculture-qa-inline-note {
   margin: 6px 0 0;
 }
 
-.qa-message .error-state {
+.agriculture-qa-message .error-state {
   display: grid;
   justify-items: start;
   gap: 8px;

@@ -1,0 +1,1548 @@
+/*
+ * Agriculture page and its Q&A, pest diagnosis, and pest knowledge
+ * components. This sheet is imported only by AgricultureView.vue.
+ */
+
+#agriculture-tab {
+    --pa: #1f5e43;
+    --pa-deep: #123a2a;
+    --pa-tint: #eaf3ed;
+    --pa-soft: rgba(31, 94, 67, 0.08);
+}
+
+[data-theme="dark"] #agriculture-tab {
+    --pa: #8fc0a5;
+    --pa-deep: #c6e0d1;
+    --pa-tint: #1e3329;
+    --pa-soft: rgba(143, 192, 165, 0.10);
+}
+
+[data-theme="dark"] .product-card { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .product-card:hover { border-color: var(--accent-blue); }
+
+[data-theme="dark"] .calendar-tasks { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .calendar-day:hover { background: rgba(255,255,255,0.08); }
+
+/* Q&A */
+.agriculture-qa-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 28px;
+}
+.agriculture-qa-input-wrap {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.agriculture-qa-input-wrap textarea {
+    flex: 1;
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-family: var(--font);
+    resize: none;
+    transition: var(--transition);
+    background: var(--bg-primary);
+}
+.agriculture-qa-input-wrap textarea:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(31,94,67,0.1);
+    background: var(--bg-secondary);
+}
+.agriculture-qa-examples { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.example-label { font-size: 0.8rem; color: var(--text-muted); margin-right: 4px; }
+.example-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--bg-secondary);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.example-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.agriculture-qa-result {
+    margin-top: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+.result-content h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.result-content h4 i { color: var(--accent-blue); }
+.result-content .answer-content {
+    background: var(--bg-primary);
+    padding: 16px;
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--accent-blue);
+    font-size: 0.9rem;
+    line-height: 1.8;
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .agriculture-qa-box textarea { background: #1b2c25; border-color: #33473d; color: var(--text-primary); }
+[data-theme="dark"] .example-btn { background: rgba(255,255,255,0.06); border-color: #33473d; color: var(--text-secondary); }
+[data-theme="dark"] .example-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+
+[data-theme="dark"] .task-item { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .task-item-rich { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .task-expand-btn:hover { background: rgba(255,255,255,0.08); }
+[data-theme="dark"] .tag-urgent { background: rgba(239,68,68,0.15); }
+[data-theme="dark"] .tag-timing { background: rgba(148,163,184,0.1); }
+[data-theme="dark"] .task-tips { background: rgba(31,94,67,0.08); }
+[data-theme="dark"] .disease-badge { background: rgba(239,68,68,0.15); }
+[data-theme="dark"] .treatment-list li { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .module-card,
+[data-theme="dark"] .sim-module-card,
+[data-theme="dark"] .diagnosis-entry-card {
+    background: var(--bg-secondary);
+    border-color: var(--border);
+}
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+}
+.product-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+.product-card:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+    border-color: var(--border);
+}
+.product-card:active { transform: translateY(0) scale(0.99); }
+.product-card.active {
+    background: var(--accent-blue);
+    color: white;
+    border-color: transparent;
+    box-shadow: 0 4px 16px rgba(31,94,67,0.2);
+}
+.product-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(31,94,67,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 12px;
+    font-size: 1.2rem;
+    color: var(--accent-blue);
+}
+.product-card.active .product-icon { background: rgba(255,255,255,0.2); color: white; }
+.product-card h4 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+.product-card p { font-size: 0.75rem; opacity: 0.7; }
+
+.tab-content .product-icon {
+    color: var(--pa);
+    background: var(--pa-soft);
+}
+
+.tab-content .example-btn:hover {
+    border-color: var(--pa);
+    color: var(--pa);
+}
+
+.modal-title-icon {
+    color: var(--brand);
+    margin-right: 10px;
+    font-size: 1.05rem;
+    vertical-align: -1px;
+}
+
+/* ---- 农产品：类别筛选 / 搜索 / 限高滚动 ---- */
+.product-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+.product-category-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+.product-category-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.product-category-btn:hover { border-color: var(--brand-soft); color: var(--brand); }
+.product-category-btn.active {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+}
+[data-theme="dark"] .product-category-btn.active { color: #14261f; }
+.product-category-btn .product-category-count { opacity: 0.7; font-size: 0.82rem; margin-left: 4px; }
+
+.product-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 220px;
+    flex: 0 1 280px;
+}
+.product-search > i {
+    position: absolute;
+    left: 16px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+.product-search input {
+    width: 100%;
+    /* 右侧留出清除按钮的位置，左侧避开放大镜图标 */
+    padding: 10px 38px 10px 38px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.product-search input:focus {
+    outline: none;
+    border-color: var(--brand-soft);
+    box-shadow: 0 0 0 3px var(--brand-tint);
+}
+/* 隐藏浏览器自带的清空叉：本组件右侧已有一个自己的清除按钮，不隐藏会出现两个叉 */
+.product-search input::-webkit-search-cancel-button,
+.product-search input::-webkit-search-decoration {
+    -webkit-appearance: none;
+    appearance: none;
+}
+.product-search-clear {
+    position: absolute;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-family: inherit;
+}
+.product-search-clear:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+/* 限高：作物继续增补时只加长滚动条，不让整页无限变长 */
+.product-grid-scroll {
+    max-height: 26rem;
+    overflow-y: auto;
+    padding-right: 4px;
+    overscroll-behavior: contain;
+}
+.product-card.is-filtered-out { display: none; }
+.product-filter-empty {
+    margin: 0;
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+}
+
+/* ==================== Calendar ==================== */
+.calendar-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 24px;
+}
+.calendar-main {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+.calendar-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+.calendar-month { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+}
+.calendar-day {
+    padding: 10px;
+    text-align: center;
+    border-radius: var(--radius-xs);
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    transition: var(--transition);
+    cursor: default;
+}
+.calendar-header {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    padding: 10px;
+    text-align: center;
+    border-radius: var(--radius-xs);
+    cursor: default;
+}
+.calendar-day.today {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: -2px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.calendar-tasks {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 24px;
+}
+.calendar-tasks h4 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.calendar-tasks h4 i { color: var(--accent-blue); }
+.task-list { display: flex; flex-direction: column; gap: 10px; }
+.task-item {
+    padding: 14px;
+    background: var(--bg-primary);
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--accent-blue);
+}
+.task-item h5 { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.task-item p { font-size: 0.8rem; color: var(--text-secondary); }
+
+/* Rich task item */
+.task-item-rich {
+    padding: 0;
+    border-left: none;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    transition: var(--transition);
+    background: var(--bg-secondary);
+}
+.task-item-rich:hover { box-shadow: var(--shadow-sm); }
+.task-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+}
+.task-icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+.task-meta { flex: 1; min-width: 0; }
+.task-meta h5 {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+.task-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.task-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 500;
+}
+.tag-category { }
+.tag-urgent {
+    background: rgba(239,68,68,0.1);
+    color: var(--danger);
+}
+.tag-timing {
+    background: rgba(107,114,128,0.1);
+    color: var(--text-muted);
+}
+.task-expand-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+.task-expand-btn:hover { background: rgba(0,0,0,0.05); }
+.task-expand-btn i {
+    font-size: 0.7rem;
+    transition: transform 0.2s ease;
+}
+.task-item-rich.expanded .task-expand-btn i { transform: rotate(180deg); }
+
+.task-desc {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    padding: 0 16px;
+    line-height: 1.5;
+}
+.task-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.25s ease, padding 0.25s ease;
+    padding: 0 16px;
+}
+.task-item-rich.expanded .task-detail {
+    max-height: 120px;
+    padding: 0 16px 14px;
+}
+.task-tips {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+    background: linear-gradient(135deg, rgba(31,94,67,0.06), rgba(47,107,79,0.06));
+    border-radius: var(--radius-xs);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+.task-tips i {
+    color: var(--accent-blue);
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+/* ==================== QA Chat ==================== */
+.agriculture-qa-chat-wrap {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.agriculture-qa-chat-flow {
+    flex: 1;
+    max-height: 480px;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.agriculture-qa-welcome {
+    text-align: center;
+    padding: 24px 16px;
+    color: var(--text-muted);
+}
+.agriculture-qa-welcome i {
+    font-size: 2rem;
+    color: var(--accent-blue);
+    margin-bottom: 10px;
+    display: block;
+}
+.agriculture-qa-welcome p { font-size: 0.9rem; line-height: 1.6; }
+.agriculture-qa-welcome strong { color: var(--accent-blue); }
+
+/* 消息气泡 */
+.agriculture-qa-message {
+    display: flex;
+    gap: 10px;
+    max-width: 85%;
+    animation: fadeInUp 0.25s ease;
+}
+.agriculture-qa-message.user {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+.agriculture-qa-message .message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+.agriculture-qa-message.user .message-avatar {
+    background: var(--gradient-main);
+    color: white;
+}
+.agriculture-qa-message.bot .message-avatar {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    color: var(--accent-blue);
+}
+.agriculture-qa-message .message-bubble {
+    padding: 12px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    line-height: 1.7;
+}
+.agriculture-qa-message.user .message-bubble {
+    background: var(--gradient-main);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+.agriculture-qa-message.bot .message-bubble {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    color: var(--text-primary);
+    border-bottom-left-radius: 4px;
+}
+.agriculture-qa-message.bot .message-bubble p { margin-bottom: 8px; }
+.agriculture-qa-message.bot .message-bubble p:last-child { margin-bottom: 0; }
+.agriculture-qa-message.bot .message-bubble strong { color: var(--accent-blue); }
+.agriculture-qa-message.bot .message-bubble ul, .agriculture-qa-message.bot .message-bubble ol {
+    padding-left: 18px;
+    margin: 6px 0;
+}
+.agriculture-qa-message.bot .message-bubble li { margin-bottom: 4px; }
+
+/* 失败态：让「AI 不可用」看起来就是失败，而不是一条正常回答 */
+.agriculture-qa-message-error .message-bubble {
+    border-color: var(--danger, #dc2626);
+}
+.agriculture-qa-message-error .message-bubble .error-state {
+    background: transparent;
+    border: none;
+    padding: 0;
+    text-align: left;
+    align-items: flex-start;
+}
+.agriculture-qa-message-error .message-bubble .error-state i {
+    font-size: 1.1rem;
+    margin-bottom: 6px;
+}
+.agriculture-qa-message-error .message-bubble .error-state p {
+    font-size: 0.85rem;
+    line-height: 1.6;
+}
+/* 流式回答中途中断时，补在气泡末尾的说明 */
+.agriculture-qa-inline-note {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-light);
+    font-size: 0.78rem;
+    color: var(--text-secondary, #6b7280);
+}
+/* AI 问答常驻免责说明：与农时日历的「待核」措辞分开维护，
+   针对问答场景补充农药用量与重大决策的边界提示 */
+.agriculture-qa-disclaimer {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin: 10px 0 0;
+    padding: 9px 12px;
+    border-radius: 8px;
+    border-left: 3px solid var(--text-muted, #8b968f);
+    background: var(--bg-tertiary, #f2f4f1);
+    font-size: 0.76rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+.agriculture-qa-disclaimer i {
+    margin-top: 3px;
+    font-size: 0.8rem;
+    color: var(--text-muted, #8b968f);
+    flex: 0 0 auto;
+}
+/* 提问进行中：发送按钮与示例/追问按钮一并置灰。
+   这些按钮此前只是「点了被静默忽略」，视觉上却仍可点击，容易让人误以为失效。 */
+#ask-agriculture-btn:disabled,
+.example-btn:disabled,
+.agriculture-qa-action-btn.suggest-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 操作按钮 */
+.agriculture-qa-msg-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+.agriculture-qa-action-btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    background: var(--bg-primary);
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.agriculture-qa-action-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.agriculture-qa-action-btn.copied { border-color: var(--accent-green); color: var(--accent-green); }
+
+/* 推荐追问 */
+.agriculture-qa-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 20px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+}
+.agriculture-qa-suggestions .example-btn {
+    font-size: 0.78rem;
+    padding: 5px 12px;
+}
+.agriculture-qa-suggestions-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 4px;
+}
+
+/* 输入栏 */
+.agriculture-qa-input-bar {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-secondary);
+}
+.agriculture-qa-input-bar textarea {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xs);
+    font-size: 0.88rem;
+    font-family: var(--font);
+    resize: none;
+    transition: var(--transition);
+    background: var(--bg-primary);
+    max-height: 100px;
+    line-height: 1.4;
+}
+.agriculture-qa-input-bar textarea:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(31,94,67,0.1);
+}
+.agriculture-qa-input-bar .btn {
+    flex-shrink: 0;
+    align-self: flex-end;
+}
+
+/* 工具栏 */
+.agriculture-qa-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 20px;
+    border-top: 1px solid var(--border-light);
+}
+.agriculture-qa-toolbar-btn {
+    padding: 4px 10px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.agriculture-qa-toolbar-btn:hover { color: var(--accent-blue); }
+
+/* 加载动画 */
+.agriculture-qa-typing {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+.agriculture-qa-typing-dots span {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    animation: typingDot 1.2s infinite;
+}
+.agriculture-qa-typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.agriculture-qa-typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes typingDot {
+    0%, 60%, 100% { opacity: 0.3; transform: scale(0.8); }
+    30% { opacity: 1; transform: scale(1); }
+}
+
+/* 暗色模式 */
+[data-theme="dark"] .agriculture-qa-chat-wrap { background: var(--bg-primary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-message.bot .message-bubble { background: #1b2c25; border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-input-bar { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-input-bar textarea { background: var(--bg-primary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-suggestions { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-action-btn { background: var(--bg-primary); border-color: var(--border); }
+[data-theme="dark"] .agriculture-qa-toolbar { border-color: var(--border); }
+
+.pest-guide { display: flex; flex-direction: column; gap: 16px; }
+
+.pest-guide-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pest-crop-filter { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.pest-crop-btn {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 999px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.pest-crop-btn:hover { border-color: var(--brand-soft); color: var(--brand); }
+.pest-crop-btn.active {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: #fff;
+}
+[data-theme="dark"] .pest-crop-btn.active { color: #14261f; }
+.pest-crop-btn .pest-crop-count { opacity: 0.7; font-size: 0.82rem; margin-left: 4px; }
+
+.pest-guide-search {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-width: 240px;
+    flex: 0 1 320px;
+}
+.pest-guide-search i {
+    position: absolute;
+    left: 14px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+.pest-guide-search input {
+    width: 100%;
+    padding: 10px 14px 10px 36px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.pest-guide-search input:focus {
+    outline: none;
+    border-color: var(--brand-soft);
+    box-shadow: 0 0 0 3px var(--brand-tint);
+}
+
+.pest-guide-meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* 分页控件：只在筛选后条数超过一页时由 JS 显示 */
+.pest-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.pest-page-btn {
+    padding: 7px 16px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 0.88rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.pest-page-btn:hover:not(:disabled) { border-color: var(--brand-soft); color: var(--brand); }
+.pest-page-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.pest-page-status { font-size: 0.85rem; color: var(--text-muted); }
+
+.pest-guide-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+    gap: 16px;
+}
+/* 失败态 / 通用空态占满整行，否则会被网格压成一个小格子，看着像渲染坏了。 */
+.pest-guide-grid > .error-state,
+.pest-guide-grid > .empty-state { grid-column: 1 / -1; }
+
+.pest-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    overflow: hidden;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+.pest-card:hover {
+    border-color: var(--brand-soft);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+.pest-card:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+.pest-card-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: var(--bg-tertiary);
+    overflow: hidden;
+}
+.pest-card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pest-card-thumb-empty {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    background: repeating-linear-gradient(
+        45deg, var(--bg-tertiary), var(--bg-tertiary) 10px,
+        var(--bg-primary) 10px, var(--bg-primary) 20px);
+}
+.pest-card-thumb-empty i { font-size: 1.5rem; opacity: 0.55; }
+
+.pest-card-tags {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: flex;
+    gap: 6px;
+}
+.pest-kind-tag {
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    backdrop-filter: blur(2px);
+}
+.pest-kind-tag.is-pest { background: rgba(217, 162, 39, 0.92); }
+.pest-kind-tag.is-disease { background: rgba(74, 111, 165, 0.92); }
+
+.pest-card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 8px; }
+.pest-card-body h4 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.35;
+}
+.pest-card-alias { font-size: 0.8rem; color: var(--text-muted); }
+.pest-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: auto;
+}
+.pest-card-part {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pest-guide-empty {
+    margin: 0;
+    padding: 28px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+}
+
+.pest-guide-disclaimer {
+    margin: 0;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.7;
+}
+
+/* ---- 速查详情弹窗 ---- */
+.pest-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+.pest-modal-panel {
+    position: relative;
+    width: min(880px, 100%);
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+}
+.pest-modal-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.52);
+}
+.pest-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--border-light);
+}
+.pest-modal-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+.pest-modal-sub {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.82rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+.pest-modal-body {
+    padding: 20px 22px 26px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.pest-modal-figure {
+    /* flex: none 不能删。.pest-modal-body 是 flex column，而带 overflow:hidden 的
+       flex item 自动最小尺寸会被解析为 0，少了这条，图会被压成 2px 的一条线。 */
+    flex: none;
+    margin: 0;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+}
+.pest-modal-figure img { width: 100%; max-height: 320px; object-fit: cover; display: block; }
+.pest-modal-figure figcaption {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    line-height: 1.6;
+}
+/* 图注（虫态 / 具体种）：单独成行并与署名区分开色阶，避免和「摄影者 · 许可」混读成一句 */
+.pest-modal-caption-note { display: block; color: var(--text-primary); margin-bottom: 2px; }
+.pest-modal-noimg {
+    margin: 0;
+    padding: 30px 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    line-height: 1.7;
+}
+
+.pest-block-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.pest-block-title i { color: var(--brand); font-size: 0.85rem; }
+.pest-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.pest-list li { font-size: 0.88rem; line-height: 1.75; color: var(--text-secondary); }
+.pest-paragraph {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.85;
+    color: var(--text-secondary);
+}
+.pest-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px 18px;
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+}
+.pest-fact { font-size: 0.86rem; line-height: 1.7; color: var(--text-secondary); }
+.pest-fact b { color: var(--text-primary); font-weight: 600; }
+
+.pest-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.pest-tag {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--brand-tint);
+    color: var(--brand);
+    font-size: 0.8rem;
+}
+[data-theme="dark"] .pest-tag { color: var(--brand-deep); }
+
+.pest-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.pest-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+.pest-table th,
+.pest-table td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-light);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.pest-table th {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+.pest-table tr:last-child td { border-bottom: none; }
+.pest-table td.is-empty { color: var(--text-muted); }
+
+.pest-warn {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: var(--radius-sm);
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    color: #b91c1c;
+    font-size: 0.86rem;
+    line-height: 1.75;
+}
+[data-theme="dark"] .pest-warn { color: #fca5a5; }
+.pest-warn i { margin-top: 3px; }
+
+.pest-sources { display: flex; flex-direction: column; gap: 8px; }
+.pest-source-item {
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+    padding-left: 12px;
+    border-left: 3px solid var(--border);
+}
+.pest-source-item a { color: var(--brand); text-decoration: none; word-break: break-all; }
+.pest-source-item a:hover { text-decoration: underline; }
+.pest-source-doc { color: var(--text-muted); }
+
+.pest-refnote {
+    margin: 0;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.7;
+}
+
+@media (max-width: 640px) {
+    .pest-guide-search { flex: 1 1 100%; }
+    .pest-guide-grid { grid-template-columns: 1fr; }
+    .pest-modal { padding: 0; align-items: flex-end; }
+    .pest-modal-panel { max-height: 92vh; border-radius: var(--radius) var(--radius) 0 0; }
+    .pest-table th, .pest-table td { white-space: normal; }
+}
+
+.module-card, .sim-module-card, .diagnosis-entry-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius);
+    padding: 36px 28px;
+    transition: var(--transition);
+    cursor: pointer;
+}
+.module-card:hover, .sim-module-card:hover, .diagnosis-entry-card:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+}
+.module-card:active, .sim-module-card:active, .diagnosis-entry-card:active { transform: translateY(0) scale(0.99); }
+.module-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: var(--radius-sm);
+    background: rgba(31,94,67,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    color: var(--accent-blue);
+}
+.module-card h4, .sim-module-card h4 {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+}
+.module-card p, .sim-module-card p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 18px;
+}
+
+/* ==================== Lunar Marker ==================== */
+.calendar-day { position: relative; }
+.lunar-marker {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.55rem;
+    color: var(--accent-green);
+    white-space: nowrap;
+    line-height: 1;
+}
+
+/* ==================== 农时日历 v2 ==================== */
+
+/* 月份标题 */
+.calendar-title-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+/* 物候期色条 */
+.phenophase-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--phase-color, var(--accent-green));
+    background: color-mix(in srgb, var(--phase-color, var(--brand)) 12%, transparent);
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+.phenophase-bar.is-hidden { display: none; }
+.phenophase-bar .phase-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--phase-color, var(--accent-green));
+    flex: 0 0 auto;
+}
+.phenophase-bar .phase-desc {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+}
+
+/* 日历格子 */
+.calendar-grid { position: relative; }
+.calendar-grid.has-phase {
+    background: color-mix(in srgb, var(--phase-color, var(--brand)) 5%, transparent);
+    border-radius: var(--radius-xs);
+}
+.calendar-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 46px;
+    padding: 10px 4px;
+    gap: 3px;
+}
+.calendar-day.is-blank {
+    background: transparent;
+    pointer-events: none;
+}
+.calendar-day .day-num { line-height: 1; }
+.calendar-day.is-clickable {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.calendar-day.is-clickable:hover {
+    background: color-mix(in srgb, var(--accent-green) 16%, transparent);
+    transform: translateY(-1px);
+}
+.calendar-day.is-clickable:focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: -2px;
+}
+/* 有农事的日期：整格填实心深绿 + 白字。原先是在日期数字下方排一排 5px 小圆点，
+   在 46px 高的格子里几乎看不见。中间试过「浅绿底 + 深绿字」，亮度对比度虽够，
+   但色相太接近，人眼看是一片糊绿，故定稿为实心深绿底配白字（与 .product-card.active
+   同一套处理）。放在 is-clickable 之后，同特异性下后者不再覆盖 color。 */
+.calendar-day.has-task {
+    background: var(--gradient-main);
+    color: #ffffff;
+    font-weight: 700;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+.calendar-day.has-task:hover {
+    background: linear-gradient(135deg, var(--brand-mid), var(--brand-soft));
+}
+.calendar-day.has-task .lunar-marker {
+    color: #ffffff;
+    opacity: 0.72;
+}
+.calendar-day.is-highlight {
+    animation: dayHighlight 1.6s ease;
+}
+@keyframes dayHighlight {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(31, 94, 67, 0); }
+    25% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 55%, transparent); }
+}
+/* 加载态 */
+.calendar-loading {
+    grid-column: 1 / -1;
+    padding: 40px 0;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+/* 任务列表分组标题 */
+.task-group-label {
+    margin: 4px 0 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+.task-group-label:not(:first-child) { margin-top: 18px; }
+
+/* 任务列表头部 + 订阅按钮 */
+.calendar-tasks-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.calendar-tasks-head h4 { margin-bottom: 0; }
+.subscribe-btn {
+    white-space: nowrap;
+    font-size: 0.78rem;
+}
+.subscribe-btn.is-subscribed {
+    color: var(--accent-gold, var(--gold));
+    border-color: var(--accent-gold, var(--gold));
+}
+
+/* 日期「待核」提示条：仅在存在未复核的推算日期时出现 */
+.farming-date-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--accent-gold, var(--gold));
+    background: color-mix(in srgb, var(--accent-gold, var(--gold)) 12%, transparent);
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.farming-date-notice.is-hidden { display: none; }
+.farming-date-notice i { color: var(--accent-gold, var(--gold)); margin-top: 2px; }
+.farming-date-notice strong { color: var(--text-primary); }
+
+/* 订阅提醒摘要条（农时日历内闭环，不依赖全站通知链路） */
+.farming-reminder-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+    padding: 8px 12px;
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--accent-green);
+    background: color-mix(in srgb, var(--accent-green) 10%, transparent);
+    font-size: 0.76rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.farming-reminder-summary.is-hidden { display: none; }
+.farming-reminder-summary .frs-strong { color: var(--text-primary); font-weight: 600; }
+.farming-reminder-summary .frs-urgent { color: var(--danger); font-weight: 600; }
+.farming-reminder-summary button {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent-green);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* 「约」日期标签：未复核的推算日期 */
+.task-tag.tag-approx {
+    background: color-mix(in srgb, var(--accent-gold, var(--gold)) 16%, transparent);
+    color: var(--accent-gold, var(--gold));
+}
+
+/* 整月无固定日期农事（仅持续性作业）时的格子层提示 */
+.calendar-blank-notice {
+    grid-column: 1 / -1;
+    margin-top: 10px;
+    padding: 12px 16px;
+    text-align: center;
+    border-radius: var(--radius-xs);
+    border: 1px dashed color-mix(in srgb, var(--accent-green) 40%, transparent);
+    background: color-mix(in srgb, var(--accent-green) 6%, transparent);
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+.calendar-blank-notice strong { color: var(--text-primary); }
+
+/* 当日弹窗内的「推算参考」说明 */
+.day-task-approx-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--accent-gold, var(--gold));
+    background: color-mix(in srgb, var(--accent-gold, var(--gold)) 12%, transparent);
+    font-size: 0.74rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+}
+.day-task-approx-note i { color: var(--accent-gold, var(--gold)); margin-top: 2px; }
+
+/* ===== 数据来源分级展示（依据公开技术资料编排 vs 已人工复核） ===== */
+
+/* 提示条内层：文案 + 可展开的来源清单 */
+.farming-date-notice .farming-body { flex: 1; min-width: 0; }
+.farming-date-notice .farming-toggle {
+    border: none;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent-gold, var(--gold));
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.farming-date-notice .farming-toggle.is-hidden { display: none; }
+.farming-date-notice .farming-toggle i { margin-top: 0; }
+.farming-date-notice .farming-sources {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.farming-date-notice .farming-sources.is-hidden { display: none; }
+.farming-date-notice .farming-sources li {
+    padding: 6px 8px;
+    border-radius: var(--radius-xs);
+    background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+.farming-date-notice .farming-src-name {
+    display: block;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.farming-date-notice .farming-src-meta { display: block; font-size: 0.72rem; }
+.farming-date-notice .farming-sources a {
+    color: var(--accent-gold, var(--gold));
+    text-underline-offset: 2px;
+}
+
+/* 依据等级角标 */
+.task-tag.tag-verified {
+    background: color-mix(in srgb, var(--accent-green) 18%, transparent);
+    color: var(--accent-green);
+}
+.task-tag.tag-unsourced {
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    color: var(--danger);
+}
+
+/* 任务详情内的「日期依据 / 来源方向」 */
+.task-basis {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-light);
+    font-size: 0.74rem;
+    line-height: 1.55;
+    color: var(--text-secondary);
+}
+.task-basis .basis-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.task-basis .basis-label i { color: var(--accent-green); }
+.task-basis p { margin: 4px 0 0; }
+.task-basis a { color: var(--accent-green); text-underline-offset: 2px; }
+.task-basis .src-docno {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent-gold, var(--gold)) 16%, transparent);
+    color: var(--accent-gold, var(--gold));
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+/* 格子点击弹窗 */
+.day-task-modal { display: flex; flex-direction: column; gap: 14px; }
+.day-task-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-light);
+}
+.day-task-head strong { font-size: 1rem; color: var(--text-primary); }
+.day-task-phase {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+}
+.day-task-item {
+    padding: 12px 14px;
+    border-radius: var(--radius-xs);
+    border-left: 3px solid var(--task-color, var(--accent-green));
+    background: var(--bg-secondary);
+}
+.day-task-item p {
+    margin: 6px 0 0;
+    font-size: 0.84rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+.day-task-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.day-task-item .task-tips {
+    margin-top: 8px;
+    font-size: 0.8rem;
+}
+
+@media (max-width: 1024px) {
+    .calendar-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+    .product-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 480px) {
+    .product-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Keep the page accent after the generic tab shell rules. */
+.tab-content .product-card.active {
+    background: var(--pa);
+    color: white;
+    border-color: transparent;
+}
+
+.tab-content .product-card.active .product-icon {
+    background: rgba(255, 255, 255, 0.22);
+    color: white;
+}
+
+html[data-large-text] #agriculture-tab .product-card { padding: 32px 22px; }
+html[data-large-text] #agriculture-tab .product-card h4 { font-size: 1.08rem; }
+html[data-large-text] #agriculture-tab .product-card p {
+    opacity: 1;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
+}
+html[data-large-text] #agriculture-tab .product-icon { width: 56px; height: 56px; font-size: 1.4rem; }
+html[data-large-text] #agriculture-tab .example-btn { font-size: 1rem; padding: 10px 18px; }
+html[data-large-text] #agriculture-tab .agriculture-qa-input-bar textarea { font-size: 1.05rem; min-height: 52px; }

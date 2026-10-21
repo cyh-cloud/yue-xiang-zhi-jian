@@ -216,6 +216,7 @@ onBeforeUnmount(() => {
   <section
     id="hero"
     class="hero"
+    data-testid="home-hero"
   >
     <canvas
       ref="canvas"
@@ -279,6 +280,7 @@ onBeforeUnmount(() => {
 
     <div
       class="scroll-nav-hint"
+      data-testid="home-scroll-hint"
       aria-hidden="true"
     >
       <i class="fas fa-chevron-down" />
@@ -286,3 +288,5 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
+
+<style src="./home/home.css"></style>

@@ -150,8 +150,8 @@ onMounted(loadApplications);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>招聘管理</p>
         <h1>简历管理</h1>
@@ -159,7 +159,7 @@ onMounted(loadApplications);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadApplications"
       >
@@ -204,7 +204,7 @@ onMounted(loadApplications);
       >
         <button
           type="button"
-          class="bo-button"
+          class="backoffice-button"
           @click="loadApplications"
         >
           重试
@@ -218,9 +218,9 @@ onMounted(loadApplications);
       />
       <div
         v-else
-        class="bo-table-wrap"
+        class="backoffice-table-wrap"
       >
-        <table class="bo-table">
+        <table class="backoffice-table">
           <thead>
             <tr>
               <th>申请人</th>
@@ -254,17 +254,17 @@ onMounted(loadApplications);
                   </span>
                 </td>
                 <td>
-                  <div class="bo-row-actions">
+                  <div class="backoffice-row-actions">
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       @click="toggleResume(application.id)"
                     >
                       {{ expandedIds.has(application.id) ? "收起简历" : "查看简历" }}
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-secondary"
+                      class="backoffice-button is-small is-secondary"
                       :disabled="busyId !== null || application.status === 'interview'"
                       @click="changeStatus(application, 'interview')"
                     >
@@ -272,7 +272,7 @@ onMounted(loadApplications);
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-success"
+                      class="backoffice-button is-small is-success"
                       :disabled="busyId !== null || application.status === 'approved'"
                       @click="changeStatus(application, 'approved')"
                     >
@@ -280,7 +280,7 @@ onMounted(loadApplications);
                     </button>
                     <button
                       type="button"
-                      class="bo-button is-small is-danger"
+                      class="backoffice-button is-small is-danger"
                       :disabled="busyId !== null || application.status === 'rejected'"
                       @click="changeStatus(application, 'rejected')"
                     >
@@ -365,85 +365,4 @@ onMounted(loadApplications);
   </section>
 </template>
 
-<style scoped>
-.status-summary {
-  display: flex;
-  gap: 18px;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--bo-card-border);
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-}
-
-.application-pill {
-  display: inline-flex;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.application-pill.is-pending {
-  background: rgba(186, 117, 23, 0.13);
-  color: #9a6413;
-}
-
-.application-pill.is-interview {
-  background: rgba(74, 111, 165, 0.13);
-  color: #3a5780;
-}
-
-.application-pill.is-approved {
-  background: rgba(31, 107, 66, 0.12);
-  color: var(--bo-success);
-}
-
-.application-pill.is-rejected {
-  background: rgba(179, 56, 47, 0.12);
-  color: var(--bo-danger);
-}
-
-.resume-row > td {
-  background: color-mix(in srgb, var(--bo-page-bg) 55%, var(--bo-card-bg));
-}
-
-.resume-detail {
-  display: grid;
-  gap: 12px;
-}
-
-.resume-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 24px;
-  font-size: 0.82rem;
-}
-
-.resume-block h3 {
-  margin: 0 0 4px;
-  color: var(--bo-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.resume-block p,
-.resume-empty {
-  margin: 0;
-  font-size: 0.84rem;
-  line-height: 1.65;
-  white-space: pre-wrap;
-}
-
-.resume-empty {
-  color: var(--bo-muted);
-}
-
-[data-theme="dark"] .application-pill.is-pending {
-  color: #efc75e;
-}
-
-[data-theme="dark"] .application-pill.is-interview {
-  color: #9cb8e5;
-}
-</style>
+<style src="./enterprise.css"></style>

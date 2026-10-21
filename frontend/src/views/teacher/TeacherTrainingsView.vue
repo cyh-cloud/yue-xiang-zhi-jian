@@ -122,8 +122,8 @@ onMounted(loadTrainings);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>实训提交</h1>
@@ -131,7 +131,7 @@ onMounted(loadTrainings);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadTrainings"
       >
@@ -172,7 +172,7 @@ onMounted(loadTrainings);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadTrainings"
       >
         重试
@@ -188,8 +188,8 @@ onMounted(loadTrainings);
       v-else
       flush
     >
-      <div class="bo-table-wrap">
-        <table class="bo-table teacher-training-table">
+      <div class="backoffice-table-wrap">
+        <table class="backoffice-table teacher-training-table">
           <thead>
             <tr>
               <th>学员</th>
@@ -250,7 +250,7 @@ onMounted(loadTrainings);
               <td>
                 <button
                   type="button"
-                  class="bo-button is-small is-secondary"
+                  class="backoffice-button is-small is-secondary"
                   data-testid="teacher-training-open"
                   @click="openGrade(training)"
                 >
@@ -266,25 +266,25 @@ onMounted(loadTrainings);
     <Teleport to="body">
       <div
         v-if="selected"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeGrade"
       >
         <form
-          class="bo-modal teacher-grade-modal"
+          class="backoffice-modal teacher-grade-modal"
           data-testid="teacher-grade-dialog"
           role="dialog"
           aria-modal="true"
           :aria-label="selectedTitle"
           @submit.prevent="submitGrade"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>实训批改</p>
               <h2>{{ selectedTitle }}</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeGrade"
             >
@@ -294,7 +294,7 @@ onMounted(loadTrainings);
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <p class="teacher-grade-meta">
               学员：<strong>{{ selected.student_name || selected.student_id }}</strong>
               · 第 {{ selected.attempts || 1 }} 次提交
@@ -330,7 +330,7 @@ onMounted(loadTrainings);
             >{{ selected.script }}</pre>
             <p
               v-else
-              class="bo-muted"
+              class="backoffice-muted"
             >
               该条提交没有可展示的正文，可能是早期版本留下的记录。
             </p>
@@ -341,7 +341,7 @@ onMounted(loadTrainings);
               :message="gradeError"
               testid="teacher-grade-error"
             />
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>我的评分（0-100）</span>
               <input
                 v-model="gradeScore"
@@ -352,7 +352,7 @@ onMounted(loadTrainings);
                 required
               >
             </label>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>评语（可留空，学员会在消息中心看到）</span>
               <textarea
                 v-model="gradeFeedback"
@@ -360,10 +360,10 @@ onMounted(loadTrainings);
               />
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="grading"
               @click="closeGrade"
             >
@@ -371,7 +371,7 @@ onMounted(loadTrainings);
             </button>
             <button
               type="button"
-              class="bo-button"
+              class="backoffice-button"
               :disabled="grading"
               @click="submitGrade"
             >
@@ -384,105 +384,4 @@ onMounted(loadTrainings);
   </section>
 </template>
 
-<style scoped>
-.teacher-regrade-notice {
-  padding: 11px 14px;
-  border: 1px solid rgba(217, 162, 39, 0.38);
-  border-radius: 9px;
-  background: rgba(217, 162, 39, 0.1);
-  color: #7a5a12;
-  font-size: 0.8rem;
-}
-
-.teacher-training-table tr.is-regrade {
-  background: rgba(217, 162, 39, 0.06);
-}
-
-.teacher-training-status {
-  display: inline-flex;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
-.teacher-training-status.is-graded {
-  background: rgba(31, 107, 66, 0.12);
-  color: var(--bo-success);
-}
-
-.teacher-training-status.is-pending,
-.teacher-training-status.is-regrade {
-  background: rgba(217, 162, 39, 0.14);
-  color: #8a6515;
-}
-
-.teacher-grade-modal {
-  width: min(760px, calc(100vw - 48px));
-}
-
-.teacher-grade-meta {
-  margin: 0;
-  color: var(--bo-muted);
-  font-size: 0.78rem;
-  line-height: 1.7;
-}
-
-.teacher-work-label {
-  color: var(--bo-text);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.teacher-work-script {
-  max-height: 300px;
-  overflow: auto;
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 8px;
-  background: var(--bo-page-bg);
-  color: var(--bo-text);
-  font: inherit;
-  font-size: 0.82rem;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.teacher-transcript {
-  display: grid;
-  max-height: 300px;
-  gap: 8px;
-  overflow: auto;
-  padding: 12px;
-  border: 1px solid var(--bo-card-border);
-  border-radius: 8px;
-  background: var(--bo-page-bg);
-}
-
-.teacher-transcript-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  color: var(--bo-text);
-  font-size: 0.82rem;
-  line-height: 1.6;
-}
-
-.teacher-transcript-who {
-  flex: none;
-  width: 38px;
-  padding: 2px 0;
-  border-radius: 4px;
-  background: var(--bo-card-border);
-  color: var(--bo-muted);
-  font-size: 0.68rem;
-  text-align: center;
-}
-
-.teacher-transcript-row.is-student .teacher-transcript-who {
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-}
-</style>
+<style src="./teacher.css"></style>

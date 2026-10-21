@@ -562,10 +562,10 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="craft-select-title"
+        aria-labelledby="crafts-select-title"
       >
         <h3
-          id="craft-select-title"
+          id="crafts-select-title"
           class="card-section-title"
         >
           <i
@@ -602,28 +602,30 @@ function externalVideoUrl(video: CraftVideo): string {
         </div>
         <div
           v-else
-          class="craft-grid"
+          class="crafts-grid"
         >
           <button
             v-for="craft in crafts"
             :key="craft.id"
             type="button"
-            class="craft-card"
+            class="crafts-card"
+            data-testid="crafts-card"
+            :data-craft-id="craft.id"
             :class="{ active: craft.id === selectedCraftId }"
             :aria-pressed="craft.id === selectedCraftId"
             @click="selectCraft(craft.id)"
           >
-            <span class="craft-visual">
+            <span class="crafts-visual">
               <i
                 class="fas fa-hands"
                 aria-hidden="true"
               />
             </span>
-            <span class="craft-info">
-              <strong class="craft-card-name">{{ craft.name }}</strong>
+            <span class="crafts-info">
+              <strong class="crafts-card-name">{{ craft.name }}</strong>
               <span
                 v-if="craft.origin"
-                class="craft-card-desc"
+                class="crafts-card-desc"
               >{{ craft.origin }}</span>
               <span
                 v-if="craft.level"
@@ -661,21 +663,22 @@ function externalVideoUrl(video: CraftVideo): string {
       </div>
       <div
         v-else-if="detail"
-        class="craft-intro"
+        class="crafts-intro"
       >
-        <div class="craft-intro-card">
-          <div class="craft-intro-icon">
+        <div class="crafts-intro-card">
+          <div class="crafts-intro-icon">
             <i
               class="fas fa-landmark"
               aria-hidden="true"
             />
           </div>
-          <div class="craft-intro-body">
-            <div class="craft-intro-head">
+          <div class="crafts-intro-body">
+            <div class="crafts-intro-head">
               <h2>{{ detail.name }}</h2>
               <span
                 v-if="detail.origin"
-                class="craft-intro-origin"
+                class="crafts-intro-origin"
+                data-testid="crafts-origin"
               >
                 <i
                   class="fas fa-map-marker-alt"
@@ -693,10 +696,10 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="craft-video-title"
+        aria-labelledby="crafts-video-title"
       >
         <h3
-          id="craft-video-title"
+          id="crafts-video-title"
           class="card-section-title"
         >
           <i
@@ -738,10 +741,10 @@ function externalVideoUrl(video: CraftVideo): string {
         <template v-else>
           <div
             v-if="selectedVideo"
-            class="craft-video-stage"
+            class="crafts-video-stage"
           >
-            <div class="craft-video-stage-bar">
-              <span class="craft-video-stage-title">{{ selectedVideo.title }}</span>
+            <div class="crafts-video-stage-bar">
+              <span class="crafts-video-stage-title">{{ selectedVideo.title }}</span>
               <button
                 type="button"
                 class="icon-btn"
@@ -755,10 +758,10 @@ function externalVideoUrl(video: CraftVideo): string {
                 />
               </button>
             </div>
-            <div class="craft-video-frame">
+            <div class="crafts-video-frame">
               <div
                 v-if="videoState !== 'ready'"
-                class="craft-video-placeholder"
+                class="crafts-video-placeholder"
                 role="status"
               >
                 <i
@@ -781,7 +784,7 @@ function externalVideoUrl(video: CraftVideo): string {
               </div>
               <iframe
                 v-if="videoEmbedUrl"
-                class="craft-video-iframe"
+                class="crafts-video-iframe"
                 :class="{ 'is-hidden': videoState !== 'ready' }"
                 :src="videoEmbedUrl"
                 :title="selectedVideo.title || '手工艺教学演示视频'"
@@ -796,20 +799,22 @@ function externalVideoUrl(video: CraftVideo): string {
             </div>
           </div>
 
-          <div class="craft-video-grid">
+          <div class="crafts-video-grid">
             <article
               v-for="(video, index) in detail.videos"
               :key="video.id"
-              class="craft-video-card"
+              class="crafts-video-card"
+              data-testid="crafts-video-card"
+              :data-video-id="video.id"
               :class="{ 'is-playing': index === selectedVideoIndex }"
             >
               <button
                 type="button"
-                class="craft-video-card-select"
+                class="crafts-video-card-select"
                 :aria-label="`播放视频：${video.title}`"
                 @click="selectVideo(index)"
               >
-                <span class="craft-video-card-cover">
+                <span class="crafts-video-card-cover">
                   <img
                     v-if="video.cover && !failedCoverIds.has(video.id)"
                     :src="video.cover"
@@ -820,40 +825,40 @@ function externalVideoUrl(video: CraftVideo): string {
                   >
                   <span
                     v-else
-                    class="craft-video-card-cover-fallback"
+                    class="crafts-video-card-cover-fallback"
                   >
                     <i
                       class="fas fa-film"
                       aria-hidden="true"
                     />
                   </span>
-                  <span class="craft-video-card-stats">
-                    <span class="craft-video-card-stat">
+                  <span class="crafts-video-card-stats">
+                    <span class="crafts-video-card-stat">
                       <i
                         class="fas fa-play-circle"
                         aria-hidden="true"
                       />
                       {{ formatVideoCount(video.view) }}
                     </span>
-                    <span class="craft-video-card-stat">
+                    <span class="crafts-video-card-stat">
                       <i
                         class="fas fa-comment-dots"
                         aria-hidden="true"
                       />
                       {{ formatVideoCount(video.danmaku) }}
                     </span>
-                    <span class="craft-video-card-stat">
+                    <span class="crafts-video-card-stat">
                       <i
                         class="fas fa-thumbs-up"
                         aria-hidden="true"
                       />
                       {{ formatVideoCount(video.like) }}
                     </span>
-                    <span class="craft-video-card-duration">
+                    <span class="crafts-video-card-duration">
                       {{ formatVideoDuration(video.duration) }}
                     </span>
                   </span>
-                  <span class="craft-video-card-play">
+                  <span class="crafts-video-card-play">
                     <i
                       class="fas fa-play"
                       aria-hidden="true"
@@ -861,13 +866,13 @@ function externalVideoUrl(video: CraftVideo): string {
                   </span>
                 </span>
                 <span
-                  class="craft-video-card-title"
+                  class="crafts-video-card-title"
                   :title="video.title"
                 >
                   {{ video.title }}
                 </span>
-                <span class="craft-video-card-meta">
-                  <span class="craft-video-card-author">
+                <span class="crafts-video-card-meta">
+                  <span class="crafts-video-card-author">
                     <i
                       class="fas fa-user"
                       aria-hidden="true"
@@ -877,7 +882,7 @@ function externalVideoUrl(video: CraftVideo): string {
                 </span>
               </button>
               <a
-                class="craft-video-card-external"
+                class="crafts-video-card-external"
                 :href="externalVideoUrl(video)"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -891,7 +896,7 @@ function externalVideoUrl(video: CraftVideo): string {
               </a>
             </article>
           </div>
-          <p class="craft-video-source">
+          <p class="crafts-video-source">
             视频来源：哔哩哔哩，共 {{ detail.videos.length }} 条；网络不佳时可点封面右下角「在新窗口打开」。
           </p>
         </template>
@@ -899,11 +904,11 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="craft-3d-title"
+        aria-labelledby="crafts-3d-title"
       >
         <div class="panel-header">
           <h3
-            id="craft-3d-title"
+            id="crafts-3d-title"
             class="card-section-title"
           >
             <i
@@ -1026,7 +1031,7 @@ function externalVideoUrl(video: CraftVideo): string {
             <model-viewer
               v-else
               ref="modelViewer"
-              class="craft-3d-viewer"
+              class="crafts-3d-viewer"
               camera-controls
               :auto-rotate="paused ? undefined : ''"
               :rotation-per-second="slow ? '10deg' : '30deg'"
@@ -1054,15 +1059,15 @@ function externalVideoUrl(video: CraftVideo): string {
             </h4>
             <div
               v-if="detail?.steps.length"
-              class="craft-progress"
+              class="crafts-progress"
             >
-              <div class="craft-progress-bar">
+              <div class="crafts-progress-bar">
                 <div
-                  class="craft-progress-fill"
+                  class="crafts-progress-fill"
                   :style="{ width: progressPercent() }"
                 />
               </div>
-              <span class="craft-progress-text">{{ progressText() }}</span>
+              <span class="crafts-progress-text">{{ progressText() }}</span>
             </div>
             <div
               v-if="detailError"
@@ -1102,6 +1107,7 @@ function externalVideoUrl(video: CraftVideo): string {
                 :key="`${step.title}-${index}`"
                 type="button"
                 class="step"
+                data-testid="crafts-step"
                 :class="{
                   active: index === activeStepIndex,
                   'is-done': isStepDone(index),
@@ -1130,14 +1136,16 @@ function externalVideoUrl(video: CraftVideo): string {
 
         <div
           v-if="models.length > 1"
-          class="craft-model-tabs"
+          class="crafts-model-tabs"
           aria-label="切换 3D 模型"
         >
           <button
             v-for="(model, index) in models"
             :key="model.id"
             type="button"
-            class="craft-model-tab"
+            class="crafts-model-tab"
+            data-testid="crafts-model-tab"
+            :data-model-id="model.id"
             :class="{ active: index === selectedModelIndex }"
             :aria-pressed="index === selectedModelIndex"
             @click="selectModel(index)"
@@ -1149,10 +1157,10 @@ function externalVideoUrl(video: CraftVideo): string {
 
       <div
         class="card-section"
-        aria-labelledby="craft-materials-title"
+        aria-labelledby="crafts-materials-title"
       >
         <h3
-          id="craft-materials-title"
+          id="crafts-materials-title"
           class="card-section-title"
         >
           <i
@@ -1194,7 +1202,7 @@ function externalVideoUrl(video: CraftVideo): string {
         <template v-else-if="purchaseGuide">
           <div
             v-if="purchaseGuide.budget"
-            class="guide-budget"
+            class="purchase-guide-budget"
           >
             <div class="budget-item starter">
               <i
@@ -1219,7 +1227,7 @@ function externalVideoUrl(video: CraftVideo): string {
           </div>
           <div
             v-if="purchaseGuide.buying_tips"
-            class="guide-buying-tips"
+            class="purchase-guide-buying-tips"
           >
             <i
               class="fas fa-compass"
@@ -1231,7 +1239,7 @@ function externalVideoUrl(video: CraftVideo): string {
           </div>
           <div
             v-if="purchaseCategories.length"
-            class="guide-toolbar"
+            class="purchase-guide-toolbar"
           >
             <button
               type="button"
@@ -1249,15 +1257,12 @@ function externalVideoUrl(video: CraftVideo): string {
           <div
             v-for="category in purchaseCategories"
             :key="category.key"
-            class="guide-category"
-            :class="[
-              category.key,
-              { open: openCategoryKeys.includes(category.key) },
-            ]"
+            class="purchase-guide-category"
+            :class="[ category.key, { open: openCategoryKeys.includes(category.key) }, ]"
           >
             <button
               type="button"
-              class="guide-cat-head"
+              class="purchase-guide-cat-head"
               :aria-expanded="openCategoryKeys.includes(category.key)"
               @click="toggleCategory(category.key)"
             >
@@ -1268,31 +1273,32 @@ function externalVideoUrl(video: CraftVideo): string {
               />
               <span>{{ category.label }}</span>
               <small>{{ category.desc }}</small>
-              <span class="guide-cat-meta">
+              <span class="purchase-guide-cat-meta">
                 <b
                   v-if="categorySubtotal(category)"
-                  class="guide-subtotal"
+                  class="purchase-guide-subtotal"
                 >
                   {{ categorySubtotal(category) }}
                 </b>
-                <em class="guide-count">{{ category.items.length }} 项</em>
+                <em class="purchase-guide-count">{{ category.items.length }} 项</em>
                 <i
-                  class="fas fa-chevron-down guide-chevron"
+                  class="fas fa-chevron-down purchase-guide-chevron"
                   aria-hidden="true"
                 />
               </span>
             </button>
-            <div class="guide-body">
-              <div class="guide-items">
+            <div class="purchase-guide-body">
+              <div class="purchase-guide-items">
                 <div
                   v-for="item in category.items"
                   :key="`${category.key}-${item.name}`"
-                  class="guide-item"
+                  class="purchase-guide-item"
+                  data-testid="crafts-purchase-item"
                   :class="category.key"
                 >
-                  <div class="guide-item-head">
+                  <div class="purchase-guide-item-head">
                     <span
-                      class="guide-badge"
+                      class="purchase-guide-badge"
                       :class="category.key"
                     >
                       {{ categoryMeta(category).badge }}
@@ -1302,7 +1308,7 @@ function externalVideoUrl(video: CraftVideo): string {
                   </div>
                   <div
                     v-if="item.spec"
-                    class="guide-spec"
+                    class="purchase-guide-spec"
                   >
                     <i
                       class="fas fa-ruler-combined"
@@ -1312,7 +1318,7 @@ function externalVideoUrl(video: CraftVideo): string {
                   </div>
                   <div
                     v-if="item.where"
-                    class="guide-where"
+                    class="purchase-guide-where"
                   >
                     <i
                       class="fas fa-map-marker-alt"
@@ -1322,7 +1328,7 @@ function externalVideoUrl(video: CraftVideo): string {
                   </div>
                   <div
                     v-if="item.tip"
-                    class="guide-tip"
+                    class="purchase-guide-tip"
                   >
                     <i
                       class="fas fa-lightbulb"
@@ -1340,32 +1346,34 @@ function externalVideoUrl(video: CraftVideo): string {
   </section>
 </template>
 
+<style src="./crafts/crafts.css"></style>
+
 <style scoped>
 .crafts-view {
   min-height: 70vh;
 }
 
-.craft-card {
+.crafts-card {
   padding: 0;
   color: inherit;
   font: inherit;
   text-align: left;
 }
 
-.craft-info {
+.crafts-info {
   display: flex;
   flex: 1;
   flex-direction: column;
   align-items: flex-start;
 }
 
-.craft-card-name {
+.crafts-card-name {
   color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 600;
 }
 
-.craft-card-desc {
+.crafts-card-desc {
   margin: 4px 0 8px;
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -1395,12 +1403,12 @@ function externalVideoUrl(video: CraftVideo): string {
   color: #ef4444;
 }
 
-.craft-video-card {
+.crafts-video-card {
   position: relative;
   padding: 0;
 }
 
-.craft-video-card-select {
+.crafts-video-card-select {
   display: block;
   width: 100%;
   padding: 0;
@@ -1411,25 +1419,25 @@ function externalVideoUrl(video: CraftVideo): string {
   text-align: left;
 }
 
-.craft-video-card-meta {
+.crafts-video-card-meta {
   padding-right: 26px;
 }
 
-.craft-video-card-external {
+.crafts-video-card-external {
   position: absolute;
   right: 0;
   bottom: 7px;
   margin-left: 0;
 }
 
-.craft-video-card-title {
+.crafts-video-card-title {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 
-.craft-video-placeholder .btn {
+.crafts-video-placeholder .btn {
   margin-top: 10px;
 }
 
@@ -1464,14 +1472,14 @@ function externalVideoUrl(video: CraftVideo): string {
   line-height: 1.55;
 }
 
-.guide-cat-head span,
-.guide-cat-head small,
-.guide-cat-head b,
-.guide-cat-head em {
+.purchase-guide-cat-head span,
+.purchase-guide-cat-head small,
+.purchase-guide-cat-head b,
+.purchase-guide-cat-head em {
   font-family: inherit;
 }
 
-.guide-item-head h5 {
+.purchase-guide-item-head h5 {
   margin: 0;
 }
 </style>

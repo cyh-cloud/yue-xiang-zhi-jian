@@ -104,8 +104,8 @@ onMounted(loadOverview);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>平台治理</p>
         <h1 data-testid="backoffice-page-title">
@@ -115,7 +115,7 @@ onMounted(loadOverview);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadOverview"
       >
@@ -141,7 +141,7 @@ onMounted(loadOverview);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadOverview"
       >
         重试
@@ -153,11 +153,11 @@ onMounted(loadOverview);
         title="待处理"
         description="需要管理员尽快采取行动的账号与审核事项。"
       >
-        <div class="bo-stat-grid">
+        <div class="backoffice-stat-grid">
           <article
             v-for="card in pendingCards"
             :key="card.label"
-            class="bo-stat-card is-alert"
+            class="backoffice-stat-card is-alert"
           >
             <strong>{{ card.value }}</strong>
             <span>{{ card.label }}</span>
@@ -170,11 +170,11 @@ onMounted(loadOverview);
         title="账号与内容存量"
         description="仅展示当前数据库能够真实计算的指标。"
       >
-        <div class="bo-stat-grid">
+        <div class="backoffice-stat-grid">
           <article
             v-for="card in inventoryCards"
             :key="card.label"
-            class="bo-stat-card"
+            class="backoffice-stat-card"
             :data-testid="card.testid"
           >
             <strong>{{ card.value }}</strong>
@@ -183,7 +183,7 @@ onMounted(loadOverview);
           </article>
         </div>
         <p
-          class="bo-note"
+          class="backoffice-note"
           data-testid="admin-dashboard-note"
         >
           口径说明：仅统计库内真实可算的项；在线人数、日活、增长趋势与平均审核时长因缺少数据源，不予展示。
@@ -192,3 +192,5 @@ onMounted(loadOverview);
     </template>
   </section>
 </template>
+
+<style src="./admin.css"></style>

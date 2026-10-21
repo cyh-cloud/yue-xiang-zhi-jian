@@ -63,10 +63,10 @@ onMounted(loadAnalytics);
 
 <template>
   <section
-    class="bo-page"
+    class="backoffice-page"
     data-testid="teacher-analytics"
   >
-    <header class="bo-page-header">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>学情分析</h1>
@@ -74,7 +74,7 @@ onMounted(loadAnalytics);
       </div>
       <button
         type="button"
-        class="bo-button is-secondary"
+        class="backoffice-button is-secondary"
         :disabled="loading"
         @click="loadAnalytics"
       >
@@ -100,7 +100,7 @@ onMounted(loadAnalytics);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadAnalytics"
       >
         重试
@@ -193,10 +193,10 @@ onMounted(loadAnalytics);
         description="只展示接口真实返回的方向与证书数据。"
       >
         <div
-          class="bo-table-wrap"
+          class="backoffice-table-wrap"
           data-testid="teacher-direction-detail"
         >
-          <table class="bo-table">
+          <table class="backoffice-table">
             <thead>
               <tr>
                 <th>方向</th>
@@ -225,101 +225,4 @@ onMounted(loadAnalytics);
   </section>
 </template>
 
-<style scoped>
-.teacher-basis,
-.teacher-no-cert {
-  margin: 0;
-  line-height: 1.7;
-}
-
-.teacher-basis {
-  font-weight: 650;
-}
-
-.teacher-no-cert {
-  margin-top: 8px;
-  color: var(--bo-muted);
-  font-size: 0.82rem;
-}
-
-.teacher-analytics-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
-
-.teacher-bar-chart,
-.teacher-direction-chart {
-  display: grid;
-  gap: 12px;
-}
-
-.teacher-bar-row,
-.teacher-direction-row {
-  display: grid;
-  grid-template-columns: 78px minmax(80px, 1fr) 58px;
-  align-items: center;
-  gap: 9px;
-}
-
-.teacher-direction-row {
-  grid-template-columns: 10px 78px minmax(80px, 1fr) 58px;
-}
-
-.teacher-bar-label {
-  overflow: hidden;
-  color: var(--bo-muted);
-  font-size: 0.76rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.teacher-bar-track {
-  height: 8px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--bo-card-border);
-}
-
-.teacher-bar-fill {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--bo-accent);
-}
-
-.teacher-bar-value {
-  color: var(--bo-text);
-  font-size: 0.76rem;
-  text-align: right;
-}
-
-.teacher-direction-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--bo-accent);
-}
-
-.is-color-1 {
-  background: #4a6fa5;
-}
-
-.is-color-2 {
-  background: #d9a227;
-}
-
-.is-color-3 {
-  background: #4a8a6a;
-}
-
-.is-color-4 {
-  background: #a9673a;
-}
-
-@media (max-width: 980px) {
-  .teacher-analytics-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
+<style src="./teacher.css"></style>

@@ -127,8 +127,8 @@ onMounted(loadAnnouncements);
 </script>
 
 <template>
-  <section class="bo-page">
-    <header class="bo-page-header">
+  <section class="backoffice-page">
+    <header class="backoffice-page-header">
       <div>
         <p>教学工作</p>
         <h1>通知公告</h1>
@@ -136,7 +136,7 @@ onMounted(loadAnnouncements);
       </div>
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="openEditor"
       >
         <i
@@ -167,7 +167,7 @@ onMounted(loadAnnouncements);
     >
       <button
         type="button"
-        class="bo-button"
+        class="backoffice-button"
         @click="loadAnnouncements"
       >
         重试
@@ -186,7 +186,7 @@ onMounted(loadAnnouncements);
       <article
         v-for="announcement in announcements"
         :key="announcement.id"
-        class="bo-card teacher-announcement-card"
+        class="backoffice-card teacher-announcement-card"
         :class="{ 'is-pinned': announcement.pinned }"
         data-testid="teacher-announcement-card"
         :data-announcement-id="announcement.id"
@@ -206,7 +206,7 @@ onMounted(loadAnnouncements);
           </div>
           <button
             type="button"
-            class="bo-button is-small is-danger"
+            class="backoffice-button is-small is-danger"
             data-testid="teacher-announcement-delete"
             @click="askDelete(announcement)"
           >
@@ -221,25 +221,25 @@ onMounted(loadAnnouncements);
     <Teleport to="body">
       <div
         v-if="editorOpen"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeEditor"
       >
         <form
-          class="bo-modal"
+          class="backoffice-modal"
           data-testid="teacher-announcement-editor"
           role="dialog"
           aria-modal="true"
           aria-label="发布通知"
           @submit.prevent="publish"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>通知公告</p>
               <h2>发布通知</h2>
             </div>
             <button
               type="button"
-              class="bo-icon-button"
+              class="backoffice-icon-button"
               aria-label="关闭"
               @click="closeEditor"
             >
@@ -249,14 +249,14 @@ onMounted(loadAnnouncements);
               />
             </button>
           </header>
-          <div class="bo-modal-body">
+          <div class="backoffice-modal-body">
             <BackofficeFeedback
               v-if="editorError"
               kind="error"
               :message="editorError"
               testid="teacher-announcement-editor-error"
             />
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>标题</span>
               <input
                 v-model="form.title"
@@ -264,7 +264,7 @@ onMounted(loadAnnouncements);
                 autocomplete="off"
               >
             </label>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>分类</span>
               <select v-model="form.category">
                 <option value="通知">
@@ -278,7 +278,7 @@ onMounted(loadAnnouncements);
                 </option>
               </select>
             </label>
-            <label class="bo-field">
+            <label class="backoffice-field">
               <span>内容</span>
               <textarea
                 v-model="form.content"
@@ -294,10 +294,10 @@ onMounted(loadAnnouncements);
               置顶显示
             </label>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="editorSaving"
               @click="closeEditor"
             >
@@ -305,7 +305,7 @@ onMounted(loadAnnouncements);
             </button>
             <button
               type="submit"
-              class="bo-button"
+              class="backoffice-button"
               :disabled="editorSaving"
             >
               {{ editorSaving ? "发布中..." : "发布" }}
@@ -316,31 +316,31 @@ onMounted(loadAnnouncements);
 
       <div
         v-if="deleteTarget"
-        class="bo-modal-overlay"
+        class="backoffice-modal-overlay"
         @click.self="closeDelete"
       >
         <div
-          class="bo-modal is-confirm"
+          class="backoffice-modal is-confirm"
           data-testid="teacher-confirm-delete"
           role="dialog"
           aria-modal="true"
           aria-label="确认删除通知"
         >
-          <header class="bo-modal-head">
+          <header class="backoffice-modal-head">
             <div>
               <p>确认删除</p>
               <h2>删除通知</h2>
             </div>
           </header>
-          <div class="bo-modal-body">
-            <p class="bo-confirm-copy">
+          <div class="backoffice-modal-body">
+            <p class="backoffice-confirm-copy">
               确定删除通知「{{ deleteTarget.title }}」吗？删除后学员端将不再展示这条公告。
             </p>
           </div>
-          <footer class="bo-modal-actions">
+          <footer class="backoffice-modal-actions">
             <button
               type="button"
-              class="bo-button is-secondary"
+              class="backoffice-button is-secondary"
               :disabled="deleting"
               @click="closeDelete"
             >
@@ -348,7 +348,7 @@ onMounted(loadAnnouncements);
             </button>
             <button
               type="button"
-              class="bo-button is-danger"
+              class="backoffice-button is-danger"
               :disabled="deleting"
               @click="confirmDelete"
             >
@@ -361,72 +361,4 @@ onMounted(loadAnnouncements);
   </section>
 </template>
 
-<style scoped>
-.teacher-announcement-list {
-  display: grid;
-  gap: 14px;
-}
-
-.teacher-announcement-card {
-  border-left: 4px solid transparent;
-}
-
-.teacher-announcement-card.is-pinned {
-  border-left-color: var(--bo-accent);
-}
-
-.teacher-announcement-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-}
-
-.teacher-announcement-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--bo-muted);
-  font-size: 0.72rem;
-}
-
-.teacher-announcement-category,
-.teacher-announcement-pin {
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--bo-accent-soft);
-  color: var(--bo-accent-strong);
-  font-weight: 700;
-}
-
-.teacher-announcement-pin {
-  background: rgba(217, 162, 39, 0.14);
-  color: #9a6d13;
-}
-
-.teacher-announcement-card h2 {
-  margin: 14px 0 6px;
-  font-size: 1rem;
-}
-
-.teacher-announcement-card p {
-  margin: 0;
-  white-space: pre-wrap;
-  color: var(--bo-muted);
-  line-height: 1.7;
-}
-
-.teacher-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--bo-text);
-  font-size: 0.82rem;
-}
-
-.teacher-checkbox input {
-  width: 16px;
-  height: 16px;
-}
-</style>
+<style src="./teacher.css"></style>

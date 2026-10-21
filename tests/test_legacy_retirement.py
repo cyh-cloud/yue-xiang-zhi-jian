@@ -59,17 +59,39 @@ class LegacyReferenceTest(unittest.TestCase):
                     "legacy reference is missing %s" % name,
                 )
 
-    def test_spa_keeps_its_shared_css_outside_the_reference_copy(self):
+    def test_spa_uses_current_layers_and_keeps_reference_read_only(self):
         self.assertFalse(os.path.exists(os.path.join(REPO_ROOT, "styles.css")))
-        self.assertTrue(
-            os.path.isfile(
+        self.assertFalse(
+            os.path.exists(
                 os.path.join(
-                    REPO_ROOT, "frontend", "src", "styles", "legacy-public.css"
+                    REPO_ROOT,
+                    "frontend",
+                    "src",
+                    "styles",
+                    "legacy-public.css",
                 )
-            )
+            ),
+            "the active legacy stylesheet must stay retired",
         )
+        reference = os.path.join(
+            REPO_ROOT,
+            "legacy",
+            "reference",
+            "frontend",
+            "legacy-public.css",
+        )
+        self.assertTrue(os.path.isfile(reference))
+        with open(reference, encoding="utf-8") as handle:
+            header = handle.read(1600)
+        self.assertIn("历史参照", header)
+        self.assertIn("禁止活动代码引用", header)
+
         main = _read("frontend", "src", "main.ts")
-        self.assertIn('"./styles/legacy-public.css"', main)
+        for sheet in ("tokens.css", "base.css", "components.css"):
+            with self.subTest(sheet=sheet):
+                self.assertIn('"./styles/%s"' % sheet, main)
+        self.assertNotIn("legacy-public.css", main)
+        self.assertNotIn("legacy/reference/", main)
         self.assertNotIn('"../../styles.css"', main)
 
 
