@@ -1,4 +1,4 @@
-"""Parsers for aqsc-moa XLSX attachments and fixture metadata."""
+"""Parsers for aqsc-moa XLSX attachments, embedded tables, and fixtures."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ import io
 import json
 import mimetypes
 from pathlib import Path
+from urllib.parse import urlparse
 
 from openpyxl import load_workbook
+from parsel import Selector
 
 
 XLSX_MIME_TYPE = (
@@ -78,6 +80,133 @@ def _row_hash(payload):
     return hashlib.sha256(body).hexdigest()
 
 
+def _key_part(value):
+    return " ".join(str(value or "").split())
+
+
+def _natural_key(
+    *,
+    certificate_no,
+    batch,
+    product_name,
+    province,
+    county,
+    applicant,
+):
+    """Build a row identity that survives file and row reordering."""
+
+    certificate_no = _key_part(certificate_no).upper().replace(" ", "")
+    if certificate_no:
+        return f"01:certificate={certificate_no}"
+    return "02:" + "|".join(
+        (
+            f"batch={_key_part(batch)}",
+            f"product={_key_part(product_name)}",
+            f"province={_key_part(province)}",
+            f"county={_key_part(county)}",
+            f"applicant={_key_part(applicant)}",
+        )
+    )
+
+
+def _announcement_id(metadata, fallback):
+    return str(
+        metadata.get("announcement_id")
+        or metadata.get("announcement_no")
+        or fallback
+    )
+
+
+def _record(
+    *,
+    metadata,
+    announcement_id,
+    product_name,
+    province,
+    county,
+    certificate_no,
+    applicant,
+    production_scale_raw,
+    main_operators_raw,
+    locator,
+    row_no,
+    seq,
+    source_names,
+    source_kind,
+    file_name=None,
+    sheet=None,
+    table_no=None,
+    page_url=None,
+):
+    cert_type = (
+        metadata.get("cert_type")
+        or _infer_cert_type(file_name or "", metadata)
+    )
+    batch = (
+        metadata.get("batch")
+        or metadata.get("announcement_no")
+        or announcement_id
+    )
+    extra = {
+        "announcement_id": announcement_id,
+        "announcement_no": metadata.get("announcement_no"),
+        "batch": batch,
+        "cert_type": cert_type,
+        "product_name": product_name,
+        "product_name_raw": product_name,
+        "normalized_name": product_name,
+        "province": province,
+        "county": county,
+        "certificate_no": certificate_no,
+        "applicant": applicant,
+        "production_scale_raw": production_scale_raw,
+        "main_operators_raw": main_operators_raw,
+        "is_aquatic": None,
+        "file_name": file_name,
+        "sheet": sheet,
+        "table_no": table_no,
+        "row_no": row_no,
+        "seq": seq,
+        "source_kind": source_kind,
+        "source_field_names": source_names,
+    }
+    return {
+        "source_item_id": _natural_key(
+            certificate_no=certificate_no,
+            batch=batch,
+            product_name=product_name,
+            province=province,
+            county=county,
+            applicant=applicant,
+        ),
+        "title": product_name,
+        "source_url": (
+            metadata.get("source_url") or page_url
+        ),
+        "long_term_url": (
+            metadata.get("long_term_url") or page_url
+        ),
+        "detail_url": None,
+        "detail_url_status": "missing",
+        "locator": locator,
+        "published_at": metadata.get("published_at"),
+        "content_type": (
+            XLSX_MIME_TYPE if source_kind == "xlsx" else "text/html"
+        ),
+        "content_hash": _row_hash(extra),
+        "parser_version": (
+            "aqsc-moa-xlsx-v2"
+            if source_kind == "xlsx"
+            else "aqsc-moa-html-v1"
+        ),
+        "candidate_status": "deferred",
+        "candidate_reason": (
+            metadata.get("candidate_reason") or "file-source:fixture"
+        ),
+        "extra": extra,
+    }
+
+
 def parse_xlsx_rows(body, *, file_name, metadata=None):
     """Parse product rows from a real or fixture XLSX attachment."""
 
@@ -86,6 +215,7 @@ def parse_xlsx_rows(body, *, file_name, metadata=None):
         io.BytesIO(bytes(body)), read_only=True, data_only=True
     )
     records = []
+    seen = set()
     try:
         for sheet in workbook.worksheets:
             header_row = None
@@ -111,70 +241,115 @@ def parse_xlsx_rows(body, *, file_name, metadata=None):
                 product_name = _cell(row, positions, "product_name")
                 if not seq or not product_name:
                     continue
-                announcement_id = str(
-                    metadata.get("announcement_id")
-                    or Path(file_name).stem
-                )
-                cert_type = (
-                    metadata.get("cert_type")
-                    or _infer_cert_type(file_name, metadata)
+                announcement_id = _announcement_id(
+                    metadata, Path(file_name).stem
                 )
                 locator = (
                     f"sheet={sheet.title}; row={row_no}; seq={seq}"
                 )
-                extra = {
-                    "announcement_id": announcement_id,
-                    "announcement_no": metadata.get("announcement_no"),
-                    "batch": metadata.get("batch"),
-                    "cert_type": cert_type,
-                    "product_name": product_name,
-                    "product_name_raw": product_name,
-                    "normalized_name": product_name,
-                    "province": _cell(row, positions, "province"),
-                    "county": _cell(row, positions, "county"),
-                    "certificate_no": _cell(
+                record = _record(
+                    metadata=metadata,
+                    announcement_id=announcement_id,
+                    product_name=product_name,
+                    province=_cell(row, positions, "province"),
+                    county=_cell(row, positions, "county"),
+                    certificate_no=_cell(
                         row, positions, "certificate_no"
                     ),
-                    "applicant": _cell(row, positions, "applicant"),
-                    "production_scale_raw": _cell(
+                    applicant=_cell(row, positions, "applicant"),
+                    production_scale_raw=_cell(
                         row, positions, "production_scale_raw"
                     ),
-                    "main_operators_raw": _cell(
+                    main_operators_raw=_cell(
                         row, positions, "main_operators_raw"
                     ),
-                    "is_aquatic": None,
-                    "file_name": file_name,
-                    "sheet": sheet.title,
-                    "row_no": row_no,
-                    "seq": seq,
-                    "source_field_names": source_names,
-                }
-                content_hash = _row_hash(extra)
-                records.append(
-                    {
-                        "source_item_id": (
-                            f"{announcement_id}:{sheet.title}:{row_no}"
-                        ),
-                        "title": product_name,
-                        "source_url": metadata.get("source_url"),
-                        "long_term_url": metadata.get("long_term_url"),
-                        "detail_url": None,
-                        "detail_url_status": "missing",
-                        "locator": locator,
-                        "published_at": metadata.get("published_at"),
-                        "content_type": XLSX_MIME_TYPE,
-                        "content_hash": content_hash,
-                        "parser_version": "aqsc-moa-xlsx-v1",
-                        "candidate_status": "deferred",
-                        "candidate_reason": metadata.get(
-                            "candidate_reason"
-                        )
-                        or "file-source:fixture",
-                        "extra": extra,
-                    }
+                    locator=locator,
+                    row_no=row_no,
+                    seq=seq,
+                    source_names=source_names,
+                    source_kind="xlsx",
+                    file_name=file_name,
+                    sheet=sheet.title,
                 )
+                if record["source_item_id"] in seen:
+                    continue
+                seen.add(record["source_item_id"])
+                records.append(record)
     finally:
         workbook.close()
+    return records
+
+
+def parse_embedded_rows(html, *, page_url, metadata=None):
+    """Parse product rows from aqsc-moa `.Details_con table` HTML."""
+
+    metadata = dict(metadata or {})
+    selector = Selector(text=html)
+    fallback_id = Path(urlparse(page_url).path).stem or page_url
+    announcement_id = _announcement_id(metadata, fallback_id)
+    records = []
+    seen = set()
+    tables = selector.css(".Details_con table")
+    for table_no, table in enumerate(tables, start=1):
+        rows = []
+        for row in table.css("tr"):
+            values = [
+                _text(cell.xpath("string(.)").get())
+                for cell in row.css("th, td")
+            ]
+            rows.append(values)
+
+        header_row = None
+        positions = {}
+        source_names = {}
+        for row_no, row in enumerate(rows, start=1):
+            candidate, candidate_names = _header_positions(row)
+            if "seq" in candidate and "province" in candidate:
+                header_row = row_no
+                positions = candidate
+                source_names = candidate_names
+                break
+        if header_row is None:
+            continue
+
+        for row_no, row in enumerate(
+            rows[header_row:], start=header_row + 1
+        ):
+            seq = _cell(row, positions, "seq")
+            product_name = _cell(row, positions, "product_name")
+            if not seq or not product_name:
+                continue
+            locator = (
+                f"table={table_no}; row={row_no}; seq={seq}"
+            )
+            record = _record(
+                metadata=metadata,
+                announcement_id=announcement_id,
+                product_name=product_name,
+                province=_cell(row, positions, "province"),
+                county=_cell(row, positions, "county"),
+                certificate_no=_cell(
+                    row, positions, "certificate_no"
+                ),
+                applicant=_cell(row, positions, "applicant"),
+                production_scale_raw=_cell(
+                    row, positions, "production_scale_raw"
+                ),
+                main_operators_raw=_cell(
+                    row, positions, "main_operators_raw"
+                ),
+                locator=locator,
+                row_no=row_no,
+                seq=seq,
+                source_names=source_names,
+                source_kind="embedded_html",
+                table_no=table_no,
+                page_url=page_url,
+            )
+            if record["source_item_id"] in seen:
+                continue
+            seen.add(record["source_item_id"])
+            records.append(record)
     return records
 
 

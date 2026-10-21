@@ -1,21 +1,91 @@
 import json
 import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
+from crawler.collection.shared.crawler_collection.database import (
+    CollectionDatabase,
+)
 from crawler.pipeline.offline_fixture import (
     OfflineFixtureConfig,
     run_offline_fixture,
 )
 
 
-FIXTURE_ROOT = (
-    Path(__file__).resolve().parent / "fixtures" / "evidence" / "dialect-org"
-)
+ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = ROOT / "collection" / "projects" / "dialect-org"
+FIXTURE_ROOT = ROOT / "tests" / "fixtures" / "evidence" / "dialect-org"
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from dialect_org.candidate import write_candidate  # noqa: E402
 
 
 class DialectOrgSourceTest(unittest.TestCase):
+    def test_explicit_false_rights_are_not_overwritten_by_item_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database = CollectionDatabase(Path(tmp) / "crawler.db")
+            item = {
+                "source_id": "dialect-org",
+                "source_item_id": "false-rights",
+                "run_id": "dialect-rights-test",
+                "source_url": "https://dialect.org.cn/dialect/false-rights",
+                "long_term_url": (
+                    "https://dialect.org.cn/dialect/false-rights"
+                ),
+                "detail_url": (
+                    "https://dialect.org.cn/dialect/false-rights"
+                ),
+                "detail_url_status": "direct",
+                "locator": "fixture false-rights",
+                "rights_status": "attribution-required",
+                "attribution_required": True,
+                "attribution_text": "来源默认署名",
+                "rights_evidence_url": "https://dialect.org.cn/",
+                "content_hash": "false-rights-hash",
+                "candidate_status": "candidate",
+                "candidate_reason": None,
+                "extra": {
+                    "region_raw": "广东广州",
+                    "province": "广东",
+                    "city": "广州",
+                    "lexeme": {
+                        "lemma": "食饭",
+                        "definition": "粤语：吃饭",
+                        "rights_status": "public-domain",
+                        "attribution_required": False,
+                        "attribution_text": "",
+                        "rights_evidence_url": "",
+                        "license_or_usage": "public-domain",
+                    },
+                },
+            }
+            conn = database.connect()
+            try:
+                write_candidate(
+                    conn,
+                    item,
+                    now="2026-10-22T10:00:00+08:00",
+                )
+                conn.commit()
+                lexeme = conn.execute(
+                    "SELECT rights_status, attribution_required, "
+                    "attribution_text, rights_evidence_url "
+                    "FROM std_dialect_lexemes"
+                ).fetchone()
+                source = conn.execute(
+                    "SELECT rights_status, attribution_required, "
+                    "attribution_text, rights_evidence_url "
+                    "FROM std_dialect_lexeme_sources"
+                ).fetchone()
+            finally:
+                conn.close()
+
+        expected = ("public-domain", 0, "", "")
+        self.assertEqual(lexeme, expected)
+        self.assertEqual(source, expected)
+
     def test_fixture_detail_persists_point_lexeme_and_invalid_audio_status(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

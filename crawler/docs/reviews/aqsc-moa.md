@@ -70,3 +70,11 @@
 - 真实 live 从 `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm` 返回 200 并发现 aqsc 公告页，公告页返回 200 并解析出 XLSX 链接，附件下载返回 403，未取得有效 XLSX。
 - live 计数为 raw 3、stage 1、blocked 1、deferred 0、候选 0、failure_count 1。robots 403 和附件 403 都保留为真实访问事实。
 - 结论保持 `blocked`，解除条件是主域 robots、公告页和附件入口恢复可采集响应。详见 `docs/reviews/aqsc-moa-scrapy-sample.md`。
+
+## 2026-10-22 最终审查修复
+
+- 公告解析顺序固定为 XLSX 附件优先、`.Details_con table` 兜底；附件与内嵌表并存时只产生附件行，同一自然键在解析阶段去重。
+- 文件行 `source_item_id` 改为证书号，或 `batch + product_name + province + county + applicant`；sheet、row、seq 继续只进入 locator，重排 fixture 已验证身份不变。
+- `.xls` 明确写 `blocked`，原因 `file:unsupported_extension:.xls`，不交给 `openpyxl` 误解析。
+- `allowed_domains` 从 `sources.json` 派生，manifest 承载链接、详情链接和附件链接在发请求前校验。
+- 新增真实结构内嵌表 fixture、附件优先级 fixture、项目级 Scrapy 回放和重排回归。

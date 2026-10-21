@@ -1,3 +1,4 @@
+import base64
 import json
 import sqlite3
 import sys
@@ -5,10 +6,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scrapy.http import HtmlResponse, Request
+
+from crawler.collection.shared.crawler_collection.registry import (
+    load_registry,
+)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = ROOT / "collection" / "projects" / "cnipa"
 FIXTURE = ROOT / "tests" / "fixtures" / "evidence" / "cnipa"
+REORDERED_FIXTURE = (
+    ROOT
+    / "tests"
+    / "fixtures"
+    / "regressions"
+    / "cnipa"
+    / "synthetic-announcement-687-reordered.pdf.b64"
+)
 REGISTRY = ROOT / "docs" / "sources.json"
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -25,6 +40,10 @@ class CnipaScrapyTest(unittest.TestCase):
         self.assertTrue(spider.live_enabled)
         self.assertEqual(spider.start_urls, [])
         self.assertEqual(spider.max_download_bytes, 100 * 1024 * 1024)
+        self.assertEqual(
+            spider.allowed_domains,
+            load_registry(REGISTRY)["cnipa"]["domains"],
+        )
 
     def test_pdf_parser_keeps_page_and_sequence_locators(self):
         payload = json.loads(
@@ -51,6 +70,48 @@ class CnipaScrapyTest(unittest.TestCase):
         self.assertTrue(all(row["detail_url"] is None for row in rows))
         self.assertTrue(
             all(row["detail_url_status"] == "missing" for row in rows)
+        )
+        self.assertEqual(rows[0]["extra"]["applicant"], "Example Applicant")
+
+    def test_pdf_natural_keys_survive_row_reordering(self):
+        payload = json.loads(
+            (FIXTURE / "discover.json").read_text(encoding="utf-8")
+        )
+        metadata = payload["items"][0]
+        original = parse_pdf_rows(
+            (FIXTURE / metadata["file_name"]).read_bytes(),
+            file_name=metadata["file_name"],
+            metadata=metadata,
+        )
+        reordered = parse_pdf_rows(
+            base64.b64decode(REORDERED_FIXTURE.read_bytes()),
+            file_name="synthetic-announcement-687-reordered.pdf",
+            metadata=metadata,
+        )
+
+        self.assertEqual(
+            {
+                row["source_item_id"]: row["title"]
+                for row in original
+            },
+            {
+                row["source_item_id"]: row["title"]
+                for row in reordered
+            },
+        )
+        self.assertEqual(
+            original[0]["source_item_id"],
+            "02:batch=第687号|product=Sample Pomegranate|"
+            "province=Example Province|county=|"
+            "applicant=Example Applicant",
+        )
+        self.assertIn("page=1; row=1; seq=1", original[0]["locator"])
+        reordered_by_title = {
+            row["title"]: row for row in reordered
+        }
+        self.assertIn(
+            "page=2; row=1; seq=2",
+            reordered_by_title["Sample Pomegranate"]["locator"],
         )
 
     def test_fixture_replay_uses_spider_middleware_and_pipeline(self):
@@ -117,6 +178,27 @@ class CnipaScrapyTest(unittest.TestCase):
             self.assertNotIn("X-Amz", row[3])
             self.assertNotIn("X-Amz", row[4])
             self.assertNotIn("X-Amz", fetch_url)
+
+    def test_disallowed_attachment_link_is_blocked(self):
+        request = Request(
+            "https://www.cnipa.gov.cn/art/2026/8/12/"
+            "art_1400_207705.html"
+        )
+        response = HtmlResponse(
+            request.url,
+            body=(
+                "<html><body><div class='index_art_con'>"
+                "<a href='https://evil.example/file.pdf'>file.pdf</a>"
+                "</div></body></html>"
+            ).encode("utf-8"),
+            encoding="utf-8",
+            request=request,
+        )
+
+        item = next(CnipaSpider().parse_carrier(response))
+
+        self.assertEqual(item.candidate_status, "blocked")
+        self.assertIn("url:domain_not_allowed", item.candidate_reason)
 
 
 if __name__ == "__main__":

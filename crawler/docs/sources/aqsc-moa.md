@@ -125,6 +125,8 @@
 - 文件名前的 `P020<数字>` 是发布系统内部编号，不对应产品编号。
 - 同一公告可同时提供 `.pdf` 正文和 `.xlsx` 名单，应优先解析 XLSX；PDF 只作正文和版式核验。
 - 2024 至 2026 年不少公告把名单直接嵌入 HTML 表格，没有附件。解析器必须同时支持附件和 `.Details_con table`。
+- 名单附件只支持 `.xlsx`。发现 `.xls` 时写 `candidate_status=blocked`，原因 `file:unsupported_extension:.xls`，不得交给 `openpyxl` 误解析。
+- 同一公告同时存在 XLSX 附件和 `.Details_con table` 时，只解析 XLSX 附件；没有可用 XLSX 附件时才解析内嵌表。两条路径使用同一自然键，重复行按自然键去重。
 
 ### 附件表头
 
@@ -481,6 +483,8 @@
 
 - 2026-10-20 的历史 fixture 切片使用已退役的旧在线入口。当前回归入口为 `python -m unittest crawler.tests.test_aqsc_moa_scrapy -v`，使用临时采集库并经过真实 Scrapy process。
 - 2026-10-21 项目级 fixture 回放改为真实 Scrapy process，经过 Spider、robots middleware、raw middleware、Pipeline 和采集运行时。回放产生 raw 5、XLSX 附件 2、stage 8、deferred 候选 8；每条候选保留工作表、行号和序号 locator。
+- 2026-10-22 文件行 `source_item_id` 改为稳定自然键：有证书号时使用证书号，缺证书号时使用批次、产品名、省份、县域和申请单位。工作表名、行号、序号继续只写 locator，文件或行重排不改变记录身份。
+- 2026-10-22 增加 `.Details_con table` 内嵌名单解析和真实结构 fixture；项目级回放覆盖“只有内嵌表”和“附件与内嵌表并存”两种路径，后者只产生附件行。
 - 2026-10-21 真实 live 小样本从监管司发现页返回 200，公告页返回 200 并解析出 XLSX 链接，附件下载返回 403。raw 保存发现页、公告页和 403 错误响应，stage 写入 1 条 blocked 记录，候选 0，failure_count 1。live 原始证据位置见 `docs/reviews/aqsc-moa-scrapy-sample.md`。
 - 100MB 上限使用声明大小 104857601 bytes 的响应验证，`raw_files.download_status=oversize`，只写 `OVERSIZE.md`，不保存正文。
 - 名特优新样本 4 行，特质农品样本 4 行；每行保留附件名、工作表、行号 locator。真实本地附件的 790 行和 152 行规模不进入公开仓库。

@@ -1,6 +1,6 @@
 import unittest
 
-from scrapy.http import HtmlResponse
+from scrapy.http import HtmlResponse, Request
 
 from crawler.collection.projects.nongmuhr.nongmuhr.parsers import (
     parse_job_detail,
@@ -147,9 +147,90 @@ class NongmuhrScrapyTest(unittest.TestCase):
         self.assertEqual(item["extra"]["headcount"], 1)
         self.assertEqual(item["extra"]["deadline_at"], "2026-07-30")
         self.assertEqual(item["extra"]["published_at"], "2025-08-10")
+        self.assertEqual(item["extra"]["company_region"], "江西")
+        self.assertEqual(item["extra"]["province"], "江西")
+        self.assertEqual(item["extra"]["city"], "宜春市")
+        self.assertEqual(
+            item["extra"]["locations"],
+            [
+                {
+                    "location_raw": "宜春市",
+                    "province": "江西",
+                    "city": "宜春市",
+                    "county": None,
+                    "extra": {
+                        "source": "work_location",
+                        "company_region": "江西",
+                    },
+                }
+            ],
+        )
         self.assertEqual(item["body_text"], "负责养殖场设备维护。")
         self.assertIn("rights_risk", item["extra"])
         self.assertNotIn("contact_phone", item)
+
+    def test_company_region_is_used_when_work_location_is_open(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                "<td>工作地点：</td><td>宜春市</td>",
+                "<td>工作地点：</td><td>不限地点</td>",
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        item = parse_job_detail(response)
+
+        self.assertEqual(item["extra"]["reported_location_raw"], "不限地点")
+        self.assertEqual(item["extra"]["location_raw"], "江西")
+        self.assertEqual(item["extra"]["province"], "江西")
+        self.assertEqual(
+            item["extra"]["locations"][0]["extra"]["source"],
+            "company_region",
+        )
+
+    def test_missing_location_marks_job_blocked(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                "<td>工作地点：</td><td>宜春市</td>",
+                "<td>工作地点：</td><td></td>",
+            ).replace(
+                "公司性质：外资/合资企业 所在地区:江西",
+                "公司性质：外资/合资企业",
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        item = parse_job_detail(response)
+
+        self.assertEqual(item["candidate_status"], "blocked")
+        self.assertEqual(
+            item["candidate_reason"], "location:unavailable"
+        )
+        self.assertEqual(item["extra"]["locations"], [])
+
+    def test_list_location_is_used_when_detail_location_is_missing(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                "<td>工作地点：</td><td>宜春市</td>",
+                "<td>工作地点：</td><td></td>",
+            ).replace(
+                "公司性质：外资/合资企业 所在地区:江西",
+                "公司性质：外资/合资企业",
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        item = parse_job_detail(
+            response,
+            list_extra={"location_raw": "宜春市"},
+        )
+
+        self.assertNotEqual(item.get("candidate_status"), "blocked")
+        self.assertEqual(item["extra"]["location_raw"], "宜春市")
+        self.assertEqual(item["extra"]["city"], "宜春市")
 
     def test_detail_parser_rejects_missing_job_title_container(self):
         response = HtmlResponse(
@@ -166,6 +247,47 @@ class NongmuhrScrapyTest(unittest.TestCase):
         self.assertEqual(spider.name, "nongmuhr")
         self.assertEqual(spider.source_id, "nongmuhr")
         self.assertEqual(spider.allowed_domains, ["nongmuhr.com"])
+
+    def test_detail_parse_failure_becomes_blocked_item_with_evidence(self):
+        request = Request(
+            "http://nongmuhr.com/EmployView.aspx?Id=13553",
+            meta={
+                "raw_evidence_id": 42,
+                "detail_url": (
+                    "http://nongmuhr.com/EmployView.aspx?Id=13553"
+                ),
+                "long_term_url": (
+                    "http://nongmuhr.com/EmployView.aspx?Id=13553"
+                ),
+                "locator": "list row 13553",
+            },
+        )
+        response = HtmlResponse(
+            request.url,
+            body=b"<html><body>navigation only</body></html>",
+            encoding="utf-8",
+            request=request,
+        )
+        list_item = {
+            "source_item_id": "13553",
+            "title": "设备工程师",
+            "detail_url": request.url,
+            "locator": "list row 13553",
+            "extra": {},
+        }
+
+        item = next(
+            NongmuhrSpider().parse_detail(response, list_item)
+        )
+
+        self.assertEqual(item.candidate_status, "blocked")
+        self.assertIn("parse:job_detail", item.candidate_reason)
+        self.assertEqual(item.source_url, request.url)
+        self.assertEqual(item.long_term_url, request.url)
+        self.assertEqual(item.locator, "list row 13553")
+        self.assertEqual(item.raw_evidence_id, 42)
+        self.assertEqual(item.extra["failure_url"], request.url)
+        self.assertEqual(item.extra["error_type"], "ValueError")
 
 
 if __name__ == "__main__":

@@ -20,6 +20,11 @@ POINT_FIELDS = (
 )
 
 
+def _first_present(mapping, name, fallback):
+    value = mapping.get(name)
+    return fallback if value is None else value
+
+
 def write_candidate(conn, item, *, now):
     extra = item["extra"]
     upsert_candidate(
@@ -45,6 +50,21 @@ def write_candidate(conn, item, *, now):
     lexeme = extra.get("lexeme") or {}
     if not lexeme.get("lemma"):
         return
+    lexeme_rights_status = _first_present(
+        lexeme, "rights_status", item["rights_status"]
+    )
+    lexeme_attribution_required = _first_present(
+        lexeme, "attribution_required", item["attribution_required"]
+    )
+    lexeme_attribution_text = _first_present(
+        lexeme, "attribution_text", item["attribution_text"]
+    )
+    lexeme_rights_evidence_url = _first_present(
+        lexeme, "rights_evidence_url", item["rights_evidence_url"]
+    )
+    lexeme_license_or_usage = _first_present(
+        lexeme, "license_or_usage", item["rights_status"]
+    )
     lexeme_hash = lexeme.get("content_hash") or sha256_bytes(
         json.dumps(
             {
@@ -98,16 +118,12 @@ def write_candidate(conn, item, *, now):
             lexeme.get("example"),
             lexeme.get("audio_url"),
             lexeme.get("audio_status") or "missing",
-            lexeme.get("rights_status") or item["rights_status"],
-            1
-            if lexeme.get("attribution_required")
-            or item["attribution_required"]
-            else 0,
-            lexeme.get("attribution_text") or item["attribution_text"],
-            lexeme.get("rights_evidence_url")
-            or item["rights_evidence_url"],
+            lexeme_rights_status,
+            1 if lexeme_attribution_required else 0,
+            lexeme_attribution_text,
+            lexeme_rights_evidence_url,
             lexeme.get("confidence") or "medium",
-            lexeme.get("license_or_usage") or item["rights_status"],
+            lexeme_license_or_usage,
             "draft",
             item.get("candidate_status") or "candidate",
             item.get("candidate_reason"),
@@ -127,17 +143,6 @@ def write_candidate(conn, item, *, now):
     detail_url = lexeme.get("detail_url") or item["detail_url"]
     detail_url_status = (
         lexeme.get("detail_url_status") or item["detail_url_status"]
-    )
-    rights_status = lexeme.get("rights_status") or item["rights_status"]
-    attribution_required = bool(
-        lexeme.get("attribution_required")
-        or item["attribution_required"]
-    )
-    attribution_text = (
-        lexeme.get("attribution_text") or item["attribution_text"]
-    )
-    rights_evidence_url = (
-        lexeme.get("rights_evidence_url") or item["rights_evidence_url"]
     )
     conn.execute(
         """
@@ -173,10 +178,10 @@ def write_candidate(conn, item, *, now):
             detail_url_status,
             lexeme.get("fetch_url"),
             lexeme.get("locator") or item["locator"],
-            rights_status,
-            1 if attribution_required else 0,
-            attribution_text,
-            rights_evidence_url,
+            lexeme_rights_status,
+            1 if lexeme_attribution_required else 0,
+            lexeme_attribution_text,
+            lexeme_rights_evidence_url,
             now,
             lexeme_hash,
             json.dumps(lexeme.get("extra") or {}, ensure_ascii=False),

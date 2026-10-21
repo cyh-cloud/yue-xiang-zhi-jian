@@ -1,0 +1,19 @@
+{
+  "source_id": "aqsc-moa",
+  "items": [
+    {
+      "source_item_id": "synthetic-mtyx-priority",
+      "file_name": "synthetic-mtyx-sample.xlsx",
+      "carrier_file": "details-con-priority.html",
+      "title": "2025年第三批全国名特优新农产品公示",
+      "source_url": "http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx",
+      "long_term_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm",
+      "announcement_id": "468194",
+      "batch": "2025年第三批",
+      "published_at": "2025-11-28",
+      "cert_type": "mingteyouxin",
+      "candidate_reason": "file-source:fixture",
+      "locator": "sheet=Sheet1; row=3"
+    }
+  ]
+}

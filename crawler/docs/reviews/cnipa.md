@@ -72,3 +72,9 @@
 - raw 2、PDF 文件 1、stage 58、deferred 候选 58，候选原因 `robots:not-found`，failure_count 0。
 - 产品行保留页码和序号 locator，`detail_url=null`、`detail_url_status=missing`；公告页是 `long_term_url`，附件 URL 是 `source_url` 和 `fetch_url`。
 - `ggfw.cnipa.gov.cn` 的签名 PDF 路径仍未解除 `unknown` robots 约束。详见 `docs/reviews/cnipa-scrapy-sample.md`。
+
+## 2026-10-22 最终审查修复
+
+- 文件行 `source_item_id` 改为 `batch + product_name + province + county + applicant`，PDF 页码、页内行号和序号继续只进入 locator。
+- 增加产品行重排 PDF fixture，验证重排前后自然键集合一致，locator 可以随页码和序号变化。
+- `allowed_domains` 从 `sources.json` 派生，manifest 承载链接和公告附件链接在发请求前校验；越界链接写 blocked Item。
