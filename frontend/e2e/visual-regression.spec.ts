@@ -155,11 +155,12 @@ test.describe("desktop visual regression", () => {
       route.fulfill({ json: { success: true, count: 0 } }),
     );
 
-    await signIn(page, "admin_demo", "admin123");
+    await signIn(page, "admin_demo", "admin123", { blockCdn: false });
     await expect(page).toHaveURL(/\/admin\/dashboard$/);
     await expect(page.getByTestId("admin-stat-users-total")).toContainText(
       "128",
     );
+    await waitForCdnState(page);
     await page.evaluate(() => document.fonts.ready);
     await expect(page).toHaveScreenshot("backoffice-admin-desktop.png", {
       fullPage: true,
@@ -243,11 +244,12 @@ test.describe("desktop visual regression", () => {
       route.fulfill({ json: { success: true, count: 0 } }),
     );
 
-    await signIn(page, "operator_demo", "123456");
+    await signIn(page, "operator_demo", "123456", { blockCdn: false });
     await expect(page).toHaveURL(/\/operator\/overview$/);
     await expect(page.getByTestId("operator-stat-overdue-tasks")).toContainText(
       "1",
     );
+    await waitForCdnState(page);
     await page.evaluate(() => document.fonts.ready);
     await expect(page).toHaveScreenshot("backoffice-operator-desktop.png", {
       fullPage: true,
