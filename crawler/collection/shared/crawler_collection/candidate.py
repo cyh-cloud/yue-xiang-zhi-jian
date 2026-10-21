@@ -76,3 +76,10 @@ def upsert_candidate(conn, item, *, table, fields, values, now):
         """,
         candidate_common_values(item, now=now) + tuple(values),
     )
+    return conn.execute(
+        f"""
+        SELECT id FROM {table}
+        WHERE source_id = ? AND source_item_id = ?
+        """,
+        (item["source_id"], item["source_item_id"]),
+    ).fetchone()[0]
