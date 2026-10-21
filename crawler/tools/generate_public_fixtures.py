@@ -22,8 +22,8 @@ ROOT = Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / "crawler" / "tests" / "fixtures" / "evidence"
 _FIXED_DATE = datetime(2026, 1, 1, 0, 0, 0)
 _LEGACY_FILES = (
-    EVIDENCE / "aqsc" / "2025年第三批名特优新公示表.xlsx",
-    EVIDENCE / "aqsc" / "2025年第三批特质农品公示表.xlsx",
+    EVIDENCE / "aqsc-moa" / "2025年第三批名特优新公示表.xlsx",
+    EVIDENCE / "aqsc-moa" / "2025年第三批特质农品公示表.xlsx",
     EVIDENCE
     / "cnipa"
     / "国家知识产权局关于对临晋江石榴等58个产品予以地理标志产品认定的公告（第687号）.pdf",
@@ -176,7 +176,7 @@ def _html(title: str, body: str, *, job_title: str | None = None) -> str:
 
 def generate_public_fixtures(root: Path = EVIDENCE) -> None:
     root = Path(root)
-    (root / "aqsc").mkdir(parents=True, exist_ok=True)
+    (root / "aqsc-moa").mkdir(parents=True, exist_ok=True)
     (root / "cnipa").mkdir(parents=True, exist_ok=True)
     (root / "nongmuhr").mkdir(parents=True, exist_ok=True)
     (root / "nzrc").mkdir(parents=True, exist_ok=True)
@@ -186,7 +186,7 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
             path.unlink()
 
     _write_xlsx(
-        root / "aqsc" / "synthetic-mtyx-sample.xlsx",
+        root / "aqsc-moa" / "synthetic-mtyx-sample.xlsx",
         [
             ["Synthetic 名特优新 fixture"],
             ["序号", "省份", "县域", "证书编号", "产品名称", "获证单位", "生产规模", "主要生产经营单位"],
@@ -197,7 +197,7 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
         ],
     )
     _write_xlsx(
-        root / "aqsc" / "synthetic-tepinongpin-sample.xlsx",
+        root / "aqsc-moa" / "synthetic-tepinongpin-sample.xlsx",
         [
             ["Synthetic 特质农品 fixture"],
             ["序号", "省份", "县域", "产品全称", "申请单位全称", "生产规模"],
@@ -211,14 +211,20 @@ def generate_public_fixtures(root: Path = EVIDENCE) -> None:
     (root / "cnipa" / "synthetic-announcement-687.pdf").write_bytes(
         build_pdf(
             [
-                ["SYNTHETIC-FIXTURE", "CNIPA announcement 687"],
                 [
                     "SYNTHETIC-FIXTURE",
+                    "Attachment 1",
+                    "Synthetic geographical indication product information",
+                    "Seq Product Name Province Applicant Origin Scope Remarks",
                     "1",
                     "Sample Pomegranate",
                     "Example Province",
                     "Example Applicant",
                     "Example Origin Scope",
+                ],
+                [
+                    "SYNTHETIC-FIXTURE",
+                    "Seq Product Name Province Applicant Origin Scope Remarks",
                     "2",
                     "Sample Tea",
                     "Example Province",

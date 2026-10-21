@@ -2,7 +2,7 @@
 
 状态: active
 
-日期: 2026-10-19
+日期: 2026-10-21
 
 本文是采集证据的单一索引。账本只记录位置、规模、哈希和审核入口，不复制样本正文。本地下载目录的逐文件哈希以 `download/SHA256SUMS.txt` 为机器可读索引；公开 fixture 的哈希以下方专用表为准，人工说明以本表和来源审核记录为准。
 
@@ -30,8 +30,8 @@
 | source_id | verified_at | key_urls | fixture_dir | files | bytes | sha256_index | review |
 | --- | --- | --- | --- | ---: | ---: | --- | --- |
 | `ihchina` | 2026-10-19 18:05 Asia/Shanghai | `https://www.ihchina.cn/getProject.html`；`https://www.ihchina.cn/project_details/12178.html` | `crawler/tests/fixtures/evidence/ihchina/` | 1 | 1019 | 见下方 fixture 表 | `docs/reviews/ihchina.md` |
-| `aqsc-moa` | 2026-10-19 01:29 Asia/Shanghai | `http://www.aqsc.agri.cn/tzgg/`；`http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 3 | 11799 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
-| `cnipa` | 2026-10-19 01:53 Asia/Shanghai | `https://ggfw.cnipa.gov.cn/dlbzsq/dbQuery`；`https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541` | `crawler/tests/fixtures/evidence/cnipa/` | 2 | 2012 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
+| `aqsc-moa` | 2026-10-21 23:05 Asia/Shanghai | `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm`；`http://www.aqsc.agri.cn/tzgg/202508/t20250806_463294.htm`；`http://www.aqsc.agri.cn/tzgg/202508/P020250821548932446299.xlsx` | `crawler/tests/fixtures/evidence/aqsc-moa/` | 3 | 12116 | 下方 fixture 表 | `docs/reviews/aqsc-moa.md` |
+| `cnipa` | 2026-10-21 23:05 Asia/Shanghai | `https://www.cnipa.gov.cn/art/2026/8/12/art_1400_207705.html`；`https://www.cnipa.gov.cn/module/download/downfile.jsp` | `crawler/tests/fixtures/evidence/cnipa/` | 2 | 2338 | 下方 fixture 表 | `docs/reviews/cnipa.md` |
 | `weather` | 2026-10-19 01:29 Asia/Shanghai | `https://www.weather.com.cn/`；`https://d1.weather.com.cn/sk_2d/101010100.html` | `crawler/tests/fixtures/evidence/weather/` | 2 | 407 | 下方 fixture 表 | `docs/reviews/weather.md` |
 | `open-meteo` | 2026-10-20 Asia/Shanghai | `https://open-meteo.com/`；`https://api.open-meteo.com/v1/forecast` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/open-meteo.md` |
 | `qweather` | 2026-10-20 Asia/Shanghai | `https://www.qweather.com/`；`https://devapi.qweather.com/v7/weather/now` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/qweather.md` |
@@ -46,24 +46,25 @@
 
 ## 当前汇总
 
-- 公开合成 fixture 共 17 个文件，总字节 20472，最大单文件 5445 字节，低于 100MB。
+- 公开合成 fixture 共 17 个文件，总字节 21219，最大单文件 5445 字节，低于 100MB。
 - 所有公开 XLSX、PDF、HTML 都带合成标记，不含真实联系人列、隐藏表单 token、原始作者元数据或嵌入附件。
 - 本地 `crawler/download/` 仍为未跟踪证据目录，不进入公开索引；没有文件时记为 0，不伪造哈希。
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
 - `ihchina` 2026-10-19 的分页全量校验只保存统计结果，见 `operations/validation.md`。详情 HTML 与 raw 快照尚未落盘。
 - `cnipa` 的短期签名 URL 不进入账本。长期入口使用检索详情页或公告页，文件本体用本地 SHA-256 标识。
+- `aqsc-moa` live 被 403 阻断；`cnipa` live 使用 www 公告页和 428298 bytes PDF，产生 58 条 deferred 候选。原始证据留在临时目录，摘要见 `reviews/*-scrapy-sample.md`。
 - live 小样本的运行结果、`failure_count` 和阻断原因以 `reviews/` 与 `scrapy-migration-validation.md` 为准，本账本不复制这些计数。
 
 ## 公开 fixture 索引
 
 | 文件 | bytes | SHA-256 |
 | --- | ---: | --- |
-| `crawler/tests/fixtures/evidence/aqsc-moa/discover.json` | 1042 | `932bf54e828232c1f3377e43264eca39031cd0ab6abbe4221cf135ca00bf2c1b` |
+| `crawler/tests/fixtures/evidence/aqsc-moa/discover.json` | 1359 | `734becbadb8820129b1e1e2bc23b82eac4fb5c9a091533f2342153e88cedc1b5` |
 | `crawler/tests/fixtures/evidence/aqsc-moa/synthetic-mtyx-sample.xlsx` | 5445 | `c77f3a82b228f09303188eeef30d3e4beb275405fe790624d3aca49140749924` |
 | `crawler/tests/fixtures/evidence/aqsc-moa/synthetic-tepinongpin-sample.xlsx` | 5312 | `af128ce30aea149f6ce54ef9c6b4eaab5bacc5fa1a5ded35b5224ddc0bd5038f` |
 | `crawler/tests/fixtures/evidence/cass-linguistics/discover.json` | 613 | `9683fcd3a167e43c434b7c2be358d3634e9776adbe2162c0113040c77508bc8b` |
-| `crawler/tests/fixtures/evidence/cnipa/discover.json` | 528 | `845c367b6faa0597f41f7167dacf1745444f7bf219b3190a38ae4fcc798f8c37` |
-| `crawler/tests/fixtures/evidence/cnipa/synthetic-announcement-687.pdf` | 1484 | `a003e49e62921be5b06de41993ed8f55ba6faceb805521f860e2fe21c947caea` |
+| `crawler/tests/fixtures/evidence/cnipa/discover.json` | 671 | `777d99d37ff8a27ffabd06aad91851d89c3aecb7c24bd716d9c273258a5fe5e5` |
+| `crawler/tests/fixtures/evidence/cnipa/synthetic-announcement-687.pdf` | 1667 | `76a1a3c162b12f95fa48f59380dc210b4a648aab4081299f4459c3c4a6c0e47e` |
 | `crawler/tests/fixtures/evidence/dialect-org/discover.json` | 495 | `7236c533df2f9100684adbd8b65a5e18c2abb7f48452474273bb3970c1e6fd20` |
 | `crawler/tests/fixtures/evidence/feiyiw/discover.json` | 556 | `443233489783b53f804ad26da39405b2d7b71a6e3e709bdb8082aff4235f8397` |
 | `crawler/tests/fixtures/evidence/ihchina/discover.json` | 1019 | `2865d896c53bf4d87b0724eba9ec8efcebed0936af618ab9a2c800513fb2f9aa` |

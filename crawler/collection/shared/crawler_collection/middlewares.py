@@ -50,11 +50,20 @@ class RawEvidenceMiddleware:
         if request.meta.get("dont_obey_robotstxt"):
             return response
         body = response.body
-        file_name = Path(response.url.split("?", 1)[0]).name
+        file_name = request.meta.get("file_name") or Path(
+            response.url.split("?", 1)[0]
+        ).name
         run_id = request.meta.get("run_id") or getattr(spider, "run_id", None)
         if not run_id:
             raise RuntimeError("request is missing the crawl run_id")
         content_hash = sha256_bytes(body)
+        declared_size = response.headers.get("Content-Length")
+        try:
+            declared_size = (
+                int(declared_size) if declared_size is not None else None
+            )
+        except (TypeError, ValueError):
+            declared_size = None
         raw_id = self.runtime.persist_raw(
             RawEvidence(
                 source_id=spider.source_id,
@@ -85,6 +94,7 @@ class RawEvidenceMiddleware:
                     "robots_decision", "unknown"
                 ),
                 run_id=run_id,
+                declared_size=declared_size,
                 metadata={
                     "file_name": file_name or "response.bin",
                     "robots_status_code": request.meta.get(

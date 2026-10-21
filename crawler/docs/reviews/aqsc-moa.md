@@ -63,3 +63,10 @@
 - robots 的 403/404 无法确认许可，建议在调度器接入前按实际 User-Agent 和站点联系渠道复核，而不是把 404 当作允许。
 - 水产 68/10 条关键词候选只是筛查量；后续应建立人工复核集，尤其处理 `鲅鱼圈鸡蛋`、`安溪毛蟹`、`仪征紫菜薹`、贝母、丹参、鱼腥草等误报。
 - 两份附件的县域空值、联系人占位符和旧 PDF OCR 可在转换器实现前再做质量抽样。
+
+## 2026-10-21 live Scrapy 复核
+
+- fixture 回放已经通过真实 Spider、robots middleware、raw middleware、Pipeline 和采集运行时，产生 raw 5、XLSX 附件 2、stage 8、deferred 候选 8。
+- 真实 live 从 `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm` 返回 200 并发现 aqsc 公告页，公告页返回 200 并解析出 XLSX 链接，附件下载返回 403，未取得有效 XLSX。
+- live 计数为 raw 3、stage 1、blocked 1、deferred 0、候选 0、failure_count 1。robots 403 和附件 403 都保留为真实访问事实。
+- 结论保持 `blocked`，解除条件是主域 robots、公告页和附件入口恢复可采集响应。详见 `docs/reviews/aqsc-moa-scrapy-sample.md`。

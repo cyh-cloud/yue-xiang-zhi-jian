@@ -52,7 +52,7 @@ class CnipaSourceTest(unittest.TestCase):
             finally:
                 conn.close()
             self.assertEqual(file_count, 2)
-            self.assertEqual(result.discovered_count, 4)
+            self.assertEqual(result.discovered_count, 2)
             self.assertTrue(any(value.startswith("cnipa:687:") for value in ids))
             self.assertTrue(any(value.startswith("cnipa:89:") for value in ids))
 
@@ -70,7 +70,7 @@ class CnipaSourceTest(unittest.TestCase):
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.written_count, 0)
-            self.assertEqual(result.skipped_count, 2)
+            self.assertEqual(result.skipped_count, 1)
             conn = sqlite3.connect(config.database_path)
             try:
                 first = conn.execute(

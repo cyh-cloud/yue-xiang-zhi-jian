@@ -1,29 +1,33 @@
-"""cnipa project fixture replay entry."""
+"""cnipa fixture replay through a real Scrapy process."""
 
 from __future__ import annotations
 
+import argparse
 import json
-import mimetypes
-from datetime import datetime, timezone
+import os
+import subprocess
+import sys
+from dataclasses import fields
 from pathlib import Path
 
-from crawler.collection.shared.crawler_collection.evidence import RawEvidence
-from crawler.collection.shared.crawler_collection.reporting import (
-    build_run_report,
-)
+from scrapy.crawler import CrawlerProcess
+from scrapy.settings import Settings
+
+from crawler.collection.shared.crawler_collection.reporting import RunReport
 from crawler.collection.shared.crawler_collection.run_id import new_run_id
-from crawler.collection.shared.crawler_collection.runtime import (
-    CollectionRuntime,
-)
 from crawler.collection.shared.crawler_collection.testing import (
+    FixtureHTTPServer,
     source_fixture_dir,
 )
 
-from .candidate import write_candidate
-from .parsers import fixture_item
+from . import settings as project_settings
+from .parsers import PDF_MIME_TYPE
+from .spiders.collection import CnipaSpider
 
 
 SOURCE_ID = "cnipa"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[5]
 
 
 def _require_fixture_dir(fixture_dir):
@@ -34,14 +38,94 @@ def _require_fixture_dir(fixture_dir):
     return expected
 
 
-def _discover_items(fixture_dir):
+def _manifest_url(fixture_dir, server):
     payload = json.loads(
         (fixture_dir / "discover.json").read_text(encoding="utf-8")
     )
-    return {
-        item["source_item_id"]: item
-        for item in payload.get("items") or []
-    }
+    items = []
+    for item in payload.get("items") or []:
+        file_name = item.get("file_name")
+        if not file_name:
+            raise ValueError("fixture item is missing file_name")
+        file_path = fixture_dir / file_name
+        file_route = f"/files/{file_name}"
+        carrier_route = f"/carriers/{item['source_item_id']}.html"
+        server.add_route(
+            file_route,
+            file_path.read_bytes(),
+            content_type=PDF_MIME_TYPE,
+        )
+        carrier_html = (
+            "<!doctype html><html><head><meta charset=\"utf-8\">"
+            "<meta name=\"fixture-origin\" content=\"synthetic-fixture\">"
+            f"<title>{item.get('title') or item['source_item_id']}</title>"
+            "</head><body>"
+            "<div class=\"index_title\">"
+            f"{item.get('title') or item['source_item_id']}</div>"
+            "<div class=\"index_time\">发布时间："
+            f"{item.get('published_at') or ''}</div>"
+            "<div class=\"index_art_con\">"
+            f"<a class=\"attachment\" href=\"{file_route}\">"
+            f"{file_name}</a>"
+            "</div></body></html>"
+        )
+        server.add_route(
+            carrier_route,
+            carrier_html.encode("utf-8"),
+            content_type="text/html; charset=utf-8",
+        )
+        items.append(
+            {
+                **item,
+                "carrier_url": server.url(carrier_route),
+                "file_url": server.url(file_route),
+                "file_source_url": item.get("source_url"),
+            }
+        )
+    manifest = {**payload, "items": items}
+    server.add_route(
+        "/discover.json",
+        json.dumps(manifest, ensure_ascii=False).encode("utf-8"),
+        content_type="application/json",
+    )
+    return server.url("/discover.json")
+
+
+def _run_fixture_process(args):
+    fixture_dir = Path(args.fixture_dir).resolve()
+    database_path = Path(args.database_path).resolve()
+    download_root = Path(args.download_root).resolve()
+    registry_path = Path(args.registry_path).resolve()
+    report_root = Path(args.report_root).resolve()
+    with FixtureHTTPServer() as server:
+        start_url = _manifest_url(fixture_dir, server)
+        settings = Settings()
+        settings.setmodule(project_settings)
+        settings.set("COLLECTION_DATABASE_PATH", str(database_path))
+        settings.set("COLLECTION_DOWNLOAD_ROOT", str(download_root))
+        settings.set("SOURCE_REGISTRY_PATH", str(registry_path))
+        settings.set("COLLECTION_REPORT_ROOT", str(report_root))
+        settings.set("COLLECTION_RUN_MODE", "fixture")
+        settings.set("DOWNLOAD_DELAY", 0)
+        settings.set("RETRY_TIMES", 0)
+        settings.set("LOG_LEVEL", "ERROR")
+        process = CrawlerProcess(
+            settings, install_root_handler=False
+        )
+        process.crawl(
+            CnipaSpider,
+            start_urls=[start_url],
+            run_id=args.run_id,
+        )
+        process.start(stop_after_crawl=True)
+
+
+def _report_from_file(path):
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    allowed = {field.name for field in fields(RunReport)}
+    return RunReport(
+        **{key: value for key, value in payload.items() if key in allowed}
+    )
 
 
 def replay_cnipa_fixture(
@@ -53,94 +137,79 @@ def replay_cnipa_fixture(
     run_id=None,
     report_root=None,
 ):
+    """Replay cnipa fixtures through Spider, middleware, and Pipeline."""
+
     fixture_dir = _require_fixture_dir(fixture_dir)
     run_id = run_id or new_run_id(SOURCE_ID)
-    started_at = datetime.now(timezone.utc).isoformat()
-    runtime = CollectionRuntime(
-        database_path=database_path,
-        download_root=download_root,
-        registry_path=registry_path,
-        candidate_writer=write_candidate,
+    database_path = Path(database_path).resolve()
+    download_root = Path(download_root).resolve()
+    registry_path = Path(registry_path).resolve()
+    report_root = Path(
+        report_root or database_path.parent / "reports"
+    ).resolve()
+    report_root.mkdir(parents=True, exist_ok=True)
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [
+            str(REPO_ROOT),
+            str(PROJECT_ROOT),
+            env.get("PYTHONPATH", ""),
+        ]
     )
-    discover = _discover_items(fixture_dir)
-    files = sorted(fixture_dir.glob("*.pdf"))
-    written = 0
-    blocked = 0
-    deferred = 0
-    failed = 0
-    errors = []
-    for path in files:
-        item = fixture_item(path)
-        metadata = discover.get(item["source_item_id"], {})
-        item.update(
-            {
-                "source_url": metadata.get(
-                    "source_url", item["source_url"]
-                ),
-                "long_term_url": metadata.get(
-                    "long_term_url", item["long_term_url"]
-                ),
-                "locator": metadata.get("locator", item["locator"]),
-                "run_id": run_id,
-                "mode": "fixture",
-                "extra": metadata.get("extra") or {},
-            }
-        )
-        body = path.read_bytes()
-        raw_id = runtime.persist_raw(
-            RawEvidence(
-                source_id=SOURCE_ID,
-                request_url=item["source_url"],
-                final_url=item["source_url"],
-                source_url=item["source_url"],
-                long_term_url=item["long_term_url"],
-                detail_url=None,
-                detail_url_status="missing",
-                fetch_url=item.get("fetch_url"),
-                locator=item["locator"],
-                body=body,
-                content_type=(
-                    mimetypes.guess_type(path.name)[0]
-                    or "application/pdf"
-                ),
-                run_id=run_id,
-                robots_decision="allowed",
-                metadata={"file_name": path.name},
-            )
-        )
-        try:
-            result = runtime.write_item(item, raw_evidence_id=raw_id)
-            if result["candidate_status"] == "candidate":
-                written += 1
-            elif result["candidate_status"] == "blocked":
-                blocked += 1
-            elif result["candidate_status"] == "deferred":
-                deferred += 1
-            else:
-                failed += 1
-                errors.append(
-                    f"{path.name}: {result['candidate_status']}: "
-                    f"{result.get('candidate_reason')}"
-                )
-        except Exception as exc:
-            failed += 1
-            errors.append(f"{path.name}: {type(exc).__name__}: {exc}")
-    return build_run_report(
-        run_id=run_id,
-        source_id=SOURCE_ID,
-        mode="fixture",
-        database_path=database_path,
-        started_at=started_at,
-        finished_at=datetime.now(timezone.utc).isoformat(),
-        request_count=len(files),
-        item_counts={
-            "discovered": len(files),
-            "written": written,
-            "blocked": blocked,
-            "deferred": deferred,
-            "failed": failed,
-        },
-        errors=errors,
-        evidence_path=download_root,
-        report_root=report_root,
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "cnipa.replay",
+            "--run-fixture",
+            "--fixture-dir",
+            str(fixture_dir),
+            "--database-path",
+            str(database_path),
+            "--download-root",
+            str(download_root),
+            "--registry-path",
+            str(registry_path),
+            "--report-root",
+            str(report_root),
+            "--run-id",
+            run_id,
+        ],
+        cwd=PROJECT_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=90,
     )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            "cnipa fixture replay failed\n"
+            f"stdout:\n{completed.stdout}\n"
+            f"stderr:\n{completed.stderr}"
+        )
+    report_path = report_root / f"{run_id}.json"
+    if not report_path.is_file():
+        raise RuntimeError(
+            f"fixture replay did not write report: {report_path}"
+        )
+    return _report_from_file(report_path)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--run-fixture", action="store_true")
+    parser.add_argument("--fixture-dir", required=True)
+    parser.add_argument("--database-path", required=True)
+    parser.add_argument("--download-root", required=True)
+    parser.add_argument("--registry-path", required=True)
+    parser.add_argument("--report-root", required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args(argv)
+    if not args.run_fixture:
+        parser.error("--run-fixture is required")
+    _run_fixture_process(args)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

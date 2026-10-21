@@ -333,7 +333,7 @@ class RunReportExtension:
         report = build_run_report(
             run_id=spider.run_id,
             source_id=spider.source_id,
-            mode="live",
+            mode=self.settings.get("COLLECTION_RUN_MODE", "live"),
             database_path=database_path,
             started_at=self.started_at,
             finished_at=datetime.now(timezone.utc).isoformat(),

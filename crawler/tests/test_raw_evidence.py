@@ -245,7 +245,7 @@ class RawEvidenceTest(unittest.TestCase):
             result = run_source("cnipa", "pdf", config)
 
             self.assertEqual(result.written_count, 0)
-            self.assertEqual(result.skipped_count, 2)
+            self.assertEqual(result.skipped_count, 1)
             conn = sqlite3.connect(config.database_path)
             try:
                 fetch = conn.execute(
