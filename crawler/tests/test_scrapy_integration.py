@@ -76,7 +76,7 @@ class ScrapyIntegrationTest(unittest.TestCase):
         expected = {
             "ihchina-scrapy-sample.md": ("blocked", "partial"),
             "nzrc-scrapy-sample.md": ("blocked", "partial"),
-            "nongmuhr-scrapy-sample.md": ("blocked", "failed"),
+            "nongmuhr-scrapy-sample.md": ("approved", "succeeded"),
             "dialect-org-scrapy-sample.md": ("blocked", "partial"),
             "cass-linguistics-scrapy-sample.md": ("blocked", "partial"),
             "feiyiw-scrapy-sample.md": ("blocked", "partial"),

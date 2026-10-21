@@ -36,7 +36,7 @@
 | `open-meteo` | 2026-10-20 Asia/Shanghai | `https://open-meteo.com/`；`https://api.open-meteo.com/v1/forecast` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/open-meteo.md` |
 | `qweather` | 2026-10-20 Asia/Shanghai | `https://www.qweather.com/`；`https://devapi.qweather.com/v7/weather/now` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/qweather.md` |
 | `nzrc` | 2026-10-19 01:28 Asia/Shanghai | `http://www.nzrc.com.cn/career_seek.html`；`http://www.nzrc.com.cn/company/jobs/8235500.html` | `crawler/tests/fixtures/evidence/nzrc/` | 3 | 1920 | 下方 fixture 表 | `docs/reviews/nzrc.md` |
-| `nongmuhr` | 2026-10-19 01:28 Asia/Shanghai | `http://nongmuhr.com/Employ.aspx`；`http://nongmuhr.com/EmployView.aspx?id=13520` | `crawler/tests/fixtures/evidence/nongmuhr/` | 3 | 1651 | 下方 fixture 表 | `docs/reviews/nongmuhr.md` |
+| `nongmuhr` | 2026-10-21 21:48 Asia/Shanghai | `http://nongmuhr.com/Employ.aspx`；`http://nongmuhr.com/EmployView.aspx?Id=13553` | `crawler/tests/fixtures/evidence/nongmuhr/` | 3 | 4709 | 下方 fixture 表 | `docs/reviews/nongmuhr-scrapy-sample.md` |
 | `5ajob` | 2026-10-19 01:29 Asia/Shanghai | `http://www.5ajob.com/job/`；`http://www.5ajob.com/c-d-9975f684d6022631-h/50506.html` | `crawler/tests/fixtures/evidence/`（无公开文件） | 0 | 0 | 不适用 | `docs/reviews/5ajob.md` |
 | `dialect-org` | 2026-10-19 01:29 Asia/Shanghai | `https://dialect.org.cn/`；`https://dialect.org.cn/dialect/1` | `crawler/tests/fixtures/evidence/dialect-org/` | 1 | 495 | 下方 fixture 表 | `docs/reviews/dialect-org.md` |
 | `cass-linguistics` | 2026-10-19 01:29 Asia/Shanghai | `http://ling.cass.cn/`；`http://ling.cass.cn/news/bensuo/202609/t20260904_6066095.html` | `crawler/tests/fixtures/evidence/cass-linguistics/` | 1 | 613 | 下方 fixture 表 | `docs/reviews/cass-linguistics.md` |
@@ -46,7 +46,7 @@
 
 ## 当前汇总
 
-- 公开合成 fixture 共 17 个文件，总字节 20472，最大单文件 5445 字节，低于 100MB。
+- 公开合成 fixture 共 17 个文件，总字节 23481，最大单文件 5445 字节，低于 100MB。
 - 所有公开 XLSX、PDF、HTML 都带合成标记，不含真实联系人列、隐藏表单 token、原始作者元数据或嵌入附件。
 - 本地 `crawler/download/` 仍为未跟踪证据目录，不进入公开索引；没有文件时记为 0，不伪造哈希。
 - 公开分支使用空历史基线，最终 clean-clone 扫描由独立 public-branch 步骤执行，见 `operations/history-hygiene.md`。
@@ -67,9 +67,9 @@
 | `crawler/tests/fixtures/evidence/dialect-org/discover.json` | 495 | `7236c533df2f9100684adbd8b65a5e18c2abb7f48452474273bb3970c1e6fd20` |
 | `crawler/tests/fixtures/evidence/feiyiw/discover.json` | 556 | `443233489783b53f804ad26da39405b2d7b71a6e3e709bdb8082aff4235f8397` |
 | `crawler/tests/fixtures/evidence/ihchina/discover.json` | 1019 | `2865d896c53bf4d87b0724eba9ec8efcebed0936af618ab9a2c800513fb2f9aa` |
-| `crawler/tests/fixtures/evidence/nongmuhr/discover.json` | 1113 | `9cc3da018da52c8d487fd9abc625a9011943d2fca6e766360c314c1f99e35337` |
-| `crawler/tests/fixtures/evidence/nongmuhr/employ-view-13519.html` | 269 | `05461e1599117ab5a294852722e9ac84b246150d36b80e2ecd6dc2ff3be297d5` |
-| `crawler/tests/fixtures/evidence/nongmuhr/employ-view-13520.html` | 269 | `a23e87237d11d244e8f625a2f73c74c045a54da97dcb10c43d532f6479245a09` |
+| `crawler/tests/fixtures/evidence/nongmuhr/discover.json` | 2211 | `6f5855d393d3f781a4fd216d94eddc3d2460267797e8f35b8259416353eb7883` |
+| `crawler/tests/fixtures/evidence/nongmuhr/employ-view-13519.html` | 1249 | `e1f0b13264815a0d83df444bcc4917328e85d8505cd9df5bf36aa5748dd9723a` |
+| `crawler/tests/fixtures/evidence/nongmuhr/employ-view-13520.html` | 1249 | `5637450c7fcc49d62f29bfcbc2401de3b216a3e03a2ecc5837186eea1cdaafb7` |
 | `crawler/tests/fixtures/evidence/nzrc/discover.json` | 1150 | `685a2c0c75fb3e3a8c9db1c12de6971d9074cb03e4c8169919e28c5afbb544d1` |
 | `crawler/tests/fixtures/evidence/nzrc/job-detail-8235500.html` | 385 | `bba750d9e49b65942bdad7e1eaf712fce5a11f19cb859adfb64191cf35960308` |
 | `crawler/tests/fixtures/evidence/nzrc/job-detail-8240109.html` | 385 | `1b3807fdeac5fd5b4e9c68917ed3a193c6ae746cd443d77f084ce67048fe7100` |

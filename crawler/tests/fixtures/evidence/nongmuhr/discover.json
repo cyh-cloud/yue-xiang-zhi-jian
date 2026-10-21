@@ -12,8 +12,22 @@
       "body_text": "公开岗位职责",
       "extra": {
         "company_name": "示例农牧公司",
+        "company_url": "CompanyView.aspx?Id=1",
         "location_raw": "广东",
-        "salary_raw": "面议"
+        "salary_raw": "面议",
+        "employment_type": "全职",
+        "department": "生产部",
+        "headcount": 1,
+        "deadline_at": "2026-12-31",
+        "experience_raw": "不限",
+        "education_raw": "大专",
+        "gender_requirement": "不限",
+        "age_requirement": "不限",
+        "published_at": "2026-10-17",
+        "company_industry": "农业种植养殖",
+        "company_size": "100－499人",
+        "company_nature": "民营企业",
+        "list_description": "公开岗位摘要"
       }
     },
     {
@@ -27,8 +41,22 @@
       "body_text": "公开岗位职责",
       "extra": {
         "company_name": "示例农牧公司",
+        "company_url": "CompanyView.aspx?Id=1",
         "location_raw": "广东",
-        "salary_raw": "面议"
+        "salary_raw": "面议",
+        "employment_type": "全职",
+        "department": "生产部",
+        "headcount": 2,
+        "deadline_at": "2026-12-31",
+        "experience_raw": "不限",
+        "education_raw": "大专",
+        "gender_requirement": "不限",
+        "age_requirement": "不限",
+        "published_at": "2026-10-17",
+        "company_industry": "农业种植养殖",
+        "company_size": "100－499人",
+        "company_nature": "民营企业",
+        "list_description": "公开岗位摘要"
       }
     }
   ]
