@@ -439,7 +439,10 @@ class AnnouncementTest(TeacherDomainTestBase):
     def _cleanup(self):
         conn = get_connection()
         conn.execute("DELETE FROM announcements WHERE title LIKE '__T16%'")
-        conn.execute("DELETE FROM notifications WHERE title LIKE '新通知'")
+        conn.execute(
+            "DELETE FROM notifications "
+            "WHERE title LIKE '新通知' OR title LIKE '__T16%'"
+        )
         conn.commit()
         conn.close()
 
@@ -516,6 +519,134 @@ class AnnouncementTest(TeacherDomainTestBase):
         # 收件人必须是 username 而不是名册号（STU001…）
         self.assertTrue(all(not r['user_id'].startswith('STU') for r in rows),
                         '收件人必须是 username，早期实现误用名册号导致学员收不到')
+
+    def test_announcement_delete_removes_only_its_notification_copies(self):
+        """删除公告要同步撤回共享消息中心的副本，其他消息不受影响。"""
+        self.addCleanup(self._cleanup)
+        teacher = self._login('teacher_demo')
+        student = self._login('student_demo')
+
+        first = self._json(
+            'POST',
+            '/api/teacher/announcements',
+            {'title': '__T16删除一__', 'content': '第一条公告正文'},
+            session_id=teacher,
+        ).get_json()
+        second = self._json(
+            'POST',
+            '/api/teacher/announcements',
+            {'title': '__T16删除二__', 'content': '第二条公告正文'},
+            session_id=teacher,
+        ).get_json()
+        self.assertTrue(first['success'])
+        self.assertTrue(second['success'])
+
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO notifications "
+            "(user_id, type, title, content, link_type, link_id) "
+            "VALUES (?, 'system', '__T16无关通知__', '保留', 'system', NULL)",
+            ('student_demo',),
+        )
+        conn.commit()
+        before = conn.execute(
+            "SELECT COUNT(*) FROM notifications WHERE user_id = ? "
+            "AND link_type = 'announcement' AND link_id IN (?, ?)",
+            ('student_demo', first['id'], second['id']),
+        ).fetchone()[0]
+        conn.close()
+
+        unread_before = self.client.get(
+            '/api/notifications/unread?user_id=student_demo',
+            headers={'X-Session-Id': student},
+        ).get_json()['count']
+
+        deleted = self.client.delete(
+            '/api/teacher/announcements/%d' % first['id'],
+            headers={'X-Session-Id': teacher},
+        )
+        self.assertTrue(deleted.get_json()['success'])
+
+        conn = get_connection()
+        remaining_announcement_links = conn.execute(
+            "SELECT COUNT(*) FROM notifications "
+            "WHERE user_id = ? AND link_type = 'announcement' "
+            "AND link_id = ?",
+            ('student_demo', first['id']),
+        ).fetchone()[0]
+        second_links = conn.execute(
+            "SELECT COUNT(*) FROM notifications "
+            "WHERE user_id = ? AND link_type = 'announcement' "
+            "AND link_id = ?",
+            ('student_demo', second['id']),
+        ).fetchone()[0]
+        unrelated = conn.execute(
+            "SELECT COUNT(*) FROM notifications "
+            "WHERE user_id = ? AND title = '__T16无关通知__'",
+            ('student_demo',),
+        ).fetchone()[0]
+        conn.close()
+
+        self.assertEqual(remaining_announcement_links, 0)
+        self.assertGreater(second_links, 0)
+        self.assertEqual(unrelated, 1)
+        self.assertLess(
+            self.client.get(
+                '/api/notifications/unread?user_id=student_demo',
+                headers={'X-Session-Id': student},
+            ).get_json()['count'],
+            unread_before,
+        )
+        self.assertEqual(before, 2)
+
+    def test_unauthorized_announcement_delete_has_no_side_effects(self):
+        """越权删除公告时，公告与对应通知都保持原样。"""
+        self.addCleanup(self._cleanup)
+        owner = self._login('teacher_demo')
+        created = self._json(
+            'POST',
+            '/api/teacher/announcements',
+            {'title': '__T16越权删除__', 'content': '不可越权删除'},
+            session_id=owner,
+        ).get_json()
+        self.assertTrue(created['success'])
+
+        from db_domains.users import register_user
+        register_user('__t16_other_teacher', '123456', '其他教师', 'teacher')
+        self.addCleanup(self._delete_other_teacher)
+        other = self._login('__t16_other_teacher')
+
+        denied = self.client.delete(
+            '/api/teacher/announcements/%d' % created['id'],
+            headers={'X-Session-Id': other},
+        )
+        self.assertFalse(denied.get_json()['success'])
+
+        conn = get_connection()
+        announcement = conn.execute(
+            'SELECT 1 FROM announcements WHERE id = ?',
+            (created['id'],),
+        ).fetchone()
+        notification = conn.execute(
+            "SELECT 1 FROM notifications WHERE user_id = 'student_demo' "
+            "AND link_type = 'announcement' AND link_id = ?",
+            (created['id'],),
+        ).fetchone()
+        conn.close()
+        self.assertIsNotNone(announcement)
+        self.assertIsNotNone(notification)
+
+    def _delete_other_teacher(self):
+        conn = get_connection()
+        conn.execute(
+            "DELETE FROM user_sessions WHERE user_id = '__t16_other_teacher'"
+        )
+        conn.execute(
+            "DELETE FROM users WHERE username = '__t16_other_teacher'"
+        )
+        conn.commit()
+        conn.close()
+
     def test_announcement_requires_title_and_content(self):
         sid = self._login('teacher_demo')
         for payload in ({'title': 'x'}, {'content': 'x'}, {}):
