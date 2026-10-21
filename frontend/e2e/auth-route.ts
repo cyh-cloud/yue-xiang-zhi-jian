@@ -111,7 +111,7 @@ export async function signIn(
   page: Page,
   username: string,
   password: string,
-  options: { blockCdn?: boolean } = {},
+  options: { blockCdn?: boolean } = { blockCdn: true },
 ): Promise<import("@playwright/test").Response> {
   let blockCdn: ((route: Route) => Promise<void>) | undefined;
   if (options.blockCdn) {

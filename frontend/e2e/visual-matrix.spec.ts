@@ -579,7 +579,7 @@ test.describe("visual matrix: backoffice roles", () => {
     test(`${role.name} dashboard desktop light`, async ({ page }) => {
       await preparePage(page);
       await role.setup(page);
-      await signIn(page, role.username, role.password);
+      await signIn(page, role.username, role.password, { blockCdn: false });
       await expect(page).toHaveURL(role.landing);
       await role.ready(page);
       await waitForCdnLoaded(page);
@@ -608,7 +608,7 @@ test.describe("visual matrix: themes and responsive samples", () => {
   test("admin desktop dark large text", async ({ page }) => {
     await preparePage(page, { theme: "dark", largeText: true });
     await mockAdminDashboard(page);
-    await signIn(page, "admin_demo", "admin123");
+    await signIn(page, "admin_demo", "admin123", { blockCdn: false });
     await expect(page).toHaveURL(/\/admin\/dashboard$/);
     await expect(page.getByTestId("admin-stat-users-total")).toContainText(
       "128",
@@ -644,7 +644,7 @@ test.describe("visual matrix: themes and responsive samples", () => {
   test("admin mobile sample", async ({ page }) => {
     await preparePage(page, { viewport: MOBILE });
     await mockAdminDashboard(page);
-    await signIn(page, "admin_demo", "admin123");
+    await signIn(page, "admin_demo", "admin123", { blockCdn: false });
     await expect(page).toHaveURL(/\/admin\/dashboard$/);
     await expect(page.getByTestId("admin-stat-users-total")).toContainText(
       "128",
@@ -689,7 +689,7 @@ test.describe("visual matrix: empty, loading and error states", () => {
       await route.fulfill({ json: { success: true, announcements: [] } });
     });
 
-    await signIn(page, "admin_demo", "admin123");
+    await signIn(page, "admin_demo", "admin123", { blockCdn: false });
     await page.goto("/admin/announcements");
     await expect(page.getByText("正在加载系统公告")).toBeVisible();
     await capture(page, "admin-announcements-loading-desktop-light.png");
@@ -702,7 +702,7 @@ test.describe("visual matrix: empty, loading and error states", () => {
     await page.route("**/api/admin/system-announcements", (route) =>
       route.fulfill({ json: { success: true, announcements: [] } }),
     );
-    await signIn(page, "admin_demo", "admin123");
+    await signIn(page, "admin_demo", "admin123", { blockCdn: false });
     await page.goto("/admin/announcements");
     await expect(page.getByTestId("admin-announcements-empty")).toBeVisible();
     await waitForCdnLoaded(page);
@@ -718,7 +718,7 @@ test.describe("visual matrix: empty, loading and error states", () => {
         json: { success: false, message: "公告服务暂时不可用" },
       }),
     );
-    await signIn(page, "admin_demo", "admin123");
+    await signIn(page, "admin_demo", "admin123", { blockCdn: false });
     await page.goto("/admin/announcements");
     await expect(page.getByTestId("admin-announcements-error")).toContainText(
       "公告服务暂时不可用",
@@ -732,7 +732,7 @@ test.describe("visual matrix: print resume", () => {
   test("resume print preview", async ({ page }) => {
     await preparePage(page);
     await mockResumePanel(page);
-    await signIn(page, "student_demo", "123456");
+    await signIn(page, "student_demo", "123456", { blockCdn: false });
     await page.goto("/employment");
     await page.getByRole("tab", { name: "我的简历" }).click();
     await expect(page.getByTestId("resume-profile")).toBeVisible();
