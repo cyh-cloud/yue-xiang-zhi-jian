@@ -5,9 +5,10 @@ import {
   ROLE_ACCOUNTS,
   expectApiDenied,
   expectApiAllowed,
-  expectCapabilityFallback,
   expectCrossRoleFallback,
   expectRefreshPreservesRole,
+  expectSuperAdminCapabilityFallback,
+  escapeRegExp,
   rolePortal,
   signIn,
 } from "./auth-route";
@@ -133,7 +134,7 @@ test.describe("session recovery and route boundaries", () => {
     });
   }
 
-  test("super-admin enters every backoffice shell but keeps capability API boundaries", async ({
+  test("super-admin bypasses shell role but domain capabilities still govern routes and APIs", async ({
     page,
     request,
   }) => {
@@ -144,23 +145,26 @@ test.describe("session recovery and route boundaries", () => {
     );
     await expect(page).toHaveURL(/\/admin\/dashboard$/);
 
-    for (const role of BACKOFFICE_ROLES) {
-      const portal = rolePortal(role);
-      await page.goto(portal.shellPath);
-      await expect(page.getByTestId("backoffice-shell")).toBeVisible();
-    }
-
+    // The shell role check is bypassed, but the operator capabilities are real.
+    await page.goto(rolePortal("operator").path);
+    await expect(page).toHaveURL(/\/operator\/farming$/);
+    await expect(page.getByTestId("backoffice-shell")).toHaveAttribute(
+      "data-role",
+      "operator",
+    );
+    await expect(page.getByTestId("backoffice-role")).toHaveText("运营用户");
+    await expect(
+      page
+        .getByRole("navigation", { name: "后台导航" })
+        .getByRole("link", { name: "农时日历" }),
+    ).toBeVisible();
     await expectApiAllowed(
       request,
       ROLE_ACCOUNTS.super_admin,
       rolePortal("operator").api,
     );
     for (const role of ["teacher", "government", "enterprise"] as const) {
-      await expectCapabilityFallback(
-        page,
-        ROLE_ACCOUNTS.super_admin,
-        role,
-      );
+      await expectSuperAdminCapabilityFallback(page, role);
     }
     await expectApiDenied(
       request,
@@ -218,8 +222,4 @@ test.describe("session recovery and route boundaries", () => {
 
 function landingPattern(path: string): RegExp {
   return new RegExp(`${escapeRegExp(path)}/?$`);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

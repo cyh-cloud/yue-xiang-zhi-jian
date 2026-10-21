@@ -2,4 +2,5 @@
 // Do not edit by hand.
 export const MAX_UPLOAD_BYTES = 52428800;
 export const MAX_UPLOAD_MEGABYTES = 50;
+export const MAX_REQUEST_BYTES = 53477376;
 export const MODEL_3D_EXTENSIONS = ["glb", "gltf", "obj", "fbx", "stl", "dae", "ply", "usdz"] as const;

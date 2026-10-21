@@ -16,6 +16,7 @@ if BACKEND not in sys.path:
     sys.path.insert(0, BACKEND)
 
 from shared.upload_limits import (  # noqa: E402
+    MAX_REQUEST_BYTES,
     MAX_UPLOAD_BYTES,
     MAX_UPLOAD_MEGABYTES,
     MODEL_3D_EXTENSIONS,
@@ -29,8 +30,9 @@ def render():
         "// Do not edit by hand.\n"
         "export const MAX_UPLOAD_BYTES = %d;\n"
         "export const MAX_UPLOAD_MEGABYTES = %d;\n"
+        "export const MAX_REQUEST_BYTES = %d;\n"
         "export const MODEL_3D_EXTENSIONS = [%s] as const;\n"
-        % (MAX_UPLOAD_BYTES, MAX_UPLOAD_MEGABYTES, extensions)
+        % (MAX_UPLOAD_BYTES, MAX_UPLOAD_MEGABYTES, MAX_REQUEST_BYTES, extensions)
     )
 
 

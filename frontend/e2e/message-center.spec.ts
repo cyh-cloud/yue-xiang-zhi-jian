@@ -47,6 +47,10 @@ interface NotificationPayload {
   notifications: Array<{ id: number; title: string }>;
 }
 
+interface UnreadPayload {
+  count: number;
+}
+
 interface SeededSources {
   systemTitle: string;
   noticeTitle: string;
@@ -151,11 +155,105 @@ async function openCenter(page: Page) {
   await expect(page.getByTestId("message-center-panel")).toBeVisible();
 }
 
+async function expectBadgeCount(page: Page, expected: number): Promise<void> {
+  const badge = page.getByTestId("message-center-badge");
+  if (expected === 0) {
+    await expect(badge).toHaveCount(0);
+    return;
+  }
+  await expect
+    .poll(async () => {
+      if ((await badge.count()) === 0) return 0;
+      return Number(await badge.innerText());
+    })
+    .toBe(expected);
+}
+
 function markerPattern(value: string): RegExp {
   return new RegExp(`${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?!\\d)`);
 }
 
 test.describe("shared message center", () => {
+  test("deleting a teacher announcement removes its shared-center copy and unread count", async ({
+    page,
+    request,
+  }) => {
+    const marker = `MC-DELETE-${Date.now()}`;
+    const teacher = await login(request, TEACHER);
+    const student = await login(request, STUDENT);
+    const deletedTitle = `${marker} 待删除公告`;
+    const keptTitle = `${marker} 保留公告`;
+    const deleted = await api<IdPayload>(
+      request,
+      "POST",
+      "/api/teacher/announcements",
+      teacher.session_id,
+      {
+        title: deletedTitle,
+        content: `${deletedTitle} 正文`,
+        category: "通知",
+      },
+    );
+    await api<IdPayload>(
+      request,
+      "POST",
+      "/api/teacher/announcements",
+      teacher.session_id,
+      {
+        title: keptTitle,
+        content: `${keptTitle} 正文`,
+        category: "通知",
+      },
+    );
+
+    const unreadBefore = await api<UnreadPayload>(
+      request,
+      "GET",
+      `/api/notifications/unread?user_id=${STUDENT.username}`,
+      student.session_id,
+    );
+
+    await signIn(page, STUDENT.username, STUDENT.password);
+    await expectBadgeCount(page, unreadBefore.count);
+    await openCenter(page);
+
+    const panel = page.getByTestId("message-center-panel");
+    await expect(
+      panel.getByTestId("message-center-item").filter({ hasText: deletedTitle }),
+    ).toHaveCount(1);
+    await expect(
+      panel.getByTestId("message-center-item").filter({ hasText: keptTitle }),
+    ).toHaveCount(1);
+
+    await api(
+      request,
+      "DELETE",
+      `/api/teacher/announcements/${deleted.id}`,
+      teacher.session_id,
+    );
+    const unreadAfter = await api<UnreadPayload>(
+      request,
+      "GET",
+      `/api/notifications/unread?user_id=${STUDENT.username}`,
+      student.session_id,
+    );
+    expect(unreadAfter.count).toBe(unreadBefore.count - 1);
+
+    await page.reload();
+    await openCenter(page);
+    await expect(
+      page
+        .getByTestId("message-center-item")
+        .filter({ hasText: deletedTitle }),
+    ).toHaveCount(0);
+    await expect(
+      page
+        .getByTestId("message-center-item")
+        .filter({ hasText: keptTitle }),
+    ).toHaveCount(1);
+    await expectBadgeCount(page, unreadAfter.count);
+  });
+
   test("four existing sources keep the unread badge and unread list consistent", async ({
     page,
     request,

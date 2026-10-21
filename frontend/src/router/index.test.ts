@@ -130,4 +130,15 @@ describe("backoffice route seams", () => {
       ),
     ).toBe("/admin/dashboard");
   });
+
+  it("returns super-admin capability denials to the admin default path", () => {
+    expect(
+      resolveCapabilityFallback(
+        "/teacher/models",
+        "/teacher/dashboard",
+        "/admin/dashboard",
+        "super_admin",
+      ),
+    ).toBe("/admin/dashboard");
+  });
 });
