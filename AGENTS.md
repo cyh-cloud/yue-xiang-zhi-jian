@@ -5,8 +5,9 @@
 > 适用 mattpocock-skills v1.3.1。
 
 ## Project
-
 基于 AI 实训的农村本土人才赋能平台：Flask 单体后端 + 多页面前端，服务学员、教师、企业、政府与管理员五类角色。后端已按领域拆分，改代码前先读下面的「后端结构」。
+
+团队协作：`backend/` 与数据库属于受保护范围；前端小功能可在当前分支提交，涉及后端接口或数据库结构时先读 `docs/team/README.md`。现有 ADR 只读，所有任务遵循，任何成员不得修改、重命名、移动或删除；实现与裁决冲突时停止并上报项目负责人。详见 `docs/team/adr-constitution.md`。
 
 ## Commands
 
@@ -49,10 +50,11 @@
 6. **不用 em-dash。** 用逗号、冒号、句号、括号或连词。
 7. **`GLOSSARY.md` 与 `docs/adr/` 不存在时静默继续。** 不提示缺失，不建议预先创建，`/domain-modeling` 会在术语或决策真正落地时惰性创建。
 8. **判断某技能做什么，先读它的 `SKILL.md`。** `/ask-matt` 的摘要只作定位用，不能作为行动依据。
+9. **Git commit 使用英文类型前缀与中文描述。** 标题写成 `feat/fix/test/docs/refactor/chore(范围): 中文描述`；正文先写本次改动概要，再写验证结果，复杂改动补充原因与影响。
 
 ## 技能流程
 
-首次进入工程流程前跑一次 `/setup-matt-pocock-skills`；不知道用哪个技能敲 `/ask-matt`；想改进这套环境跑 `/retro`。技能之间靠显式点名 Skill 工具，不丢裸 `/name`。
+项目技能在 `.agents/skills/`，入口见 `docs/team/project-skills.md`。首次进入工程流程前跑一次 `/setup-matt-pocock-skills`；不知道用哪个技能敲 `/ask-matt`；想改进这套环境跑 `/retro`。技能之间靠显式点名 Skill 工具，不丢裸 `/name`。
 
 tracker 与标签词汇见 `docs/agents/`；grilling 的提问纪律与阶段边界处理见 mattpocock-skills 自带的 `ask-matt` / `grilling` 说明，本文件不复述。
 
@@ -60,29 +62,13 @@ tracker 与标签词汇见 `docs/agents/`；grilling 的提问纪律与阶段边
 
 | 找什么 | 去哪 |
 | --- | --- |
+| 团队开发规范 | `docs/team/README.md` |
 | 领域词汇 | `GLOSSARY.md`（多上下文先读 `GLOSSARY-MAP.md`） |
-| 历史决策 | `docs/adr/` |
+| 开发宪法（ADR，只读） | `docs/adr/` |
 | tracker / 标签 / 领域文档配置 | `docs/agents/` |
+| 项目技能 | `.agents/skills/`（入口：`docs/team/project-skills.md`） |
 | 编码规范（审查期读取） | `CODING_STANDARDS.md` |
 | 被拒绝的需求 | `.out-of-scope/` |
 | 本地 tracker 的 spec 与票据 | `.scratch/<feature>/` |
 | 架构巡检报告 | `<OS-TMP>/architecture-review-<ts>.html`（不在仓库） |
 | 原型 | `prototype/<name>` 分支（不在工作树） |
-
-<!--
-拆坏了的 AGENTS.md 怎么修？如果您开始担心仓库中 AGENTS.md 文件的重组，需按 progressive disclosure：
-
-I want you to refactor my AGENTS.md file to follow progressive disclosure principles.
-
-Follow these steps:
-
-1. **Find contradictions**: Identify any instructions that conflict with each other, and for each conflict ask me which version to keep.
-2. **Identify the essentials**: Extract only what belongs in AGENTS.md:
-   - One-sentence project description
-   - Package manager (if not npm)
-   - Non-standard build/typecheck commands
-   - Anything truly relevant to every task
-3. **Group the rest**: Arrange the remaining instructions into logical categories (TypeScript conventions, testing patterns, API design, Git workflow), each in its own file.
-4. **Create the file structure**: a minimal AGENTS.md with links; one file per group; a suggested docs/ tree.
-5. **Flag for deletion**: instructions that are redundant, too vague, or obvious to the agent.
--->
