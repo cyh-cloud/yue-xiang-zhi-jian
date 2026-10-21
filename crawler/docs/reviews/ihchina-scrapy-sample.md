@@ -2,44 +2,41 @@
 
 日期: 2026-10-21
 
-验收结论: blocked（当前代码尚未按新口径重跑）
+验收结论: blocked（本次重跑 HTTP 504）
 
-运行结果: partial
+运行结果: failed
 
-## 列表
+## 实际重跑
 
-- URL: `https://www.ihchina.cn/getProject.html?category_id=16&limit=10&p=1`
-- 取得时间: `2026-10-21T05:10:03+08:00`
-- HTTP: `200`
-- 列表请求: 2 页
-- 详情请求: 20 条
-- 样本 ID: `12185`、`12184`、`12183`、`12182`、`12181`
+- run_id: `ihchina-703ba5dd90304355b31576e508452d21`
+- 归档位置: `../crawler-live-evidence/issue-133-20261021/ihchina/`
+- 列表 URL: `https://www.ihchina.cn/getProject.html?category_id=16&limit=10&p=1`
+- 取得时间: `2026-10-21 23:26:50 Asia/Shanghai`
+- HTTP: `504`
+- Content-Type: `text/html`
+- robots: `https://www.ihchina.cn/robots.txt` 返回 `404`，结论为 `not-found`
 
-## 详情
-
-前 5 条详情 URL 均返回 `200`：
-
-- `https://www.ihchina.cn/project_details/12185.html`
-- `https://www.ihchina.cn/project_details/12184.html`
-- `https://www.ihchina.cn/project_details/12183.html`
-- `https://www.ihchina.cn/project_details/12182.html`
-- `https://www.ihchina.cn/project_details/12181.html`
+本次按新 robots 口径重跑时，列表入口返回 HTTP 504，Spider 没有取得可用列表和详情，因此没有产生候选。`not-found` 仍只是访问事实，不是发布授权。
 
 ## 计数
 
-- raw: 23
-- stage: 20
-- 候选标准实体: 0
-- 当前代码 blocked: 20
-- 目标口径 deferred: 20
-- failed: 0
+- raw: 1
+- stage: 0
+- candidate: 0
+- deferred: 0
+- blocked: 0
+- failed/failure_count: 1
+- skipped: 0
+- failure_reason: `HTTP 504: https://www.ihchina.cn/getProject.html?category_id=16&limit=10&p=1`
 
-## 失败摘要
+## 证据
 
-`https://www.ihchina.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。按最新裁决，`robots:not-found` 不阻断采集和采集库写入；raw、stage 保留，候选应写为 `deferred`，原因 `robots:not-found`。当前分支的 blocked 20 是现有代码按旧 robots 策略产生的计数，尚未按新口径重跑。404 仍不表示获得授权，也不自动获得业务发布资格。
+- 公开索引: `crawler/docs/operations/live-evidence-index.json`
+- 运行报告: `ihchina/reports/ihchina-703ba5dd90304355b31576e508452d21.json`
+- 原始响应正文留在归档目录，不进入公开仓库。
 
-证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-ihchina-736f27ec38934feab384df46eca528b0\download`。
+## 解除条件
 
-## 重试条件
-
-项目负责人已裁决 `not-found` 不阻断采集。解除条件改为：按新口径重跑 5 条列表加 5 条详情，确认候选状态为 `deferred`，并保留 `robots:not-found` 原因。不得把 `not-found` 改写成 `allowed`。
+- 列表入口恢复稳定响应后重新运行列表和至少 5 条详情。
+- 重跑确认 raw、stage、候选状态、`robots:not-found` 原因和失败计数。
+- 不把 HTTP 200、robots 404 或 fixture 回放写成 live 成功。

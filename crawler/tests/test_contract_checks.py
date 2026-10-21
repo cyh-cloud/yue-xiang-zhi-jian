@@ -69,6 +69,25 @@ class ContractChecksTest(unittest.TestCase):
                 check_contracts.DOCS = original
             self.assertTrue(errors)
 
+    def test_live_evidence_checker_uses_committed_index_validator(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            docs = Path(tmp)
+            operations = docs / "operations"
+            operations.mkdir()
+            (operations / "live-evidence-index.json").write_text(
+                json.dumps({"schema_version": 999, "runs": []}),
+                encoding="utf-8",
+            )
+            original = check_contracts.DOCS
+            try:
+                check_contracts.DOCS = docs
+                errors = check_contracts.check_live_evidence_index()
+            finally:
+                check_contracts.DOCS = original
+            self.assertTrue(
+                any("schema_version must be 1" in error for error in errors)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

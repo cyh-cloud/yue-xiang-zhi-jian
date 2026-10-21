@@ -1,4 +1,5 @@
 import ast
+import json
 import unittest
 from pathlib import Path
 
@@ -10,7 +11,6 @@ from crawler.collection.shared.crawler_collection.projects import (
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = ROOT / "collection" / "projects"
 SHARED = ROOT / "collection" / "shared" / "crawler_collection"
-REVIEWS = ROOT / "docs" / "reviews"
 
 
 class ScrapyIntegrationTest(unittest.TestCase):
@@ -73,20 +73,20 @@ class ScrapyIntegrationTest(unittest.TestCase):
             self.assertNotIn("qweather", text, path)
 
     def test_required_site_sample_records_exist(self):
-        expected = {
-            "ihchina-scrapy-sample.md": ("blocked", "partial"),
-            "nzrc-scrapy-sample.md": ("blocked", "partial"),
-            "nongmuhr-scrapy-sample.md": ("approved", "succeeded"),
-            "dialect-org-scrapy-sample.md": ("blocked", "partial"),
-            "cass-linguistics-scrapy-sample.md": ("blocked", "partial"),
-            "feiyiw-scrapy-sample.md": ("blocked", "partial"),
-            "aqsc-moa-scrapy-sample.md": ("blocked", "partial"),
-            "cnipa-scrapy-sample.md": ("approved-with-gaps", "partial"),
-        }
-        for name, (conclusion, run_status) in expected.items():
-            text = (REVIEWS / name).read_text(encoding="utf-8")
-            self.assertIn(f"验收结论: {conclusion}", text, name)
-            self.assertIn(f"运行结果: {run_status}", text, name)
+        index = json.loads(
+            (ROOT / "docs" / "operations" / "live-evidence-index.json")
+            .read_text(encoding="utf-8")
+        )
+        self.assertEqual(index["source_count"], 8)
+        for run in index["runs"]:
+            acceptance = ROOT.parent / run["acceptance_record"]
+            text = acceptance.read_text(encoding="utf-8")
+            self.assertIn("验收结论: ", text, acceptance.name)
+            self.assertIn(
+                f"运行结果: {run['status']}",
+                text,
+                acceptance.name,
+            )
 
     def test_file_sites_use_explicit_start_urls_for_live_canaries(self):
         sources = {

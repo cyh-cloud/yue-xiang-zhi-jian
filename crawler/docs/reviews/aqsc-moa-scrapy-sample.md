@@ -2,6 +2,8 @@
 
 日期: 2026-10-21
 
+run_id: `crawler-132-aqsc-live-20261021`
+
 验收结论: blocked
 
 运行结果: partial
@@ -50,7 +52,7 @@
 
 100MB 上限使用声明大小 `104857601` bytes 的 fixture 响应验证，`raw_files.download_status=oversize`，只写 `OVERSIZE.md`，不保存响应正文。
 
-证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-aqsc-d54ba3f6884b4bafaec14b9d4585b9c5\download`。
+证据位置：`../crawler-live-evidence/issue-133-20261021/aqsc-moa/`。公开索引为 `crawler/docs/operations/live-evidence-index.json`。
 
 ## 解除条件
 
