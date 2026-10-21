@@ -4,11 +4,17 @@ import {
   type APIRequestContext,
 } from "@playwright/test";
 
-import { signIn } from "./auth-route";
+import {
+  ROLE_ACCOUNTS,
+  expectApiDenied,
+  expectCrossRoleFallback,
+  rolePortal,
+  signIn,
+} from "./auth-route";
 
-const ENTERPRISE = { username: "enterprise_demo", password: "123456" } as const;
-const ADMIN = { username: "admin_demo", password: "admin123" } as const;
-const STUDENT = { username: "student_demo", password: "123456" } as const;
+const ENTERPRISE = ROLE_ACCOUNTS.enterprise;
+const ADMIN = ROLE_ACCOUNTS.super_admin;
+const STUDENT = ROLE_ACCOUNTS.student;
 
 interface SessionPayload {
   session_id: string;
@@ -401,13 +407,26 @@ test.describe("enterprise portal", () => {
     await page.getByRole("link", { name: "简历管理" }).click();
     await expect(page.getByText("暂无简历投递", { exact: true })).toBeVisible();
 
-    await signIn(page, STUDENT.username, STUDENT.password);
-    await page.goto("/enterprise/jobs");
-    await expect(page).toHaveURL(/\/agriculture\/?$/);
-    const student = await login(request, STUDENT);
-    const denied = await request.get("/api/enterprise/jobs", {
-      headers: { "X-Session-Id": student.session_id },
-    });
-    expect(denied.status()).toBe(403);
+    for (const role of [
+      "student",
+      "teacher",
+      "government",
+      "operator",
+    ] as const) {
+      await expectCrossRoleFallback(page, ROLE_ACCOUNTS[role], "enterprise");
+    }
+    for (const role of [
+      "student",
+      "teacher",
+      "government",
+      "operator",
+      "super_admin",
+    ] as const) {
+      await expectApiDenied(
+        request,
+        ROLE_ACCOUNTS[role],
+        rolePortal("enterprise").api,
+      );
+    }
   });
 });

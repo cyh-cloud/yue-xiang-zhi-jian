@@ -5,7 +5,13 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { signIn } from "./auth-route";
+import {
+  ROLE_ACCOUNTS,
+  expectApiDenied,
+  expectCrossRoleFallback,
+  rolePortal,
+  signIn,
+} from "./auth-route";
 
 interface SessionPayload {
   session_id: string;
@@ -26,26 +32,8 @@ interface TeacherTraining {
   status_label: string;
 }
 
-const TEACHER = { username: "teacher_demo", password: "123456" } as const;
-const STUDENT = { username: "student_demo", password: "123456" } as const;
-const OTHER_ROLES = {
-  student: {
-    account: STUDENT,
-    landing: /\/agriculture\/?$/,
-  },
-  enterprise: {
-    account: { username: "enterprise_demo", password: "123456" },
-    landing: /\/enterprise\/dashboard$/,
-  },
-  government: {
-    account: { username: "gov_demo", password: "123456" },
-    landing: /\/government\/dashboard$/,
-  },
-  operator: {
-    account: { username: "operator_demo", password: "123456" },
-    landing: /\/operator\/overview$/,
-  },
-} as const;
+const TEACHER = ROLE_ACCOUNTS.teacher;
+const STUDENT = ROLE_ACCOUNTS.student;
 
 async function login(
   request: APIRequestContext,
@@ -428,21 +416,22 @@ test.describe("teacher training review", () => {
 });
 
 test.describe("teacher role denial", () => {
-  for (const [role, config] of Object.entries(OTHER_ROLES)) {
+  for (const role of [
+    "student",
+    "enterprise",
+    "government",
+    "operator",
+  ] as const) {
     test(`${role} cannot enter the teacher portal or teacher APIs`, async ({
       page,
       request,
     }) => {
-      const session = await login(request, config.account);
-      const denied = await request.get("/api/teacher/students", {
-        headers: { "X-Session-Id": session.session_id },
-      });
-      expect(denied.status()).toBe(403);
-
-      await signIn(page, config.account.username, config.account.password);
-      await expect(page).toHaveURL(config.landing);
-      await page.goto("/teacher/dashboard");
-      await expect(page).toHaveURL(config.landing);
+      await expectApiDenied(
+        request,
+        ROLE_ACCOUNTS[role],
+        rolePortal("teacher").api,
+      );
+      await expectCrossRoleFallback(page, ROLE_ACCOUNTS[role], "teacher");
     });
   }
 });

@@ -5,16 +5,18 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { signIn } from "./auth-route";
+import {
+  ROLE_ACCOUNTS,
+  expectApiDenied,
+  rolePortal,
+  signIn,
+} from "./auth-route";
 
-const STUDENT = { username: "student_demo", password: "123456" } as const;
-const TEACHER = { username: "teacher_demo", password: "123456" } as const;
-const ENTERPRISE = {
-  username: "enterprise_demo",
-  password: "123456",
-} as const;
-const OPERATOR = { username: "operator_demo", password: "123456" } as const;
-const ADMIN = { username: "admin_demo", password: "admin123" } as const;
+const STUDENT = ROLE_ACCOUNTS.student;
+const TEACHER = ROLE_ACCOUNTS.teacher;
+const ENTERPRISE = ROLE_ACCOUNTS.enterprise;
+const OPERATOR = ROLE_ACCOUNTS.operator;
+const ADMIN = ROLE_ACCOUNTS.super_admin;
 
 interface SessionPayload {
   session_id: string;
@@ -419,10 +421,19 @@ test("content moderation removes discussions/comments and denies other roles", a
       discussions.discussions.some((item) => item.id === discussion.id),
     ).toBe(false);
 
-    const denied = await request.get("/api/admin/content", {
-      headers: { "X-Session-Id": student.session_id },
-    });
-    expect(denied.status()).toBe(403);
+    for (const role of [
+      "student",
+      "teacher",
+      "enterprise",
+      "government",
+      "operator",
+    ] as const) {
+      await expectApiDenied(
+        request,
+        ROLE_ACCOUNTS[role],
+        rolePortal("super_admin").api,
+      );
+    }
     await resetBrowserSession(page);
     await signIn(page, STUDENT.username, STUDENT.password);
     await page.goto("/admin/content");

@@ -1,36 +1,25 @@
 import { expect, test } from "@playwright/test";
-import { signIn } from "./auth-route";
+import {
+  BACKOFFICE_ROLES,
+  NON_ADMIN_BACKOFFICE_ROLES,
+  ROLE_ACCOUNTS,
+  expectApiDenied,
+  expectApiAllowed,
+  expectCapabilityFallback,
+  expectCrossRoleFallback,
+  expectRefreshPreservesRole,
+  rolePortal,
+  signIn,
+} from "./auth-route";
 
-const ACCOUNTS = {
-  student: { username: "student_demo", password: "123456", landing: "/agriculture/" },
-  teacher: { username: "teacher_demo", password: "123456", landing: "/teacher/" },
-  enterprise: {
-    username: "enterprise_demo",
-    password: "123456",
-    landing: "/enterprise/",
-  },
-  government: { username: "gov_demo", password: "123456", landing: "/government/" },
-  operator: {
-    username: "operator_demo",
-    password: "123456",
-    landing: "/operator/overview",
-  },
-  super_admin: {
-    username: "admin_demo",
-    password: "admin123",
-    landing: "/admin/",
-  },
-} as const;
+test.use({ serviceWorkers: "block" });
 
 test.describe("authentication entry and role landing", () => {
-  for (const [role, account] of Object.entries(ACCOUNTS)) {
+  for (const role of Object.keys(ROLE_ACCOUNTS) as (keyof typeof ROLE_ACCOUNTS)[]) {
+    const account = ROLE_ACCOUNTS[role];
     test(`${role} signs in and lands on the role portal`, async ({ page }) => {
       await signIn(page, account.username, account.password);
-      const portal = account.landing.replace(/\/$/, "");
-      const landing = portal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      await expect(page).toHaveURL(
-        new RegExp(`^(?:https?://[^/]+)?${landing}(?:/dashboard)?$`),
-      );
+      await expect(page).toHaveURL(landingPattern(account.landing));
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     });
   }
@@ -63,24 +52,22 @@ test.describe("authentication entry and role landing", () => {
 });
 
 test.describe("session recovery and route boundaries", () => {
-  test("refresh restores user and capabilities and keeps the portal", async ({
-    page,
-  }) => {
-    await signIn(page, ACCOUNTS.teacher.username, ACCOUNTS.teacher.password);
-    await expect(page).toHaveURL(/\/teacher\/dashboard$/);
-
-    await page.reload();
-    await expect(page).toHaveURL(/\/teacher\/dashboard$/);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  });
+  for (const role of Object.keys(ROLE_ACCOUNTS) as (keyof typeof ROLE_ACCOUNTS)[]) {
+    const account = ROLE_ACCOUNTS[role];
+    test(`${role} refresh restores the session and keeps the portal`, async ({
+      page,
+    }) => {
+      await expectRefreshPreservesRole(page, account);
+    });
+  }
 
   test("legacy session without capabilities refreshes them once", async ({
     page,
   }) => {
     const login = await page.request.post("/api/auth/login", {
       data: {
-        username: ACCOUNTS.teacher.username,
-        password: ACCOUNTS.teacher.password,
+        username: ROLE_ACCOUNTS.teacher.username,
+        password: ROLE_ACCOUNTS.teacher.password,
       },
     });
     const body = await login.json();
@@ -124,20 +111,93 @@ test.describe("session recovery and route boundaries", () => {
 
   test("external redirect targets are ignored", async ({ page }) => {
     await page.goto("/login?redirect=https%3A%2F%2Fevil.example%2Fsteal");
-    await signIn(page, ACCOUNTS.student.username, ACCOUNTS.student.password);
+    await signIn(
+      page,
+      ROLE_ACCOUNTS.student.username,
+      ROLE_ACCOUNTS.student.password,
+    );
     await expect(page).toHaveURL(/\/agriculture\/?$/);
     await expect(page).not.toHaveURL(/evil\.example/);
   });
 
-  test("cross-role users return to their own default portal", async ({ page }) => {
-    await signIn(page, ACCOUNTS.student.username, ACCOUNTS.student.password);
-    await expect(page).toHaveURL(/\/agriculture\/?$/);
-    await page.goto("/admin/users");
-    await expect(page).toHaveURL(/\/agriculture\/?$/);
+  for (const role of NON_ADMIN_BACKOFFICE_ROLES) {
+    test(`${role} returns to its own default portal from another backoffice`, async ({
+      page,
+    }) => {
+      const account = ROLE_ACCOUNTS[role];
+      const nextIndex =
+        (BACKOFFICE_ROLES.indexOf(role) + 1) % BACKOFFICE_ROLES.length;
+      const targetRole = BACKOFFICE_ROLES[nextIndex];
+      if (!targetRole) throw new Error("backoffice role matrix is empty");
+      await expectCrossRoleFallback(page, account, targetRole);
+    });
+  }
+
+  test("super-admin enters every backoffice shell but keeps capability API boundaries", async ({
+    page,
+    request,
+  }) => {
+    await signIn(
+      page,
+      ROLE_ACCOUNTS.super_admin.username,
+      ROLE_ACCOUNTS.super_admin.password,
+    );
+    await expect(page).toHaveURL(/\/admin\/dashboard$/);
+
+    for (const role of BACKOFFICE_ROLES) {
+      const portal = rolePortal(role);
+      await page.goto(portal.shellPath);
+      await expect(page.getByTestId("backoffice-shell")).toBeVisible();
+    }
+
+    await expectApiAllowed(
+      request,
+      ROLE_ACCOUNTS.super_admin,
+      rolePortal("operator").api,
+    );
+    for (const role of ["teacher", "government", "enterprise"] as const) {
+      await expectCapabilityFallback(
+        page,
+        ROLE_ACCOUNTS.super_admin,
+        role,
+      );
+    }
+    await expectApiDenied(
+      request,
+      ROLE_ACCOUNTS.super_admin,
+      "/api/teacher/courses",
+      "POST",
+      { title: "T26 超管越权探针", description: "不应创建", category: "综合" },
+    );
+    await expectApiDenied(
+      request,
+      ROLE_ACCOUNTS.super_admin,
+      "/api/government/policies",
+      "POST",
+      { title: "T26 超管越权探针", content: "不应创建" },
+    );
+    await expectApiDenied(
+      request,
+      ROLE_ACCOUNTS.super_admin,
+      "/api/enterprise/jobs",
+      "POST",
+      {
+        title: "T26 超管越权探针",
+        salary: "5K-8K",
+        location: "广州",
+        category: "农业技术",
+        description: "不应创建",
+        requirements: ["不应创建"],
+      },
+    );
   });
 
   test("unknown backend paths stay inside that portal", async ({ page }) => {
-    await signIn(page, ACCOUNTS.teacher.username, ACCOUNTS.teacher.password);
+    await signIn(
+      page,
+      ROLE_ACCOUNTS.teacher.username,
+      ROLE_ACCOUNTS.teacher.password,
+    );
     await expect(page).toHaveURL(/\/teacher\/dashboard$/);
     await page.goto("/teacher/not-a-section");
     await expect(page).toHaveURL(/\/teacher(?:\/dashboard)?$/);
@@ -145,9 +205,21 @@ test.describe("session recovery and route boundaries", () => {
   });
 
   test("trailing slashes keep the known portal section", async ({ page }) => {
-    await signIn(page, ACCOUNTS.student.username, ACCOUNTS.student.password);
+    await signIn(
+      page,
+      ROLE_ACCOUNTS.student.username,
+      ROLE_ACCOUNTS.student.password,
+    );
     await page.goto("/agriculture/");
     await expect(page).toHaveURL(/\/agriculture\/?$/);
     await expect(page.getByRole("heading", { name: "农业技能" })).toBeVisible();
   });
 });
+
+function landingPattern(path: string): RegExp {
+  return new RegExp(`${escapeRegExp(path)}/?$`);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

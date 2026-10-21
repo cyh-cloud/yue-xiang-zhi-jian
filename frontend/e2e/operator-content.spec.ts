@@ -5,9 +5,14 @@ import {
   type Page,
 } from "@playwright/test";
 
-import { signIn } from "./auth-route";
+import {
+  ROLE_ACCOUNTS,
+  expectApiDenied,
+  rolePortal,
+  signIn,
+} from "./auth-route";
 
-const OPERATOR = { username: "operator_demo", password: "123456" };
+const OPERATOR = ROLE_ACCOUNTS.operator;
 
 test.use({ serviceWorkers: "block" });
 
@@ -580,19 +585,17 @@ test.describe("operator overview and content maintenance", () => {
     await page.goto("/operator/pest");
     await expect(page).toHaveURL(/\/agriculture\/?$/);
 
-    for (const account of [
-      { username: "student_demo", password: "123456" },
-      { username: "teacher_demo", password: "123456" },
-      { username: "enterprise_demo", password: "123456" },
-      { username: "gov_demo", password: "123456" },
-    ]) {
-      const login = await request.post("/api/auth/login", { data: account });
-      expect(login.ok()).toBeTruthy();
-      const body = (await login.json()) as { session_id: string };
-      const denied = await request.get("/api/operator/farming/tasks", {
-        headers: { "X-Session-Id": body.session_id },
-      });
-      expect(denied.status()).toBe(403);
+    for (const role of [
+      "student",
+      "teacher",
+      "enterprise",
+      "government",
+    ] as const) {
+      await expectApiDenied(
+        request,
+        ROLE_ACCOUNTS[role],
+        rolePortal("operator").api,
+      );
     }
   });
 });
