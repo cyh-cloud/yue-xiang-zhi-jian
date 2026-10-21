@@ -198,12 +198,12 @@ Pipeline 不写业务实体，不发布业务内容。业务发布门禁位于�
 
 | 项目 | 结果 |
 | --- | --- |
-| `ihchina` | robots `not-found`，raw 23、stage 20；当前代码写 blocked 20，目标口径为 deferred 20，待重跑 |
-| `nzrc` | robots `not-found`，raw 20、stage 19；当前代码写 blocked 19，目标口径为 deferred 19，待重跑 |
+| `ihchina` | robots `not-found`；历史 live 为 raw 23、stage 20，当时写 blocked 20；代码口径已改为 deferred，尚未重跑 |
+| `nzrc` | robots `not-found`；历史 live 为 raw 20、stage 19，当时写 blocked 19；代码口径已改为 deferred，尚未重跑 |
 | `nongmuhr` | 5 列表 + 5 详情 HTTP 200，但字段结构变化，解析真实失败，blocked |
-| `dialect-org` | robots `not-found`，raw 16、stage 15；当前代码写 blocked 15，目标口径为 deferred 15，待重跑 |
-| `cass-linguistics` | robots `not-found`，另有 4 条详情 404；当前代码写 blocked 5，目标口径为 deferred 5，失败 4，待重跑 |
-| `feiyiw` | robots `not-found`，raw 20、stage 17；当前代码写 blocked 17，目标口径为 deferred 17，待重跑 |
+| `dialect-org` | robots `not-found`；历史 live 为 raw 16、stage 15，当时写 blocked 15；代码口径已改为 deferred，尚未重跑 |
+| `cass-linguistics` | robots `not-found`，另有 4 条详情 404；历史 live 写 blocked 5；代码口径已改为 deferred，失败 4，尚未重跑 |
+| `feiyiw` | robots `not-found`；历史 live 为 raw 20、stage 17，当时写 blocked 17；代码口径已改为 deferred，尚未重跑 |
 | `aqsc-moa` | fixture 骨架通过，无 live；下一阶段补 live 小样本 |
 | `cnipa` | fixture 骨架通过，无 live；下一阶段补 live 小样本 |
 

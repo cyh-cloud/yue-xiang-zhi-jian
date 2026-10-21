@@ -64,7 +64,9 @@ def replay_aqsc_fixture(
     )
     discover = _discover_items(fixture_dir)
     files = sorted(fixture_dir.glob("*.xlsx"))
+    written = 0
     blocked = 0
+    deferred = 0
     failed = 0
     errors = []
     for path in files:
@@ -108,9 +110,13 @@ def replay_aqsc_fixture(
         )
         try:
             result = runtime.write_item(item, raw_evidence_id=raw_id)
-            if result["candidate_status"] == "blocked":
+            if result["candidate_status"] == "candidate":
+                written += 1
+            elif result["candidate_status"] == "blocked":
                 blocked += 1
-            elif result["candidate_status"] != "candidate":
+            elif result["candidate_status"] == "deferred":
+                deferred += 1
+            else:
                 failed += 1
                 errors.append(
                     f"{path.name}: {result['candidate_status']}: "
@@ -129,8 +135,9 @@ def replay_aqsc_fixture(
         request_count=len(files),
         item_counts={
             "discovered": len(files),
-            "written": 0,
+            "written": written,
             "blocked": blocked,
+            "deferred": deferred,
             "failed": failed,
         },
         errors=errors,

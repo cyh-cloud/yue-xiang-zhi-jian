@@ -3,18 +3,20 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
 from .admission import (
+    AdmissionDecision,
     NON_RUNNABLE_ACCESS,
     NON_RUNNABLE_RIGHTS,
     evaluate_admission,
 )
 from .database import CollectionDatabase
 from .evidence import RawEvidence, sanitize_headers, sha256_bytes
-from .items import validate_item
+from .items import CollectionItem, resolve_rights, validate_item
 from .registry import load_registry
 from .robots import RobotsFact
 
@@ -40,6 +42,10 @@ def _safe_path_component(value):
         "_" if character in '<>:"/\\|?*' else character
         for character in str(value)
     )
+
+
+def _present(value, default):
+    return value if value is not None else default
 
 
 class CollectionRuntime:
@@ -123,25 +129,25 @@ class CollectionRuntime:
         response_headers = sanitize_headers(evidence.response_headers)
         registry = load_registry(self.registry_path)
         source = registry.get(evidence.source_id) or {}
-        access_level = (
-            evidence.access_level or source.get("access") or "unknown"
+        access_level = _present(
+            evidence.access_level,
+            source.get("access") or "unknown",
         )
-        rights_status = (
-            evidence.rights_status
-            or source.get("rights_status")
-            or "unknown"
+        rights_status = _present(
+            evidence.rights_status,
+            source.get("rights_status") or "unknown",
         )
-        attribution_required = evidence.attribution_required or bool(
-            source.get("attribution_required")
+        attribution_required = _present(
+            evidence.attribution_required,
+            bool(source.get("attribution_required")),
         )
-        attribution_text = (
-            evidence.attribution_text
-            or source.get("attribution_text")
-            or source.get("name")
+        attribution_text = _present(
+            evidence.attribution_text,
+            source.get("attribution_text") or source.get("name"),
         )
-        rights_evidence_url = (
-            evidence.rights_evidence_url
-            or source.get("rights_evidence_url")
+        rights_evidence_url = _present(
+            evidence.rights_evidence_url,
+            source.get("rights_evidence_url"),
         )
         source_url = evidence.source_url or evidence.request_url
         long_term_url = evidence.long_term_url or source_url
@@ -159,11 +165,12 @@ class CollectionRuntime:
                     request_headers, status_code, content_type,
                     response_headers, body_bytes, body_sha256, body_path,
                     body_saved, access_level, rights_status,
-                    attribution_required, robots_decision, fetch_status,
+                    attribution_required, attribution_text,
+                    rights_evidence_url, robots_decision, fetch_status,
                     error_message, started_at, retrieved_at, metadata_json,
                     created_at
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     evidence.source_id,
@@ -187,6 +194,8 @@ class CollectionRuntime:
                     access_level,
                     rights_status,
                     1 if attribution_required else 0,
+                    attribution_text,
+                    rights_evidence_url,
                     evidence.robots_decision,
                     evidence.fetch_status,
                     evidence.error_message,
@@ -212,6 +221,7 @@ class CollectionRuntime:
                     "attribution_required": (
                         1 if attribution_required else 0
                     ),
+                    "attribution_text": attribution_text,
                     "rights_evidence_url": rights_evidence_url,
                     "file_url": evidence.fetch_url or evidence.request_url,
                     "final_url": evidence.final_url,
@@ -238,7 +248,19 @@ class CollectionRuntime:
         return raw_id
 
     def write_item(self, item, *, raw_evidence_id, admission=None):
-        payload = validate_item(item)
+        payload = (
+            asdict(item)
+            if isinstance(item, CollectionItem)
+            else dict(item)
+        )
+        source = (
+            load_registry(self.registry_path).get(payload.get("source_id"))
+            or {}
+        )
+        payload.update(resolve_rights(payload, source))
+        if not payload.get("rights_status"):
+            payload["rights_status"] = "unknown"
+        payload = validate_item(payload)
         now = payload.get("retrieved_at") or _now()
         payload["retrieved_at"] = now
         conn = self.database.connect()
@@ -246,7 +268,7 @@ class CollectionRuntime:
             raw = conn.execute(
                 """
                 SELECT source_id, robots_decision, run_id, rights_status,
-                       access_level
+                       access_level, fetch_status, status_code
                 FROM raw_fetches WHERE id = ?
                 """,
                 (raw_evidence_id,),
@@ -284,30 +306,21 @@ class CollectionRuntime:
                     payload,
                     registry_path=self.registry_path,
                     robots=robots,
+                    fetch_status=raw[5],
+                    status_code=raw[6],
                 )
                 if raw[3] in NON_RUNNABLE_RIGHTS:
-                    internal = type(
-                        "Decision",
-                        (),
-                        {
-                            "allowed": False,
-                            "status": "blocked",
-                            "reason": f"raw_rights:{raw[3]}",
-                        },
-                    )()
+                    internal = AdmissionDecision(
+                        False, "blocked", f"raw_rights:{raw[3]}"
+                    )
                 elif raw[4] in NON_RUNNABLE_ACCESS:
-                    internal = type(
-                        "Decision",
-                        (),
-                        {
-                            "allowed": False,
-                            "status": "blocked",
-                            "reason": f"raw_access:{raw[4]}",
-                        },
-                    )()
+                    internal = AdmissionDecision(
+                        False, "blocked", f"raw_access:{raw[4]}"
+                    )
                 decision = (
                     admission
-                    if admission is not None and not admission.allowed
+                    if admission is not None
+                    and (not admission.allowed or internal.allowed)
                     else internal
                 )
                 if raw_run_id and raw_run_id != "legacy":
@@ -382,6 +395,9 @@ class CollectionRuntime:
                     "candidate_status": "blocked",
                     "candidate_reason": decision.reason,
                 }
+            payload["candidate_status"] = decision.status
+            if decision.reason is not None:
+                payload["candidate_reason"] = decision.reason
             if self.candidate_writer is None:
                 conn.commit()
                 return {

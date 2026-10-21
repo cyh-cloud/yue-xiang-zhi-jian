@@ -147,7 +147,6 @@ def _item_from_payload(payload, *, source_id, run_id, index):
     merged.setdefault("source_id", source_id)
     merged.setdefault("run_id", run_id)
     merged.setdefault("mode", "fixture")
-    merged.setdefault("rights_status", "attribution-required")
     merged.setdefault("source_index", index)
     extra = dict(merged.get("extra") or {})
     known = set(CollectionItem.__dataclass_fields__)

@@ -12,6 +12,12 @@ from .run_id import new_run_id
 
 CANDIDATE_STATUSES = frozenset({"candidate", "blocked", "deferred"})
 DETAIL_URL_STATUSES = frozenset({"direct", "missing"})
+RIGHTS_FIELDS = (
+    "rights_status",
+    "attribution_required",
+    "attribution_text",
+    "rights_evidence_url",
+)
 FORBIDDEN_ITEM_FIELDS = frozenset(
     {"response", "selector", "connection", "cookie", "authorization"}
 )
@@ -27,14 +33,14 @@ class CollectionItem:
     detail_url_status: str
     run_id: str
     mode: str
-    rights_status: str
+    rights_status: str | None = None
     access_level: str | None = None
     locator: str | None = None
     fetch_url: str | None = None
     title: str | None = None
     body_text: str | None = None
     published_at: str | None = None
-    attribution_required: bool = False
+    attribution_required: bool | None = None
     attribution_text: str | None = None
     rights_evidence_url: str | None = None
     content_type: str | None = None
@@ -48,6 +54,20 @@ class CollectionItem:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
+def resolve_rights(payload, source=None):
+    """Resolve item rights without treating an explicit False as absent."""
+    source = source or {}
+    resolved = {}
+    for name in RIGHTS_FIELDS:
+        value = payload.get(name)
+        if value is None:
+            value = source.get(name)
+        if name == "attribution_required" and value is None:
+            value = False
+        resolved[name] = value
+    return resolved
+
+
 def item_from_mapping(payload, *, source_id, response, list_item=None):
     merged = dict(list_item or {})
     merged.update(payload or {})
@@ -57,7 +77,6 @@ def item_from_mapping(payload, *, source_id, response, list_item=None):
         response.meta.get("run_id") or new_run_id(source_id),
     )
     merged.setdefault("mode", "live")
-    merged.setdefault("rights_status", "attribution-required")
     merged.setdefault("retrieved_at", datetime.now(timezone.utc).isoformat())
     merged.setdefault(
         "raw_evidence_id", response.meta.get("raw_evidence_id")
@@ -91,7 +110,8 @@ def validate_item(item: CollectionItem | dict) -> dict[str, Any]:
     payload.setdefault("title", None)
     payload.setdefault("body_text", None)
     payload.setdefault("published_at", None)
-    payload.setdefault("attribution_required", False)
+    payload.setdefault("rights_status", None)
+    payload.setdefault("attribution_required", None)
     payload.setdefault("attribution_text", None)
     payload.setdefault("rights_evidence_url", None)
     payload.setdefault("access_level", None)
@@ -107,7 +127,6 @@ def validate_item(item: CollectionItem | dict) -> dict[str, Any]:
         "long_term_url",
         "run_id",
         "mode",
-        "rights_status",
     )
     for name in required:
         if not str(payload.get(name) or "").strip():

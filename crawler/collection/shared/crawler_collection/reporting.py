@@ -55,7 +55,16 @@ class RunReport:
 
     @property
     def status(self):
-        if self.discovered == 0 or self.written == 0 and self.blocked == 0:
+        if self.discovered == 0 and not (
+            self.blocked or self.deferred or self.skipped or self.failed
+        ):
+            return "failed"
+        if (
+            self.written == 0
+            and self.blocked == 0
+            and self.deferred == 0
+            and self.skipped == 0
+        ):
             return "failed"
         if self.failed or self.skipped or self.blocked or self.deferred:
             return "partial"
@@ -88,7 +97,7 @@ def collection_counts(database_path, run_id):
     try:
         raw_count = _count_rows(conn, "raw_fetches", run_id)
         stage_count = _count_rows(conn, "stage_source_items", run_id)
-        candidate_count = 0
+        candidate_rows = 0
         candidate_states = {}
         for table in CANDIDATE_TABLES:
             exists = conn.execute(
@@ -98,7 +107,7 @@ def collection_counts(database_path, run_id):
             ).fetchone()
             if not exists:
                 continue
-            candidate_count += _count_rows(conn, table, run_id)
+            candidate_rows += _count_rows(conn, table, run_id)
             for status, count in conn.execute(
                 f"SELECT candidate_status, COUNT(*) FROM {table} "
                 "WHERE run_id = ? GROUP BY candidate_status",
@@ -112,7 +121,8 @@ def collection_counts(database_path, run_id):
     return {
         "raw_count": raw_count,
         "stage_count": stage_count,
-        "candidate_count": candidate_count,
+        "candidate_count": candidate_states.get("candidate", 0),
+        "candidate_rows": candidate_rows,
         "candidate_states": candidate_states,
     }
 
@@ -165,23 +175,34 @@ def build_run_report(
     item_counts = item_counts or {}
     report_root = report_root or Path(database_path).parent / "reports"
     path = _report_path(report_root, run_id)
+    written = item_counts.get(
+        "written", counts["candidate_states"].get("candidate", 0)
+    )
+    blocked = item_counts.get(
+        "blocked", counts["candidate_states"].get("blocked", 0)
+    )
+    deferred = item_counts.get(
+        "deferred", counts["candidate_states"].get("deferred", 0)
+    )
+    skipped = item_counts.get("skipped", 0)
+    failed = item_counts.get("failed", 0)
+    if "discovered" in item_counts:
+        discovered = item_counts["discovered"]
+    elif item_counts:
+        discovered = written + blocked + deferred + skipped + failed
+    else:
+        discovered = counts["candidate_rows"] + skipped + failed
+
     report = RunReport(
         run_id=run_id,
         source_id=source_id,
         mode=mode,
-        discovered=item_counts.get(
-            "discovered",
-            counts["candidate_count"]
-            + item_counts.get("blocked", 0)
-            + item_counts.get("deferred", 0)
-            + item_counts.get("skipped", 0)
-            + item_counts.get("failed", 0),
-        ),
-        written=item_counts.get("written", counts["candidate_count"]),
-        skipped=item_counts.get("skipped", 0),
-        failed=item_counts.get("failed", 0),
-        blocked=item_counts.get("blocked", 0),
-        deferred=item_counts.get("deferred", 0),
+        discovered=discovered,
+        written=written,
+        skipped=skipped,
+        failed=failed,
+        blocked=blocked,
+        deferred=deferred,
         errors=tuple(errors),
         started_at=started_at,
         finished_at=finished_at or datetime.now(timezone.utc).isoformat(),

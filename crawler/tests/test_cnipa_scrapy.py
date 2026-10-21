@@ -17,6 +17,7 @@ PROJECT_ROOT = (
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from cnipa.parsers import fixture_files, fixture_item
+from cnipa.candidate import write_candidate
 from cnipa.spiders.collection import CnipaSpider
 
 
@@ -58,13 +59,14 @@ class CnipaScrapySkeletonTest(unittest.TestCase):
         self.assertNotIn("X-Amz", item["long_term_url"])
         self.assertIn("X-Amz", item["fetch_url"])
 
-    def test_missing_detail_row_stays_out_of_candidates(self):
+    def test_missing_detail_row_uses_carrier_and_locator(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             runtime = CollectionRuntime(
                 database_path=root / "crawler.db",
                 download_root=root / "downloads",
                 registry_path=ROOT / "docs" / "sources.json",
+                candidate_writer=write_candidate,
             )
             item = CollectionItem(**fixture_item(PDF))
             raw_id = runtime.persist_raw(
@@ -81,8 +83,7 @@ class CnipaScrapySkeletonTest(unittest.TestCase):
 
             result = runtime.write_item(item, raw_evidence_id=raw_id)
 
-        self.assertEqual(result["candidate_status"], "blocked")
-        self.assertEqual(result["candidate_reason"], "detail_url:missing")
+        self.assertEqual(result["candidate_status"], "candidate")
 
 
 if __name__ == "__main__":

@@ -146,7 +146,7 @@ class CollectionRuntimeTest(unittest.TestCase):
             self._finish(conn)
         self.assertEqual(rows, list(expected))
 
-    def test_missing_detail_keeps_stage_but_does_not_write_candidate(self):
+    def test_missing_detail_uses_carrier_and_locator_as_candidate(self):
         raw_id = self.runtime.persist_raw(self._evidence())
         item = self._item(
             detail_url=None,
@@ -156,7 +156,7 @@ class CollectionRuntimeTest(unittest.TestCase):
 
         result = self.runtime.write_item(item, raw_evidence_id=raw_id)
 
-        self.assertEqual(result["candidate_status"], "blocked")
+        self.assertEqual(result["candidate_status"], "candidate")
         conn = sqlite3.connect(self.db_path)
         try:
             stage_count = conn.execute(
@@ -168,7 +168,7 @@ class CollectionRuntimeTest(unittest.TestCase):
         finally:
             self._finish(conn)
         self.assertEqual(stage_count, 1)
-        self.assertEqual(candidate_count, 0)
+        self.assertEqual(candidate_count, 1)
 
     def test_disabled_and_robots_rejected_sources_do_not_write(self):
         raw_id = self.runtime.persist_raw(self._evidence())
