@@ -18,7 +18,9 @@ from crawler.collection.shared.crawler_collection.items import (
 )
 from crawler.collection.shared.crawler_collection.projects import (
     discover_projects,
+    executable_source_ids,
 )
+from crawler.collection.shared.crawler_collection.registry import load_registry
 from crawler.collection.shared.crawler_collection.reporting import (
     RunReport,
     build_run_report,
@@ -31,37 +33,71 @@ REGISTRY = ROOT / "docs" / "sources.json"
 PROJECTS = ROOT / "collection" / "projects"
 
 
-EXPECTED_PROJECTS = {
-    "ihchina",
-    "nzrc",
-    "nongmuhr",
-    "dialect-org",
-    "cass-linguistics",
-    "feiyiw",
-    "aqsc-moa",
-    "cnipa",
-}
-
-
 class ScrapyProjectDiscoveryTest(unittest.TestCase):
-    def test_discovery_returns_only_eight_scoped_projects(self):
+    def test_discovery_matches_executable_registry_sources(self):
         projects = discover_projects(PROJECTS)
+        expected = executable_source_ids(load_registry(REGISTRY))
 
-        self.assertEqual(set(projects), EXPECTED_PROJECTS)
+        self.assertEqual(set(projects), expected)
         for source_id, project in projects.items():
             self.assertEqual(project.source_id, source_id)
             self.assertTrue(project.config_path.is_file())
             self.assertTrue(project.package_path.is_dir())
 
-    def test_excluded_and_deferred_sources_have_no_scrapy_project(self):
-        for source_id in (
-            "5ajob",
-            "zhongguoyuyan",
-            "cnopendata",
-            "open-meteo",
-            "qweather",
-        ):
+    def test_non_executable_registry_sources_have_no_scrapy_project(self):
+        registry = load_registry(REGISTRY)
+        non_executable = set(registry) - executable_source_ids(registry)
+
+        for source_id in non_executable:
             self.assertFalse((PROJECTS / source_id).exists())
+
+    def test_project_set_tracks_registry_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            projects = root / "projects"
+            projects.mkdir()
+            registry = root / "sources.json"
+
+            def write_registry(*source_ids):
+                registry.write_text(
+                    json.dumps(
+                        {
+                            "sources": [
+                                {
+                                    "id": source_id,
+                                    "enabled": True,
+                                    "status": "approved-with-gaps",
+                                    "run_modes": ["fixture"],
+                                }
+                                for source_id in source_ids
+                            ]
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+
+            def write_project(source_id):
+                project = projects / source_id
+                project.mkdir()
+                (project / "scrapy.cfg").write_text(
+                    "[settings]\n",
+                    encoding="utf-8",
+                )
+                (project / source_id.replace("-", "_")).mkdir()
+
+            write_registry("first")
+            write_project("first")
+            self.assertEqual(
+                set(discover_projects(projects, registry)),
+                {"first"},
+            )
+
+            write_registry("first", "second")
+            write_project("second")
+            self.assertEqual(
+                set(discover_projects(projects, registry)),
+                {"first", "second"},
+            )
 
 
 class CollectionItemContractTest(unittest.TestCase):

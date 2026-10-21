@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scrapy.http import Request, Response
 
@@ -18,12 +19,31 @@ FIXTURE = ROOT / "tests" / "fixtures" / "evidence" / "aqsc-moa"
 REGISTRY = ROOT / "docs" / "sources.json"
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from aqsc_moa import live as live_module
 from aqsc_moa.parsers import parse_xlsx_rows  # noqa: E402
 from aqsc_moa.replay import replay_aqsc_fixture  # noqa: E402
 from aqsc_moa.spiders.collection import AqscMoaSpider  # noqa: E402
 
 
 class AqscMoaScrapyTest(unittest.TestCase):
+    def test_live_canary_requires_explicit_start_urls_before_crawl(self):
+        for start_urls in (None, [], ("",)):
+            with self.subTest(start_urls=start_urls):
+                with mock.patch.object(
+                    live_module, "CrawlerProcess"
+                ) as process:
+                    with self.assertRaisesRegex(
+                        ValueError, "explicit start URL"
+                    ):
+                        live_module.run_live_sample(
+                            database_path=Path("unused.db"),
+                            download_root=Path("unused-download"),
+                            registry_path=REGISTRY,
+                            report_root=Path("unused-reports"),
+                            start_urls=start_urls,
+                        )
+                    process.assert_not_called()
+
     def test_spider_is_live_enabled_with_explicit_start_urls(self):
         spider = AqscMoaSpider()
         self.assertEqual(spider.name, "aqsc-moa")

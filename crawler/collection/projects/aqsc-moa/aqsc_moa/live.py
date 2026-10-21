@@ -16,9 +16,6 @@ from .spiders.collection import AqscMoaSpider
 
 
 SOURCE_ID = "aqsc-moa"
-DEFAULT_START_URLS = (
-    "https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm",
-)
 
 
 def run_live_sample(
@@ -30,6 +27,17 @@ def run_live_sample(
     start_urls=None,
     run_id=None,
 ):
+    if isinstance(start_urls, str):
+        start_urls = [start_urls]
+    else:
+        start_urls = list(start_urls or ())
+    if not start_urls or any(
+        not isinstance(url, str) or not url.strip() for url in start_urls
+    ):
+        raise ValueError(
+            "run_live_sample requires at least one explicit start URL"
+        )
+
     database_path = Path(database_path).resolve()
     download_root = Path(download_root).resolve()
     registry_path = Path(registry_path).resolve()
@@ -46,7 +54,7 @@ def run_live_sample(
     process = CrawlerProcess(settings, install_root_handler=False)
     process.crawl(
         AqscMoaSpider,
-        start_urls=list(start_urls or DEFAULT_START_URLS),
+        start_urls=start_urls,
         run_id=run_id,
     )
     process.start(stop_after_crawl=True)
@@ -61,7 +69,7 @@ def main(argv=None):
     parser.add_argument("--registry-path", required=True)
     parser.add_argument("--report-root", required=True)
     parser.add_argument("--run-id")
-    parser.add_argument("--start-url", action="append")
+    parser.add_argument("--start-url", action="append", required=True)
     args = parser.parse_args(argv)
     run_id, report_path = run_live_sample(
         database_path=args.database_path,
