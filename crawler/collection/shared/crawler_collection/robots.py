@@ -58,15 +58,18 @@ class RobotsEvidenceMiddleware(RobotsTxtMiddleware):
     def __init__(self, crawler):
         super().__init__(crawler)
         self._facts = {}
+        self._schemes = {}
 
     async def process_request(self, request, spider=None):
-        netloc = urlparse(request.url).netloc
+        parsed = urlparse(request.url)
+        netloc = parsed.netloc
+        self._schemes[netloc] = parsed.scheme or "https"
         try:
             await super().process_request(request, spider)
         except IgnoreRequest:
             fact = self._facts.get(netloc) or RobotsFact(
                 "disallowed",
-                evidence_url=f"https://{netloc}/robots.txt",
+                evidence_url=self._robots_url(netloc),
             )
             self._attach(request, RobotsFact(
                 "disallowed",
@@ -78,9 +81,11 @@ class RobotsEvidenceMiddleware(RobotsTxtMiddleware):
         if not request.meta.get("dont_obey_robotstxt"):
             fact = self._facts.get(netloc) or RobotsFact(
                 "unknown",
-                evidence_url=f"https://{netloc}/robots.txt",
+                evidence_url=self._robots_url(netloc),
             )
             self._attach(request, fact)
+            if fact.decision == "unknown":
+                raise IgnoreRequest("robots:unknown")
 
     def _parse_robots(self, response, netloc):
         super()._parse_robots(response, netloc)
@@ -94,8 +99,12 @@ class RobotsEvidenceMiddleware(RobotsTxtMiddleware):
         super()._robots_error(exc, netloc)
         self._facts[netloc] = RobotsFact(
             "unknown",
-            evidence_url=f"https://{netloc}/robots.txt",
+            evidence_url=self._robots_url(netloc),
         )
+
+    def _robots_url(self, netloc):
+        scheme = self._schemes.get(netloc, "https")
+        return f"{scheme}://{netloc}/robots.txt"
 
     @staticmethod
     def _attach(request, fact):

@@ -124,7 +124,6 @@ def validate_item(item: CollectionItem | dict) -> dict[str, Any]:
         "source_id",
         "source_item_id",
         "source_url",
-        "long_term_url",
         "run_id",
         "mode",
     )
@@ -137,16 +136,29 @@ def validate_item(item: CollectionItem | dict) -> dict[str, Any]:
         raise ValueError(
             "detail_url_status must be either 'direct' or 'missing'"
         )
-    if status == "direct" and not str(payload.get("detail_url") or "").strip():
-        raise ValueError("detail_url is required when detail_url_status is direct")
-    if status == "missing" and not str(payload.get("locator") or "").strip():
-        raise ValueError("locator is required when detail_url_status is missing")
 
     candidate_status = str(payload.get("candidate_status") or "").strip()
     if candidate_status not in CANDIDATE_STATUSES:
         raise ValueError(
             "candidate_status must be candidate, blocked, or deferred"
         )
+    audit_only = candidate_status in {"blocked", "deferred"}
+    if not audit_only and not str(
+        payload.get("long_term_url") or ""
+    ).strip():
+        raise ValueError("long_term_url is required for candidate records")
+    if (
+        status == "direct"
+        and not str(payload.get("detail_url") or "").strip()
+        and not audit_only
+    ):
+        raise ValueError("detail_url is required when detail_url_status is direct")
+    if (
+        status == "missing"
+        and not str(payload.get("locator") or "").strip()
+        and not audit_only
+    ):
+        raise ValueError("locator is required when detail_url_status is missing")
 
     forbidden = FORBIDDEN_ITEM_FIELDS.intersection(
         key.lower() for key in payload

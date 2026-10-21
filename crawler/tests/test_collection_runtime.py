@@ -170,12 +170,23 @@ class CollectionRuntimeTest(unittest.TestCase):
         self.assertEqual(stage_count, 1)
         self.assertEqual(candidate_count, 1)
 
-    def test_disabled_and_robots_rejected_sources_do_not_write(self):
-        raw_id = self.runtime.persist_raw(self._evidence())
-        for item, robot in (
-            (self._item(source_id="5ajob"), RobotsFact("allowed")),
-            (self._item(), RobotsFact("disallowed")),
+    def test_disabled_and_robots_rejected_sources_write_blocked_candidates(self):
+        for evidence, item, robot in (
+            (
+                self._evidence(source_id="5ajob"),
+                self._item(
+                    source_id="5ajob",
+                    source_item_id="disabled-source",
+                ),
+                RobotsFact("allowed"),
+            ),
+            (
+                self._evidence(),
+                self._item(source_item_id="robots-disallowed"),
+                RobotsFact("disallowed"),
+            ),
         ):
+            raw_id = self.runtime.persist_raw(evidence)
             decision = evaluate_admission(
                 item,
                 registry_path=Path("crawler/docs/sources.json"),
@@ -190,14 +201,19 @@ class CollectionRuntimeTest(unittest.TestCase):
 
         conn = sqlite3.connect(self.db_path)
         try:
-            self.assertEqual(
-                conn.execute(
-                    "SELECT COUNT(*) FROM std_ich_projects"
-                ).fetchone()[0],
-                0,
-            )
+            rows = conn.execute(
+                "SELECT source_item_id, candidate_status, candidate_reason "
+                "FROM std_ich_projects ORDER BY source_item_id"
+            ).fetchall()
         finally:
             self._finish(conn)
+        self.assertEqual(
+            rows,
+            [
+                ("disabled-source", "blocked", "source_disabled"),
+                ("robots-disallowed", "blocked", "robots:disallowed"),
+            ],
+        )
 
     def test_missing_candidate_writer_blocks_without_guessing_a_table(self):
         runtime = CollectionRuntime(
@@ -256,14 +272,22 @@ class CollectionRuntimeTest(unittest.TestCase):
         conn = sqlite3.connect(self.db_path)
         try:
             row = conn.execute(
-                "SELECT download_status, oversize_note FROM raw_files "
+                "SELECT download_status, oversize_note, sha256 "
+                "FROM raw_files "
                 "WHERE raw_fetch_id = ?",
+                (raw_id,),
+            ).fetchone()
+            fetch = conn.execute(
+                "SELECT body_saved, body_sha256, body_path "
+                "FROM raw_fetches WHERE id = ?",
                 (raw_id,),
             ).fetchone()
         finally:
             self._finish(conn)
         self.assertEqual(row[0], "oversize")
         self.assertIn("exceeds", row[1])
+        self.assertEqual(row[2], "")
+        self.assertEqual(fetch, (0, None, None))
 
     def test_runtime_does_not_import_business_or_converter(self):
         source = (

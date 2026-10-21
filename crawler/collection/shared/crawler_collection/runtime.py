@@ -88,26 +88,62 @@ class CollectionRuntime:
     def persist_raw(self, evidence: RawEvidence):
         self.download_root.mkdir(parents=True, exist_ok=True)
         body = bytes(evidence.body)
-        digest = sha256_bytes(body)
+        status_code = evidence.status_code
+        fetch_status = evidence.fetch_status or "unknown"
+        declared_size = evidence.declared_size
+        diagnostic_error = (
+            fetch_status in {"http_error", "error", "unknown"}
+            or (
+                status_code is not None
+                and int(status_code) >= 400
+            )
+        )
+        oversize = not diagnostic_error and (
+            bool(evidence.metadata.get("oversize"))
+            or len(body) > self.max_download_bytes
+            or (
+                declared_size is not None
+                and int(declared_size) > self.max_download_bytes
+            )
+        )
+        save_body = (
+            not oversize
+            and fetch_status == "ok"
+            and (
+                status_code is None
+                or 200 <= int(status_code) < 300
+            )
+        )
+        digest = sha256_bytes(body) if save_body else None
         host = _safe_path_component(
             urlparse(evidence.request_url).netloc or "fixture.local"
         )
         domain_dir = self.download_root / host
         domain_dir.mkdir(parents=True, exist_ok=True)
-        file_name = evidence.metadata.get("file_name") or (
-            f"response-{digest[:12]}.bin"
+        file_name = (
+            evidence.metadata.get("file_name")
+            or Path(urlparse(evidence.request_url).path).name
+            or (
+                f"response-{digest[:12]}.bin"
+                if digest
+                else "response.bin"
+            )
         )
         file_name = Path(file_name).name
-        declared_size = evidence.declared_size
-        oversize = len(body) > self.max_download_bytes or (
-            declared_size is not None
-            and int(declared_size) > self.max_download_bytes
-        )
+        file_path = None
+        download_status = None
+        oversize_note = None
         if oversize:
-            size_detail = f"actual {len(body)} bytes"
+            details = []
             if declared_size is not None:
-                size_detail += f", declared {int(declared_size)} bytes"
-            size_detail += f" exceeds {self.max_download_bytes} bytes"
+                details.append(f"declared {int(declared_size)} bytes")
+            if body:
+                details.append(f"received {len(body)} bytes")
+            details.append(f"exceeds {self.max_download_bytes} bytes")
+            reason = evidence.metadata.get("oversize_reason")
+            if reason:
+                details.append(str(reason))
+            size_detail = ", ".join(details)
             note = domain_dir / "OVERSIZE.md"
             with note.open("a", encoding="utf-8") as handle:
                 handle.write(
@@ -116,7 +152,7 @@ class CollectionRuntime:
             file_path = note.relative_to(self.download_root).as_posix()
             download_status = "oversize"
             oversize_note = size_detail
-        else:
+        elif save_body:
             target = domain_dir / file_name
             if target.exists() and target.read_bytes() != body:
                 target = domain_dir / f"{digest[:12]}-{file_name}"
@@ -187,10 +223,14 @@ class CollectionRuntime:
                     evidence.status_code,
                     evidence.content_type,
                     json.dumps(response_headers),
-                    len(body),
+                    (
+                        int(declared_size)
+                        if oversize and declared_size is not None
+                        else len(body)
+                    ),
                     digest,
-                    file_path,
-                    0 if oversize else 1,
+                    file_path if save_body else None,
+                    1 if save_body else 0,
                     access_level,
                     rights_status,
                     1 if attribution_required else 0,
@@ -206,42 +246,52 @@ class CollectionRuntime:
                 ),
             )
             raw_id = cursor.lastrowid
-            raw_file_sql, raw_file_params = _insert_sql(
-                "raw_files",
-                {
-                    "raw_fetch_id": raw_id,
-                    "source_id": evidence.source_id,
-                    "source_url": source_url,
-                    "long_term_url": long_term_url,
-                    "detail_url": evidence.detail_url,
-                    "detail_url_status": evidence.detail_url_status,
-                    "fetch_url": evidence.fetch_url,
-                    "locator": locator,
-                    "rights_status": rights_status,
-                    "attribution_required": (
-                        1 if attribution_required else 0
-                    ),
-                    "attribution_text": attribution_text,
-                    "rights_evidence_url": rights_evidence_url,
-                    "file_url": evidence.fetch_url or evidence.request_url,
-                    "final_url": evidence.final_url,
-                    "file_path": file_path,
-                    "file_name": file_name,
-                    "mime_type": evidence.content_type,
-                    "file_ext": Path(file_name).suffix or None,
-                    "byte_size": len(body),
-                    "sha256": digest,
-                    "access_level": access_level,
-                    "download_status": download_status,
-                    "oversize_note": oversize_note,
-                    "media_metadata": json.dumps(
-                        evidence.metadata, ensure_ascii=False
-                    ),
-                    "retrieved_at": retrieved_at,
-                    "created_at": retrieved_at,
-                },
-            )
-            conn.execute(raw_file_sql, raw_file_params)
+            if save_body or oversize:
+                raw_file_sql, raw_file_params = _insert_sql(
+                    "raw_files",
+                    {
+                        "raw_fetch_id": raw_id,
+                        "source_id": evidence.source_id,
+                        "source_url": source_url,
+                        "long_term_url": long_term_url,
+                        "detail_url": evidence.detail_url,
+                        "detail_url_status": evidence.detail_url_status,
+                        "fetch_url": evidence.fetch_url,
+                        "locator": locator,
+                        "rights_status": rights_status,
+                        "attribution_required": (
+                            1 if attribution_required else 0
+                        ),
+                        "attribution_text": attribution_text,
+                        "rights_evidence_url": rights_evidence_url,
+                        "file_url": (
+                            evidence.fetch_url or evidence.request_url
+                        ),
+                        "final_url": evidence.final_url,
+                        "file_path": file_path,
+                        "file_name": file_name,
+                        "mime_type": (
+                            evidence.content_type
+                            or "application/octet-stream"
+                        ),
+                        "file_ext": Path(file_name).suffix or None,
+                        "byte_size": (
+                            int(declared_size)
+                            if oversize and declared_size is not None
+                            else len(body)
+                        ),
+                        "sha256": digest or "",
+                        "access_level": access_level,
+                        "download_status": download_status,
+                        "oversize_note": oversize_note,
+                        "media_metadata": json.dumps(
+                            evidence.metadata, ensure_ascii=False
+                        ),
+                        "retrieved_at": retrieved_at,
+                        "created_at": retrieved_at,
+                    },
+                )
+                conn.execute(raw_file_sql, raw_file_params)
             conn.commit()
         finally:
             conn.close()
@@ -325,6 +375,31 @@ class CollectionRuntime:
                 )
                 if raw_run_id and raw_run_id != "legacy":
                     payload["run_id"] = raw_run_id
+            audit_only = payload["candidate_status"] in {
+                "blocked",
+                "deferred",
+            }
+            if audit_only:
+                payload["long_term_url"] = (
+                    payload.get("long_term_url")
+                    or payload.get("fetch_url")
+                    or payload["source_url"]
+                )
+                if (
+                    payload["detail_url_status"] == "direct"
+                    and not payload.get("detail_url")
+                ):
+                    payload["detail_url_status"] = "missing"
+                if (
+                    payload["detail_url_status"] == "missing"
+                    and not payload.get("locator")
+                ):
+                    payload["locator"] = (
+                        payload.get("fetch_url") or payload["source_url"]
+                    )
+            payload["title"] = (
+                payload.get("title") or payload["source_item_id"]
+            )
             if not payload.get("content_hash"):
                 payload["content_hash"] = sha256_bytes(
                     json.dumps(
@@ -389,15 +464,17 @@ class CollectionRuntime:
                     json.dumps(payload["extra"], ensure_ascii=False),
                 ),
             )
-            if not decision.allowed:
-                conn.commit()
-                return {
-                    "candidate_status": "blocked",
-                    "candidate_reason": decision.reason,
-                }
-            payload["candidate_status"] = decision.status
-            if decision.reason is not None:
-                payload["candidate_reason"] = decision.reason
+            payload["candidate_status"] = (
+                decision.status if decision.allowed else "blocked"
+            )
+            payload["candidate_reason"] = (
+                decision.reason
+                or (
+                    "admission:blocked"
+                    if payload["candidate_status"] == "blocked"
+                    else None
+                )
+            )
             if self.candidate_writer is None:
                 conn.commit()
                 return {

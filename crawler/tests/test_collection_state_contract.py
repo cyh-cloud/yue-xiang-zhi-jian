@@ -7,6 +7,7 @@ from pathlib import Path
 from scrapy.http import HtmlResponse, Request
 
 from crawler.collection.shared.crawler_collection.admission import (
+    AdmissionDecision,
     evaluate_admission,
 )
 from crawler.collection.shared.crawler_collection.evidence import RawEvidence
@@ -135,6 +136,33 @@ class CollectionStateAdmissionTest(unittest.TestCase):
         self.assertEqual(decision.status, "deferred")
         self.assertEqual(decision.reason, "batch:later")
 
+    def test_deferred_item_may_omit_carrier_and_locator(self):
+        payload = validate_item(
+            _item(
+                long_term_url=None,
+                detail_url=None,
+                detail_url_status="missing",
+                locator=None,
+                candidate_status="deferred",
+                candidate_reason="carrier:missing",
+            )
+        )
+
+        self.assertEqual(payload["candidate_status"], "deferred")
+        self.assertIsNone(payload["long_term_url"])
+        self.assertIsNone(payload["locator"])
+
+    def test_candidate_item_still_requires_carrier_and_locator(self):
+        with self.assertRaises(ValueError):
+            validate_item(
+                _item(
+                    long_term_url=None,
+                    detail_url=None,
+                    detail_url_status="missing",
+                    locator=None,
+                )
+            )
+
 
 class CollectionStateRuntimeTest(unittest.TestCase):
     def setUp(self):
@@ -240,6 +268,97 @@ class CollectionStateRuntimeTest(unittest.TestCase):
             conn.close()
 
         self.assertEqual((raw_flag, stage_flag, candidate_flag), (0, 0, 0))
+
+    def test_deferred_item_without_carrier_fields_is_persisted(self):
+        raw_id = self.runtime.persist_raw(self._raw())
+
+        result = self.runtime.write_item(
+            _item(
+                source_item_id="deferred-missing",
+                long_term_url=None,
+                detail_url=None,
+                detail_url_status="missing",
+                locator=None,
+                candidate_status="deferred",
+                candidate_reason="carrier:missing",
+            ),
+            raw_evidence_id=raw_id,
+        )
+
+        self.assertEqual(result["candidate_status"], "deferred")
+        conn = sqlite3.connect(self.database_path)
+        try:
+            row = conn.execute(
+                "SELECT candidate_status, candidate_reason, "
+                "long_term_url, locator FROM std_ich_projects "
+                "WHERE source_item_id = 'deferred-missing'"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(
+            row,
+            (
+                "deferred",
+                "carrier:missing",
+                "https://example.test/1",
+                "https://example.test/1",
+            ),
+        )
+
+    def test_failed_admission_persists_blocked_candidate(self):
+        raw_id = self.runtime.persist_raw(self._raw())
+
+        result = self.runtime.write_item(
+            _item(source_item_id="blocked-admission"),
+            raw_evidence_id=raw_id,
+            admission=AdmissionDecision(
+                False,
+                "blocked",
+                "policy:blocked",
+            ),
+        )
+
+        self.assertEqual(result["candidate_status"], "blocked")
+        self.assertEqual(result["candidate_reason"], "policy:blocked")
+        conn = sqlite3.connect(self.database_path)
+        try:
+            row = conn.execute(
+                "SELECT candidate_status, candidate_reason "
+                "FROM std_ich_projects "
+                "WHERE source_item_id = 'blocked-admission'"
+            ).fetchone()
+        finally:
+            conn.close()
+        self.assertEqual(row, ("blocked", "policy:blocked"))
+
+    def test_candidate_deferred_and_blocked_states_persist(self):
+        raw_id = self.runtime.persist_raw(self._raw())
+        expected = (
+            ("candidate", None),
+            ("deferred", "batch:later"),
+            ("blocked", "rights:review"),
+        )
+
+        for index, (status, reason) in enumerate(expected):
+            result = self.runtime.write_item(
+                _item(
+                    source_item_id=f"state-{index}",
+                    candidate_status=status,
+                    candidate_reason=reason,
+                ),
+                raw_evidence_id=raw_id,
+            )
+            self.assertEqual(result["candidate_status"], status)
+
+        conn = sqlite3.connect(self.database_path)
+        try:
+            rows = conn.execute(
+                "SELECT candidate_status, candidate_reason "
+                "FROM std_ich_projects ORDER BY source_item_id"
+            ).fetchall()
+        finally:
+            conn.close()
+        self.assertEqual(rows, list(expected))
 
     def test_report_derives_deferred_and_blocked_from_database(self):
         report_database = self.root / "report.db"
