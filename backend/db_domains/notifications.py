@@ -43,6 +43,27 @@ def create_notification_for_all_students(ntype, title, content='', link_type='',
     conn.commit()
     conn.close()
 
+
+def delete_notifications_by_link(link_type, link_id):
+    """删除某个业务对象产生的全部站内通知副本，返回删除行数。
+
+    公告等业务对象由持有方负责校验归属与删除成功，再通过本窄接口撤回对应的
+    消息中心副本；本域只按 (link_type, link_id) 作用于 notifications 表，
+    不感知业务对象是否存在。
+    """
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "DELETE FROM notifications WHERE link_type = ? AND link_id = ?",
+            (link_type, link_id),
+        )
+        deleted = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return deleted
+
+
 def get_notifications(user_id, limit=20):
     conn = get_connection()
     rows = conn.execute(

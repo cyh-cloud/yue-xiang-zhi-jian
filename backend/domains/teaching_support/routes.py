@@ -121,6 +121,7 @@ def create_announcement():
 @require_capability('teaching.manage', anonymous=401)
 def delete_announcement(ann_id):
     if teaching.delete_announcement(ann_id, teacher_id=_teacher_scope()):
+        notifications.delete_notifications_by_link('announcement', ann_id)
         return jsonify({"success": True, "message": "删除成功"})
     return jsonify({"success": False, "message": "未找到通知"})
 
