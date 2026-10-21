@@ -273,6 +273,26 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                             "ORDER BY file_name",
                             (source_id,),
                         ).fetchall()
+                        if source_id in {"nzrc", "nongmuhr"}:
+                            job_source_count = conn.execute(
+                                """
+                                SELECT COUNT(*)
+                                FROM std_job_sources
+                                WHERE source_id = ?
+                                """,
+                                (source_id,),
+                            ).fetchone()[0]
+                            job_location_count = conn.execute(
+                                """
+                                SELECT COUNT(*)
+                                FROM std_job_locations
+                                WHERE source_id = ?
+                                """,
+                                (source_id,),
+                            ).fetchone()[0]
+                        else:
+                            job_source_count = None
+                            job_location_count = None
                         if table is None:
                             candidate_count = 0
                             candidate_states = []
@@ -312,6 +332,13 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                         )
                     if source_id == "feiyiw":
                         self.assertIn("supplementary", stage_extra)
+                    if source_id in {"nzrc", "nongmuhr"}:
+                        self.assertEqual(
+                            job_source_count, expected_candidates
+                        )
+                        self.assertEqual(
+                            job_location_count, expected_candidates
+                        )
                     self.assertEqual(
                         raw_count, 2 * first.raw_count
                     )

@@ -3,6 +3,9 @@
 from crawler.collection.shared.crawler_collection.candidate import (
     upsert_candidate,
 )
+from crawler.collection.shared.crawler_collection.job_relations import (
+    upsert_job_relations,
+)
 
 
 FIELDS = (
@@ -35,7 +38,7 @@ FIELDS = (
 
 def write_candidate(conn, item, *, now):
     extra = item["extra"]
-    upsert_candidate(
+    job_id = upsert_candidate(
         conn,
         item,
         table="std_jobs",
@@ -68,3 +71,5 @@ def write_candidate(conn, item, *, now):
         ),
         now=now,
     )
+    upsert_job_relations(conn, job_id, item, now=now)
+    return job_id
