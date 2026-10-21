@@ -59,7 +59,12 @@ const ROLE_CONFIG: Record<BackofficeRole, RoleConfig> = {
             to: "/teacher/trainings",
             icon: "fa-clipboard-check",
           },
-          { label: "3D 模型", to: "/teacher/models", icon: "fa-cube" },
+          {
+            label: "3D 模型",
+            to: "/teacher/models",
+            icon: "fa-cube",
+            capability: "teaching.manage",
+          },
         ],
       },
     ],

@@ -130,7 +130,7 @@ CSS 目标子集当成全站验收。
 | `npm run test:e2e` | 未完成：视觉矩阵后台角色用例在 172-175 处超时，随后中止；不能记为全量通过 |
 | `npm run test:visual:matrix` | 本次未单独执行；不能把历史 CSS 的 25/25 当作 T27 结果 |
 
-上传契约的边界是：单文件上限为 50MB，multipart 请求上限为 51MB。超限请求由真实
+上传契约的边界是：单文件上限为 50MB，multipart 请求上限为 51MiB。超限请求由真实
 Flask 返回 JSON 413（`code=file_too_large`），测试静态代理只负责透传，不冒充 nginx。
 nginx 的 `client_max_body_size 51m` 继续由
 `tests/test_upload_deployment_contract.py` 机械校验。

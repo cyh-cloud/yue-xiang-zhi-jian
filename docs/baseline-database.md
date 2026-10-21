@@ -25,8 +25,8 @@ T17 把 `data/*.db` 加进 `.gitignore` 并从 git 移除跟踪后，仓库里�
 
 脚本做三件事：
 
-1. 对目标库（默认 `data/yuexiang.db`，可用 `--db` 覆盖）跑一遍迁移：清两处历史脏数据
-   （`points` 的 NULL 主键行、`messages` 的孤儿收件人行）；
+1. 把目标库（默认 `data/yuexiang.db`，可用 `--db` 覆盖）复制到临时目录，对副本
+   跑一遍迁移：清两处历史脏数据（`points` 的 NULL 主键行、`messages` 的孤儿收件人行）；
 2. 把处理完的库复制成基线库；
 3. 清掉基线库里的 `schema_migrations` 记录，并把 journal_mode 从 WAL 切回 DELETE。
 
@@ -52,10 +52,10 @@ e2e 用同一份库：`e2e/serve.py` 把 `YUEXIANG_DB` 指向临时路径，启�
 ## 与现库的关系
 
 现库 `data/yuexiang.db` 是受控业务快照，不是运行中的可变用户库，不要直接写它。
-迁移脚本对现库副本做两件写操作：
+迁移脚本对现库副本只做两处脏数据清理：
 
-- 灌内容（对已有行按自然键就地更新，不动自增 id）；
-- 清两处脏数据（`points` 的 NULL 主键行、`messages` 的孤儿收件人行）。
+- `points` 的 NULL 主键行；
+- `messages` 的孤儿收件人行。
 
 清理动作逐行记进 `schema_migrations.extra`，不静默丢弃。想在副本上先看效果：
 
