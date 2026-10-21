@@ -156,12 +156,14 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
             class Handler(BaseHTTPRequestHandler):
                 robots_status = 200
                 robots_body = b""
+                target_hits = []
 
                 def do_GET(self):
                     if self.path == "/robots.txt":
                         status = self.robots_status
                         body = self.robots_body
                     elif self.path == "/item":
+                        self.target_hits.append(self.path)
                         status = 200
                         body = b"<html>item</html>"
                     else:
@@ -180,11 +182,19 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                 handler = type(
                     f"Handler{status}",
                     (Handler,),
-                    {"robots_status": status, "robots_body": body},
+                    {
+                        "robots_status": status,
+                        "robots_body": body,
+                        "target_hits": [],
+                    },
                 )
                 server = ThreadingHTTPServer(("127.0.0.1", 0), handler)
                 threading.Thread(target=server.serve_forever, daemon=True).start()
-                return server, f"http://127.0.0.1:{server.server_port}/item"
+                return (
+                    server,
+                    f"http://127.0.0.1:{server.server_port}/item",
+                    handler,
+                )
 
             servers = [
                 serve(200, b"User-agent: *\\nAllow: /\\n"),
@@ -192,7 +202,7 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                 serve(404, b"not found"),
                 serve(500, b"server error"),
             ]
-            urls = [url for _, url in servers]
+            urls = [url for _, url, _ in servers]
             root = Path(tempfile.mkdtemp())
             database_path = root / "crawler.db"
             settings = Settings(
@@ -238,8 +248,9 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
             process = CrawlerProcess(settings)
             process.crawl(Spider)
             process.start(stop_after_crawl=True)
-            for server, _ in servers:
+            for server, _, _ in servers:
                 server.shutdown()
+            target_hits = [len(handler.target_hits) for _, _, handler in servers]
 
             conn = sqlite3.connect(database_path)
             try:
@@ -263,6 +274,7 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                 "decisions": decisions,
                 "stage_count": stage_count,
                 "candidate_count": candidate_count,
+                "target_hits": target_hits,
                 "reports": [path.name for path in reports],
                 "report": report_data,
             }))
@@ -298,7 +310,7 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
             f"{payload}\n{completed.stderr}",
         )
         self.assertEqual(
-            payload["stage_count"], 3, f"{payload}\n{completed.stderr}"
+            payload["stage_count"], 2, f"{payload}\n{completed.stderr}"
         )
         self.assertEqual(
             payload["candidate_count"], 2, f"{payload}\n{completed.stderr}"
@@ -306,13 +318,23 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
         self.assertEqual(
             len(payload["reports"]), 1, f"{payload}\n{completed.stderr}"
         )
+        self.assertEqual(
+            payload["target_hits"][3],
+            0,
+            f"{payload}\n{completed.stderr}",
+        )
+        self.assertEqual(
+            payload["target_hits"][:3],
+            [1, 0, 1],
+            f"{payload}\n{completed.stderr}",
+        )
         report = payload["report"]
         self.assertEqual(report["mode"], "live")
         self.assertEqual(report["request_count"], 4)
         self.assertEqual(report["raw_count"], 4)
-        self.assertEqual(report["stage_count"], 3)
+        self.assertEqual(report["stage_count"], 2)
         self.assertEqual(report["candidate_count"], 1)
-        self.assertEqual(report["blocked"], 2)
+        self.assertEqual(report["blocked"], 1)
         self.assertEqual(report["deferred"], 1)
         self.assertTrue(report["started_at"])
         self.assertTrue(report["finished_at"])

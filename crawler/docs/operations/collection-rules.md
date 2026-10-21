@@ -23,6 +23,7 @@
 - `zhongguoyuyan.cn` 因版权不允许使用数据而标记 `excluded`，不采集正文。
 - `5ajob` 的 robots 对普通 UA 和搜索引擎 UA 规则不同，必须按实际 UA 判断。
 - robots 返回 403、5xx、连接失败或无法解析时记录 `unknown` 或错误事实并阻断候选，不把失败当允许。
+- robots 为 `unknown` 时目标请求在下载器层终止，只保留 `robots:unknown` 的 raw 失败事实，不产生 stage 或候选。
 
 ## 登录
 
@@ -62,6 +63,7 @@
 - 单个下载文件不得超过 100MB。
 - 下载前尽量读取 `Content-Length`。
 - 超过上限的文件不下载正文，在对应域名目录写 `OVERSIZE.md`，记录 URL、声明大小、原因和人工处理建议。
+- Scrapy `DOWNLOAD_MAXSIZE` 在下载器层取消时，共享中间件仍写 `OVERSIZE.md`；raw 记录 `fetch_status=oversize`、`body_saved=0`，`raw_files.sha256` 留空。
 - 流式下载超过 100MB 时立即中止并删除临时文件。
 - Markdown 文档不复制大文件内容或 Base64。
 
@@ -119,6 +121,7 @@
 - std 层只保存统一实体和来源引用。
 - 响应正文需要压缩时保留解压后的哈希规则和原始编码。
 - 失败响应只保存诊断元数据，不伪装成成功快照。
+- HTTP 4xx/5xx 保留状态码、响应头、内容类型和错误原因，不写正文文件；`body_saved=0`、`body_sha256` 为空，且不创建成功文件哈希记录。
 
 ## 运行记录
 

@@ -5,8 +5,10 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import scrapy
 from scrapy.crawler import CrawlerProcess
@@ -30,6 +32,9 @@ from crawler.collection.shared.crawler_collection.robots import (
     robots_fact_from_status,
 )
 from crawler.collection.shared.crawler_collection.runtime import CollectionRuntime
+from crawler.collection.shared.crawler_collection.reporting import (
+    RunReportExtension,
+)
 from crawler.collection.shared.crawler_collection.spiders import (
     CollectionSpiderMixin,
 )
@@ -511,7 +516,7 @@ class RawEvidenceRegressionTest(unittest.TestCase):
                 json.loads(row[5])["robots_status_code"], 200
             )
 
-    def test_detail_response_uses_actual_url_status_and_content_hash(self):
+    def test_error_response_keeps_only_diagnostic_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             settings = Settings(
@@ -557,11 +562,15 @@ class RawEvidenceRegressionTest(unittest.TestCase):
                 row = conn.execute(
                     """
                     SELECT final_url, detail_url, detail_url_status,
-                           status_code, fetch_status, body_sha256, run_id,
+                           status_code, fetch_status, body_sha256,
+                           body_path, body_saved, error_message, run_id,
                            retrieved_at
                     FROM raw_fetches
                     """
                 ).fetchone()
+                file_count = conn.execute(
+                    "SELECT COUNT(*) FROM raw_files"
+                ).fetchone()[0]
             finally:
                 conn.close()
 
@@ -570,9 +579,440 @@ class RawEvidenceRegressionTest(unittest.TestCase):
             self.assertEqual(row[2], "direct")
             self.assertEqual(row[3], 404)
             self.assertNotEqual(row[4], "ok")
-            self.assertEqual(row[5], hashlib.sha256(body).hexdigest())
-            self.assertEqual(row[6], "run-live-1")
-            self.assertTrue(row[7])
+            self.assertIsNone(row[5])
+            self.assertIsNone(row[6])
+            self.assertEqual(row[7], 0)
+            self.assertEqual(row[8], "HTTP 404")
+            self.assertEqual(row[9], "run-live-1")
+            self.assertTrue(row[10])
+            self.assertEqual(file_count, 0)
+
+    def test_server_error_response_is_not_saved_as_file_evidence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = Settings(
+                {
+                    "COLLECTION_DATABASE_PATH": str(root / "crawler.db"),
+                    "COLLECTION_DOWNLOAD_ROOT": str(root / "downloads"),
+                    "SOURCE_REGISTRY_PATH": str(REGISTRY),
+                }
+            )
+            middleware = RawEvidenceMiddleware.from_crawler(
+                type(
+                    "Crawler",
+                    (),
+                    {"settings": settings},
+                )()
+            )
+            request = Request(
+                "https://example.test/server-error",
+                meta={"locator": "server error page"},
+            )
+            response = HtmlResponse(
+                request.url,
+                body=b"server error",
+                status=500,
+                encoding="utf-8",
+                request=request,
+            )
+            spider = type(
+                "Spider",
+                (),
+                {"source_id": "ihchina", "run_id": "run-server-error"},
+            )()
+
+            middleware.process_response(request, response, spider)
+
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                fetch = conn.execute(
+                    "SELECT status_code, fetch_status, body_saved, "
+                    "body_sha256, body_path, error_message "
+                    "FROM raw_fetches"
+                ).fetchone()
+                file_count = conn.execute(
+                    "SELECT COUNT(*) FROM raw_files"
+                ).fetchone()[0]
+            finally:
+                conn.close()
+
+        self.assertEqual(fetch[0], 500)
+        self.assertEqual(fetch[1], "http_error")
+        self.assertEqual(fetch[2], 0)
+        self.assertIsNone(fetch[3])
+        self.assertIsNone(fetch[4])
+        self.assertEqual(fetch[5], "HTTP 500")
+        self.assertEqual(file_count, 0)
+
+    def test_downloader_maxsize_writes_oversize_note(self):
+        script = textwrap.dedent(
+            '''
+            import json
+            import sqlite3
+            import tempfile
+            import threading
+            from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+            from pathlib import Path
+
+            import scrapy
+            from scrapy.crawler import CrawlerProcess
+            from scrapy.settings import Settings
+
+            from crawler.collection.shared.crawler_collection.pipelines import (
+                collection_settings,
+            )
+            from crawler.collection.shared.crawler_collection.spiders import (
+                CollectionSpiderMixin,
+            )
+
+            class Handler(BaseHTTPRequestHandler):
+                target_hits = 0
+
+                def do_GET(self):
+                    if self.path == "/robots.txt":
+                        body = b"not found"
+                        self.send_response(404)
+                        self.send_header("Content-Type", "text/plain")
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                    type(self).target_hits += 1
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.send_header("Content-Length", "104857601")
+                    self.end_headers()
+
+                def log_message(self, *args):
+                    pass
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            url = (
+                f"http://127.0.0.1:{server.server_port}/huge.bin"
+            )
+            root = Path(tempfile.mkdtemp())
+            database_path = root / "crawler.db"
+            settings = Settings(
+                collection_settings(
+                    bot_name="oversize-contract",
+                    package_name="oversize_contract",
+                    database_path=str(database_path),
+                    download_root=str(root / "download"),
+                    registry_path=str(
+                        Path.cwd() / "crawler" / "docs" / "sources.json"
+                    ),
+                    candidate_writer=(
+                        "ihchina.candidate.write_candidate"
+                    ),
+                )
+            )
+            settings.set("LOG_LEVEL", "ERROR")
+            settings.set("ROBOTSTXT_OBEY", True)
+            settings.set("RETRY_TIMES", 0)
+            settings.set("DOWNLOAD_MAXSIZE", 100 * 1024 * 1024)
+            settings.set("DOWNLOAD_WARNSIZE", 100 * 1024 * 1024)
+            settings.set("SPIDER_MODULES", [])
+            settings.set("NEWSPIDER_MODULE", "")
+
+            class Spider(CollectionSpiderMixin, scrapy.Spider):
+                name = "oversize-contract"
+                source_id = "ihchina"
+                start_urls = [url]
+
+                def parse(self, response):
+                    raise AssertionError("oversize response reached parse")
+
+            process = CrawlerProcess(settings)
+            process.crawl(Spider)
+            process.start(stop_after_crawl=True)
+            server.shutdown()
+
+            conn = sqlite3.connect(database_path)
+            try:
+                fetch = conn.execute(
+                    """
+                    SELECT fetch_status, status_code, body_saved,
+                           body_sha256, body_path, robots_decision,
+                           error_message
+                    FROM raw_fetches
+                    """
+                ).fetchone()
+                file_row = conn.execute(
+                    """
+                    SELECT download_status, sha256, byte_size,
+                           file_path, file_name, oversize_note
+                    FROM raw_files
+                    """
+                ).fetchone()
+            finally:
+                conn.close()
+            note_path = root / "download" / file_row[3]
+            print(json.dumps({
+                "fetch": fetch,
+                "file": file_row,
+                "target_hits": Handler.target_hits,
+                "note": note_path.read_text(encoding="utf-8")
+                    if note_path.exists() else None,
+            }))
+            '''
+        )
+        script = script.replace(
+            "import json\n",
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            f"project_root = Path({str(PROJECTS / 'ihchina')!r})\n"
+            "sys.path.insert(0, str(project_root))\n",
+            1,
+        )
+
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT.parent,
+            text=True,
+            capture_output=True,
+            timeout=45,
+        )
+
+        self.assertEqual(
+            completed.returncode,
+            0,
+            f"{completed.stdout}\n{completed.stderr}",
+        )
+        payload = json.loads(completed.stdout.strip().splitlines()[-1])
+        fetch = payload["fetch"]
+        file_row = payload["file"]
+        self.assertEqual(fetch[0], "oversize")
+        self.assertIsNone(fetch[1])
+        self.assertEqual(fetch[2], 0)
+        self.assertIsNone(fetch[3])
+        self.assertIsNone(fetch[4])
+        self.assertEqual(fetch[5], "not-found")
+        self.assertIn("104857601", fetch[6])
+        self.assertEqual(file_row[0], "oversize")
+        self.assertEqual(file_row[1], "")
+        self.assertEqual(file_row[2], 104857601)
+        self.assertTrue(file_row[3].endswith("OVERSIZE.md"))
+        self.assertEqual(file_row[4], "huge.bin")
+        self.assertIn("104857601", file_row[5])
+        self.assertEqual(payload["target_hits"], 1)
+        self.assertIn("104857601", payload["note"])
+
+    def test_streamed_download_over_limit_writes_oversize_note(self):
+        script = textwrap.dedent(
+            '''
+            import json
+            import sqlite3
+            import tempfile
+            import threading
+            from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+            from pathlib import Path
+
+            import scrapy
+            from scrapy.crawler import CrawlerProcess
+            from scrapy.settings import Settings
+
+            from crawler.collection.shared.crawler_collection.pipelines import (
+                collection_settings,
+            )
+            from crawler.collection.shared.crawler_collection.spiders import (
+                CollectionSpiderMixin,
+            )
+
+            class Handler(BaseHTTPRequestHandler):
+                target_hits = 0
+
+                def do_GET(self):
+                    if self.path == "/robots.txt":
+                        body = b"not found"
+                        self.send_response(404)
+                        self.send_header("Content-Length", str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                    type(self).target_hits += 1
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/octet-stream")
+                    self.end_headers()
+                    self.wfile.write(b"x" * 4096)
+
+                def log_message(self, *args):
+                    pass
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            threading.Thread(target=server.serve_forever, daemon=True).start()
+            url = f"http://127.0.0.1:{server.server_port}/stream.bin"
+            root = Path(tempfile.mkdtemp())
+            database_path = root / "crawler.db"
+            settings = Settings(
+                collection_settings(
+                    bot_name="stream-oversize",
+                    package_name="stream_oversize",
+                    database_path=str(database_path),
+                    download_root=str(root / "download"),
+                    registry_path=str(
+                        Path.cwd() / "crawler" / "docs" / "sources.json"
+                    ),
+                    candidate_writer=(
+                        "ihchina.candidate.write_candidate"
+                    ),
+                )
+            )
+            settings.set("LOG_LEVEL", "ERROR")
+            settings.set("ROBOTSTXT_OBEY", True)
+            settings.set("RETRY_TIMES", 0)
+            settings.set("DOWNLOAD_MAXSIZE", 1024)
+            settings.set("DOWNLOAD_WARNSIZE", 1024)
+            settings.set("SPIDER_MODULES", [])
+            settings.set("NEWSPIDER_MODULE", "")
+
+            class Spider(CollectionSpiderMixin, scrapy.Spider):
+                name = "stream-oversize"
+                source_id = "ihchina"
+                start_urls = [url]
+
+                def parse(self, response):
+                    raise AssertionError("oversize response reached parse")
+
+            process = CrawlerProcess(settings)
+            process.crawl(Spider)
+            process.start(stop_after_crawl=True)
+            server.shutdown()
+
+            conn = sqlite3.connect(database_path)
+            try:
+                fetch = conn.execute(
+                    "SELECT fetch_status, body_saved, body_sha256 "
+                    "FROM raw_fetches"
+                ).fetchone()
+                file_row = conn.execute(
+                    "SELECT download_status, sha256, file_path "
+                    "FROM raw_files"
+                ).fetchone()
+            finally:
+                conn.close()
+            note_path = root / "download" / file_row[2]
+            print(json.dumps({
+                "fetch": fetch,
+                "file": file_row,
+                "target_hits": Handler.target_hits,
+                "note": note_path.read_text(encoding="utf-8")
+                    if note_path.exists() else None,
+            }))
+            '''
+        )
+        script = script.replace(
+            "import json\n",
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            f"project_root = Path({str(PROJECTS / 'ihchina')!r})\n"
+            "sys.path.insert(0, str(project_root))\n",
+            1,
+        )
+
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=ROOT.parent,
+            text=True,
+            capture_output=True,
+            timeout=45,
+        )
+
+        self.assertEqual(
+            completed.returncode,
+            0,
+            f"{completed.stdout}\n{completed.stderr}",
+        )
+        payload = json.loads(completed.stdout.strip().splitlines()[-1])
+        self.assertEqual(payload["fetch"], ["oversize", 0, None])
+        self.assertEqual(payload["file"][0], "oversize")
+        self.assertEqual(payload["file"][1], "")
+        self.assertEqual(payload["target_hits"], 1)
+        self.assertIn("exceeds 1024 bytes", payload["note"])
+
+    def test_parse_failure_writes_blocked_audit_candidate(self):
+        class Signals:
+            def connect(self, *args, **kwargs):
+                return None
+
+        class Stats:
+            def get_stats(self):
+                return {}
+
+        class Crawler:
+            def __init__(self, settings):
+                self.settings = settings
+                self.signals = Signals()
+                self.stats = Stats()
+
+        sys.path.insert(0, str(PROJECTS / "ihchina"))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            settings = Settings(
+                {
+                    "COLLECTION_DATABASE_PATH": str(root / "crawler.db"),
+                    "COLLECTION_DOWNLOAD_ROOT": str(root / "downloads"),
+                    "COLLECTION_REPORT_ROOT": str(root / "reports"),
+                    "COLLECTION_RUN_MODE": "live",
+                    "SOURCE_REGISTRY_PATH": str(REGISTRY),
+                    "COLLECTION_CANDIDATE_WRITER": (
+                        "ihchina.candidate.write_candidate"
+                    ),
+                }
+            )
+            crawler = Crawler(settings)
+            spider = type(
+                "Spider",
+                (),
+                {"source_id": "ihchina", "run_id": "run-parse"},
+            )()
+            middleware = RawEvidenceMiddleware.from_crawler(crawler)
+            request = Request(
+                "https://example.test/parse-error",
+                meta={
+                    "run_id": "run-parse",
+                    "robots_decision": "allowed",
+                    "locator": "parse error page",
+                },
+            )
+            middleware.process_request(request, spider)
+            response = HtmlResponse(
+                request.url,
+                body=b"<html>broken</html>",
+                encoding="utf-8",
+                request=request,
+            )
+            response = middleware.process_response(
+                request, response, spider
+            )
+            extension = RunReportExtension(crawler)
+            extension.spider_opened(spider)
+            extension.spider_error(
+                SimpleNamespace(value=ValueError("bad selector")),
+                response,
+                spider,
+            )
+            extension.spider_closed(spider, "finished")
+
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                stage_count = conn.execute(
+                    "SELECT COUNT(*) FROM stage_source_items"
+                ).fetchone()[0]
+                candidate = conn.execute(
+                    "SELECT candidate_status, candidate_reason "
+                    "FROM std_ich_projects"
+                ).fetchone()
+            finally:
+                conn.close()
+
+        self.assertEqual(stage_count, 1)
+        self.assertEqual(candidate[0], "blocked")
+        self.assertIn("parse_error:ValueError", candidate[1])
+        self.assertEqual(spider.run_report.blocked, 1)
+        self.assertEqual(spider.run_report.failed, 1)
 
 
 class RuntimeRegressionTest(unittest.TestCase):

@@ -8,6 +8,7 @@ import sqlite3
 from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
+from importlib import import_module
 from pathlib import Path
 
 from scrapy import signals
@@ -232,6 +233,13 @@ def record_pipeline_result(spider, result):
     counts[key] = counts.get(key, 0) + 1
 
 
+def _load_candidate_writer(dotted_path):
+    if not dotted_path:
+        return None
+    module_name, attribute = dotted_path.rsplit(".", 1)
+    return getattr(import_module(module_name), attribute)
+
+
 class RunReportExtension:
     """Create one report for each Scrapy crawl and persist it as JSON."""
 
@@ -285,6 +293,91 @@ class RunReportExtension:
             self._failed_requests.add(request)
         else:
             self._unattributed_spider_failures += 1
+        self._persist_parse_failure(response, failure, spider)
+
+    def _persist_parse_failure(self, response, failure, spider):
+        if response is None:
+            return
+        request = getattr(response, "request", None)
+        meta = getattr(response, "meta", {}) or {}
+        raw_evidence_id = meta.get("raw_evidence_id")
+        if request is None or not raw_evidence_id:
+            return
+        try:
+            from .runtime import CollectionRuntime
+
+            runtime = CollectionRuntime(
+                database_path=self.settings[
+                    "COLLECTION_DATABASE_PATH"
+                ],
+                download_root=(
+                    self.settings.get("COLLECTION_DOWNLOAD_ROOT")
+                    or Path(
+                        self.settings["COLLECTION_DATABASE_PATH"]
+                    ).parent / "download"
+                ),
+                registry_path=self.settings.get(
+                    "SOURCE_REGISTRY_PATH"
+                ),
+                candidate_writer=_load_candidate_writer(
+                    self.settings.get("COLLECTION_CANDIDATE_WRITER")
+                ),
+            )
+            reason = (
+                f"parse_error:{type(failure.value).__name__}: "
+                f"{failure.value}"
+            )[:500]
+            detail_url = meta.get("detail_url")
+            source_url = meta.get("source_url") or request.url
+            result = runtime.write_item(
+                {
+                    "source_id": spider.source_id,
+                    "source_item_id": (
+                        meta.get("source_item_id")
+                        or f"parse-error:{request.url}"
+                    ),
+                    "source_url": source_url,
+                    "long_term_url": (
+                        meta.get("long_term_url") or source_url
+                    ),
+                    "detail_url": detail_url,
+                    "detail_url_status": (
+                        "direct" if detail_url else "missing"
+                    ),
+                    "fetch_url": request.url,
+                    "locator": meta.get("locator") or request.url,
+                    "run_id": meta.get("run_id") or spider.run_id,
+                    "mode": self.settings.get(
+                        "COLLECTION_RUN_MODE", "live"
+                    ),
+                    "title": (
+                        meta.get("title")
+                        or f"parse-error:{type(failure.value).__name__}"
+                    ),
+                    "candidate_status": "blocked",
+                    "candidate_reason": reason,
+                    "raw_evidence_id": raw_evidence_id,
+                    "extra": {
+                        "parse_error_type": type(
+                            failure.value
+                        ).__name__,
+                        "parse_error_message": str(failure.value),
+                    },
+                },
+                raw_evidence_id=raw_evidence_id,
+            )
+            if result.get("candidate_reason") == (
+                "candidate_writer:missing"
+            ):
+                raise RuntimeError("candidate_writer:missing")
+            record_pipeline_result(spider, result)
+        except Exception as exc:
+            persistence_error = (
+                "parse_failure_persist:"
+                f"{type(exc).__name__}: {exc}"
+            )
+            self.errors.append(persistence_error)
+            self._failure_reasons.append(persistence_error)
 
     def item_error(self, item, response, spider, failure):
         self._item_failures += 1
