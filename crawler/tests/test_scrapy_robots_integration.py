@@ -14,6 +14,8 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
         script = textwrap.dedent(
             """
             import json
+            import os
+            import sys
             import tempfile
             import threading
             from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -61,6 +63,9 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                     registry_path=str(
                         Path.cwd() / "crawler" / "docs" / "sources.json"
                     ),
+                    candidate_writer=(
+                        "ihchina.candidate.write_candidate"
+                    ),
                 )
             )
             settings.set("LOG_LEVEL", "ERROR")
@@ -89,6 +94,15 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                 "report": report_data,
             }))
             """
+        )
+        script = script.replace(
+            "import json\n",
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            f"project_root = Path({str(ROOT / 'collection' / 'projects' / 'ihchina')!r})\n"
+            "sys.path.insert(0, str(project_root))\n",
+            1,
         )
 
         completed = subprocess.run(
@@ -190,6 +204,9 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                     registry_path=str(
                         Path.cwd() / "crawler" / "docs" / "sources.json"
                     ),
+                    candidate_writer=(
+                        "ihchina.candidate.write_candidate"
+                    ),
                 )
             )
             settings.set("LOG_LEVEL", "ERROR")
@@ -250,6 +267,15 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
                 "report": report_data,
             }))
             """
+        )
+        script = script.replace(
+            "import json\n",
+            "import json\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            f"project_root = Path({str(ROOT / 'collection' / 'projects' / 'ihchina')!r})\n"
+            "sys.path.insert(0, str(project_root))\n",
+            1,
         )
 
         completed = subprocess.run(

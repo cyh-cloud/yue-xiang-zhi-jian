@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,6 +12,11 @@ from crawler.collection.shared.crawler_collection.robots import RobotsFact
 from crawler.collection.shared.crawler_collection.runtime import CollectionRuntime
 
 
+PROJECTS = Path(__file__).resolve().parents[1] / "collection" / "projects"
+sys.path.insert(0, str(PROJECTS / "ihchina"))
+from ihchina.candidate import write_candidate  # noqa: E402
+
+
 class CollectionRuntimeTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -20,6 +26,7 @@ class CollectionRuntimeTest(unittest.TestCase):
             database_path=self.db_path,
             download_root=self.root / "downloads",
             registry_path=Path("crawler/docs/sources.json"),
+            candidate_writer=write_candidate,
         )
 
     def tearDown(self):
@@ -161,6 +168,33 @@ class CollectionRuntimeTest(unittest.TestCase):
             )
         finally:
             self._finish(conn)
+
+    def test_missing_candidate_writer_blocks_without_guessing_a_table(self):
+        runtime = CollectionRuntime(
+            database_path=self.db_path,
+            download_root=self.root / "downloads",
+            registry_path=Path("crawler/docs/sources.json"),
+        )
+        raw_id = runtime.persist_raw(self._evidence())
+
+        result = runtime.write_item(self._item(), raw_evidence_id=raw_id)
+
+        self.assertEqual(result["candidate_status"], "blocked")
+        self.assertEqual(
+            result["candidate_reason"], "candidate_writer:missing"
+        )
+        conn = sqlite3.connect(self.db_path)
+        try:
+            stage_count = conn.execute(
+                "SELECT COUNT(*) FROM stage_source_items"
+            ).fetchone()[0]
+            candidate_count = conn.execute(
+                "SELECT COUNT(*) FROM std_ich_projects"
+            ).fetchone()[0]
+        finally:
+            self._finish(conn)
+        self.assertEqual(stage_count, 1)
+        self.assertEqual(candidate_count, 0)
 
     def test_run_report_counts_partial_and_failed(self):
         report = RunReport(

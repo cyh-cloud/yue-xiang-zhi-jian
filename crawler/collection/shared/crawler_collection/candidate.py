@@ -76,15 +76,3 @@ def upsert_candidate(conn, item, *, table, fields, values, now):
         """,
         candidate_common_values(item, now=now) + tuple(values),
     )
-
-
-def write_default_candidate(conn, item, *, now):
-    """Compatibility writer for callers that do not configure a site helper."""
-    upsert_candidate(
-        conn,
-        item,
-        table="std_ich_projects",
-        fields=("name",),
-        values=(item["title"],),
-        now=now,
-    )

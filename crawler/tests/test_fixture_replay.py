@@ -1,4 +1,5 @@
 import sqlite3
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,6 +7,11 @@ from pathlib import Path
 from crawler.collection.shared.crawler_collection.replay import (
     replay_fixture,
 )
+
+
+PROJECTS = Path(__file__).resolve().parents[1] / "collection" / "projects"
+sys.path.insert(0, str(PROJECTS / "ihchina"))
+from ihchina.candidate import write_candidate  # noqa: E402
 
 
 class FixtureReplayTest(unittest.TestCase):
@@ -43,6 +49,7 @@ class FixtureReplayTest(unittest.TestCase):
             database_path=self.root / "crawler.db",
             download_root=self.root / "downloads",
             registry_path=Path("crawler/docs/sources.json"),
+            candidate_writer=write_candidate,
         )
         second = replay_fixture(
             source_id="ihchina",
@@ -50,6 +57,7 @@ class FixtureReplayTest(unittest.TestCase):
             database_path=self.root / "crawler.db",
             download_root=self.root / "downloads",
             registry_path=Path("crawler/docs/sources.json"),
+            candidate_writer=write_candidate,
         )
 
         self.assertEqual(first.status, "succeeded")

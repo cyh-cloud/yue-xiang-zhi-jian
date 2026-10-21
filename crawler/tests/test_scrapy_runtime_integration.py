@@ -109,6 +109,7 @@ class ScrapyRuntimeIntegrationTest(unittest.TestCase):
                     "SOURCE_REGISTRY_PATH": str(
                         ROOT / "docs" / "sources.json"
                     ),
+                    "COLLECTION_CANDIDATE_WRITER": "",
                 }
             )
             process = CrawlerProcess(settings)
@@ -117,7 +118,14 @@ class ScrapyRuntimeIntegrationTest(unittest.TestCase):
             crawler = process.create_crawler(IhchinaSpider)
             spider = IhchinaSpider.from_crawler(crawler)
             middleware = RawEvidenceMiddleware.from_crawler(crawler)
-            pipeline = CollectionPipeline.from_crawler(crawler)
+            from ihchina.candidate import write_candidate
+
+            pipeline = CollectionPipeline(
+                str(root / "crawler.db"),
+                download_root=str(root / "downloads"),
+                registry_path=str(ROOT / "docs" / "sources.json"),
+                candidate_writer=write_candidate,
+            )
             request = Request(
                 "https://www.ihchina.cn/project_details/12178.html",
                 meta={

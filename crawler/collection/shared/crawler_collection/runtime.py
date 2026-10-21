@@ -12,7 +12,6 @@ from .admission import (
     NON_RUNNABLE_RIGHTS,
     evaluate_admission,
 )
-from .candidate import write_default_candidate
 from .database import CollectionDatabase
 from .evidence import RawEvidence, sanitize_headers, sha256_bytes
 from .items import validate_item
@@ -57,7 +56,7 @@ class CollectionRuntime:
         self.download_root = Path(download_root)
         self.registry_path = registry_path
         self.max_download_bytes = max_download_bytes
-        self.candidate_writer = candidate_writer or write_default_candidate
+        self.candidate_writer = candidate_writer
         self.database = CollectionDatabase(self.database_path)
         conn = self.database.connect()
         conn.close()
@@ -382,6 +381,12 @@ class CollectionRuntime:
                 return {
                     "candidate_status": "blocked",
                     "candidate_reason": decision.reason,
+                }
+            if self.candidate_writer is None:
+                conn.commit()
+                return {
+                    "candidate_status": "blocked",
+                    "candidate_reason": "candidate_writer:missing",
                 }
             self._upsert_candidate(conn, payload, now=now)
             conn.commit()

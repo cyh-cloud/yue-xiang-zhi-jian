@@ -538,7 +538,16 @@ class RuntimeRegressionTest(unittest.TestCase):
             database_path=self.db_path,
             download_root=self.root / "downloads",
             registry_path=REGISTRY,
+            candidate_writer=self._candidate_writer(),
         )
+
+    @staticmethod
+    def _candidate_writer():
+        project_root = PROJECTS / "ihchina"
+        sys.path.insert(0, str(project_root))
+        from ihchina.candidate import write_candidate
+
+        return write_candidate
 
     def tearDown(self):
         self.tmp.cleanup()
