@@ -192,12 +192,12 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 
 | 项目 | 结果 |
 | --- | --- |
-| `ihchina` | live 5 列表 + 5 详情通过 |
-| `nzrc` | live 21 列表 + 5 详情通过，联系方式不采集 |
+| `ihchina` | robots 404，raw 23、stage 20、blocked 20，候选 0 |
+| `nzrc` | robots 404，raw 20、stage 19、blocked 19，候选 0 |
 | `nongmuhr` | 5 列表 + 5 详情 HTTP 200，但字段结构变化，blocked |
-| `dialect-org` | live 15 列表 + 5 详情通过 |
-| `cass-linguistics` | live 9 列表 + 5 详情通过 |
-| `feiyiw` | live 25 列表 + 5 详情通过 |
+| `dialect-org` | robots 404，raw 16、stage 15、blocked 15，候选 0 |
+| `cass-linguistics` | robots 404，raw 10、stage 5、blocked 5，失败 4，候选 0 |
+| `feiyiw` | robots 404，raw 20、stage 17、blocked 17，候选 0 |
 | `aqsc-moa` | fixture 骨架通过，无 live |
 | `cnipa` | fixture 骨架通过，无 live |
 

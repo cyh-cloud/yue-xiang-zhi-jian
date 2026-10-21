@@ -116,3 +116,69 @@ def write_candidate(conn, item, *, now):
             json.dumps(lexeme.get("extra") or {}, ensure_ascii=False),
         ),
     )
+    lexeme_id = conn.execute(
+        "SELECT id FROM std_dialect_lexemes WHERE point_id = ? AND lemma = ?",
+        (point_id, lexeme["lemma"]),
+    ).fetchone()[0]
+    source_url = lexeme.get("source_url") or item["source_url"]
+    long_term_url = (
+        lexeme.get("long_term_url") or item["long_term_url"]
+    )
+    detail_url = lexeme.get("detail_url") or item["detail_url"]
+    detail_url_status = (
+        lexeme.get("detail_url_status") or item["detail_url_status"]
+    )
+    rights_status = lexeme.get("rights_status") or item["rights_status"]
+    attribution_required = bool(
+        lexeme.get("attribution_required")
+        or item["attribution_required"]
+    )
+    attribution_text = (
+        lexeme.get("attribution_text") or item["attribution_text"]
+    )
+    rights_evidence_url = (
+        lexeme.get("rights_evidence_url") or item["rights_evidence_url"]
+    )
+    conn.execute(
+        """
+        INSERT INTO std_dialect_lexeme_sources (
+            lexeme_id, source_id, source_item_id, source_url, long_term_url,
+            detail_url, detail_url_status, fetch_url, locator, rights_status,
+            attribution_required, attribution_text, rights_evidence_url,
+            is_primary, retrieved_at, content_hash, extra
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+        ON CONFLICT(lexeme_id, source_id, source_item_id, source_url)
+        DO UPDATE SET
+            long_term_url=excluded.long_term_url,
+            detail_url=excluded.detail_url,
+            detail_url_status=excluded.detail_url_status,
+            fetch_url=excluded.fetch_url,
+            locator=excluded.locator,
+            rights_status=excluded.rights_status,
+            attribution_required=excluded.attribution_required,
+            attribution_text=excluded.attribution_text,
+            rights_evidence_url=excluded.rights_evidence_url,
+            is_primary=excluded.is_primary,
+            retrieved_at=excluded.retrieved_at,
+            content_hash=excluded.content_hash,
+            extra=excluded.extra
+        """,
+        (
+            lexeme_id,
+            lexeme.get("source_id") or item["source_id"],
+            lexeme.get("source_item_id") or item["source_item_id"],
+            source_url,
+            long_term_url,
+            detail_url,
+            detail_url_status,
+            lexeme.get("fetch_url"),
+            lexeme.get("locator") or item["locator"],
+            rights_status,
+            1 if attribution_required else 0,
+            attribution_text,
+            rights_evidence_url,
+            now,
+            lexeme_hash,
+            json.dumps(lexeme.get("extra") or {}, ensure_ascii=False),
+        ),
+    )

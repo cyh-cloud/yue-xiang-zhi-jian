@@ -392,7 +392,10 @@ class CollectionRuntime:
             conn.commit()
         finally:
             conn.close()
-        return {"candidate_status": "candidate", "candidate_reason": None}
+        return {
+            "candidate_status": payload.get("candidate_status") or "candidate",
+            "candidate_reason": payload.get("candidate_reason"),
+        }
 
     def _upsert_candidate(self, conn, item, *, now):
         self.candidate_writer(conn, item, now=now)

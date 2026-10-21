@@ -116,6 +116,36 @@ class CollectionRuntimeTest(unittest.TestCase):
         self.assertEqual(candidate_count, 1)
         self.assertEqual(candidate, ("candidate", None))
 
+    def test_runtime_returns_the_written_candidate_state_and_reason(self):
+        raw_id = self.runtime.persist_raw(self._evidence())
+        expected = (
+            ("deferred", "missing_required_field"),
+            ("blocked", "rights_review_required"),
+        )
+
+        for index, (status, reason) in enumerate(expected):
+            with self.subTest(status=status):
+                result = self.runtime.write_item(
+                    self._item(
+                        source_item_id=f"state-{index}",
+                        candidate_status=status,
+                        candidate_reason=reason,
+                    ),
+                    raw_evidence_id=raw_id,
+                )
+                self.assertEqual(result["candidate_status"], status)
+                self.assertEqual(result["candidate_reason"], reason)
+
+        conn = sqlite3.connect(self.db_path)
+        try:
+            rows = conn.execute(
+                "SELECT candidate_status, candidate_reason "
+                "FROM std_ich_projects ORDER BY source_item_id"
+            ).fetchall()
+        finally:
+            self._finish(conn)
+        self.assertEqual(rows, list(expected))
+
     def test_missing_detail_keeps_stage_but_does_not_write_candidate(self):
         raw_id = self.runtime.persist_raw(self._evidence())
         item = self._item(

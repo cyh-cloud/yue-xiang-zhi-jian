@@ -16,7 +16,7 @@ class UnittestDiscoveryEntryTest(unittest.TestCase):
                 "unittest",
                 "discover",
                 "-s",
-                "crawler",
+                "crawler/tests",
                 "-p",
                 "test_scrapy_dependency_contract.py",
                 "-t",

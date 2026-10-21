@@ -34,7 +34,7 @@
 - 天气不在 Scrapy 项目中；`open-meteo` 和 `qweather` 没有 Spider。
 - `5ajob`、`zhongguoyuyan`、`cnopendata` 没有新项目。
 - `aqsc-moa` 和 `cnipa` 没有 live 请求或真实文件采集。
-- 全量 crawler 测试通过，共 187 项。
+- 全量 crawler 测试通过，共 193 项。
 - 每个项目都有独立 fixture 回放入口；连续两次回放时 raw 追加，stage 和候选按来源自然键幂等。
 - 8 个项目的 fixture 回放均经过各自项目入口，并断言候选数量、状态和连续两次幂等。
 - `aqsc-moa` 和 `cnipa` 的 fixture 回放把真实 XLSX/PDF 写入 `raw_files`，不是只回放 `discover.json`。

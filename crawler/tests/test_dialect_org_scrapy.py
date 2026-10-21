@@ -1,4 +1,5 @@
 import unittest
+import sqlite3
 from pathlib import Path
 import sys
 import tempfile
@@ -22,8 +23,14 @@ from dialect_org.spiders.collection import (
     DialectOrgSpider,
 )
 from dialect_org.candidate import write_candidate
+from dialect_org.replay import replay_dialect_fixture
 from crawler.collection.shared.crawler_collection.runtime import (
     CollectionRuntime,
+)
+
+
+FIXTURE = (
+    Path(__file__).resolve().parent / "fixtures" / "evidence" / "dialect-org"
 )
 
 
@@ -126,6 +133,57 @@ class DialectOrgScrapyTest(unittest.TestCase):
             result = runtime.write_item(point, raw_evidence_id=raw_id)
 
             self.assertEqual(result["candidate_status"], "candidate")
+
+    def test_fixture_replay_writes_lexeme_source_relation_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            kwargs = {
+                "fixture_dir": FIXTURE,
+                "database_path": root / "crawler.db",
+                "download_root": root / "downloads",
+                "registry_path": (
+                    Path(__file__).resolve().parents[1]
+                    / "docs"
+                    / "sources.json"
+                ),
+            }
+
+            first = replay_dialect_fixture(**kwargs)
+            second = replay_dialect_fixture(**kwargs)
+
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM std_dialect_lexeme_sources"
+                ).fetchone()[0]
+                source = conn.execute(
+                    """
+                    SELECT source_id, source_item_id, source_url,
+                           long_term_url, detail_url_status, rights_status,
+                           attribution_required, attribution_text, is_primary
+                    FROM std_dialect_lexeme_sources
+                    """
+                ).fetchone()
+            finally:
+                conn.close()
+
+        self.assertEqual(first.status, "succeeded")
+        self.assertEqual(second.status, "succeeded")
+        self.assertEqual(count, 1)
+        self.assertEqual(
+            source,
+            (
+                "dialect-org",
+                "1",
+                "https://dialect.org.cn/dialect/1",
+                "https://dialect.org.cn/dialect/1",
+                "direct",
+                "attribution-required",
+                1,
+                "中国方言库",
+                1,
+            ),
+        )
 
 
 if __name__ == "__main__":

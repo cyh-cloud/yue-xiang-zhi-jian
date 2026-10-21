@@ -28,6 +28,32 @@ def _require_fixture_dir(fixture_dir):
 
 
 def _detail_html(raw):
+    source_item_id = str(raw["id"])
+    relations = ""
+    if source_item_id == "12178":
+        relations = """
+        <div class="inherit_xx2">
+          <div class="x-tables"><table>
+            <tr><th>序号</th><th>姓名</th><th>性别</th><th>出生日期</th>
+              <th>民族</th><th>类别</th><th>项目编号</th>
+              <th>项目名称</th><th>申报地区或单位</th></tr>
+            <tr><td>01</td><td><a href="/ccr_detail/716.html">王安江</a></td>
+              <td>男</td><td>1935.11</td><td>苗族</td><td>民间文学</td>
+              <td>Ⅰ-1</td><td>苗族古歌</td><td>贵州省台江县</td></tr>
+          </table></div>
+          <div class="x-tables"><table>
+            <tr><th>编号</th><th>项目名称</th><th>类型</th><th>地区</th></tr>
+            <tr><td>Ⅰ-2</td>
+              <td><a href="/project_details/12179.html">相关项目</a></td>
+              <td>民间文学</td><td>贵州省</td></tr>
+          </table></div>
+        </div>
+        """
+    image = (
+        '<img src="/uploads/project.jpg">'
+        if source_item_id == "12178"
+        else ""
+    )
     return (
         '<div class="article-mod2">'
         f'<div class="t_head"><div class="h30">{raw.get("title")}</div></div>'
@@ -37,8 +63,9 @@ def _detail_html(raw):
         f'<div class="p">申报地区或单位：{raw.get("province") or ""}</div>'
         '<div class="p">保护单位：示例保护单位</div>'
         "</div>"
-        '<div class="text"><div class="p">公开项目正文</div></div>'
+        f'<div class="text"><div class="p">公开项目正文{image}</div></div>'
         "</div>"
+        f"{relations}"
     )
 
 
