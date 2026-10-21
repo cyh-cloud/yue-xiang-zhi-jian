@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,12 +13,31 @@ FIXTURE = ROOT / "tests" / "fixtures" / "evidence" / "cnipa"
 REGISTRY = ROOT / "docs" / "sources.json"
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from cnipa import live as live_module
 from cnipa.parsers import parse_pdf_rows  # noqa: E402
 from cnipa.replay import replay_cnipa_fixture  # noqa: E402
 from cnipa.spiders.collection import CnipaSpider  # noqa: E402
 
 
 class CnipaScrapyTest(unittest.TestCase):
+    def test_live_canary_requires_explicit_start_urls_before_crawl(self):
+        for start_urls in (None, [], ("",)):
+            with self.subTest(start_urls=start_urls):
+                with mock.patch.object(
+                    live_module, "CrawlerProcess"
+                ) as process:
+                    with self.assertRaisesRegex(
+                        ValueError, "explicit start URL"
+                    ):
+                        live_module.run_live_sample(
+                            database_path=Path("unused.db"),
+                            download_root=Path("unused-download"),
+                            registry_path=REGISTRY,
+                            report_root=Path("unused-reports"),
+                            start_urls=start_urls,
+                        )
+                    process.assert_not_called()
+
     def test_spider_is_live_enabled_with_explicit_start_urls(self):
         spider = CnipaSpider()
         self.assertEqual(spider.name, "cnipa")

@@ -95,7 +95,7 @@ cd <repo-root>
 python -m unittest discover -s crawler/tests -p "test_*.py" -t .
 ```
 
-单独运行站点项目时，在该项目目录使用其 `scrapy.cfg`。`aqsc-moa` 和 `cnipa` 默认只运行 fixture；live canary 必须显式传入公告或承载页起始 URL，不能从仓库默认值自动发起。
+单独运行站点项目时，在该项目目录使用其 `scrapy.cfg`。`aqsc-moa` 和 `cnipa` 默认只运行 fixture；live canary 必须显式传入公告或承载页起始 URL。缺少 `--start-url`，或调用 `run_live_sample` 时 `start_urls` 为空，会在创建爬虫前失败，不发起任何网络请求。
 
 项目设置会自行把 crawler 包根加入 `sys.path`，因此可以直接从任一项目目录运行：
 
