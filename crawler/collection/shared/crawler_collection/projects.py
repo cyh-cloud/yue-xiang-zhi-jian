@@ -1,21 +1,15 @@
-"""Discover the eight independent Scrapy project packages."""
+"""Discover executable Scrapy project packages from the source registry."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
+from .registry import load_registry
 
-PROJECT_IDS = (
-    "ihchina",
-    "nzrc",
-    "nongmuhr",
-    "dialect-org",
-    "cass-linguistics",
-    "feiyiw",
-    "aqsc-moa",
-    "cnipa",
-)
+
+RUNNABLE_STATUSES = frozenset({"approved", "approved-with-gaps"})
+EXECUTABLE_RUN_MODES = frozenset({"fixture", "live"})
 
 
 @dataclass(frozen=True)
@@ -26,22 +20,39 @@ class ProjectInfo:
     package_path: Path
 
 
-def discover_projects(root):
+def executable_source_ids(registry):
+    """Return sources that should have a runnable Scrapy project."""
+    return {
+        source_id
+        for source_id, source in registry.items()
+        if source.get("enabled")
+        and source.get("status") in RUNNABLE_STATUSES
+        and EXECUTABLE_RUN_MODES.intersection(source.get("run_modes") or ())
+    }
+
+
+def discover_projects(root, registry_path=None):
     base = Path(root)
     projects = {}
+    expected_ids = executable_source_ids(load_registry(registry_path))
     actual_ids = {
         path.name
         for path in base.iterdir()
-        if path.is_dir()
-        and path.name != "__pycache__"
-        and (path / "scrapy.cfg").is_file()
+        if path.is_dir() and path.name != "__pycache__"
     }
-    if actual_ids != set(PROJECT_IDS):
+    unexpected = actual_ids - expected_ids
+    missing = expected_ids - actual_ids
+    if unexpected:
         raise ValueError(
-            "Scrapy project list does not match the frozen eight-project scope: "
-            + ", ".join(sorted(actual_ids))
+            "unexpected Scrapy project directories: "
+            + ", ".join(sorted(unexpected))
         )
-    for source_id in PROJECT_IDS:
+    if missing:
+        raise ValueError(
+            "missing Scrapy project directories: "
+            + ", ".join(sorted(missing))
+        )
+    for source_id in sorted(expected_ids):
         project_root = base / source_id
         package_name = source_id.replace("-", "_")
         package_path = project_root / package_name

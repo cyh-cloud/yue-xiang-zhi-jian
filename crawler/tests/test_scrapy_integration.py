@@ -18,8 +18,8 @@ class ScrapyIntegrationTest(unittest.TestCase):
         projects = discover_projects(PROJECTS)
 
         self.assertEqual(
-            list(projects),
-            [
+            set(projects),
+            {
                 "ihchina",
                 "nzrc",
                 "nongmuhr",
@@ -28,7 +28,7 @@ class ScrapyIntegrationTest(unittest.TestCase):
                 "feiyiw",
                 "aqsc-moa",
                 "cnipa",
-            ],
+            },
         )
 
     def test_excluded_and_deferred_sources_have_no_project(self):
