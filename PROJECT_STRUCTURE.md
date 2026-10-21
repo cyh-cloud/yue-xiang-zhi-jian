@@ -15,7 +15,7 @@
 | `tests/` | 领域级与前端运行契约单测 |
 | `tools/` | 机械检查、上传上限同步等仓库工具 |
 | `images/` `uploads/` | 固定图片素材、用户上传产物 |
-| `data/` | SQLite 库与运行日志，不进版本库 |
+| `data/` | SQLite 库与运行日志；`baseline.db` 不入库，`yuexiang.db` 是受控业务快照 |
 | `migrations/` | 一次性内容迁移脚本与测试探针（ADR 0002） |
 
 仓库根保留 `requirements.txt`、`.env.example` 与运行配置。旧多页面 HTML、全局脚本、
@@ -58,12 +58,14 @@ CSS 组件化改写与移动端适配不属于本次收口。
 3. Flask 通过 `python backend/run.py` 启动，负责 API 与上传写入。
 
 没有多 worker、没有容器编排。SQLite 单文件库放在 `data/` 下，`.gitignore` 忽略
-`data/*.db`；新环境用基线库还原。
+`data/*.db`。`data/yuexiang.db` 是随 `frontend/vue-rebuild` 分发的受控业务快照；
+`data/baseline.db` 是可重建的测试基线，不进入版本库。新环境优先复制快照或生成基线
+后再启动，不直接编辑受控快照。
 
 ### 新环境怎么起
 
-    python migrations/0001_content_to_db.py --make-baseline
-    cp data/baseline.db data/yuexiang.db
+    Copy-Item data\baseline.db $env:TEMP\yuexiang.db
+    $env:YUEXIANG_DB = "$env:TEMP\yuexiang.db"
     python backend/run.py
 
 详见 `docs/baseline-database.md`。

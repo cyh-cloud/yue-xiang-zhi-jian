@@ -2,6 +2,9 @@
 
 状态：T10 复审验收记录，对应 Issue #121，服务 Issue #96。T9 的验收入口和历史结果仍保留在 git 历史中。
 
+本文只保留 CSS 组件化证据。全站最终验收、全量 e2e、视觉矩阵、Python 与数据库快照
+口径见 [`frontend-vue-rebuild-spec.md#最终验收记录`](frontend-vue-rebuild-spec.md#最终验收记录)。
+
 ## 终态
 
 - `tokens.css`：全局语义 token、明暗主题、大字模式和断点契约。
@@ -28,7 +31,7 @@
 | 前端单测 | 48 passed |
 | ESLint | 通过 |
 | CSS / 旧样式 / 选择器契约单测 | 34 passed |
-| 目标行为 e2e | 63 passed，一次调用完成 |
+| CSS 目标行为子集 e2e | 63 passed，一次调用完成；仅覆盖 9 个指定 spec，不是全量 e2e |
 | 完整视觉矩阵 | 25/25 passed，一次调用完成，未更新截图基线 |
 
 实际验收命令（2026-10-21，T10 复审树，仓库根与 `frontend/` 分别执行）：
@@ -54,7 +57,8 @@ npm run test:visual:matrix
 - 视觉矩阵正常态和 CDN 降级态都由 Playwright 显式控制，25 个场景在 T10
   当前树的一次 `npm run test:visual:matrix` 中全部通过，没有失败后重跑。
 - E2E 使用 `YUEXIANG_BASELINE_DB` 指向的基线库，由 `e2e/serve.py` 复制到临时库；
-  没有把数据库、`node_modules/`、`dist/` 或测试结果加入提交。
+  本次 CSS 验收没有把数据库、`node_modules/`、`dist/` 或测试结果作为 CSS 变更提交。
+  `data/yuexiang.db` 是后续受控业务快照，数据库口径以总验收记录为准。
 - `npm ci` 在 Node `v24.14.0` 下报告 `abbrev` / `nopt` 的 engine 警告，
   但安装成功，类型检查、构建、单测、ESLint 和 e2e 均通过。
 
@@ -64,3 +68,5 @@ npm run test:visual:matrix
   不是本次 CSS 变更引入；本次运行的是 CSS、旧样式、选择器与前端契约相关的聚焦测试。
 - Windows Chromium 是正式截图环境，Linux 像素基线不在本次范围。
 - AI 上游真实成功链未在本次 CSS 验收中重新验证。
+
+CSS 证据的最终入口是 [`frontend-vue-rebuild-spec.md#最终验收记录`](frontend-vue-rebuild-spec.md#最终验收记录)。

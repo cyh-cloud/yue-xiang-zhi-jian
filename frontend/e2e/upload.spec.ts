@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 const TEACHER = { username: "teacher_demo", password: "123456" };
 const MODEL_BYTES = Buffer.from("glTF T3 multipart probe");
+const OVERSIZED_MULTIPART_BYTES = 51 * 1024 * 1024 + 1;
 
 test("a real browser multipart upload reaches Flask byte for byte", async ({
   page,
@@ -84,4 +85,32 @@ test("a real browser multipart upload reaches Flask byte for byte", async ({
     headers: { "X-Session-Id": session.session_id },
   });
   expect(removed.status()).toBe(200);
+});
+
+test("oversized multipart is rejected with JSON 413 through the test proxy", async ({
+  request,
+}) => {
+  const login = await request.post("/api/auth/login", { data: TEACHER });
+  expect(login.status()).toBe(200);
+  const session = await login.json();
+
+  const response = await request.post("/api/teacher/models-3d", {
+    headers: { "X-Session-Id": session.session_id },
+    multipart: {
+      file: {
+        name: "t27-oversized.glb",
+        mimeType: "model/gltf-binary",
+        buffer: Buffer.alloc(OVERSIZED_MULTIPART_BYTES),
+      },
+      title: "__T27 oversized multipart__",
+    },
+  });
+
+  expect(response.status()).toBe(413);
+  expect(response.headers()["content-type"]).toContain("application/json");
+  await expect(response.json()).resolves.toMatchObject({
+    success: false,
+    code: "file_too_large",
+    message: expect.stringContaining("50MB"),
+  });
 });

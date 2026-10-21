@@ -126,5 +126,6 @@ T1 的新基线均在 CSS 组件化改写前从当前实现生成。现有
 
 ## 验收记录
 
-最终一次完整矩阵的实际命令、结果和环境边界统一记录在
-`docs/css-final-acceptance.md`，避免双份验收记录漂移。
+CSS 矩阵的实际命令、结果和环境边界记录在 `docs/css-final-acceptance.md`；全站最终
+验收记录统一在 `docs/frontend-vue-rebuild-spec.md#最终验收记录`，避免双份总验收记录
+漂移。
