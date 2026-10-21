@@ -32,6 +32,11 @@ npm run test:e2e
 数据库来自临时目录中的基线副本，两条命令结束后都删除该目录。先准备
 `data/baseline.db`，否则依赖内容的用例会按既有约定明确失败。
 
+全站最终验收记录（执行 SHA、命令、结果、版本与未覆盖项）见
+[`../docs/frontend-vue-rebuild-spec.md#最终验收记录`](../docs/frontend-vue-rebuild-spec.md#最终验收记录)；
+CSS 专项证据见
+[`../docs/css-final-acceptance.md`](../docs/css-final-acceptance.md)。
+
 旧 `.html` 路径仍由前端路由静默重定向；它们不依赖旧页面文件，也不会回退到 Flask
 静态路由。Flask 只提供 API 与 `/uploads/`、`/images/` 媒体。
 

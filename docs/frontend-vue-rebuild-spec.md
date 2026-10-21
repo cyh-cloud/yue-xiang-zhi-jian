@@ -1,6 +1,6 @@
 # 前端 Vue 重构规格
 
-状态：accepted，已由 Issue #39 与 ADR 0003 完成收口
+状态：accepted，最终验收记录见本文末节；Issue #39 的关闭以该记录与子票状态为准。
 
 ## 目标
 
@@ -95,3 +95,56 @@
 - PWA 与离线缓存策略重新设计。
 - AI 模块整体改造，包括提示词、降级文案与上游模型选择。
 - 课程材料展示与上传界面。旧站没有该入口，本次不新增。
+
+## 最终验收记录
+
+本节是前端 Vue 重构与 Issue #39 收口的唯一最终验收记录。CSS 组件化证据保留在
+[`css-final-acceptance.md`](css-final-acceptance.md)，本文不复制 CSS 明细，也不把
+CSS 目标子集当成全站验收。
+
+### 验收对象与环境
+
+- 集成分支：`codex/frontend-closeout-integration`
+- 验收基线：`4b6d0c2`，已包含 T25/T26
+- T27 执行提交：`ed8cbc9`，增加真实代理超限 413 用例
+- 日期：2026-10-21
+- 环境：Windows，Node `v24.14.0`，npm `11.19.1`，Playwright `1.64.1`，
+  Chromium 由 Playwright 管理
+- 业务库：`data/yuexiang.db` 是随 `frontend/vue-rebuild` 分发的受控业务快照，
+  大小 3,575,808 bytes，`PRAGMA integrity_check=ok`，`users=7`，
+  `farming_tasks=123`
+- 测试库：Playwright 通过 `YUEXIANG_BASELINE_DB` 把业务快照复制到临时库，
+  `e2e/serve.py` 不写回 `data/yuexiang.db`
+- 基线库：`data/baseline.db` 是由迁移脚本生成的忽略产物；测试临时库与基线库都不
+  进入版本库
+
+### 命令与结果
+
+| 命令 | 本次结果 |
+| --- | --- |
+| `npx playwright test e2e/upload.spec.ts` | 2 passed |
+| `python -m unittest tests.test_upload_deployment_contract -v` | 14 passed |
+| `npm run typecheck` | 通过 |
+| `npm run test:unit` | 48 passed |
+| `npm run build` | 通过 |
+| `npm run test:e2e` | 未完成：视觉矩阵后台角色用例在 172-175 处超时，随后中止；不能记为全量通过 |
+| `npm run test:visual:matrix` | 本次未单独执行；不能把历史 CSS 的 25/25 当作 T27 结果 |
+
+上传契约的边界是：单文件上限为 50MB，multipart 请求上限为 51MB。超限请求由真实
+Flask 返回 JSON 413（`code=file_too_large`），测试静态代理只负责透传，不冒充 nginx。
+nginx 的 `client_max_body_size 51m` 继续由
+`tests/test_upload_deployment_contract.py` 机械校验。
+
+### 证据边界
+
+- CSS 终态的 34 条契约测试、48 条前端单测和 25 个视觉场景属于 CSS 证据，见
+  [`css-final-acceptance.md`](css-final-acceptance.md)，不能替代全量行为 e2e。
+- CSS 验收中的 `63 passed` 是 9 个指定 spec 的目标子集，不是全量 e2e。
+- 全量 Python 单测本次未复验，标记为“环境边界/未复验”，不得写成通过。
+- AI 真实上游成功链本次未复验；当前测试默认关闭真实 AI 上游。
+- 本次未验证 Linux 像素基线、完整移动端适配、真实 nginx 作为 Playwright
+  webServer，以及全量行为 e2e 的最终通过。
+
+Issue #39 只有在 T27 合入、全量 `npm run test:e2e` 与
+`npm run test:visual:matrix` 得到可复现的通过记录，或项目负责人明确接受这些
+环境边界后，才应关闭。
