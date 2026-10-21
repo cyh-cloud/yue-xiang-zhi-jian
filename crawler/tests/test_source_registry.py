@@ -66,8 +66,10 @@ class SourceRegistryTest(unittest.TestCase):
         self.assertEqual(sources["open-meteo"]["status"], "draft")
         self.assertEqual(sources["qweather"]["status"], "draft")
         self.assertEqual(sources["ihchina"]["run_modes"], ["fixture", "live"])
-        self.assertEqual(sources["aqsc-moa"]["run_modes"], ["fixture"])
-        self.assertEqual(sources["cnipa"]["run_modes"], ["fixture"])
+        self.assertEqual(
+            sources["aqsc-moa"]["run_modes"], ["fixture", "live"]
+        )
+        self.assertEqual(sources["cnipa"]["run_modes"], ["fixture", "live"])
         self.assertEqual(sources["cnopendata"]["run_modes"], [])
         self.assertTrue(sources["cnipa"]["attribution_required"])
         self.assertTrue(sources["cnipa"]["rights_evidence_url"])

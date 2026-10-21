@@ -3,16 +3,18 @@
   "items": [
     {
       "source_item_id": "synthetic-announcement-687",
-      "title": "synthetic-announcement-687",
-      "source_url": "https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541",
-      "long_term_url": "https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541",
+      "file_name": "synthetic-announcement-687.pdf",
+      "title": "Synthetic CNIPA announcement 687",
+      "source_url": "https://www.cnipa.gov.cn/art/2026/8/12/art_1400_207705.html",
+      "long_term_url": "https://www.cnipa.gov.cn/art/2026/8/12/art_1400_207705.html",
       "detail_url": null,
       "detail_url_status": "missing",
-      "locator": "synthetic-announcement-687.pdf#page=1",
-      "extra": {
-        "cert_type": "公告",
-        "product_name": "示例地理标志产品"
-      }
+      "announcement_id": "687",
+      "announcement_no": "第687号",
+      "published_at": "2026-08-12",
+      "cert_type": "地理标志",
+      "candidate_reason": "file-source:fixture",
+      "locator": "page=1; seq=1"
     }
   ]
 }

@@ -178,26 +178,26 @@ class ProjectFixtureReplayTest(unittest.TestCase):
             "aqsc-moa",
             "aqsc_moa",
             "replay_aqsc_fixture",
-            "succeeded",
-            2,
-            2,
+            "partial",
+            8,
+            8,
             0,
             "std_agri_products",
             "product_name",
-            "示例产品",
+            "示例鲅鱼圈鸡蛋",
         ),
         (
             "cnipa",
             "cnipa",
             "cnipa",
             "replay_cnipa_fixture",
-            "succeeded",
-            1,
-            1,
+            "partial",
+            2,
+            2,
             0,
             "std_agri_products",
             "product_name",
-            "示例地理标志产品",
+            "Sample Pomegranate",
         ),
     )
 
@@ -233,11 +233,18 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                     second = replay(**kwargs)
                     self.assertEqual(first.status, expected_status)
                     self.assertEqual(second.status, expected_status)
-                    self.assertEqual(
-                        first.candidate_count, expected_candidates
+                    expected_report_candidates = (
+                        0
+                        if source_id in {"aqsc-moa", "cnipa"}
+                        else expected_candidates
                     )
                     self.assertEqual(
-                        second.candidate_count, expected_candidates
+                        first.candidate_count,
+                        expected_report_candidates,
+                    )
+                    self.assertEqual(
+                        second.candidate_count,
+                        expected_report_candidates,
                     )
                     self.assertEqual(first.stage_count, expected_stage)
                     self.assertEqual(second.stage_count, expected_stage)
@@ -262,15 +269,21 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                                 (source_id,),
                             ).fetchone()[0]
                         )
+                        file_filter = (
+                            " AND file_ext IN ('.xlsx', '.pdf')"
+                            if source_id in {"aqsc-moa", "cnipa"}
+                            else ""
+                        )
                         raw_file_count = conn.execute(
                             "SELECT COUNT(*) FROM raw_files "
-                            "WHERE source_id = ?",
+                            "WHERE source_id = ?" + file_filter,
                             (source_id,),
                         ).fetchone()[0]
                         raw_file_rows = conn.execute(
                             "SELECT file_name, sha256, byte_size "
                             "FROM raw_files WHERE source_id = ? "
-                            "ORDER BY file_name",
+                            + file_filter +
+                            " ORDER BY file_name",
                             (source_id,),
                         ).fetchall()
                         if source_id in {"nzrc", "nongmuhr"}:
@@ -311,14 +324,20 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                             ).fetchall()
                             selected_value = conn.execute(
                                 f"SELECT {column} FROM {table} "
-                                "WHERE source_id = ? ORDER BY id LIMIT 1",
+                                "WHERE source_id = ? "
+                                "ORDER BY source_item_id LIMIT 1",
                                 (source_id,),
                             ).fetchone()[0]
                     finally:
                         conn.close()
                     self.assertEqual(stage_count, expected_stage)
                     self.assertEqual(candidate_count, expected_candidates)
-                    if expected_candidates:
+                    if source_id in {"aqsc-moa", "cnipa"}:
+                        self.assertEqual(
+                            candidate_states,
+                            [("deferred", expected_stage)],
+                        )
+                    elif expected_candidates:
                         self.assertEqual(
                             candidate_states,
                             [("candidate", expected_candidates)],
@@ -343,9 +362,6 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                         raw_count, 2 * first.raw_count
                     )
                     if source_id in {"aqsc-moa", "cnipa"}:
-                        self.assertEqual(
-                            raw_file_count, 2 * expected_stage
-                        )
                         fixture_files = sorted(
                             path
                             for path in source_fixture_dir(source_id).iterdir()
@@ -360,6 +376,9 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                             )
                             for path in fixture_files
                         }
+                        self.assertEqual(
+                            raw_file_count, 2 * len(fixture_files)
+                        )
                         self.assertEqual(
                             {
                                 tuple(row)
@@ -994,8 +1013,10 @@ class FixtureAndRegistryRegressionTest(unittest.TestCase):
             "feiyiw",
         ):
             self.assertIn("live", sources[source_id]["run_modes"], source_id)
-        self.assertEqual(sources["aqsc-moa"]["run_modes"], ["fixture"])
-        self.assertEqual(sources["cnipa"]["run_modes"], ["fixture"])
+        self.assertEqual(
+            sources["aqsc-moa"]["run_modes"], ["fixture", "live"]
+        )
+        self.assertEqual(sources["cnipa"]["run_modes"], ["fixture", "live"])
 
 
 class ConverterIsolationRegressionTest(unittest.TestCase):

@@ -80,20 +80,22 @@ class ScrapyIntegrationTest(unittest.TestCase):
             "dialect-org-scrapy-sample.md": ("blocked", "partial"),
             "cass-linguistics-scrapy-sample.md": ("blocked", "partial"),
             "feiyiw-scrapy-sample.md": ("blocked", "partial"),
+            "aqsc-moa-scrapy-sample.md": ("blocked", "partial"),
+            "cnipa-scrapy-sample.md": ("approved-with-gaps", "partial"),
         }
         for name, (conclusion, run_status) in expected.items():
             text = (REVIEWS / name).read_text(encoding="utf-8")
             self.assertIn(f"验收结论: {conclusion}", text, name)
             self.assertIn(f"运行结果: {run_status}", text, name)
 
-    def test_file_only_sites_have_no_live_enabled(self):
+    def test_file_sites_use_explicit_start_urls_for_live_canaries(self):
         sources = {
             "aqsc-moa": PROJECTS / "aqsc-moa" / "aqsc_moa" / "spiders" / "collection.py",
             "cnipa": PROJECTS / "cnipa" / "cnipa" / "spiders" / "collection.py",
         }
         for source_id, path in sources.items():
             text = path.read_text(encoding="utf-8")
-            self.assertIn("live_enabled = False", text, source_id)
+            self.assertIn("live_enabled = True", text, source_id)
             self.assertIn("start_urls = []", text, source_id)
 
 

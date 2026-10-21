@@ -104,18 +104,18 @@ class CollectionRuntime:
             and int(declared_size) > self.max_download_bytes
         )
         if oversize:
+            size_detail = f"actual {len(body)} bytes"
+            if declared_size is not None:
+                size_detail += f", declared {int(declared_size)} bytes"
+            size_detail += f" exceeds {self.max_download_bytes} bytes"
             note = domain_dir / "OVERSIZE.md"
             with note.open("a", encoding="utf-8") as handle:
                 handle.write(
-                    f"- {evidence.request_url}: actual {len(body)} bytes exceeds "
-                    f"{self.max_download_bytes} bytes\n"
+                    f"- {evidence.request_url}: {size_detail}\n"
                 )
             file_path = note.relative_to(self.download_root).as_posix()
             download_status = "oversize"
-            oversize_note = (
-                f"actual {len(body)} bytes exceeds "
-                f"{self.max_download_bytes} bytes"
-            )
+            oversize_note = size_detail
         else:
             target = domain_dir / file_name
             if target.exists() and target.read_bytes() != body:

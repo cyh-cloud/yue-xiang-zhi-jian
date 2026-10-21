@@ -63,4 +63,12 @@
 - `pdf` 模式现在遍历 `pdf_root` 中所有已映射公告 PDF，不再只取第 687 号文件；每份 PDF 独立生成 raw 文件证据和产品行 locator。
 - 公告详情页作为 `long_term_url`，产品行保持 `detail_url_status=missing`，页码和序号作为 locator；按最新口径可以进入候选和发布审核，承载页或 locator 缺失时写 `deferred`。
 - 公开 fixture 是 `synthetic-announcement-687.pdf`，2 页、2 条示例产品行，覆盖解析路径但不复制原始附件。第 89、539 号及全量 537 公告的 PDF 表格重建仍为 `deferred`，解除条件是补齐可复核 fixture 或完成真实全量运行。
-- 国家知识产权局 HTML 公告附件解析路径没有离线 fixture，保持 `deferred`，不声称已验证。
+- 国家知识产权局 HTML 公告附件解析路径已在 2026-10-21 live 样本中验证；公开仓库只保留合成 PDF，不提交真实 HTML 或原始附件。
+
+## 2026-10-21 live Scrapy 复核
+
+- 真实 live 使用 `https://www.cnipa.gov.cn/art/2026/8/12/art_1400_207705.html` 发现附件 1，公告页和 PDF 均返回 200。
+- PDF 为 28 页、428298 bytes，SHA-256 `1f6c48cddda9acb3b5da658097beb23557c413ceb67029cc9ecb877c68d66c39`，解析出 58 条产品行。
+- raw 2、PDF 文件 1、stage 58、deferred 候选 58，候选原因 `robots:not-found`，failure_count 0。
+- 产品行保留页码和序号 locator，`detail_url=null`、`detail_url_status=missing`；公告页是 `long_term_url`，附件 URL 是 `source_url` 和 `fetch_url`。
+- `ggfw.cnipa.gov.cn` 的签名 PDF 路径仍未解除 `unknown` robots 约束。详见 `docs/reviews/cnipa-scrapy-sample.md`。

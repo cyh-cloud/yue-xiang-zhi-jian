@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .items import validate_item
 from .reporting import record_pipeline_result
-from .runtime import CollectionRuntime
+from .runtime import DEFAULT_MAX_DOWNLOAD_BYTES, CollectionRuntime
 
 
 class CollectionPipeline:
@@ -85,8 +85,11 @@ def collection_settings(
         "CONCURRENT_REQUESTS_PER_DOMAIN": 2,
         "DOWNLOAD_TIMEOUT": 30,
         "RETRY_TIMES": 2,
+        "DOWNLOAD_MAXSIZE": DEFAULT_MAX_DOWNLOAD_BYTES,
+        "DOWNLOAD_WARNSIZE": DEFAULT_MAX_DOWNLOAD_BYTES,
         "COLLECTION_DATABASE_PATH": database_path,
         "COLLECTION_DOWNLOAD_ROOT": download_root,
+        "COLLECTION_RUN_MODE": "live",
         "SOURCE_REGISTRY_PATH": registry_path,
         "COLLECTION_CANDIDATE_WRITER": candidate_writer,
         "COLLECTION_REPORT_ROOT": str(
