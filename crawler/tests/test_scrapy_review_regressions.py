@@ -27,6 +27,11 @@ from crawler.collection.shared.crawler_collection.items import CollectionItem
 from crawler.collection.shared.crawler_collection.middlewares import (
     RawEvidenceMiddleware,
 )
+from crawler.collection.shared.crawler_collection.projects import (
+    discover_projects,
+    executable_source_ids,
+)
+from crawler.collection.shared.crawler_collection.registry import load_registry
 from crawler.collection.shared.crawler_collection.robots import RobotsFact
 from crawler.collection.shared.crawler_collection.robots import (
     robots_fact_from_status,
@@ -46,6 +51,138 @@ from crawler.collection.shared.crawler_collection.testing import (
 ROOT = Path(__file__).resolve().parents[1]
 PROJECTS = ROOT / "collection" / "projects"
 REGISTRY = ROOT / "docs" / "sources.json"
+
+
+SOURCE_EXPECTATIONS = {
+    "ihchina": {
+        "replay_function": "replay_ihchina_fixture",
+        "status": "succeeded",
+        "candidates": 2,
+        "report_candidates": 2,
+        "stage_count": 2,
+        "blocked": 0,
+        "table": "std_ich_projects",
+        "column": "protection_unit",
+        "value": "示例保护单位",
+        "candidate_status": "candidate",
+        "file_extensions": (),
+        "job_relations": False,
+        "stage_extra_media": None,
+        "stage_extra_keys": (),
+    },
+    "nzrc": {
+        "replay_function": "replay_nzrc_fixture",
+        "status": "succeeded",
+        "candidates": 2,
+        "report_candidates": 2,
+        "stage_count": 2,
+        "blocked": 0,
+        "table": "std_jobs",
+        "column": "company_url",
+        "value": "http://www.nzrc.com.cn/company/companys/90001.html",
+        "candidate_status": "candidate",
+        "file_extensions": (),
+        "job_relations": True,
+        "stage_extra_media": None,
+        "stage_extra_keys": (),
+    },
+    "nongmuhr": {
+        "replay_function": "replay_nongmuhr_fixture",
+        "status": "succeeded",
+        "candidates": 2,
+        "report_candidates": 2,
+        "stage_count": 2,
+        "blocked": 0,
+        "table": "std_jobs",
+        "column": "deadline_at",
+        "value": "2026-12-31",
+        "candidate_status": "candidate",
+        "file_extensions": (),
+        "job_relations": True,
+        "stage_extra_media": None,
+        "stage_extra_keys": (),
+    },
+    "dialect-org": {
+        "replay_function": "replay_dialect_fixture",
+        "status": "succeeded",
+        "candidates": 1,
+        "report_candidates": 1,
+        "stage_count": 1,
+        "blocked": 0,
+        "table": "std_dialect_points",
+        "column": "city",
+        "value": "广州",
+        "candidate_status": "candidate",
+        "file_extensions": (),
+        "job_relations": False,
+        "stage_extra_media": None,
+        "stage_extra_keys": (),
+    },
+    "cass-linguistics": {
+        "replay_function": "replay_cass_fixture",
+        "status": "succeeded",
+        "candidates": 1,
+        "report_candidates": 1,
+        "stage_count": 1,
+        "blocked": 0,
+        "table": "std_research_articles",
+        "column": "summary",
+        "value": "公开摘要",
+        "candidate_status": "candidate",
+        "file_extensions": (),
+        "job_relations": False,
+        "stage_extra_media": "中国社会科学网",
+        "stage_extra_keys": (),
+    },
+    "feiyiw": {
+        "replay_function": "replay_feiyiw_fixture",
+        "status": "succeeded",
+        "candidates": 1,
+        "report_candidates": 1,
+        "stage_count": 1,
+        "blocked": 0,
+        "table": "std_ich_articles",
+        "column": "body_text",
+        "value": "公开正文",
+        "candidate_status": "candidate",
+        "file_extensions": (),
+        "job_relations": False,
+        "stage_extra_media": None,
+        "stage_extra_keys": ("supplementary",),
+    },
+    "aqsc-moa": {
+        "replay_function": "replay_aqsc_fixture",
+        "status": "partial",
+        "candidates": 8,
+        "report_candidates": 0,
+        "stage_count": 8,
+        "blocked": 0,
+        "table": "std_agri_products",
+        "column": "product_name",
+        "value": "示例鲅鱼圈鸡蛋",
+        "candidate_status": "deferred",
+        "file_extensions": (".xlsx", ".pdf"),
+        "job_relations": False,
+        "stage_extra_media": None,
+        "stage_extra_keys": (),
+    },
+    "cnipa": {
+        "replay_function": "replay_cnipa_fixture",
+        "status": "partial",
+        "candidates": 2,
+        "report_candidates": 0,
+        "stage_count": 2,
+        "blocked": 0,
+        "table": "std_agri_products",
+        "column": "product_name",
+        "value": "Sample Pomegranate",
+        "candidate_status": "deferred",
+        "file_extensions": (".xlsx", ".pdf"),
+        "job_relations": False,
+        "stage_extra_media": None,
+        "stage_extra_keys": (),
+    },
+}
 
 
 def _item(**overrides):
@@ -99,132 +236,24 @@ class ProjectSettingsPathTest(unittest.TestCase):
 
 
 class ProjectFixtureReplayTest(unittest.TestCase):
-    entries = (
-        (
-            "ihchina",
-            "ihchina",
-            "ihchina",
-            "replay_ihchina_fixture",
-            "succeeded",
-            2,
-            2,
-            0,
-            "std_ich_projects",
-            "protection_unit",
-            "示例保护单位",
-        ),
-        (
-            "nzrc",
-            "nzrc",
-            "nzrc",
-            "replay_nzrc_fixture",
-            "succeeded",
-            2,
-            2,
-            0,
-            "std_jobs",
-            "company_url",
-            "http://www.nzrc.com.cn/company/companys/90001.html",
-        ),
-        (
-            "nongmuhr",
-            "nongmuhr",
-            "nongmuhr",
-            "replay_nongmuhr_fixture",
-            "succeeded",
-            2,
-            2,
-            0,
-            "std_jobs",
-            "deadline_at",
-            "2026-12-31",
-        ),
-        (
-            "dialect-org",
-            "dialect-org",
-            "dialect_org",
-            "replay_dialect_fixture",
-            "succeeded",
-            1,
-            1,
-            0,
-            "std_dialect_points",
-            "city",
-            "广州",
-        ),
-        (
-            "cass-linguistics",
-            "cass-linguistics",
-            "cass_linguistics",
-            "replay_cass_fixture",
-            "succeeded",
-            1,
-            1,
-            0,
-            "std_research_articles",
-            "summary",
-            "公开摘要",
-        ),
-        (
-            "feiyiw",
-            "feiyiw",
-            "feiyiw",
-            "replay_feiyiw_fixture",
-            "succeeded",
-            1,
-            1,
-            0,
-            "std_ich_articles",
-            "body_text",
-            "公开正文",
-        ),
-        (
-            "aqsc-moa",
-            "aqsc-moa",
-            "aqsc_moa",
-            "replay_aqsc_fixture",
-            "partial",
-            8,
-            8,
-            0,
-            "std_agri_products",
-            "product_name",
-            "示例鲅鱼圈鸡蛋",
-        ),
-        (
-            "cnipa",
-            "cnipa",
-            "cnipa",
-            "replay_cnipa_fixture",
-            "partial",
-            2,
-            2,
-            0,
-            "std_agri_products",
-            "product_name",
-            "Sample Pomegranate",
-        ),
-    )
+    def _discover_projects_with_expectations(self):
+        projects = discover_projects(PROJECTS, REGISTRY)
+        registry_source_ids = executable_source_ids(load_registry(REGISTRY))
+        self.assertEqual(set(projects), registry_source_ids)
+        self.assertEqual(set(SOURCE_EXPECTATIONS), registry_source_ids)
+        return projects
 
     def test_every_project_replays_from_its_entry_with_expected_counts(self):
-        for (
-            source_id,
-            project,
-            package,
-            function_name,
-            expected_status,
-            expected_candidates,
-            expected_stage,
-            expected_blocked,
-            table,
-            column,
-            expected_value,
-        ) in self.entries:
+        projects = self._discover_projects_with_expectations()
+        for source_id, project in sorted(projects.items()):
+            expected = SOURCE_EXPECTATIONS[source_id]
             with self.subTest(source_id=source_id):
-                sys.path.insert(0, str(PROJECTS / project))
+                sys.path.insert(0, str(project.root))
                 replay = getattr(
-                    importlib.import_module(f"{package}.replay"),
-                    function_name,
+                    importlib.import_module(
+                        f"{project.package_path.name}.replay"
+                    ),
+                    expected["replay_function"],
                 )
                 with tempfile.TemporaryDirectory() as tmp:
                     root = Path(tmp)
@@ -236,25 +265,26 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                     }
                     first = replay(**kwargs)
                     second = replay(**kwargs)
-                    self.assertEqual(first.status, expected_status)
-                    self.assertEqual(second.status, expected_status)
-                    expected_report_candidates = (
-                        0
-                        if source_id in {"aqsc-moa", "cnipa"}
-                        else expected_candidates
-                    )
+                    self.assertEqual(first.status, expected["status"])
+                    self.assertEqual(second.status, expected["status"])
                     self.assertEqual(
                         first.candidate_count,
-                        expected_report_candidates,
+                        expected["report_candidates"],
                     )
                     self.assertEqual(
                         second.candidate_count,
-                        expected_report_candidates,
+                        expected["report_candidates"],
                     )
-                    self.assertEqual(first.stage_count, expected_stage)
-                    self.assertEqual(second.stage_count, expected_stage)
-                    self.assertEqual(first.blocked, expected_blocked)
-                    self.assertEqual(second.blocked, expected_blocked)
+                    self.assertEqual(
+                        first.stage_count,
+                        expected["stage_count"],
+                    )
+                    self.assertEqual(
+                        second.stage_count,
+                        expected["stage_count"],
+                    )
+                    self.assertEqual(first.blocked, expected["blocked"])
+                    self.assertEqual(second.blocked, expected["blocked"])
                     conn = sqlite3.connect(root / "crawler.db")
                     try:
                         raw_count = conn.execute(
@@ -274,11 +304,18 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                                 (source_id,),
                             ).fetchone()[0]
                         )
-                        file_filter = (
-                            " AND file_ext IN ('.xlsx', '.pdf')"
-                            if source_id in {"aqsc-moa", "cnipa"}
-                            else ""
-                        )
+                        file_extensions = expected["file_extensions"]
+                        if file_extensions:
+                            allowed_extensions = ", ".join(
+                                f"'{extension}'"
+                                for extension in file_extensions
+                            )
+                            file_filter = (
+                                " AND file_ext IN "
+                                f"({allowed_extensions})"
+                            )
+                        else:
+                            file_filter = ""
                         raw_file_count = conn.execute(
                             "SELECT COUNT(*) FROM raw_files "
                             "WHERE source_id = ?" + file_filter,
@@ -291,7 +328,7 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                             " ORDER BY file_name",
                             (source_id,),
                         ).fetchall()
-                        if source_id in {"nzrc", "nongmuhr"}:
+                        if expected["job_relations"]:
                             job_source_count = conn.execute(
                                 """
                                 SELECT COUNT(*)
@@ -311,6 +348,8 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                         else:
                             job_source_count = None
                             job_location_count = None
+                        table = expected["table"]
+                        column = expected["column"]
                         if table is None:
                             candidate_count = 0
                             candidate_states = []
@@ -335,43 +374,52 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                             ).fetchone()[0]
                     finally:
                         conn.close()
-                    self.assertEqual(stage_count, expected_stage)
-                    self.assertEqual(candidate_count, expected_candidates)
-                    if source_id in {"aqsc-moa", "cnipa"}:
+                    self.assertEqual(
+                        stage_count,
+                        expected["stage_count"],
+                    )
+                    self.assertEqual(
+                        candidate_count,
+                        expected["candidates"],
+                    )
+                    if expected["candidate_status"] == "deferred":
                         self.assertEqual(
                             candidate_states,
-                            [("deferred", expected_stage)],
+                            [("deferred", expected["stage_count"])],
                         )
-                    elif expected_candidates:
+                    elif expected["candidates"]:
                         self.assertEqual(
                             candidate_states,
-                            [("candidate", expected_candidates)],
+                            [("candidate", expected["candidates"])],
                         )
                     else:
                         self.assertEqual(candidate_states, [])
-                    self.assertEqual(selected_value, expected_value)
-                    if source_id == "cass-linguistics":
+                    self.assertEqual(selected_value, expected["value"])
+                    if expected["stage_extra_media"] is not None:
                         self.assertEqual(
-                            stage_extra["media"], "中国社会科学网"
+                            stage_extra["media"],
+                            expected["stage_extra_media"],
                         )
-                    if source_id == "feiyiw":
-                        self.assertIn("supplementary", stage_extra)
-                    if source_id in {"nzrc", "nongmuhr"}:
+                    for key in expected["stage_extra_keys"]:
+                        self.assertIn(key, stage_extra)
+                    if expected["job_relations"]:
                         self.assertEqual(
-                            job_source_count, expected_candidates
+                            job_source_count,
+                            expected["candidates"],
                         )
                         self.assertEqual(
-                            job_location_count, expected_candidates
+                            job_location_count,
+                            expected["candidates"],
                         )
                     self.assertEqual(
                         raw_count, 2 * first.raw_count
                     )
-                    if source_id in {"aqsc-moa", "cnipa"}:
+                    if file_extensions:
                         fixture_files = sorted(
                             path
                             for path in source_fixture_dir(source_id).iterdir()
                             if path.suffix.lower()
-                            in {".xlsx", ".pdf"}
+                            in set(file_extensions)
                         )
                         expected_files = {
                             (
@@ -397,18 +445,16 @@ class ProjectFixtureReplayTest(unittest.TestCase):
                         )
 
     def test_every_project_rejects_a_fixture_directory_for_another_source(self):
-        for (
-            source_id,
-            project,
-            package,
-            function_name,
-            *_,
-        ) in self.entries:
+        projects = self._discover_projects_with_expectations()
+        for source_id, project in sorted(projects.items()):
+            expected = SOURCE_EXPECTATIONS[source_id]
             with self.subTest(source_id=source_id):
-                sys.path.insert(0, str(PROJECTS / project))
+                sys.path.insert(0, str(project.root))
                 replay = getattr(
-                    importlib.import_module(f"{package}.replay"),
-                    function_name,
+                    importlib.import_module(
+                        f"{project.package_path.name}.replay"
+                    ),
+                    expected["replay_function"],
                 )
                 with tempfile.TemporaryDirectory() as tmp:
                     root = Path(tmp)
