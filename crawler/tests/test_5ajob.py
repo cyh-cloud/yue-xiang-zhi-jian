@@ -3,7 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 from crawler.pipeline.sources import fiveajob
 
 
@@ -50,7 +53,7 @@ class FiveAJobSourceTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
@@ -73,13 +76,13 @@ class FiveAJobSourceTest(unittest.TestCase):
     def test_prohibited_source_is_rejected_before_discovery(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "missing-fixture",
             )
 
-            result = run_source("5ajob", "list-fixture", config)
+            result = run_offline_fixture("5ajob", "list-fixture", config)
 
             self.assertEqual(result.status, "blocked")
             self.assertEqual(result.discovered_count, 0)
@@ -112,7 +115,7 @@ class FiveAJobSourceTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
@@ -188,7 +191,7 @@ class FiveAJobSourceTest(unittest.TestCase):
                 json.dumps(pages, ensure_ascii=False),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,

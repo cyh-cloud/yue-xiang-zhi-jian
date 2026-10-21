@@ -479,7 +479,7 @@
 
 ## 实现验证
 
-- 2026-10-20 通过 `python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc-moa` 解析两份公开合成 fixture，共 8 行写入 raw/stage。
+- 2026-10-20 的历史 fixture 切片使用已退役的旧在线入口。当前回归入口为 `python -m unittest crawler.tests.test_aqsc_moa_scrapy -v`，使用临时采集库并经过真实 Scrapy process。
 - 2026-10-21 项目级 fixture 回放改为真实 Scrapy process，经过 Spider、robots middleware、raw middleware、Pipeline 和采集运行时。回放产生 raw 5、XLSX 附件 2、stage 8、deferred 候选 8；每条候选保留工作表、行号和序号 locator。
 - 2026-10-21 真实 live 小样本从监管司发现页返回 200，公告页返回 200 并解析出 XLSX 链接，附件下载返回 403。raw 保存发现页、公告页和 403 错误响应，stage 写入 1 条 blocked 记录，候选 0，failure_count 1。live 原始证据位置见 `docs/reviews/aqsc-moa-scrapy-sample.md`。
 - 100MB 上限使用声明大小 104857601 bytes 的响应验证，`raw_files.download_status=oversize`，只写 `OVERSIZE.md`，不保存正文。

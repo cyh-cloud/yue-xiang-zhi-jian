@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 
 
 class CassLinguisticsSourceTest(unittest.TestCase):
@@ -52,13 +55,13 @@ class CassLinguisticsSourceTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("cass-linguistics", "fixture", config)
+            result = run_offline_fixture("cass-linguistics", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.discovered_count, 1)

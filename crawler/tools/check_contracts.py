@@ -384,9 +384,8 @@ def check_implementation_contract() -> list[str]:
     errors: list[str] = []
     database_text = _read(SCHEMA_SOURCE)
     evidence_text = _read(PIPELINE / "evidence.py")
-    run_source_text = _read(PIPELINE / "run_source.py")
+    offline_text = _read(PIPELINE / "offline_fixture.py")
     converter_text = _read(PIPELINE / "converter.py")
-    run_py_text = _read(PIPELINE.parent / "run.py")
     init_text = _read(PIPELINE / "__init__.py")
     feiyiw_text = _read(PIPELINE / "sources" / "feiyiw.py")
 
@@ -415,31 +414,39 @@ def check_implementation_contract() -> list[str]:
         if field not in evidence_text:
             errors.append(f"evidence.py: raw evidence missing {field}")
 
-    if "RUN_MODES = tuple(" not in run_source_text:
-        errors.append("run_source.py: RUN_MODES must be the single mode tuple")
-    if "_SOURCE_MODES" not in run_source_text:
-        errors.append("run_source.py: missing source-mode truth table")
-    if "source_registry.load_registry" not in run_source_text:
-        errors.append("run_source.py: must load the central source registry")
-    if "source_registry.rights_fields" not in run_source_text:
-        errors.append("run_source.py: rights must come from the source registry")
-    if "RUN_MODES = (" in run_py_text:
-        errors.append("run.py: duplicate RUN_MODES definition")
-    if "from .pipeline import RUN_MODES" not in run_py_text:
-        errors.append("run.py: must import RUN_MODES")
+    if "OFFLINE_MODES = tuple(" not in offline_text:
+        errors.append("offline_fixture.py: OFFLINE_MODES must be explicit")
+    if "_OFFLINE_MODE_ALIASES" not in offline_text:
+        errors.append("offline_fixture.py: missing offline mode aliases")
+    if "source_registry.load_registry" not in offline_text:
+        errors.append(
+            "offline_fixture.py: must load the central source registry"
+        )
+    if "source_registry.rights_fields" not in offline_text:
+        errors.append(
+            "offline_fixture.py: rights must come from the source registry"
+        )
+    for retired in (PIPELINE / "run_source.py", PIPELINE.parent / "run.py"):
+        if retired.exists():
+            errors.append(f"legacy live entry must be retired: {retired.name}")
+    for token in ("urllib.request", "HTTPError", "urlopen", "Request("):
+        if token in offline_text:
+            errors.append(
+                f"offline_fixture.py: live network token remains: {token}"
+            )
     for token in (
         "persist_raw_evidence",
         "stage_source_items",
         "evaluate_publication",
-        "source:{source_id}:{mode}:",
+        "offline:{source_id}:{mode}:",
         "P020251225613822033339.xlsx",
         "t20251128_468194.htm",
         "_ihchina_list_url",
     ):
-        if token not in run_source_text:
-            errors.append(f"run_source.py: missing {token}")
-    if 'run_id="fixture:announcements"' in run_source_text:
-        errors.append("run_source.py: hardcoded announcement success path")
+        if token not in offline_text:
+            errors.append(f"offline_fixture.py: missing {token}")
+    if 'run_id="fixture:announcements"' in offline_text:
+        errors.append("offline_fixture.py: hardcoded announcement success path")
     if "_is_public_article_url" not in feiyiw_text:
         errors.append("feiyiw.py: missing public URL boundary")
 

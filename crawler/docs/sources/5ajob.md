@@ -151,11 +151,11 @@
 
 ## 实现验证
 
-- 2026-10-20 已实现列表 fixture 纵向切片，统一入口为 `run_source("5ajob", "list-fixture", config)`。
+- 2026-10-20 已实现列表 fixture 纵向切片。该来源保持 `prohibited` 且没有 Scrapy 项目，只允许通过 `python -m unittest crawler.tests.test_5ajob -v` 验证离线解析器。
 - canonical 岗位 URL 同时写入 `source_url`、`long_term_url` 和 `detail_url`；`source_item_id` 使用职位 ID。
 - 全局按职位 ID 和 canonical URL 去重。某页没有新增职位 ID 时停止，因此后续回绕页不会被继续处理。
 - 农业相关性仅使用标题、行业和描述证据，保留命中字段、命中文案、排除记录和处理页数；公司名不参与判定。
 - 权利状态使用 `prohibited`，并在 `extra.risk_acceptance` 保留“转载需 5ajob.com 许可”的来源声明。
-- 统一运行入口会先读取 `sources.json`，`prohibited` 来源返回 `blocked`，不创建采集库或 raw/stage/std 记录。
+- 来源注册表判定为 `prohibited`，调度器和 Scrapy 项目均不得启动该来源；离线解析器测试不创建 raw/stage/std 记录。
 - 离线 fixture 可携带 `detail_html`，解析公司、地点、薪资、学历、描述、要求和有效期；该能力只用于解析器测试。
 - 测试使用本地 fixture，不访问网络。真实 250 页全量列表、脚本注入有效期和许可恢复仍为 `deferred`。

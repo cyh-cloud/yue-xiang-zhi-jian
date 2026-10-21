@@ -3,7 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,14 +17,14 @@ class NzrcSourceTest(unittest.TestCase):
     def test_saved_detail_projects_job_and_keeps_private_contacts_null(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 source_root=DOWNLOAD,
             )
 
-            result = run_source("nzrc", "saved", config)
+            result = run_offline_fixture("nzrc", "saved", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertGreater(result.written_count, 0)

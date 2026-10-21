@@ -3,9 +3,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.error import HTTPError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
 
 from . import database, source_registry
 from .evidence import (
@@ -21,29 +19,23 @@ from .sources import cass_linguistics
 
 DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
 
-_TEST_SOURCE_MODES = {
+_OFFLINE_TEST_SOURCE_MODES = {
     "fixture-source": frozenset({"fixture"}),
 }
-# Legacy CLI names translate to a canonical registry mode before validation.
-# The registry still decides whether the canonical mode is executable.
-_LEGACY_MODE_ALIASES = {
+# Offline fixture aliases translate saved inputs to the fixture mode.
+_OFFLINE_MODE_ALIASES = {
     ("aqsc-moa", "xlsx"): "fixture",
     ("cnipa", "pdf"): "fixture",
     ("cnipa", "announcement-fixture"): "fixture",
-    ("nzrc", "saved"): "live",
-    ("nongmuhr", "saved"): "live",
+    ("nzrc", "saved"): "fixture",
+    ("nongmuhr", "saved"): "fixture",
 }
-RUN_MODES = tuple(
+OFFLINE_MODES = tuple(
     sorted(
-        {
-            mode
-            for source in source_registry.load_registry().values()
-            for mode in source_registry.run_modes(source)
-        }
-        | {legacy for _, legacy in _LEGACY_MODE_ALIASES}
+        {mode for _, mode in _OFFLINE_MODE_ALIASES}
         | {
             mode
-            for modes in _TEST_SOURCE_MODES.values()
+            for modes in _OFFLINE_TEST_SOURCE_MODES.values()
             for mode in modes
         }
     )
@@ -80,7 +72,7 @@ _CNIPA_DETAIL_URLS = {
 
 
 @dataclass(frozen=True)
-class RunConfig:
+class OfflineFixtureConfig:
     database_path: Path
     download_root: Path
     fixture_root: Path
@@ -93,7 +85,7 @@ class RunConfig:
 
 
 @dataclass(frozen=True)
-class SourceRunResult:
+class OfflineFixtureResult:
     run_id: str
     source_id: str
     status: str
@@ -1025,179 +1017,6 @@ def _attach_ihchina_fixture_details(
         item["_evidence_key"] = detail_key
 
 
-def _fetch_ihchina_detail(url):
-    request = Request(
-        url,
-        headers={
-            "User-Agent": (
-                "yuexiang-crawler/0.1 (competition; noncommercial)"
-            )
-        },
-    )
-    with urlopen(request, timeout=30) as response:
-        return (
-            response.read(),
-            getattr(response, "status", 200),
-            response.geturl(),
-            dict(response.headers.items()),
-        )
-
-
-def _attach_ihchina_live_details(source_id, items, evidence, rights):
-    from .sources import ihchina
-
-    errors = []
-    for item in items:
-        item_id = item["source_item_id"]
-        detail_url = item["detail_url"]
-        detail_key = f"detail:{item_id}"
-        try:
-            body, status_code, final_url, headers = _fetch_ihchina_detail(
-                detail_url
-            )
-        except HTTPError as exc:
-            body = exc.read()
-            final_url = exc.geturl() or detail_url
-            headers = dict(exc.headers.items())
-            evidence.append(
-                _evidence(
-                    source_id,
-                    detail_key,
-                    request_url=detail_url,
-                    final_url=final_url,
-                    source_url=detail_url,
-                    long_term_url=detail_url,
-                    body=body,
-                    content_type=exc.headers.get_content_type(),
-                    detail_url=detail_url,
-                    detail_url_status="direct",
-                    locator=f"project-detail:{item_id}",
-                    file_name=f"ihchina-project-{item_id}.html",
-                    rights_status=rights["rights_status"],
-                    attribution_required=rights["attribution_required"],
-                    attribution_text=rights["attribution_text"],
-                    rights_evidence_url=rights["rights_evidence_url"],
-                    status_code=exc.code,
-                    response_headers=headers,
-                    fetch_status="http_error",
-                    error_message=str(exc),
-                    metadata={"media_kind": "html"},
-                )
-            )
-            errors.append(f"project {item_id}: HTTP {exc.code}")
-            continue
-
-        evidence.append(
-            _evidence(
-                source_id,
-                detail_key,
-                request_url=detail_url,
-                final_url=final_url,
-                source_url=detail_url,
-                long_term_url=detail_url,
-                body=body,
-                content_type=headers.get("Content-Type", "text/html"),
-                detail_url=detail_url,
-                detail_url_status="direct",
-                locator=f"project-detail:{item_id}",
-                file_name=f"ihchina-project-{item_id}.html",
-                rights_status=rights["rights_status"],
-                attribution_required=rights["attribution_required"],
-                attribution_text=rights["attribution_text"],
-                rights_evidence_url=rights["rights_evidence_url"],
-                status_code=status_code,
-                response_headers=headers,
-                metadata={"media_kind": "html"},
-            )
-        )
-        parsed = ihchina.parse_project_detail(
-            body.decode("utf-8", errors="replace"),
-            detail_url,
-        )
-        for inheritor in parsed["inheritors"]:
-            inheritor_id = inheritor.get("source_item_id")
-            inheritor_url = inheritor.get("source_url")
-            if not inheritor_id or not inheritor_url:
-                continue
-            try:
-                (
-                    inheritor_body,
-                    inheritor_status,
-                    inheritor_final_url,
-                    inheritor_headers,
-                ) = _fetch_ihchina_detail(inheritor_url)
-            except HTTPError as exc:
-                inheritor_body = exc.read()
-                inheritor_final_url = exc.geturl() or inheritor_url
-                inheritor_headers = dict(exc.headers.items())
-                evidence.append(
-                    _evidence(
-                        source_id,
-                        f"inheritor:{inheritor_id}",
-                        request_url=inheritor_url,
-                        final_url=inheritor_final_url,
-                        source_url=inheritor_url,
-                        long_term_url=inheritor_url,
-                        body=inheritor_body,
-                        content_type=exc.headers.get_content_type(),
-                        detail_url=inheritor_url,
-                        detail_url_status="direct",
-                        locator=f"inheritor-detail:{inheritor_id}",
-                        file_name=f"ihchina-inheritor-{inheritor_id}.html",
-                        rights_status=rights["rights_status"],
-                        attribution_required=rights["attribution_required"],
-                        attribution_text=rights["attribution_text"],
-                        rights_evidence_url=rights[
-                            "rights_evidence_url"
-                        ],
-                        status_code=exc.code,
-                        response_headers=inheritor_headers,
-                        fetch_status="http_error",
-                        error_message=str(exc),
-                        metadata={"media_kind": "html"},
-                    )
-                )
-                errors.append(
-                    f"inheritor {inheritor_id}: HTTP {exc.code}"
-                )
-                continue
-            evidence.append(
-                _evidence(
-                    source_id,
-                    f"inheritor:{inheritor_id}",
-                    request_url=inheritor_url,
-                    final_url=inheritor_final_url,
-                    source_url=inheritor_url,
-                    long_term_url=inheritor_url,
-                    body=inheritor_body,
-                    content_type=inheritor_headers.get(
-                        "Content-Type", "text/html"
-                    ),
-                    detail_url=inheritor_url,
-                    detail_url_status="direct",
-                    locator=f"inheritor-detail:{inheritor_id}",
-                    file_name=f"ihchina-inheritor-{inheritor_id}.html",
-                    rights_status=rights["rights_status"],
-                    attribution_required=rights["attribution_required"],
-                    attribution_text=rights["attribution_text"],
-                    rights_evidence_url=rights["rights_evidence_url"],
-                    status_code=inheritor_status,
-                    response_headers=inheritor_headers,
-                    metadata={"media_kind": "html"},
-                )
-            )
-            inheritor.update(
-                ihchina.parse_inheritor_detail(
-                    inheritor_body.decode("utf-8", errors="replace"),
-                    inheritor_url,
-                )
-            )
-            inheritor["source_item_id"] = inheritor_id
-        _merge_ihchina_detail(item, parsed)
-        item["_evidence_key"] = detail_key
-    return errors
-
-
 def _discover_ihchina_fixture(source_id, config):
     path = _fixture_path(config)
     if not path.exists():
@@ -1253,108 +1072,6 @@ def _discover_ihchina_fixture(source_id, config):
         path,
     )
     return DiscoveryResult(items=items, evidence=evidence)
-
-
-def _discover_ihchina_live(source_id, config):
-    limit = int(config.page_limit)
-    evidence = []
-    items = []
-    seen = set()
-    rights = _rights_fields(source_id, config)
-    page_no = 1
-    total = None
-    while True:
-        request_url = _ihchina_list_url(page_no, limit)
-        request = Request(
-            request_url,
-            headers={
-                "User-Agent": (
-                    "yuexiang-crawler/0.1 (competition; noncommercial)"
-                )
-            },
-        )
-        try:
-            with urlopen(request, timeout=30) as response:
-                body = response.read()
-                status_code = getattr(response, "status", 200)
-                final_url = response.geturl()
-                headers = dict(response.headers.items())
-            payload = json.loads(body.decode("utf-8"))
-        except HTTPError as exc:
-            body = exc.read()
-            request_url = exc.geturl() or request_url
-            evidence.append(
-                _evidence(
-                    source_id,
-                    f"page:{page_no}",
-                    request_url=request_url,
-                    source_url=request_url,
-                    long_term_url=request_url,
-                    body=body,
-                    content_type=exc.headers.get_content_type(),
-                    locator=f"page={page_no}",
-                    file_name=f"ihchina-page-{page_no}.html",
-                    rights_status=rights["rights_status"],
-                    attribution_required=rights["attribution_required"],
-                    attribution_text=rights["attribution_text"],
-                    rights_evidence_url=rights["rights_evidence_url"],
-                    status_code=exc.code,
-                    response_headers=dict(exc.headers.items()),
-                    fetch_status="http_error",
-                    error_message=str(exc),
-                    metadata={"page": page_no, "media_kind": "html"},
-                )
-            )
-            return DiscoveryResult(
-                items=items,
-                evidence=evidence,
-                errors=[f"page {page_no}: HTTP {exc.code}"],
-            )
-        key = f"page:{page_no}"
-        evidence.append(
-            _evidence(
-                source_id,
-                key,
-                request_url=request_url,
-                source_url=request_url,
-                long_term_url=final_url,
-                body=body,
-                content_type=headers.get("Content-Type", "application/json"),
-                locator=f"page={page_no}",
-                file_name=f"ihchina-page-{page_no}.json",
-                rights_status=rights["rights_status"],
-                attribution_required=rights["attribution_required"],
-                attribution_text=rights["attribution_text"],
-                rights_evidence_url=rights["rights_evidence_url"],
-                status_code=status_code,
-                response_headers=headers,
-                metadata={"page": page_no, "media_kind": "json"},
-            )
-        )
-        total = payload.get("total", total)
-        for item in _ihchina_items(
-            payload, page_no, limit, rights, {}, None
-        ):
-            if item["source_item_id"] in seen:
-                continue
-            seen.add(item["source_item_id"])
-            item["source_url"] = request_url
-            item["_evidence_key"] = key
-            items.append(item)
-        if not payload.get("list") or page_no * limit >= int(total or 0):
-            break
-        page_no += 1
-    detail_errors = _attach_ihchina_live_details(
-        source_id,
-        items,
-        evidence,
-        rights,
-    )
-    return DiscoveryResult(
-        items=items,
-        evidence=evidence,
-        errors=detail_errors,
-    )
 
 
 def _fiveajob_page_url(page_no):
@@ -1417,8 +1134,6 @@ def _discover(source_id, mode, config):
     if source_id == "fixture-source":
         return _discover_generic_fixture(source_id, config)
     if source_id == "ihchina":
-        if mode == "live":
-            return _discover_ihchina_live(source_id, config)
         return _discover_ihchina_fixture(source_id, config)
     if source_id == "aqsc-moa":
         return _discover_aqsc_xlsx(source_id, config)
@@ -1563,21 +1278,25 @@ def _write_std(conn, source_id, item, retrieved_at, content_hash):
         database.upsert_std_job(conn, normal, retrieved_at)
 
 
-def run_source(source_id, mode, config):
+def run_offline_fixture(source_id, mode, config):
+    if mode == "live":
+        raise ValueError(
+            "live collection is handled only by Scrapy projects"
+        )
     registry = source_registry.load_registry(
         getattr(config, "registry_path", None)
     )
     source = registry.get(source_id)
-    if source is None and source_id not in _TEST_SOURCE_MODES:
+    if source is None and source_id not in _OFFLINE_TEST_SOURCE_MODES:
         raise ValueError(f"unsupported source: {source_id}")
     run_id = (
-        f"source:{source_id}:{mode}:"
+        f"offline:{source_id}:{mode}:"
         f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}"
     )
     if source is not None:
         source_decision = source_registry.evaluate_source(source)
         if not source_decision.allowed:
-            return SourceRunResult(
+            return OfflineFixtureResult(
                 run_id=run_id,
                 source_id=source_id,
                 status="blocked",
@@ -1590,8 +1309,8 @@ def run_source(source_id, mode, config):
             )
         allowed_modes = source_registry.run_modes(source)
     else:
-        allowed_modes = _TEST_SOURCE_MODES[source_id]
-    canonical_mode = _LEGACY_MODE_ALIASES.get(
+        allowed_modes = _OFFLINE_TEST_SOURCE_MODES[source_id]
+    canonical_mode = _OFFLINE_MODE_ALIASES.get(
         (source_id, mode), mode
     )
     if canonical_mode not in allowed_modes:
@@ -1601,7 +1320,7 @@ def run_source(source_id, mode, config):
     try:
         discovery = _discover(source_id, mode, config)
     except Exception as exc:
-        return SourceRunResult(
+        return OfflineFixtureResult(
             run_id=run_id,
             source_id=source_id,
             status="failed",
@@ -1628,7 +1347,7 @@ def run_source(source_id, mode, config):
     except Exception as exc:
         conn.rollback()
         conn.close()
-        return SourceRunResult(
+        return OfflineFixtureResult(
             run_id=run_id,
             source_id=source_id,
             status="failed",
@@ -1722,7 +1441,7 @@ def run_source(source_id, mode, config):
         status = "failed" if errors else "partial"
     else:
         status = "partial"
-    return SourceRunResult(
+    return OfflineFixtureResult(
         run_id=run_id,
         source_id=source_id,
         status=status,

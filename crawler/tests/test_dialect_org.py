@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 
 
 FIXTURE_ROOT = (
@@ -16,14 +19,14 @@ class DialectOrgSourceTest(unittest.TestCase):
     def test_fixture_detail_persists_point_lexeme_and_invalid_audio_status(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=FIXTURE_ROOT,
             )
 
-            first = run_source("dialect-org", "fixture", config)
-            second = run_source("dialect-org", "fixture", config)
+            first = run_offline_fixture("dialect-org", "fixture", config)
+            second = run_offline_fixture("dialect-org", "fixture", config)
 
             self.assertEqual(first.status, "succeeded")
             self.assertEqual(first.discovered_count, 1)
@@ -154,13 +157,13 @@ class DialectOrgSourceTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("dialect-org", "fixture", config)
+            result = run_offline_fixture("dialect-org", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             conn = sqlite3.connect(config.database_path)

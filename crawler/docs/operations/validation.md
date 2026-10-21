@@ -20,6 +20,9 @@ python -m unittest discover -s crawler/tests -p "test_*.py" -t .
 python crawler/tools/check_contracts.py
 python tools/check_python.py
 python tools/check_architecture.py
+python -m crawler.tools.build_live_evidence_index --validate-only
+uv lock --check
+git diff --check
 ```
 
 仓库根的全量单测 `python -m unittest discover -s . -p "test_*.py" -t .` 需要应用基线数据库 `data/baseline.db` 或等效测试数据库，不属于 crawler 验收范围。clean clone 不包含这些被忽略的数据库文件，因此不能把全量单测当作 crawler 的 clean-clone 通过证明。
@@ -188,16 +191,17 @@ python crawler/tools/check_history_hygiene.py
 
 扫描所有可达 Git 历史中的 raw 路径、`.headers`、Cookie、Authorization、签名、私钥、HTML 隐藏表单、XLSX 联系人列、PDF 原始元数据和常见个人数据。公开分支必须使用空基线，任何命中都必须失败。
 
-## 无网络 dry-run
+## 无网络 fixture 回放
 
-公开 fixture 足以复核 P0 的附件行门禁。以下命令使用临时采集库，不访问网络：
+公开 fixture 足以复核 P0 的附件行门禁。以下测试使用临时采集库，不访问网络：
 
 ```powershell
-python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc-moa
-python -m crawler.run cnipa --mode pdf --database crawler/data/crawler-audit.db --pdf-root crawler/tests/fixtures/evidence/cnipa
+python -m unittest crawler.tests.test_aqsc_moa_scrapy crawler.tests.test_cnipa_scrapy -v
 ```
 
-两条命令都必须返回 `status='succeeded'`；AQSC 公开合成样本应发现 8 行，CNIPA 公开合成 PDF 应发现 2 行。附件行保留在 raw/stage，并写入公告承载页和非空 locator。没有直接详情 URL 不是阻断条件；承载页或 locator 缺失时才写 `deferred`，不得发布。
+AQSC 公开合成样本应发现 8 行，CNIPA 公开合成 PDF 应发现 2 行。附件行保留在 raw/stage，并写入公告承载页和非空 locator。两条测试都必须经过真实 Scrapy process、middleware 和 Pipeline。没有直接详情 URL 不是阻断条件；承载页或 locator 缺失时才写 `deferred`，不得发布。
+
+旧在线入口 `python -m crawler.run` 已删除。`pipeline/offline_fixture.py` 只保留离线 fixture 回归，传入 `live` 会直接失败。
 
 ## ihchina 3610 实测
 

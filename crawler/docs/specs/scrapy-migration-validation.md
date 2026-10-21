@@ -2,7 +2,7 @@
 
 日期: 2026-10-21
 
-结果: blocked（ihchina 本次重跑 504，aqsc-moa 附件仍 403）
+结果: cutover complete，live 缺口保留（ihchina 本次重跑 504，aqsc-moa 附件仍 403）
 
 ## 项目清单
 
@@ -58,3 +58,10 @@
 - `cass-linguistics` 有 4 条详情返回 404，未写成成功样本。
 - `aqsc-moa` 的附件仍被 WAF 403 阻断，解除条件是 robots 和附件入口恢复可采集响应。
 - `cnipa` 当前只验证 www 公告页和第一份 PDF，`ggfw` 签名 PDF 路径仍保持 unknown robots 约束。
+
+## 2026-10-22 最终集成
+
+- 旧在线 CLI 和 `pipeline/run_source.py` 已退役，Scrapy 是唯一实时采集写入路径。
+- 8 个项目均完成隔离数据库 fixture 双回放、`scrapy list`、`scrapy check`、来源审核和 live canary 尝试。
+- 全量回归、schema/contract、Python 静态、whitespace、lock 和 live evidence index 校验结果见 `collection-state-and-evidence-acceptance.md`。
+- 本文件保留 2026-10-21 的实际 live 计数，不把 fixture 成功改写为 live 成功。

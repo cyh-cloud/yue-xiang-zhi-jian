@@ -48,11 +48,11 @@
 - 已完成：公司 hash 为空的 canonical URL fixture。
 - 已完成离线详情解析：fixture 可带 `detail_html`，解析公司、地点、薪资、学历、描述、要求和有效期。
 - robots 真实响应哈希仍为 `deferred`，解除条件是使用最终调度 UA 完成 robots 快照并保存大小、SHA-256 和取得时间。
-- 已明确页面声明“未经许可不得转载”，来源注册表为 `prohibited`；统一运行入口在发现前拒绝执行，只保留解析器离线测试。
+- 已明确页面声明“未经许可不得转载”，来源注册表为 `prohibited`；调度器和 Scrapy 项目在发现前拒绝执行，只保留解析器离线测试。
 
 ## 2026-10-20 修复复核
 
-- 来源注册表为 `prohibited`，因此 `run_source('5ajob', 'list-fixture', config)` 返回 `blocked`，不创建采集库、不产生 raw/stage/std。
+- 来源注册表为 `prohibited`，因此离线 harness 在发现前返回 `blocked`，不创建采集库、不产生 raw/stage/std。
 - 列表过滤和详情 HTML 解析仍可在离线单元测试中验证，不作为真实运行授权。
 - 真实 250 页全量、浏览器脚本有效期和许可恢复均保持 `deferred`；解除条件是取得可复核许可并完成真实全量回放。
 

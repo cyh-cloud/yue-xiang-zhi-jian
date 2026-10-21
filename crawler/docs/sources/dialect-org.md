@@ -163,10 +163,10 @@
 
 ## 实现验证
 
-- 运行入口: `run_source('dialect-org', 'fixture', config)`，fixture 使用一条真实详情形状的 HTML，不依赖网络。
+- 运行入口: `crawler/collection/projects/dialect-org`，fixture 回放使用一条真实详情形状的 HTML，不依赖网络。
 - 已覆盖: 词条详情 URL 作为 `source_url`、`long_term_url` 和 `detail_url`；方言点、词条和来源关系的自然键；重复运行不产生重复行。
 - 音频: 占位 OSS 地址记为 `invalid`，`audio_url` 保持 `null`；无 `audio` 元素且显示“暂无音频录音”时记为 `missing`。
 - 地区: 可识别的省、市写入 `province`、`city`；无法归一时保留 `region_raw`，在 `extra.region_normalization` 标记 `unresolved` 和 `requires_review`，不补经纬度或方言系属。
 - 方言名: 来源没有独立字段，释义中的候选名称只写入 `extra.dialect_name_suggestion`，不自动写入 `dialect_name`。
 - 权利标记: 样本按记录使用 `attribution-required`，在 `extra.rights_risk` 保留“未发现开放许可、只保留短释义和来源链接”的风险说明。
-- 验证命令: `python -m unittest crawler.tests.test_dialect_org -v`；相邻运行入口回归使用 `python -m unittest crawler.tests.test_run_source -v`。
+- 验证命令: `python -m unittest crawler.tests.test_dialect_org_scrapy crawler.tests.test_scrapy_review_regressions -v`。

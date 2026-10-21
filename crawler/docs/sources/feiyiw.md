@@ -231,11 +231,11 @@
 
 ## 实现验证
 
-- 解析入口: `crawler/pipeline/sources/feiyiw.py` 提供列表发现、详情解析和 `article_id` 规范化；不依赖共享运行入口。
+- 解析入口: `crawler/collection/projects/feiyiw` 提供列表发现、详情解析和 `article_id` 规范化；旧 `pipeline/sources/feiyiw.py` 只保留离线解析回归。
 - 已测行为: 公开列表按 `article_id` 去重；详情必须来自有效 `article_id` 且包含公开标题和正文；会员、购买、登录页拒绝生成文章记录。
 - 记录边界: 每条记录保留 `source_url`、`long_term_url`、`detail_url`、署名和 `rights_status`；正文标签进入 `extra.supplementary`，文章元数据写入已冻结的 `std_ich_articles`，不直接投射到 `std_ich_projects`。
-- 测试: `python -m unittest crawler.tests.test_feiyiw -v`。
-- 未接入项: 共享 `run_source` 已接入 fixture 的 raw、stage 和 `std_ich_articles` 写入；真实网络全量运行和业务库发布仍未完成。
+- 测试: `python -m unittest crawler.tests.test_feiyiw_scrapy -v`。
+- 未接入项: 真实网络全量运行和业务库发布仍未完成；实时写入入口为 Scrapy 项目。
 
 ## 审核要求
 
@@ -245,7 +245,7 @@
 - 详情 URL 可直达: 是
 - 合规结论: `approved-with-gaps`，仅采公开页面和必要摘要，不采会员内容，不作为国家级名录权威来源
 
-## Runner 闭环
+## Scrapy 闭环
 
-- `run_source('feiyiw','fixture',config)` 已写 raw、stage 和已冻结的 `std_ich_articles`。
+- Scrapy fixture 回放已写 raw、stage 和已冻结的 `std_ich_articles`。
 - 真实网络全量运行尚未完成；转换器只把 `std_ich_articles` 当作补充资讯输入，不覆盖非遗项目事实。

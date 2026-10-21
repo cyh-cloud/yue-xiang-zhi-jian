@@ -149,7 +149,7 @@
 
 ## 实现验证
 
-- 公共入口: `run_source('cass-linguistics', 'fixture', config)` 只读取已保存的公开研究详情 fixture。
+- 公共入口: `crawler/collection/projects/cass-linguistics` 只读取已保存的公开研究详情 fixture。
 - 写入: 每条公开详情生成一条 `std_research_articles`，保留 `source_url`、`long_term_url` 和正文哈希。
 - 访问边界: `body_access=public` 才写入；`www.dialectgrammar.com` 只作为 `login-required` 子资源元数据保留，不请求、不写词条。
 - 不生成 `std_dialect_lexemes`，研究资讯不会转换成方言词条。

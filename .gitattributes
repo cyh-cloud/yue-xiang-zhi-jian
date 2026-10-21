@@ -1,2 +1,3 @@
 crawler/tests/fixtures/evidence/**/*.pdf binary
 crawler/tests/fixtures/evidence/**/*.xlsx binary
+crawler/docs/** whitespace=cr-at-eol

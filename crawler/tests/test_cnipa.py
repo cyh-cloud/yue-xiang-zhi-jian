@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 from crawler.pipeline.converter import run_batch
 
 
@@ -27,14 +30,14 @@ class CnipaSourceTest(unittest.TestCase):
             pdf_root.mkdir()
             shutil.copyfile(PDF, pdf_root / "公告-第687号.pdf")
             shutil.copyfile(PDF, pdf_root / "公告-第89号.pdf")
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 pdf_root=pdf_root,
             )
 
-            result = run_source("cnipa", "pdf", config)
+            result = run_offline_fixture("cnipa", "pdf", config)
 
             self.assertEqual(result.status, "succeeded")
             conn = sqlite3.connect(config.database_path)
@@ -59,14 +62,14 @@ class CnipaSourceTest(unittest.TestCase):
     def test_pdf_products_keep_long_term_url_and_page_locator(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 pdf_root=PDF.parent,
             )
 
-            result = run_source("cnipa", "pdf", config)
+            result = run_offline_fixture("cnipa", "pdf", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.written_count, 0)
@@ -103,14 +106,14 @@ class CnipaSourceTest(unittest.TestCase):
     def test_pdf_product_rows_are_not_agri_publish_candidates(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 pdf_root=PDF.parent,
             )
 
-            run_source("cnipa", "pdf", config)
+            run_offline_fixture("cnipa", "pdf", config)
             result = run_batch(
                 "agri",
                 {
@@ -130,13 +133,13 @@ class CnipaSourceTest(unittest.TestCase):
     def test_signature_url_is_not_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 pdf_root=PDF.parent,
             )
-            run_source("cnipa", "pdf", config)
+            run_offline_fixture("cnipa", "pdf", config)
             conn = sqlite3.connect(config.database_path)
             try:
                 values = []
@@ -190,13 +193,13 @@ class CnipaSourceTest(unittest.TestCase):
                 '{"data":{"count":1,"data":[{"id":541,"name":"第687号","coding":"2026-08-03","type":2}]}}',
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
                 pdf_root=PDF.parent,
             )
-            result = run_source("cnipa", "announcement-fixture", config)
+            result = run_offline_fixture("cnipa", "announcement-fixture", config)
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.discovered_count, 1)
             conn = sqlite3.connect(config.database_path)

@@ -11,11 +11,11 @@
 | `review-baseline` | 14 份独立审核记录 | 首轮审核已落盘 |
 | `architecture-baseline` | `schema/`、`mapping/`、`operations/` | 设计文档已落盘 |
 | `registry-contract` | `sources.json`、`sources/CONTRACT.md`、`README.md` | 来源注册表和共享契约已建立 |
-| `publication-gate` | `pipeline/publication.py`、`pipeline/converter.py`、`pipeline/run_source.py` | 四域共用发布门禁，missing/null/blocked 只计一次跳过 |
+| `publication-gate` | `pipeline/publication.py`、`pipeline/converter.py`、`pipeline/offline_fixture.py` | 四域共用发布门禁，missing/null/blocked 只计一次跳过 |
 | `raw-evidence` | `pipeline/evidence.py`、`pipeline/database.py` | 实际响应字节、哈希、URL、headers、locator 和 raw_files 落库 |
 | `raw-evidence-append-only` | `pipeline/evidence.py`、`pipeline/database.py`、`crawler/tests/test_raw_evidence.py` | 重复运行追加 raw_files，保存最终 URL 和实际字节数，missing 记录强制 locator |
-| `registry-enforcement` | `pipeline/source_registry.py`、`pipeline/run_source.py`、`pipeline/converter.py` | 运行和转换统一读取来源注册表，blocked/login/prohibited/excluded 不执行 |
-| `offline-detail-parsers` | `pipeline/sources/ihchina.py`、`pipeline/sources/fiveajob.py`、`pipeline/run_source.py` | IHChina 项目/传承人 fixture 遍历、CNIPA 多 PDF、5ajob 详情 HTML 解析 |
+| `registry-enforcement` | `pipeline/source_registry.py`、`pipeline/offline_fixture.py`、`pipeline/converter.py` | 离线回放和转换统一读取来源注册表，blocked/login/prohibited/excluded 不执行 |
+| `offline-detail-parsers` | `pipeline/sources/`、`pipeline/offline_fixture.py` | IHChina 项目/传承人 fixture 遍历、CNIPA 多 PDF、5ajob 详情 HTML 解析 |
 | `weather-runtime-cache` | `pipeline/sources/weather_sources.py` | 15 分钟线程安全 DTO 缓存和 TTL 测试 |
 | `history-scan-hardening` | `tools/check_history_hygiene.py`、`tools/public_hygiene.py` | 私有/session 路径、凭证、HTML 隐藏表单、XLSX 联系人列、PDF 元数据和二进制证据扫描；公开基线为空 |
 | `public-fixture-hygiene` | `tools/generate_public_fixtures.py`、`tests/fixtures/evidence/` | 9 个确定性合成 fixture，无个人数据、隐藏 token、原始作者元数据或完整源附件 |
@@ -25,6 +25,7 @@
 | `converter-service` | `pipeline/converter.py` | 真实 batch_id、std_sources 优先级、冲突落库和 rollback |
 | `registry-alignment` | `sources.json`、`sources/`、`reviews/`、`ISSUES.md` | 状态、权利、计数和证据对齐 |
 | `contract-hardening` | `tools/check_contracts.py`、`tools/check_history_hygiene.py` | 文档、实现、问题统计和历史卫生机械检查 |
+| `collection-state-cutover` | `docs/specs/collection-state-and-evidence-acceptance.md`、8 个 Scrapy 项目 | 子票据实现收口、隔离库双回放、旧在线入口退役、全量回归通过 |
 
 ## 延后
 
