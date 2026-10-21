@@ -30,6 +30,17 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
+        // 媒体目录由 Flask 提供（backend/domains/static_files/routes.py 只放行
+        // uploads 与 images 两个目录）。开发时若不代理，请求会落到 Vite 的
+        // SPA fallback，返回 index.html，<img> 无法解码，表现为图片全部丢失。
+        "/images": {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
+        "/uploads": {
+          target: proxyTarget,
+          changeOrigin: true,
+        },
         "/api": {
           target: proxyTarget,
           changeOrigin: true,
