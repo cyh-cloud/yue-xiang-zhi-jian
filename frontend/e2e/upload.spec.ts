@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+import { MAX_REQUEST_BYTES } from "../src/api/uploadLimits";
+
 const TEACHER = { username: "teacher_demo", password: "123456" };
 const MODEL_BYTES = Buffer.from("glTF T3 multipart probe");
-const OVERSIZED_MULTIPART_BYTES = 51 * 1024 * 1024 + 1;
+const OVERSIZED_MULTIPART_BYTES = MAX_REQUEST_BYTES + 1;
 
 test("a real browser multipart upload reaches Flask byte for byte", async ({
   page,

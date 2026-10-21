@@ -1,5 +1,6 @@
 import type { NavigationGuardWithThis } from "vue-router";
 
+import type { Role } from "@/api/types";
 import { useSessionStore } from "@/stores/session";
 
 const LOGIN_PATH = "/login";
@@ -8,7 +9,12 @@ export function resolveCapabilityFallback(
   toPath: string,
   routeDefaultPath: string | undefined,
   sessionDefaultPath: string,
+  sessionRole?: Role | null,
 ): string {
+  // A super admin may pass the shell role check, but domain capabilities still
+  // decide whether a domain page is accessible. Keep that denial inside the
+  // super-admin portal instead of landing on another role's dashboard.
+  if (sessionRole === "super_admin") return sessionDefaultPath;
   const fallback = routeDefaultPath || sessionDefaultPath;
   return fallback === toPath ? sessionDefaultPath : fallback;
 }
@@ -55,6 +61,7 @@ export const routeAccessGuard: NavigationGuardWithThis<undefined> = (to) => {
           to.path,
           meta.defaultPath,
           session.defaultPath,
+          session.role,
         ),
         replace: true,
       };

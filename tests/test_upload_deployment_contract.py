@@ -92,6 +92,12 @@ class UploadLimitContractTest(unittest.TestCase):
         self.assertEqual(generate.returncode, 0, generate.stderr)
         with open(target, "rb") as handle:
             self.assertNotIn(b"\r\n", handle.read())
+        with open(target, encoding="utf-8") as handle:
+            generated = handle.read()
+        self.assertIn(
+            "export const MAX_REQUEST_BYTES = %d;" % MAX_REQUEST_BYTES,
+            generated,
+        )
         result = subprocess.run(
             [sys.executable, os.path.join(REPO_ROOT, "tools", "sync_upload_limit.py"), "--check"],
             cwd=REPO_ROOT,
