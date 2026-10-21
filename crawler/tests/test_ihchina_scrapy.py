@@ -2,6 +2,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
+from dataclasses import asdict
 from pathlib import Path
 
 from scrapy.http import HtmlResponse, TextResponse
@@ -16,6 +17,13 @@ from crawler.collection.projects.ihchina.ihchina.spiders.collection import (
 from crawler.collection.projects.ihchina.ihchina.replay import (
     replay_ihchina_fixture,
 )
+from crawler.collection.projects.ihchina.ihchina.candidate import (
+    write_candidate,
+)
+from crawler.collection.shared.crawler_collection.database import (
+    CollectionDatabase,
+)
+from crawler.collection.shared.crawler_collection.items import CollectionItem
 
 
 FIXTURE = (
@@ -170,6 +178,119 @@ class IhchinaScrapyProjectTest(unittest.TestCase):
                 }
             ],
         )
+
+    def test_detail_parser_skips_relations_without_detail_links(self):
+        html = """
+        <div class="article-mod2">
+          <div class="t_head"><div class="h30">苗族古歌</div></div>
+        </div>
+        <div class="inherit_xx2">
+          <div class="x-tables"><table>
+            <tr><th>序号</th><th>姓名</th></tr>
+            <tr><td>01</td><td>无链接传承人</td></tr>
+          </table></div>
+          <div class="x-tables"><table>
+            <tr><th>编号</th><th>项目名称</th></tr>
+            <tr><td>Ⅰ-2</td><td>无链接项目</td></tr>
+          </table></div>
+        </div>
+        """
+        response = HtmlResponse(
+            url="https://www.ihchina.cn/project_details/12178.html",
+            body=html.encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        parsed = parse_project_detail(response)
+
+        self.assertEqual(parsed["extra"]["inheritors"], [])
+        self.assertEqual(parsed["extra"]["related_projects"], [])
+
+    def test_detail_parser_includes_header_media_and_pop_video(self):
+        html = """
+        <div class="article-mod2">
+          <div class="t_head">
+            <div class="h30">苗族古歌</div>
+            <img src="/header.jpg">
+            <div class="pop-video" data-src="/video.mp4"></div>
+          </div>
+          <div class="text"><div class="p">正文</div></div>
+        </div>
+        """
+        response = HtmlResponse(
+            url="https://www.ihchina.cn/project_details/12178.html",
+            body=html.encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        parsed = parse_project_detail(response)
+
+        self.assertEqual(
+            parsed["extra"]["media_links"],
+            [
+                {
+                    "media_url": "https://www.ihchina.cn/header.jpg",
+                    "media_type": "image",
+                },
+                {
+                    "media_url": "https://www.ihchina.cn/video.mp4",
+                    "media_type": "video",
+                },
+            ],
+        )
+
+    def test_same_inheritor_can_belong_to_two_projects(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            database_path = Path(tmp) / "crawler.db"
+            conn = CollectionDatabase(database_path).connect()
+            try:
+                for project_id in ("project-1", "project-2"):
+                    item = CollectionItem(
+                        source_id="ihchina",
+                        source_item_id=project_id,
+                        source_url=(
+                            "https://www.ihchina.cn/project_details/"
+                            f"{project_id}.html"
+                        ),
+                        long_term_url=(
+                            "https://www.ihchina.cn/project_details/"
+                            f"{project_id}.html"
+                        ),
+                        detail_url=(
+                            "https://www.ihchina.cn/project_details/"
+                            f"{project_id}.html"
+                        ),
+                        detail_url_status="direct",
+                        run_id="run-1",
+                        mode="fixture",
+                        rights_status="attribution-required",
+                        title=f"项目 {project_id}",
+                        content_hash=f"hash-{project_id}",
+                        extra={
+                            "inheritors": [
+                                {
+                                    "source_item_id": "716",
+                                    "name": "王安江",
+                                    "source_url": (
+                                        "https://www.ihchina.cn/"
+                                        "ccr_detail/716.html"
+                                    ),
+                                }
+                            ]
+                        },
+                    )
+                    write_candidate(
+                        conn,
+                        asdict(item),
+                        now="2026-10-21T00:00:00Z",
+                    )
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM std_ich_inheritors"
+                ).fetchone()[0]
+            finally:
+                conn.close()
+
+        self.assertEqual(count, 2)
 
     def test_detail_without_usable_url_remains_stage_only(self):
         spider = IhchinaSpider()

@@ -48,13 +48,18 @@ def _inheritors(soup, source_url):
         if len(cells) < 2:
             continue
         link = row.select_one("a[href*='/ccr_detail/']")
-        href = urljoin(source_url, link["href"]) if link else None
+        if link is None:
+            continue
+        href = urljoin(source_url, link["href"])
+        source_item_id = _detail_id(href, "ccr_detail")
+        if not source_item_id:
+            continue
         name = _text(link) or _text(cells[1])
         if not name:
             continue
         inheritors.append(
             {
-                "source_item_id": _detail_id(href, "ccr_detail"),
+                "source_item_id": source_item_id,
                 "name": name,
                 "gender": _text(cells[2]) if len(cells) > 2 else None,
                 "birth_date": _text(cells[3]) if len(cells) > 3 else None,
@@ -81,13 +86,18 @@ def _related_projects(soup, source_url):
         if len(cells) < 2:
             continue
         link = row.select_one("a[href*='/project_details/']")
-        href = urljoin(source_url, link["href"]) if link else None
+        if link is None:
+            continue
+        href = urljoin(source_url, link["href"])
+        source_item_id = _detail_id(href, "project_details")
+        if not source_item_id:
+            continue
         name = _text(link) or _text(cells[1])
         if not name:
             continue
         related.append(
             {
-                "source_item_id": _detail_id(href, "project_details"),
+                "source_item_id": source_item_id,
                 "ich_code": _text(cells[0]),
                 "name": name,
                 "category": _text(cells[2]) if len(cells) > 2 else None,
@@ -123,6 +133,9 @@ def _media_links(description_node, source_url):
             continue
         seen.add(media_url)
         media_type = media_types.get(node.name, node.name)
+        classes = node.get("class") or []
+        if "pop-video" in classes:
+            media_type = "video"
         if node.name == "source" and node.parent is not None:
             media_type = media_types.get(node.parent.name, node.parent.name)
         links.append(
@@ -199,6 +212,9 @@ def parse_project_detail(response):
             "project_type": values.get("类型"),
             "inheritors": _inheritors(soup, response.url),
             "related_projects": _related_projects(soup, response.url),
-            "media_links": _media_links(body_node, response.url),
+            "media_links": _media_links(
+                soup.select_one(".article-mod2") or body_node,
+                response.url,
+            ),
         },
     }

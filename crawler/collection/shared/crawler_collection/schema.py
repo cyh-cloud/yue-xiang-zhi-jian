@@ -372,7 +372,7 @@ CREATE TABLE IF NOT EXISTS std_ich_inheritors (
     content_hash TEXT NOT NULL,
     confidence TEXT NOT NULL,
     extra TEXT NOT NULL DEFAULT '{}',
-    UNIQUE(source_id, source_item_id),
+    UNIQUE(project_id, source_id, source_item_id),
     FOREIGN KEY(project_id) REFERENCES std_ich_projects(id),
     CHECK (length(trim(source_url)) > 0),
     CHECK (length(trim(long_term_url)) > 0),
@@ -964,6 +964,7 @@ def ensure_schema(conn):
     conn.executescript(SCHEMA)
     _ensure_run_id_columns(conn)
     _migrate_stage_natural_key(conn)
+    _migrate_ich_inheritor_natural_key(conn)
 
 
 def _ensure_run_id_columns(conn):
@@ -1029,3 +1030,40 @@ def _migrate_stage_natural_key(conn):
         "CREATE INDEX IF NOT EXISTS idx_stage_source_items_source "
         "ON stage_source_items(source_id, source_item_id)"
     )
+
+
+def _migrate_ich_inheritor_natural_key(conn):
+    """Allow one inheritor identity to relate to multiple projects."""
+    row = conn.execute(
+        "SELECT sql FROM sqlite_master "
+        "WHERE type = 'table' AND name = 'std_ich_inheritors'"
+    ).fetchone()
+    if row is None or "UNIQUE(source_id, source_item_id)" not in row[0]:
+        return
+
+    conn.execute(
+        "ALTER TABLE std_ich_inheritors "
+        "RENAME TO std_ich_inheritors_legacy"
+    )
+    conn.executescript(SCHEMA)
+    conn.execute(
+        """
+        INSERT INTO std_ich_inheritors (
+            id, project_id, source_id, source_item_id, source_url,
+            long_term_url, detail_url, detail_url_status, locator,
+            rights_status, attribution_required, attribution_text,
+            rights_evidence_url, name, gender, birth_date, ethnicity,
+            category, ich_code, project_name, declaration_region,
+            biography_text, retrieved_at, content_hash, confidence, extra
+        )
+        SELECT
+            id, project_id, source_id, source_item_id, source_url,
+            long_term_url, detail_url, detail_url_status, locator,
+            rights_status, attribution_required, attribution_text,
+            rights_evidence_url, name, gender, birth_date, ethnicity,
+            category, ich_code, project_name, declaration_region,
+            biography_text, retrieved_at, content_hash, confidence, extra
+        FROM std_ich_inheritors_legacy
+        """
+    )
+    conn.execute("DROP TABLE std_ich_inheritors_legacy")

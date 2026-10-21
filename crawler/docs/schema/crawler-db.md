@@ -30,7 +30,7 @@
 | std | `std_agri_product_sources` | 产品来源关系。自然键：`(product_id, source_id, source_url)`，并带完整来源与 locator 证据。 |
 | std | `std_agri_product_aliases` | 产品别名关系。自然键：`(product_id, alias, alias_type)`，并带来源证据。 |
 | std | `std_ich_projects` | 非遗项目标准实体。自然键：`(source_id, source_item_id)`；`(ich_code, declaration_region, name)` 只作跨来源候选键。 |
-| std | `std_ich_inheritors` | 项目传承人关系。自然键：`(source_id, source_item_id)`，并带完整来源与 locator 证据。 |
+| std | `std_ich_inheritors` | 项目传承人关系。自然键：`(project_id, source_id, source_item_id)`，并带完整来源与 locator 证据。 |
 | std | `std_ich_related_items` | 非遗项目有向关系。自然键：`(source_id, subject_project_id, related_source_item_id, relation_type)`。 |
 | std | `std_ich_media_links` | 项目媒体链接。自然键：`(project_id, media_url)`，并带承载页与来源证据。 |
 | std | `std_jobs` | 公开岗位标准实体。自然键：`(source_id, source_item_id)`；缺 ID 时使用 `(source_id, source_url)`。 |
@@ -514,7 +514,7 @@ CREATE TABLE IF NOT EXISTS std_ich_inheritors (
     content_hash TEXT NOT NULL,
     confidence TEXT NOT NULL,
     extra TEXT NOT NULL DEFAULT '{}',
-    UNIQUE(source_id, source_item_id),
+    UNIQUE(project_id, source_id, source_item_id),
     FOREIGN KEY(project_id) REFERENCES std_ich_projects(id),
     CHECK (length(trim(source_url)) > 0),
     CHECK (length(trim(long_term_url)) > 0),

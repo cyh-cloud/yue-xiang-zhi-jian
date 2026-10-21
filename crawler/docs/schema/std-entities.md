@@ -38,7 +38,7 @@ Interface:
 
 ```text
 identity: integer
-natural_key: (source_id, source_item_id)
+natural_key: (project_id, source_id, source_item_id)
 candidate_key: (ich_code, declaration_region, name)
 source_relation: primary source_id + source_url
 records: inheritors, related_items, media_links

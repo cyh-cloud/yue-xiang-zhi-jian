@@ -92,7 +92,7 @@ def _write_related_entities(conn, item, *, extra, now):
                 biography_text, retrieved_at, content_hash, confidence, extra
             ) VALUES (?, ?, ?, ?, ?, ?, 'direct', ?, ?, ?, ?, ?, ?, ?, ?,
                       ?, ?, ?, ?, ?, ?, ?, ?, 'medium', ?)
-            ON CONFLICT(source_id, source_item_id) DO UPDATE SET
+            ON CONFLICT(project_id, source_id, source_item_id) DO UPDATE SET
                 project_id=excluded.project_id,
                 source_url=excluded.source_url,
                 long_term_url=excluded.long_term_url,
