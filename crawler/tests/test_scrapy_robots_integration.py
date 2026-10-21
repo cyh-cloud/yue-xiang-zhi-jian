@@ -301,7 +301,7 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
             payload["stage_count"], 3, f"{payload}\n{completed.stderr}"
         )
         self.assertEqual(
-            payload["candidate_count"], 1, f"{payload}\n{completed.stderr}"
+            payload["candidate_count"], 2, f"{payload}\n{completed.stderr}"
         )
         self.assertEqual(
             len(payload["reports"]), 1, f"{payload}\n{completed.stderr}"
@@ -312,7 +312,8 @@ class RobotsEvidenceIntegrationTest(unittest.TestCase):
         self.assertEqual(report["raw_count"], 4)
         self.assertEqual(report["stage_count"], 3)
         self.assertEqual(report["candidate_count"], 1)
-        self.assertEqual(report["blocked"], 3)
+        self.assertEqual(report["blocked"], 2)
+        self.assertEqual(report["deferred"], 1)
         self.assertTrue(report["started_at"])
         self.assertTrue(report["finished_at"])
         self.assertTrue(report["evidence_path"])

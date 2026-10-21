@@ -47,7 +47,7 @@ class RawEvidence:
     locator: str | None = None
     access_level: str | None = None
     rights_status: str | None = None
-    attribution_required: bool = False
+    attribution_required: bool | None = None
     attribution_text: str | None = None
     rights_evidence_url: str | None = None
     retrieved_at: str | None = None
