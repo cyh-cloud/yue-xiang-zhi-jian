@@ -5,7 +5,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 from crawler.pipeline import database
 from crawler.pipeline.evidence import RawEvidence, persist_raw_evidence
 
@@ -60,14 +63,14 @@ class RawEvidenceTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            first = run_source("fixture-source", "fixture", config)
-            second = run_source("fixture-source", "fixture", config)
+            first = run_offline_fixture("fixture-source", "fixture", config)
+            second = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(first.status, "succeeded")
             self.assertEqual(second.status, "succeeded")
@@ -137,14 +140,14 @@ class RawEvidenceTest(unittest.TestCase):
     def test_aqsc_xlsx_evidence_uses_documented_urls_and_actual_file_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 xlsx_root=AQSC,
             )
 
-            result = run_source("aqsc-moa", "xlsx", config)
+            result = run_offline_fixture("aqsc-moa", "xlsx", config)
 
             self.assertEqual(result.written_count, 0)
             self.assertEqual(result.skipped_count, 8)
@@ -235,14 +238,14 @@ class RawEvidenceTest(unittest.TestCase):
         pdf = next(CNIPA.glob("*.pdf"))
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 pdf_root=CNIPA,
             )
 
-            result = run_source("cnipa", "pdf", config)
+            result = run_offline_fixture("cnipa", "pdf", config)
 
             self.assertEqual(result.written_count, 0)
             self.assertEqual(result.skipped_count, 1)
@@ -314,14 +317,14 @@ class RawEvidenceTest(unittest.TestCase):
                 json.dumps({"pages": pages}, ensure_ascii=False),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
                 page_limit=1,
             )
 
-            result = run_source("ihchina", "fixture", config)
+            result = run_offline_fixture("ihchina", "fixture", config)
 
             self.assertEqual(result.discovered_count, 2)
             self.assertEqual(result.written_count, 2)
@@ -357,14 +360,14 @@ class RawEvidenceTest(unittest.TestCase):
     def test_saved_html_evidence_keeps_actual_bytes_and_content_type(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 source_root=NZRC,
             )
 
-            run_source("nzrc", "saved", config)
+            run_offline_fixture("nzrc", "saved", config)
 
             conn = sqlite3.connect(config.database_path)
             try:

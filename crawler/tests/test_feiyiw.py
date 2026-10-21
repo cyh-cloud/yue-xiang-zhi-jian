@@ -154,7 +154,10 @@ class FeiyiwSourceTest(unittest.TestCase):
         import tempfile
         from pathlib import Path
 
-        from crawler.pipeline import RunConfig, run_source
+        from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -170,8 +173,8 @@ class FeiyiwSourceTest(unittest.TestCase):
             (fixture / "discover.json").write_text(json.dumps({
                 "items": [{"source_item_id": "70177", "detail_html": detail_html, "fetched_url": DETAIL_URL}]
             }, ensure_ascii=False), encoding="utf-8")
-            config = RunConfig(database_path=root / "crawler.db", download_root=root / "download", fixture_root=fixture)
-            result = run_source("feiyiw", "fixture", config)
+            config = OfflineFixtureConfig(database_path=root / "crawler.db", download_root=root / "download", fixture_root=fixture)
+            result = run_offline_fixture("feiyiw", "fixture", config)
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.written_count, 1)
             conn = sqlite3.connect(config.database_path)

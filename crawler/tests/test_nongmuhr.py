@@ -3,7 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,14 +17,14 @@ class NongmuhrSourceTest(unittest.TestCase):
     def test_saved_details_project_jobs_and_preserve_description_boundary(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 source_root=DOWNLOAD,
             )
 
-            result = run_source("nongmuhr", "saved", config)
+            result = run_offline_fixture("nongmuhr", "saved", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertGreaterEqual(result.written_count, 2)

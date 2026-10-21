@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 from crawler.pipeline.converter import run_batch
 
 
@@ -16,14 +19,14 @@ class AqscMoaSourceTest(unittest.TestCase):
     def test_xlsx_rows_become_stage_products_with_source_locator(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 xlsx_root=DOWNLOAD,
             )
 
-            result = run_source("aqsc-moa", "xlsx", config)
+            result = run_offline_fixture("aqsc-moa", "xlsx", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.written_count, 0)
@@ -52,14 +55,14 @@ class AqscMoaSourceTest(unittest.TestCase):
     def test_xlsx_rows_are_evidence_only_and_never_enter_agri_plan(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 xlsx_root=DOWNLOAD,
             )
 
-            run_source("aqsc-moa", "xlsx", config)
+            run_offline_fixture("aqsc-moa", "xlsx", config)
             result = run_batch(
                 "agri",
                 {
@@ -93,27 +96,27 @@ class AqscMoaSourceTest(unittest.TestCase):
             root = Path(tmp)
             fixture = root / "fixture"
             fixture.mkdir()
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
                 xlsx_root=DOWNLOAD,
             )
 
-            result = run_source("aqsc-moa", "xlsx", config)
+            result = run_offline_fixture("aqsc-moa", "xlsx", config)
 
             self.assertEqual(result.failed_count, 0)
 
     def test_aquatic_keywords_do_not_create_false_positive(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
                 xlsx_root=DOWNLOAD,
             )
-            run_source("aqsc-moa", "xlsx", config)
+            run_offline_fixture("aqsc-moa", "xlsx", config)
             conn = sqlite3.connect(config.database_path)
             try:
                 rows = conn.execute(

@@ -5,46 +5,79 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
-from crawler.pipeline.run_source import RUN_MODES
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
+from crawler.pipeline.offline_fixture import OFFLINE_MODES
 
 
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "fixture-source"
 
 
-class RunSourceContractTest(unittest.TestCase):
-    def test_cli_and_runner_share_one_mode_truth(self):
-        from crawler import run as cli
+class OfflineFixtureContractTest(unittest.TestCase):
+    def test_offline_modes_do_not_include_live(self):
+        self.assertEqual(
+            set(OFFLINE_MODES),
+            {
+                "fixture",
+                "xlsx",
+                "pdf",
+                "saved",
+                "announcement-fixture",
+            },
+        )
+        self.assertNotIn("live", OFFLINE_MODES)
 
-        self.assertIs(cli.RUN_MODES, RUN_MODES)
-        self.assertIn("xlsx", RUN_MODES)
-        self.assertIn("pdf", RUN_MODES)
-        self.assertIn("saved", RUN_MODES)
-        self.assertIn("announcement-fixture", RUN_MODES)
+    def test_legacy_online_entrypoints_are_retired(self):
+        crawler_root = Path(__file__).resolve().parents[1]
+        self.assertFalse((crawler_root / "run.py").exists())
+        self.assertFalse(
+            (crawler_root / "pipeline" / "run_source.py").exists()
+        )
+
+        import crawler.pipeline as pipeline
+
+        self.assertFalse(hasattr(pipeline, "run_source"))
+        self.assertFalse(hasattr(pipeline, "RUN_MODES"))
+
+    def test_live_mode_is_rejected_before_any_writer_is_opened(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            config = OfflineFixtureConfig(
+                database_path=root / "crawler.db",
+                download_root=root / "download",
+                fixture_root=root / "fixture",
+            )
+
+            with self.assertRaisesRegex(ValueError, "Scrapy"):
+                run_offline_fixture("ihchina", "live", config)
+
+            self.assertFalse(config.database_path.exists())
 
     def test_unsupported_source_mode_combinations_are_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=Path(tmp) / "crawler.db",
                 download_root=Path(tmp) / "download",
                 fixture_root=Path(tmp) / "fixture",
             )
             with self.assertRaises(ValueError):
-                run_source("aqsc-moa", "pdf", config)
+                run_offline_fixture("aqsc-moa", "pdf", config)
             with self.assertRaises(ValueError):
-                run_source("cnipa", "saved", config)
+                run_offline_fixture("cnipa", "xlsx", config)
 
     def test_fixture_source_runs_through_all_layers_and_is_idempotent(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=FIXTURE_ROOT,
             )
 
-            first = run_source("fixture-source", "fixture", config)
-            second = run_source("fixture-source", "fixture", config)
+            first = run_offline_fixture("fixture-source", "fixture", config)
+            second = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(first.status, "succeeded")
             self.assertGreaterEqual(first.discovered_count, 1)
@@ -128,13 +161,13 @@ class RunSourceContractTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("fixture-source", "fixture", config)
+            result = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.written_count, 0)
@@ -206,13 +239,13 @@ class RunSourceContractTest(unittest.TestCase):
                 json.dumps({"source_id": "fixture-source", "items": items}),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("fixture-source", "fixture", config)
+            result = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(result.discovered_count, 4)
             self.assertEqual(result.written_count, 1)
@@ -270,13 +303,13 @@ class RunSourceContractTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("fixture-source", "fixture", config)
+            result = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             saved = config.download_root / "example.test" / "sample.txt"
@@ -338,13 +371,13 @@ class RunSourceContractTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("fixture-source", "fixture", config)
+            result = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             domain_dir = config.download_root / "example.test"

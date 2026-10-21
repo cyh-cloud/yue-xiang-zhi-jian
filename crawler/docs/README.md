@@ -22,9 +22,27 @@ python -m unittest discover -s crawler/tests -p "test_*.py" -t .
 python crawler/tools/check_contracts.py
 python tools/check_python.py
 python tools/check_architecture.py
+python -m crawler.tools.build_live_evidence_index --validate-only
+uv lock --check
+git diff --check
 ```
 
-Scrapy 项目的依赖由 `crawler/pyproject.toml` 和 `crawler/uv.lock` 统一管理。项目运行入口、fixture 回放和当前 8 项目验收结果见 `operations/scrapy-migration.md` 与 `specs/scrapy-migration-validation.md`。
+逐个项目检查 Spider 发现和契约:
+
+```powershell
+Get-ChildItem crawler/collection/projects -Directory |
+  Where-Object Name -ne "__pycache__" |
+  ForEach-Object {
+    Push-Location $_.FullName
+    python -m scrapy list
+    python -m scrapy check
+    Pop-Location
+  }
+```
+
+Scrapy 项目的依赖由 `crawler/pyproject.toml` 和 `crawler/uv.lock` 统一管理。项目运行入口、fixture 回放和当前 8 项目验收结果见 `operations/scrapy-migration.md`、`specs/scrapy-migration-validation.md` 与 `specs/collection-state-and-evidence-acceptance.md`。
+
+旧在线 CLI 和 `pipeline/run_source.py` 已退役。`pipeline/offline_fixture.py` 只用于离线 fixture 回归，不接受 `live` 模式。实时采集写入只允许通过 8 个 Scrapy 项目。
 
 仓库根的全量单测需要应用基线数据库 `data/baseline.db` 或等效测试库，不属于 crawler 验收。clean clone 没有该被忽略数据库时，全量单测失败不代表 crawler 交付失败。
 
@@ -40,8 +58,9 @@ Scrapy 项目的依赖由 `crawler/pyproject.toml` 和 `crawler/uv.lock` 统一�
 8. `mapping/`：内容域字段映射。
 9. `operations/`：采集规则、验收和上线顺序。
 10. `specs/scrapy-migration-validation.md`：8 个 Scrapy 项目的集成验收和阻断记录。
-11. `TASKS.md`：当前任务图、依赖和实施批次指针。
-12. `ISSUES.md`：问题清单、状态和待决事项的唯一真相源；`BLOCKERS.md` 只是入口指针。
+11. `specs/collection-state-and-evidence-acceptance.md`：最终集成、旧入口退役和全量回归记录。
+12. `TASKS.md`：当前任务图、依赖和实施批次指针。
+13. `ISSUES.md`：问题清单、状态和待决事项的唯一真相源；`BLOCKERS.md` 只是入口指针。
 
 ## 状态含义
 

@@ -4,7 +4,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 
 
 class IhchinaSourceTest(unittest.TestCase):
@@ -89,13 +92,13 @@ class IhchinaSourceTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("ihchina", "fixture", config)
+            result = run_offline_fixture("ihchina", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.discovered_count, 1)
@@ -165,13 +168,13 @@ class IhchinaSourceTest(unittest.TestCase):
                 json.dumps({"total": 3610, "count": 3610, "p": 1, "list": [item]}, ensure_ascii=False),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("ihchina", "fixture", config)
+            result = run_offline_fixture("ihchina", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.discovered_count, 1)
@@ -221,13 +224,13 @@ class IhchinaSourceTest(unittest.TestCase):
                 json.dumps({"pages": [page1, page2]}, ensure_ascii=False),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
             )
 
-            result = run_source("ihchina", "fixture", config)
+            result = run_offline_fixture("ihchina", "fixture", config)
 
             self.assertEqual(result.status, "succeeded")
             self.assertEqual(result.discovered_count, 2)
@@ -236,10 +239,10 @@ class IhchinaSourceTest(unittest.TestCase):
     def test_live_mode_is_explicit_and_rejects_unknown_source(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
             )
             with self.assertRaises(ValueError):
-                run_source("unknown-source", "live", config)
+                run_offline_fixture("unknown-source", "live", config)

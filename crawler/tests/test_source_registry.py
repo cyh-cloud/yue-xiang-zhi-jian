@@ -3,7 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crawler.pipeline import RunConfig, run_source
+from crawler.pipeline.offline_fixture import (
+    OfflineFixtureConfig,
+    run_offline_fixture,
+)
 from crawler.pipeline import database
 from crawler.pipeline.converter import run_batch
 
@@ -13,7 +16,7 @@ SOURCES = ROOT / "docs" / "sources.json"
 
 
 class SourceRegistryTest(unittest.TestCase):
-    def test_legacy_entry_cannot_enable_a_mode_missing_from_registry(self):
+    def test_offline_harness_rejects_live_even_when_registry_allows_it(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             registry = root / "sources.json"
@@ -28,14 +31,14 @@ class SourceRegistryTest(unittest.TestCase):
                                 "status": "approved-with-gaps",
                                 "access": "public",
                                 "rights_status": "attribution-required",
-                                "run_modes": ["fixture"],
+                                "run_modes": ["fixture", "live"],
                             }
                         ]
                     }
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
@@ -43,8 +46,8 @@ class SourceRegistryTest(unittest.TestCase):
                 registry_path=registry,
             )
 
-            with self.assertRaises(ValueError):
-                run_source("nzrc", "saved", config)
+            with self.assertRaisesRegex(ValueError, "Scrapy"):
+                run_offline_fixture("nzrc", "live", config)
 
     def test_registry_has_final_ids_statuses_and_rights(self):
         payload = json.loads(SOURCES.read_text(encoding="utf-8"))
@@ -74,10 +77,10 @@ class SourceRegistryTest(unittest.TestCase):
         self.assertTrue(sources["cnipa"]["attribution_required"])
         self.assertTrue(sources["cnipa"]["rights_evidence_url"])
 
-    def test_legacy_entry_only_accepts_registry_declared_modes(self):
+    def test_offline_harness_only_accepts_offline_modes(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=root / "fixture",
@@ -87,8 +90,8 @@ class SourceRegistryTest(unittest.TestCase):
                 registry_path=SOURCES,
             )
 
-            cnipa = run_source("cnipa", "fixture", config)
-            aqsc = run_source("aqsc-moa", "fixture", config)
+            cnipa = run_offline_fixture("cnipa", "fixture", config)
+            aqsc = run_offline_fixture("aqsc-moa", "fixture", config)
 
             self.assertEqual(cnipa.status, "failed")
             self.assertEqual(aqsc.status, "failed")
@@ -136,14 +139,14 @@ class SourceRegistryTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            config = RunConfig(
+            config = OfflineFixtureConfig(
                 database_path=root / "crawler.db",
                 download_root=root / "download",
                 fixture_root=fixture,
                 registry_path=registry,
             )
 
-            result = run_source("fixture-source", "fixture", config)
+            result = run_offline_fixture("fixture-source", "fixture", config)
 
             self.assertEqual(result.status, "blocked")
             self.assertEqual(result.discovered_count, 0)

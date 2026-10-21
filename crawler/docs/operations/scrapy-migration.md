@@ -1,6 +1,6 @@
 # Scrapy 迁移计划
 
-状态: implemented
+状态: cutover-complete
 
 日期: 2026-10-21
 
@@ -58,6 +58,7 @@ crawler/
           replay.py
           spiders/
   pipeline/
+    offline_fixture.py
     converter.py
   tests/
     fixtures/
@@ -94,7 +95,7 @@ cd <repo-root>
 python -m unittest discover -s crawler/tests -p "test_*.py" -t .
 ```
 
-单独运行站点项目时，在该项目目录使用其 `scrapy.cfg`。fixture 项目（`aqsc-moa`、`cnipa`）没有 live 入口，只运行站点测试和 fixture 接口验证。
+单独运行站点项目时，在该项目目录使用其 `scrapy.cfg`。`aqsc-moa` 和 `cnipa` 默认只运行 fixture；live canary 必须显式传入公告或承载页起始 URL，不能从仓库默认值自动发起。
 
 项目设置会自行把 crawler 包根加入 `sys.path`，因此可以直接从任一项目目录运行：
 
@@ -110,7 +111,7 @@ python -m scrapy check
 
 `crawler/pyproject.toml` 和 `crawler/uv.lock` 是唯一依赖声明和锁文件，所有项目在同一 uv 环境中运行。项目自己的目录、settings、Spider 和测试入口仍然隔离，不复制根锁文件。fixture 统一放在 `crawler/tests/fixtures/evidence/<source_id>/`，现有证据原地保留，每个项目只引用自己的子目录。
 
-`crawler/pipeline/converter.py` 保持在 Scrapy 项目树之外。旧的手写来源实现和 `run_source.py` 只在迁移期保留，直到对应来源完成切换。正式来源全部切换后，删除或封存旧实时入口，只保留 Scrapy 一条实时写入路径。
+`crawler/pipeline/converter.py` 保持在 Scrapy 项目树之外。旧在线 CLI `crawler/run.py` 和 `pipeline/run_source.py` 已退役；旧 fixture 回归器改名为 `pipeline/offline_fixture.py`，只接受离线模式并显式拒绝 `live`。Scrapy 是唯一实时采集写入路径。
 
 ## 责任边界
 
@@ -149,8 +150,8 @@ Pipeline 不写业务实体，不发布业务内容。业务发布门禁位于�
 3. **`ihchina`。** 它是当前已有实时请求的 P0 来源，先完成 JSON 分页、详情、原始证据和候选标准实体的离线及隔离实时对照，再切换实时入口。
 4. **`nzrc` 与 `nongmuhr`。** 迁移招聘列表、详情和保存式 fixture，并在站点允许时完成 5 条列表记录和 5 条详情记录的实时样本验证。
 5. **`dialect-org`、`cass-linguistics`、`feiyiw`。** 迁移方言、公开研究资料和非遗资讯，并在站点允许时完成 5 条列表记录和 5 条详情记录的实时样本验证。受限或登录后内容继续排除。
-6. **`aqsc-moa` 与 `cnipa`。** 本轮只建立项目骨架、fixture 和接口契约测试，不执行实时文件采集。下一阶段分别补 live 小样本，验证附件下载、XLSX 或 PDF 解析、文件哈希、locator、承载页 URL、missing 详情状态和 `deferred` 候选。
-7. **旧实现退役。** 每个已通过实时验证和审核的来源切换后，关闭对应旧实时入口。全部正式来源切换完成后，删除或封存旧实时入口，只保留 Scrapy 一条实时写入路径。
+6. **`aqsc-moa` 与 `cnipa`。** 项目骨架、fixture 和 live 小样本均已完成。`cnipa` 取得公告页和 PDF 并产生 deferred 候选；`aqsc-moa` 附件被 403 阻断，保留 blocked 证据和解除条件。
+7. **旧实现退役。** 8 个正式来源均已有 Scrapy 项目、fixture 回放、live canary 尝试、来源审核和隔离库证据。旧在线入口已删除，Scrapy 是唯一实时写入路径。
 
 每个阶段一次只切换一个来源。批量迁移可以作为计划分组，不能作为一次实时切换。
 
@@ -162,7 +163,7 @@ Pipeline 不写业务实体，不发布业务内容。业务发布门禁位于�
 | 采集库回放 | 使用临时采集库连续运行两次，raw 按请求追加，stage 按 `(source_id, source_item_id)` 幂等并指向最近一次 raw 证据，候选标准实体按来源自然键不重复，运行计数可对账。 |
 | 实时 canary | 使用独立采集库和下载目录；robots、访问等级、User-Agent、限速、状态码、哈希和取得时间完整。 |
 | 样本覆盖 | `ihchina`、`nzrc`、`nongmuhr`、`dialect-org`、`cass-linguistics`、`feiyiw` 在站点允许时验证 5 条列表记录和 5 条详情记录；保留失败样本和反例。 |
-| 文件项目边界 | `aqsc-moa` 和 `cnipa` 本轮通过项目骨架、fixture 和接口契约测试验收，不执行实时文件采集；下一阶段补 live 小样本。 |
+| 文件项目边界 | `aqsc-moa` 和 `cnipa` 通过项目骨架、fixture 和接口契约测试，并已执行 live 小样本。`aqsc-moa` 附件 403 保持 blocked；`cnipa` PDF 成功并保持 deferred。 |
 | 封锁记录 | 站点阻止实时验证时，记录 URL、时间、状态码或错误、证据位置和重试条件；fixture 通过不等于实时成功。 |
 | 业务发布门禁 | 与旧实现逐条比较发布资格。`detail_url_status=missing` 时必须有长期承载页和非空 locator；`aqsc-moa`、`cnipa` 和受限来源的边界不得放宽。 |
 | 边界检查 | 项目导入图和测试证明 Scrapy 运行不打开业务库，不调用转换器。 |
@@ -173,11 +174,10 @@ Pipeline 不写业务实体，不发布业务内容。业务发布门禁位于�
 
 ## 共存与回退
 
-- 迁移期一个来源只有一个实时写入者。对应来源尚未切换时，Scrapy 项目只写临时采集库和临时下载目录。
-- 禁止旧实现和 Scrapy 项目在同一运行窗口同时写正式采集库。
-- Scrapy 项目先在隔离库完成 fixture 对照和 live canary，再以来源为粒度切换正式写入权。
-- 正式来源全部切换后，删除或封存旧实时入口，只保留 Scrapy 一条实时写入路径。不设计长期双入口 writer 路由。
-- 首次切换前保留旧实现作为回退点。回退使用上一个运行版本和数据库快照。
+- 切换已完成，8 个正式来源的实时写入权只属于各自的 Scrapy 项目。
+- 旧在线 CLI 和 `run_source.py` 已删除，仓库不保留第二个实时 writer，也不提供双入口路由。
+- 离线 fixture 回归由项目 replay 和 `pipeline/offline_fixture.py` 承担，不访问网络。
+- 回退使用上一个应用版本和数据库快照。旧版本从 Git 历史恢复，不通过长期第二 writer 双写正式采集库。
 - 回退保留已采集证据和新候选实体，不通过删除数据伪造干净回退。
 
 ## 非目标
@@ -186,26 +186,17 @@ Pipeline 不写业务实体，不发布业务内容。业务发布门禁位于�
 - 不让 Scrapy Pipeline 写业务库，不用 Pipeline 替代转换器。
 - 不把天气迁移为 Scrapy 项目；`open-meteo` 和 `qweather` 不建立 Spider。
 - 不为排除或延后的来源创建项目。本轮恰好 8 个项目：`ihchina`、`nzrc`、`nongmuhr`、`dialect-org`、`cass-linguistics`、`feiyiw`、`aqsc-moa`、`cnipa`。
-- 前 6 个项目做小样本联网验证，目标为 5 条列表记录和 5 条详情记录；`aqsc-moa` 与 `cnipa` 本轮只做项目骨架、接口和 fixture 测试，下一阶段再补 live 小样本。
+- 前 6 个项目做小样本联网验证；`aqsc-moa` 与 `cnipa` 执行文件 live 小样本，失败时保留阻断证据。
 - `5ajob`、`zhongguoyuyan`、`cnopendata`、`open-meteo`、`qweather` 不是可执行项目。`5ajob` 不建 Scrapy 项目、不启用 live、不重新开启采集，只保留现有离线解析器和 fixture 测试；`zhongguoyuyan` 保持 `excluded`，`cnopendata` 保持 `deferred`。
 - [来源扩展候选](source-expansion.md) 中的 9 个未验证站点仍是候选，不属于本轮 8 个项目；正式登记和审核前不建立项目。
 - 不新增调度平台、代理池、验证码处理或反爬策略。
-- 不执行全量采集，不改写 Git 历史。本轮 `aqsc-moa` 与 `cnipa` 不执行真实文件采集，下一阶段补 live 小样本。
+- 不执行全量采集，不改写 Git 历史。`aqsc-moa` 与 `cnipa` 只执行文件小样本，不扩大到历史附件全量。
 
 ## 当前验收结果
 
-完整记录见 [Scrapy 迁移集成验收](../specs/scrapy-migration-validation.md)。
+实际 live 计数、失败 URL 和发布条件以 [Scrapy 迁移集成验收](../specs/scrapy-migration-validation.md) 为准。最终集成命令、隔离库双回放计数和旧入口退役证据见 [采集状态与证据链最终验收](../specs/collection-state-and-evidence-acceptance.md)。
 
-| 项目 | 结果 |
-| --- | --- |
-| `ihchina` | robots `not-found`；历史 live 为 raw 23、stage 20，当时写 blocked 20；代码口径已改为 deferred，尚未重跑 |
-| `nzrc` | robots `not-found`；历史 live 为 raw 20、stage 19，当时写 blocked 19；代码口径已改为 deferred，尚未重跑 |
-| `nongmuhr` | 5 列表 + 5 详情 HTTP 200，但字段结构变化，解析真实失败，blocked |
-| `dialect-org` | robots `not-found`；历史 live 为 raw 16、stage 15，当时写 blocked 15；代码口径已改为 deferred，尚未重跑 |
-| `cass-linguistics` | robots `not-found`，另有 4 条详情 404；历史 live 写 blocked 5；代码口径已改为 deferred，失败 4，尚未重跑 |
-| `feiyiw` | robots `not-found`；历史 live 为 raw 20、stage 17，当时写 blocked 17；代码口径已改为 deferred，尚未重跑 |
-| `aqsc-moa` | fixture 骨架通过，无 live；下一阶段补 live 小样本 |
-| `cnipa` | fixture 骨架通过，无 live；下一阶段补 live 小样本 |
+`ihchina` 本次 live 重跑遇到 HTTP 504，`aqsc-moa` 附件仍返回 HTTP 403。两者保持 blocked live 结论和明确解除条件，fixture 通过不作为 live 成功。其余 6 个来源已形成实际 live 证据，其中 `nongmuhr` 为 succeeded，另外 5 个为带缺口或 deferred 的 partial 结果。
 
 ## 框架例外
 
