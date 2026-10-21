@@ -1,22 +1,28 @@
-"""Site-specific fixture replay for ihchina."""
+"""Site-specific fixture replay for ihchina through a real Scrapy crawl."""
 
 from __future__ import annotations
 
+import argparse
 import json
+import os
+import subprocess
+import sys
+from dataclasses import fields
 from pathlib import Path
 
-from scrapy.http import HtmlResponse, TextResponse
-
-from crawler.collection.shared.crawler_collection.replay import replay_fixture
+from crawler.collection.shared.crawler_collection.reporting import (
+    RunReport,
+    build_run_report,
+)
+from crawler.collection.shared.crawler_collection.run_id import new_run_id
 from crawler.collection.shared.crawler_collection.testing import (
     source_fixture_dir,
 )
 
-from .candidate import write_candidate
-from .parsers import parse_list_page, parse_project_detail
 
-
-BASE_URL = "https://www.ihchina.cn"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[5]
+REPORT_MARKER = "REPORT_JSON:"
 
 
 def _require_fixture_dir(fixture_dir):
@@ -27,46 +33,14 @@ def _require_fixture_dir(fixture_dir):
     return expected
 
 
-def _detail_html(raw):
-    source_item_id = str(raw["id"])
-    relations = ""
-    if source_item_id == "12178":
-        relations = """
-        <div class="inherit_xx2">
-          <div class="x-tables"><table>
-            <tr><th>序号</th><th>姓名</th><th>性别</th><th>出生日期</th>
-              <th>民族</th><th>类别</th><th>项目编号</th>
-              <th>项目名称</th><th>申报地区或单位</th></tr>
-            <tr><td>01</td><td><a href="/ccr_detail/716.html">王安江</a></td>
-              <td>男</td><td>1935.11</td><td>苗族</td><td>民间文学</td>
-              <td>Ⅰ-1</td><td>苗族古歌</td><td>贵州省台江县</td></tr>
-          </table></div>
-          <div class="x-tables"><table>
-            <tr><th>编号</th><th>项目名称</th><th>类型</th><th>地区</th></tr>
-            <tr><td>Ⅰ-2</td>
-              <td><a href="/project_details/12179.html">相关项目</a></td>
-              <td>民间文学</td><td>贵州省</td></tr>
-          </table></div>
-        </div>
-        """
-    image = (
-        '<img src="/uploads/project.jpg">'
-        if source_item_id == "12178"
-        else ""
-    )
-    return (
-        '<div class="article-mod2">'
-        f'<div class="t_head"><div class="h30">{raw.get("title")}</div></div>'
-        '<div class="table">'
-        f'<div class="p">项目编号：{raw.get("num") or ""}</div>'
-        f'<div class="p">类别：{raw.get("cate") or ""}</div>'
-        f'<div class="p">申报地区或单位：{raw.get("province") or ""}</div>'
-        '<div class="p">保护单位：示例保护单位</div>'
-        "</div>"
-        f'<div class="text"><div class="p">公开项目正文{image}</div></div>'
-        "</div>"
-        f"{relations}"
-    )
+def _project_env():
+    existing = os.environ.get("PYTHONPATH", "")
+    entries = [str(REPO_ROOT), str(PROJECT_ROOT)]
+    if existing:
+        entries.append(existing)
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(entries)
+    return env
 
 
 def replay_ihchina_fixture(
@@ -79,48 +53,154 @@ def replay_ihchina_fixture(
     report_root=None,
 ):
     fixture_dir = _require_fixture_dir(fixture_dir)
-    payload = json.loads(
-        (fixture_dir / "discover.json").read_text(encoding="utf-8")
+    database_path = Path(database_path).resolve()
+    download_root = Path(download_root).resolve()
+    registry_path = Path(registry_path).resolve()
+    run_id = run_id or new_run_id("ihchina")
+    report_root = (
+        Path(report_root).resolve()
+        if report_root
+        else (database_path.parent / "reports")
     )
-    list_response = TextResponse(
-        url=(
-            f"{BASE_URL}/getProject.html?"
-            "category_id=16&limit=10&p=1"
-        ),
-        body=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        encoding="utf-8",
+    command = [
+        sys.executable,
+        "-m",
+        "ihchina.replay",
+        "--worker",
+        "--fixture-dir",
+        str(fixture_dir),
+        "--database-path",
+        str(database_path),
+        "--download-root",
+        str(download_root),
+        "--registry-path",
+        str(registry_path),
+        "--run-id",
+        run_id,
+        "--report-root",
+        str(report_root),
+    ]
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            env=_project_env(),
+            text=True,
+            capture_output=True,
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return RunReport(
+            run_id=run_id,
+            source_id="ihchina",
+            mode="fixture",
+            discovered=0,
+            failed=1,
+            errors=(f"{type(exc).__name__}: {exc}",),
+        )
+    payload = None
+    for line in completed.stdout.splitlines():
+        if line.startswith(REPORT_MARKER):
+            payload = json.loads(line[len(REPORT_MARKER):])
+    if completed.returncode != 0 or payload is None:
+        detail = (completed.stderr or completed.stdout).strip()
+        return RunReport(
+            run_id=run_id,
+            source_id="ihchina",
+            mode="fixture",
+            discovered=0,
+            failed=1,
+            errors=(detail[-2000:] or "Scrapy replay failed",),
+        )
+    names = {field.name for field in fields(RunReport)}
+    return RunReport(**{key: value for key, value in payload.items() if key in names})
+
+
+def _run_worker(args):
+    from scrapy.crawler import CrawlerProcess
+    from scrapy.settings import Settings
+    from scrapy import signals
+
+    from . import settings as project_settings
+    from .spiders.collection import IhchinaSpider
+
+    settings = Settings()
+    settings.setmodule(project_settings)
+    settings.set("COLLECTION_DATABASE_PATH", args.database_path)
+    settings.set("COLLECTION_DOWNLOAD_ROOT", args.download_root)
+    settings.set("SOURCE_REGISTRY_PATH", args.registry_path)
+    settings.set("COLLECTION_REPORT_ROOT", args.report_root)
+    settings.set("IHCHINA_FIXTURE_DIR", args.fixture_dir)
+    settings.set("ROBOTSTXT_OBEY", False)
+    settings.set("RETRY_TIMES", 0)
+    settings.set("LOG_ENABLED", False)
+    settings.set("TELNETCONSOLE_ENABLED", False)
+    settings.set("EXTENSIONS", {})
+    middlewares = dict(settings.getdict("DOWNLOADER_MIDDLEWARES"))
+    middlewares[
+        "ihchina.fixture_downloader.IhchinaFixtureDownloaderMiddleware"
+    ] = 900
+    settings.set("DOWNLOADER_MIDDLEWARES", middlewares)
+
+    errors = []
+    process = CrawlerProcess(settings)
+    crawler = process.create_crawler(IhchinaSpider)
+
+    def spider_error(failure, response, spider):
+        errors.append(f"{type(failure.value).__name__}: {failure.value}")
+
+    def item_error(item, response, spider, failure):
+        errors.append(f"pipeline: {type(failure.value).__name__}: {failure.value}")
+
+    crawler.signals.connect(spider_error, signal=signals.spider_error)
+    crawler.signals.connect(item_error, signal=signals.item_error)
+    process.crawl(crawler, run_id=args.run_id)
+    process.start(stop_after_crawl=True)
+
+    spider = crawler.spider
+    item_counts = dict(getattr(spider, "_collection_counts", {}) or {})
+    item_counts["failed"] = len(errors)
+    item_counts["discovered"] = len(
+        json.loads(
+            (Path(args.fixture_dir) / "discover.json").read_text(
+                encoding="utf-8"
+            )
+        ).get("list", [])
     )
-    list_items = {
-        item["source_item_id"]: item
-        for item in parse_list_page(list_response)["items"]
-    }
-
-    def build_item(raw, *, index):
-        source_item_id = str(raw["id"])
-        list_item = list_items[source_item_id]
-        detail_url = (
-            f"{BASE_URL}/project_details/{source_item_id}.html"
+    request_count = 0
+    if crawler.stats is not None:
+        request_count = crawler.stats.get_value(
+            "downloader/request_count", 0
         )
-        response = HtmlResponse(
-            detail_url,
-            body=_detail_html(raw).encode("utf-8"),
-            encoding="utf-8",
-        )
-        parsed = parse_project_detail(response)
-        parsed["extra"] = {
-            **list_item.get("extra", {}),
-            **parsed.get("extra", {}),
-        }
-        return parsed
-
-    return replay_fixture(
+    report = build_run_report(
+        run_id=args.run_id,
         source_id="ihchina",
-        fixture_dir=fixture_dir,
-        database_path=database_path,
-        download_root=download_root,
-        registry_path=registry_path,
-        run_id=run_id,
-        report_root=report_root,
-        item_builder=build_item,
-        candidate_writer=write_candidate,
+        mode="fixture",
+        database_path=args.database_path,
+        request_count=request_count,
+        item_counts=item_counts,
+        errors=errors,
+        evidence_path=args.download_root,
+        report_root=args.report_root,
     )
+    print(REPORT_MARKER + json.dumps(report.to_dict(), ensure_ascii=False))
+    return 0
+
+
+def _main(argv=None):
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--worker", action="store_true")
+    parser.add_argument("--fixture-dir", required=True)
+    parser.add_argument("--database-path", required=True)
+    parser.add_argument("--download-root", required=True)
+    parser.add_argument("--registry-path", required=True)
+    parser.add_argument("--run-id", required=True)
+    parser.add_argument("--report-root", required=True)
+    args = parser.parse_args(argv)
+    if args.worker:
+        return _run_worker(args)
+    parser.error("this module is invoked as the ihchina replay worker")
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main())

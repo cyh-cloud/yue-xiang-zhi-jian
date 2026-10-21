@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sqlite3
 import tempfile
 import unittest
@@ -24,6 +25,8 @@ from crawler.collection.shared.crawler_collection.database import (
     CollectionDatabase,
 )
 from crawler.collection.shared.crawler_collection.items import CollectionItem
+from crawler.collection.shared.crawler_collection.evidence import RawEvidence
+from crawler.collection.shared.crawler_collection.runtime import CollectionRuntime
 
 
 FIXTURE = (
@@ -292,9 +295,104 @@ class IhchinaScrapyProjectTest(unittest.TestCase):
 
         self.assertEqual(count, 2)
 
-    def test_detail_without_usable_url_remains_stage_only(self):
-        spider = IhchinaSpider()
-        assert spider.name == "ihchina"
+    def test_missing_detail_url_keeps_carrier_and_locator_auditable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_id = "ihchina-missing-detail"
+            carrier_url = (
+                "https://www.ihchina.cn/project?keywords=%E8%8B%97%E6%97%8F"
+            )
+            locator = "list row 7"
+            runtime = CollectionRuntime(
+                database_path=root / "crawler.db",
+                download_root=root / "downloads",
+                registry_path=(
+                    Path(__file__).resolve().parents[1]
+                    / "docs"
+                    / "sources.json"
+                ),
+                candidate_writer=write_candidate,
+            )
+            raw_id = runtime.persist_raw(
+                RawEvidence(
+                    source_id="ihchina",
+                    request_url=carrier_url,
+                    final_url=carrier_url,
+                    source_url=carrier_url,
+                    long_term_url=carrier_url,
+                    detail_url=None,
+                    detail_url_status="missing",
+                    locator=locator,
+                    body=b'{"list":[{"id":12178}]}',
+                    content_type="application/json",
+                    run_id=run_id,
+                    robots_decision="allowed",
+                )
+            )
+            item = CollectionItem(
+                source_id="ihchina",
+                source_item_id="12178",
+                source_url=carrier_url,
+                long_term_url=carrier_url,
+                detail_url=None,
+                detail_url_status="missing",
+                locator=locator,
+                run_id=run_id,
+                mode="fixture",
+                rights_status="attribution-required",
+                title="苗族古歌",
+                candidate_status="deferred",
+                candidate_reason="detail_url:missing",
+            )
+
+            result = runtime.write_item(item, raw_evidence_id=raw_id)
+
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                raw = conn.execute(
+                    """
+                    SELECT detail_url, detail_url_status, long_term_url, locator
+                    FROM raw_fetches
+                    """
+                ).fetchone()
+                stage = conn.execute(
+                    """
+                    SELECT detail_url, detail_url_status, long_term_url,
+                           locator, raw_fetch_id
+                    FROM stage_source_items
+                    """
+                ).fetchone()
+                candidate = conn.execute(
+                    """
+                    SELECT detail_url, detail_url_status, long_term_url,
+                           locator, candidate_status, candidate_reason
+                    FROM std_ich_projects
+                    """
+                ).fetchone()
+            finally:
+                conn.close()
+
+        self.assertEqual(result["candidate_status"], "deferred")
+        self.assertEqual(result["candidate_reason"], "detail_url:missing")
+        self.assertEqual(
+            raw,
+            (None, "missing", carrier_url, locator),
+        )
+        self.assertEqual(
+            stage,
+            (None, "missing", carrier_url, locator, raw_id),
+        )
+        self.assertEqual(
+            candidate,
+            (
+                None,
+                "missing",
+                carrier_url,
+                locator,
+                "deferred",
+                "detail_url:missing",
+            ),
+        )
 
     def test_spider_has_one_site_identity_and_no_shared_parameterization(self):
         spider = IhchinaSpider()
@@ -331,9 +429,116 @@ class IhchinaScrapyProjectTest(unittest.TestCase):
                     / "sources.json"
                 ),
             )
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                raw_count = conn.execute(
+                    "SELECT COUNT(*) FROM raw_fetches"
+                ).fetchone()[0]
+                stage_count = conn.execute(
+                    "SELECT COUNT(*) FROM stage_source_items"
+                ).fetchone()[0]
+                candidate_count = conn.execute(
+                    "SELECT COUNT(*) FROM std_ich_projects"
+                ).fetchone()[0]
+            finally:
+                conn.close()
 
         self.assertEqual(first.status, "succeeded")
         self.assertEqual(second.status, "succeeded")
+        self.assertEqual(first.raw_count, 3)
+        self.assertEqual(second.raw_count, 3)
+        self.assertEqual(first.stage_count, 2)
+        self.assertEqual(second.stage_count, 2)
+        self.assertEqual(raw_count, 6)
+        self.assertEqual(stage_count, 2)
+        self.assertEqual(candidate_count, 2)
+
+    def test_fixture_replay_uses_real_scrapy_and_binds_each_response(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            result = replay_ihchina_fixture(
+                fixture_dir=FIXTURE,
+                database_path=root / "crawler.db",
+                download_root=root / "downloads",
+                registry_path=(
+                    Path(__file__).resolve().parents[1]
+                    / "docs"
+                    / "sources.json"
+                ),
+            )
+
+            conn = sqlite3.connect(root / "crawler.db")
+            try:
+                raw_rows = conn.execute(
+                    """
+                    SELECT request_url, body_sha256
+                    FROM raw_fetches
+                    ORDER BY id
+                    """
+                ).fetchall()
+                stage_rows = conn.execute(
+                    """
+                    SELECT s.source_item_id, s.detail_url, r.request_url,
+                           r.body_sha256
+                    FROM stage_source_items AS s
+                    JOIN raw_fetches AS r ON r.id = s.raw_fetch_id
+                    ORDER BY s.source_item_id
+                    """
+                ).fetchall()
+                candidate_count = conn.execute(
+                    "SELECT COUNT(*) FROM std_ich_projects"
+                ).fetchone()[0]
+            finally:
+                conn.close()
+
+        expected = {
+            (
+                "https://www.ihchina.cn/getProject.html?"
+                "category_id=16&limit=10&p=1",
+                hashlib.sha256(
+                    (FIXTURE / "discover.json").read_bytes()
+                ).hexdigest(),
+            ),
+            (
+                "https://www.ihchina.cn/project_details/12178.html",
+                hashlib.sha256(
+                    (FIXTURE / "detail-12178.html").read_bytes()
+                ).hexdigest(),
+            ),
+            (
+                "https://www.ihchina.cn/project_details/12179.html",
+                hashlib.sha256(
+                    (FIXTURE / "detail-12179.html").read_bytes()
+                ).hexdigest(),
+            ),
+        }
+        self.assertEqual(result.status, "succeeded")
+        self.assertEqual(result.raw_count, 3)
+        self.assertEqual(result.stage_count, 2)
+        self.assertEqual(result.candidate_count, 2)
+        self.assertEqual(set(raw_rows), expected)
+        self.assertEqual(
+            stage_rows,
+            [
+                (
+                    "12178",
+                    "https://www.ihchina.cn/project_details/12178.html",
+                    "https://www.ihchina.cn/project_details/12178.html",
+                    hashlib.sha256(
+                        (FIXTURE / "detail-12178.html").read_bytes()
+                    ).hexdigest(),
+                ),
+                (
+                    "12179",
+                    "https://www.ihchina.cn/project_details/12179.html",
+                    "https://www.ihchina.cn/project_details/12179.html",
+                    hashlib.sha256(
+                        (FIXTURE / "detail-12179.html").read_bytes()
+                    ).hexdigest(),
+                ),
+            ],
+        )
+        self.assertEqual(candidate_count, 2)
 
     def test_fixture_replay_persists_related_standard_entities(self):
         with tempfile.TemporaryDirectory() as tmp:
