@@ -4,7 +4,9 @@
 
 日期: 2026-10-19
 
-`std` 是跨来源标准实体层，不是来源列的投影。每个实体有稳定 identity、自然键、来源关系、发布状态和不变式。转换器只读这里定义的实体，不读 raw 或 stage。
+`std` 是采集库中的跨来源候选标准实体层，不是来源列的投影，也不是业务发布层。每个实体有稳定 identity、自然键、来源关系、候选状态和不变式。转换器只读这里定义的实体，不读 raw 或 stage。
+
+`publish_status` 是历史命名字段，保留在物理表中用于兼容现有转换器和业务写入流程。判断采集准入必须读取 `candidate_status`，不能把 `publish_status` 当作候选状态。`candidate_status` 固定为 `candidate`、`deferred`、`blocked`。
 
 ## 公共 Interface
 
@@ -14,8 +16,10 @@
 | --- | --- |
 | `identity` | 实体内部 ID，由采集库分配，不对业务暴露 |
 | `natural_key` | 识别同一实体的规范化字段组合 |
-| `provenance` | 主来源和全部来源关系，能回到详情 URL 和取得时间 |
-| `publish_status` | `draft`、`reviewed`、`published`、`blocked` |
+| `provenance` | 主来源和全部来源关系，能回到详情 URL、承载页 URL、locator 和取得时间 |
+| `candidate_status` | `candidate`、`deferred`、`blocked`，表示采集侧是否可进入转换器 |
+| `candidate_reason` | 候选状态的原因，例如 `robots:not-found`、`detail_url:missing` |
+| `publish_status` | 历史命名的兼容字段，不用于采集候选判断 |
 | `confidence` | `high`、`medium`、`low` |
 | `content_hash` | 规范化内容哈希，用于变更检测 |
 | `first_seen_at`、`last_seen_at` | 首次和最近发现时间 |
@@ -24,11 +28,13 @@
 公共不变式:
 
 - 实体行不能只有 JSON 来源信息，必须有 `source_id` 和具体来源关系。
-- 主实体和关系实体都必须有 `source_url`、`long_term_url`、`detail_url_status` 和 `locator` 证据列；`missing` 行的 `locator` 不得为空。
+- 主实体和关系实体都必须有 `source_url`、`long_term_url`、`detail_url_status` 和 `locator` 证据列；`missing` 行的 `long_term_url` 和 `locator` 都不得为空。
+- `detail_url_status=missing` 的记录可以使用承载页 URL 加 locator 进入候选、业务实体和发布审核。承载页为空、locator 为空或无法定位记录时，`candidate_status` 必须为 `deferred`。
+- `candidate_status=deferred` 表示数据完整但当前暂不转换或发布，不是解析失败。`blocked` 只用于数据不完整、权利不明、访问禁止或其他真实阻断。
 - 会参与自然键、筛选或发布的字段必须是独立列。
 - 来源改名或页面改版不能改变内部 ID。
 - 失效实体标记 `is_active=0`，不物理删除。
-- 业务发布状态只能由审核流程推进。
+- 采集候选状态只由采集侧准入决定。业务发布状态只能由转换器和审核流程推进。
 
 ## 非遗实体
 
@@ -130,7 +136,7 @@ publish: draft | reviewed | published | blocked
 不变式:
 
 - 物理唯一键是来源记录 `(source_id, source_item_id)`；`merge_key` 只用于转换器把同产品跨来源分组，不强制跨来源行合并。
-- 无详情 URL 的记录只留在 raw/stage，不进入 std 或业务发布。
+- 无 direct 详情 URL 的记录使用承载页 URL 和 locator 进入 std。承载页或 locator 不满足条件时写 `candidate_status=deferred`，不进入转换器和业务发布。满足权利和审核条件时，这类记录可以发布。
 - `normalized_name` 由可复现规则生成，原始名称保留在 `product_name_raw`。
 - 地理标志 PDF 签名 URL 只留在 raw 层。
 

@@ -178,7 +178,7 @@
 - 生产规模: 5933.33 公顷
 - 主要生产经营单位: 北京丽城嘉苑农业发展有限公司；北京绿农兴云智慧农业专业合作社
 - 水产标记: `aquatic=false`
-- 目标映射: 只有获得直接详情 URL 后才写 `std_agri_products` 和 `std_agri_product_sources`；当前附件行只进入 raw/stage。
+- 目标映射: 有直接详情 URL 时使用 `detail_url_status=direct`；没有时使用公告承载页 URL 加附件行或工作表行 locator，并写 `detail_url_status=missing`。两者都可进入 `std_agri_products` 和 `std_agri_product_sources`，承载页或 locator 缺失时写 `deferred`。
 
 ### 样本 2: 水产品，名特优新
 
@@ -405,7 +405,9 @@
 
 ## 发布边界
 
-动态查询结果行没有单条长期详情 URL，不得直接进入业务发布。可保留公告详情 URL 和附件行定位作为采集证据；只有能定位到公告详情或附件行的记录，才允许进入发布审核。
+动态查询结果行和附件行没有单条详情 URL 时，使用公告详情页或数据集页作为长期承载页 URL，`detail_url=null`、`detail_url_status=missing`，并保留工作表名、行号或表格行号 locator。承载页 URL 可长期打开且 locator 能定位记录时，可以进入候选、业务实体和发布审核。承载页或 locator 缺失时写 `deferred`。不得把公告页伪装成单条详情 URL。
+
+本轮 Scrapy 范围只做 fixture 和骨架验证。下一阶段必须执行 live 小样本，覆盖公告和附件下载、XLSX 解析、文件大小和 SHA-256、locator、承载页 URL、missing 详情状态和 `deferred` 候选。
 
 ## 数据量与更新
 
@@ -420,7 +422,7 @@
 
 - HTTPS: `www.aqsc.agri.cn` 在验证时出现证书主机名不匹配，HTTPS 返回 403 或 TLS 失败；已验证可用的主入口是 `http://www.aqsc.agri.cn/`。不要通过关闭证书校验来抓取 HTTPS。
 - 编码: aqsc 页面响应头编码不可靠，必须按 `gb18030` 解码；监管司页面实际 UTF-8。
-- robots: `www.aqsc.agri.cn/robots.txt` 返回 403，`jgs.moa.gov.cn/robots.txt` 返回 404，`mtyx.aqsc.org/robots.txt` 返回 404。没有取得明确允许规则，不能把 404 当作授权。
+- robots: `www.aqsc.agri.cn/robots.txt` 返回 403，按真实阻断处理，不自动采集该域。`jgs.moa.gov.cn/robots.txt` 和 `mtyx.aqsc.org/robots.txt` 返回 404，记录为 `not-found`，允许采集并写 `deferred` 候选，但不等于授权。跨域策略按子资源分别判断。
 - 跨站链接: 监管司和 aqsc 页面会链接 `www.moa.gov.cn`。已验证 `www.moa.gov.cn/robots.txt` 为 `User-agent:* / Disallow:/`，不要自动跨站抓取该域。
 - 登录: 三个目标入口均无需登录。查询系统会下发 `PHPSESSID`，只作匿名会话使用，不保存账号、密码、Cookie 或登录凭据。
 - 版权: 页面声明保留所有权利。只采集结构化事实字段、公告元数据和附件哈希，保留来源链接；不把公告全文或附件原样发布到业务库。
@@ -467,11 +469,11 @@
 - 样本可复现: 通过，3 条样本均能定位到公告页、附件和附件行。
 - 字段映射完整: 通过，名特优新和特质农品分别映射，水产字段和来源字段均已定义。
 - 详情 URL 可直达: 通过，样本使用公告详情页，不使用首页或列表页。
-- 当前结论: `approved-with-gaps`。主要缺口是 robots 无明确规则、动态查询无单条详情、历史 PDF 和完整水产复核集尚未验证。
+- 当前结论: `approved-with-gaps`。主要缺口是主域 robots 返回 403、动态查询无单条详情、历史 PDF 和完整水产复核集尚未验证。下一阶段需补 live 文件小样本。
 
 ## 实现验证
 
-- 2026-10-20 通过 `python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc-moa` 解析两份公开合成 fixture，共 8 行写入 raw/stage；没有 direct 详情 URL，不写 std。
+- 2026-10-20 通过 `python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit.db --xlsx-root crawler/tests/fixtures/evidence/aqsc-moa` 解析两份公开合成 fixture，共 8 行写入 raw/stage。
 - 名特优新样本 4 行，特质农品样本 4 行；每行保留附件名、工作表、行号 locator。真实本地附件的 790 行和 152 行规模不进入公开仓库。
-- 这些行没有单条详情 URL，`detail_url=null`、`detail_url_status=missing`、`publish_status=blocked`，只作为 stage 证据，不进入 std 或业务发布候选。
+- 这些行没有单条详情 URL，`detail_url=null`、`detail_url_status=missing`，使用公告页作为承载页 URL。按最新口径应写 `candidate_status=deferred`，等待 live 文件验证和发布审核；`publish_status=blocked` 是不再使用的旧候选判断。
 - 水产关键词误报词形保持 `is_aquatic=NULL`，不根据关键词自动判定为水产。

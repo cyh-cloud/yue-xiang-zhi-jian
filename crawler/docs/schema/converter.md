@@ -11,7 +11,7 @@
 - 输入是 `std-entities.md` 定义的 std 实体和 `std_sources` 来源登记，不读 `raw_*`、`stage_*`、页面或附件。
 - 输出按内容域写入业务表，并写采集库的 `import_batches`、`import_conflicts`。
 - 天气不进入持久化转换，运行时 DTO 直接在请求或提示组装阶段使用。
-- 发布状态由人工审核流程推进。转换器只写 `draft` 或保持已有状态。
+- 采集候选状态由 `candidate_status` 表达，转换器只消费 `candidate`。`deferred` 保留在采集库等待业务需要，`blocked` 不进入转换。发布状态由人工审核流程推进，转换器只写 `draft` 或保持已有状态。
 
 ## 批次契约
 
@@ -47,7 +47,16 @@
 
 ### 发布
 
-转换器写入 `draft`。发布前检查来源访问等级、许可、详情 URL、审核记录和内容域不变式。转换器不推断授权，不自动把 `draft` 升级为 `published`。
+转换器写入 `draft`。发布前检查来源访问等级、许可、详情回溯信息和审核记录。
+
+详情回溯使用以下机械规则：
+
+- `detail_url_status=direct` 时，`detail_url` 必须非空。
+- `detail_url_status=missing` 时，承载页 `long_term_url` 必须非空，`locator` 必须能定位到该条记录。
+- 两项满足时可以进入业务实体和发布审核，不要求把承载页写成详情 URL。
+- 承载页或 locator 缺失时写 `deferred`，不得发布。
+
+转换器不推断授权，不自动把 `draft` 升级为 `published`。
 
 ### 回滚
 
@@ -61,7 +70,7 @@
 
 ### `agri`
 
-`std_agri_products` 转 `agri_certified_products`，来源转 `agri_product_sources`。三种 `cert_type` 分开升级写入，不互相合并。水产三态的 `unknown` 不降为 `false`。无 direct 详情 URL 的记录只留在 raw/stage，不进入 std，也不进入业务发布。
+`std_agri_products` 转 `agri_certified_products`，来源转 `agri_product_sources`。三种 `cert_type` 分开升级写入，不互相合并。水产三态的 `unknown` 不降为 `false`。附件行和动态查询行使用公告页或检索详情页作为承载页 URL，并保留工作表行号或 PDF 页码 locator；满足权利和审核条件时可以发布。承载页或 locator 缺失时写 `deferred`。
 
 ### `jobs`
 

@@ -104,13 +104,13 @@ python -m scrapy list
 python -m scrapy check
 ```
 
-所有项目共用 `CollectionPipeline`、`RawEvidenceMiddleware`、`RobotsEvidenceMiddleware` 和 `RunReportExtension`。Pipeline 只写采集库；raw 中间件把实际响应或请求异常追加为证据；robots 中间件保存 allowed、disallowed、not-found 或 unknown 的真实结论；运行扩展为每次 live crawl 生成结构化 JSON 报告。报告中的 `failure_count` 只统计解析异常、HTTP 4xx/5xx 和下载异常；robots disallowed 请求计入 `blocked`，同一请求不重复计数。`errors` 和 `failure_reason` 同时保留 robots 拒绝原因。项目配置同时提供数据库、下载根、报告根、来源注册表和限速参数。
+所有项目共用 `CollectionPipeline`、`RawEvidenceMiddleware`、`RobotsEvidenceMiddleware` 和 `RunReportExtension`。Pipeline 只写采集库；raw 中间件把实际响应或请求异常追加为证据；robots 中间件保存 allowed、disallowed、not-found 或 unknown 的真实结论；运行扩展为每次 live crawl 生成结构化 JSON 报告。报告中的 `failure_count` 只统计解析异常、HTTP 4xx/5xx 和下载异常；robots disallowed 计入 `blocked`，robots not-found 计入 `deferred`，同一请求不重复计数。`errors` 和 `failure_reason` 同时保留 robots 拒绝原因。项目配置同时提供数据库、下载根、报告根、来源注册表和限速参数。
 
 一次 crawl 的 `run_id` 由 `CollectionSpiderMixin.from_crawler` 初始化，该次 crawl 的所有请求、raw、stage 和候选共用同一标识。写入 stage 前必须确认 raw 的 `source_id` 和 `run_id` 与 Item 一致，跨来源或跨运行引用会被阻断。
 
 `crawler/pyproject.toml` 和 `crawler/uv.lock` 是唯一依赖声明和锁文件，所有项目在同一 uv 环境中运行。项目自己的目录、settings、Spider 和测试入口仍然隔离，不复制根锁文件。fixture 统一放在 `crawler/tests/fixtures/evidence/<source_id>/`，现有证据原地保留，每个项目只引用自己的子目录。
 
-`crawler/pipeline/converter.py` 保持在 Scrapy 项目树之外。旧的手写来源实现和 `run_source.py` 在迁移期保留，直到对应来源完成切换。
+`crawler/pipeline/converter.py` 保持在 Scrapy 项目树之外。旧的手写来源实现和 `run_source.py` 只在迁移期保留，直到对应来源完成切换。正式来源全部切换后，删除或封存旧实时入口，只保留 Scrapy 一条实时写入路径。
 
 ## 责任边界
 
@@ -123,7 +123,13 @@ python -m scrapy check
 
 共享包不导入任何站点模块，不感知业务库，不包含转换器。Scrapy 项目不复制共享实现，不打开业务库，不调用转换器。
 
-Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以检查 rights、robots、必需字段和证据完整性，但检查不通过时只能把候选标记为 `blocked`、`deferred`，或者跳过候选写入，不能发布业务实体。业务发布门禁位于转换和审核链路。
+Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它检查 rights、robots、必需字段、详情回溯信息和证据完整性，并据此写 `candidate_status`：
+
+- `candidate`：数据完整，可以交给转换器。
+- `deferred`：数据完整但当前暂不转换或发布。robots 404 写这个状态，原因 `robots:not-found`。
+- `blocked`：数据不完整、解析失败、权利不明、访问被明确禁止或存在其他真实阻断。
+
+Pipeline 不写业务实体，不发布业务内容。业务发布门禁位于转换和审核链路。
 
 运行产物固定落在 crawler 根下：数据库为 `crawler/data/crawler.db`，raw 文件为 `crawler/download/`，运行报告为 `crawler/data/reports/`。这些路径都在 `.gitignore` 覆盖范围内。
 
@@ -143,8 +149,8 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 3. **`ihchina`。** 它是当前已有实时请求的 P0 来源，先完成 JSON 分页、详情、原始证据和候选标准实体的离线及隔离实时对照，再切换实时入口。
 4. **`nzrc` 与 `nongmuhr`。** 迁移招聘列表、详情和保存式 fixture，并在站点允许时完成 5 条列表记录和 5 条详情记录的实时样本验证。
 5. **`dialect-org`、`cass-linguistics`、`feiyiw`。** 迁移方言、公开研究资料和非遗资讯，并在站点允许时完成 5 条列表记录和 5 条详情记录的实时样本验证。受限或登录后内容继续排除。
-6. **`aqsc-moa` 与 `cnipa`。** 只建立项目骨架、fixture 和接口契约测试，不执行实时文件采集。两者继续使用现有 XLSX、PDF 和公告附件契约，业务发布门禁不变。
-7. **旧实现退役。** 每个已通过实时验证和审核的来源切换后，单独提交旧路径清理。清理不删除历史证据，不修改既有 ADR。
+6. **`aqsc-moa` 与 `cnipa`。** 本轮只建立项目骨架、fixture 和接口契约测试，不执行实时文件采集。下一阶段分别补 live 小样本，验证附件下载、XLSX 或 PDF 解析、文件哈希、locator、承载页 URL、missing 详情状态和 `deferred` 候选。
+7. **旧实现退役。** 每个已通过实时验证和审核的来源切换后，关闭对应旧实时入口。全部正式来源切换完成后，删除或封存旧实时入口，只保留 Scrapy 一条实时写入路径。
 
 每个阶段一次只切换一个来源。批量迁移可以作为计划分组，不能作为一次实时切换。
 
@@ -156,22 +162,22 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 | 采集库回放 | 使用临时采集库连续运行两次，raw 按请求追加，stage 按 `(source_id, source_item_id)` 幂等并指向最近一次 raw 证据，候选标准实体按来源自然键不重复，运行计数可对账。 |
 | 实时 canary | 使用独立采集库和下载目录；robots、访问等级、User-Agent、限速、状态码、哈希和取得时间完整。 |
 | 样本覆盖 | `ihchina`、`nzrc`、`nongmuhr`、`dialect-org`、`cass-linguistics`、`feiyiw` 在站点允许时验证 5 条列表记录和 5 条详情记录；保留失败样本和反例。 |
-| 文件项目边界 | `aqsc-moa` 和 `cnipa` 只通过项目骨架、fixture 和接口契约测试验收，不执行实时文件采集。 |
+| 文件项目边界 | `aqsc-moa` 和 `cnipa` 本轮通过项目骨架、fixture 和接口契约测试验收，不执行实时文件采集；下一阶段补 live 小样本。 |
 | 封锁记录 | 站点阻止实时验证时，记录 URL、时间、状态码或错误、证据位置和重试条件；fixture 通过不等于实时成功。 |
-| 业务发布门禁 | 与旧实现逐条比较发布资格；`aqsc-moa`、`cnipa` 和受限来源的边界不得放宽。 |
+| 业务发布门禁 | 与旧实现逐条比较发布资格。`detail_url_status=missing` 时必须有长期承载页和非空 locator；`aqsc-moa`、`cnipa` 和受限来源的边界不得放宽。 |
 | 边界检查 | 项目导入图和测试证明 Scrapy 运行不打开业务库，不调用转换器。 |
-| 回退演练 | 记录切回旧实现的方式，并证明回退不删除 raw、stage 或候选标准实体证据。 |
+| 回退演练 | 记录切换前的回退版本和数据库快照，并证明回退不删除 raw、stage 或候选标准实体证据。 |
 | 文档契约 | 新增或修改的路径、命令和链接通过机械检查；文档不出现 em-dash。 |
 
 实时 canary 只在核心字段、计数和门禁结果达到来源审核记录中的约定后，才允许切换正式写入权。
 
 ## 共存与回退
 
-- 迁移期一个来源只有一个实时写入者。旧实现保持写入权时，Scrapy 项目只写临时采集库和临时下载目录。
+- 迁移期一个来源只有一个实时写入者。对应来源尚未切换时，Scrapy 项目只写临时采集库和临时下载目录。
 - 禁止旧实现和 Scrapy 项目在同一运行窗口同时写正式采集库。
-- 切换以来源为粒度，通过运行路由配置把该 `source_id` 指向 Scrapy 项目。回退时把同一路由指回旧实现。
-- 切换后保留旧实现至少一个观察周期。旧代码删除是独立变更，不与首次切换合并。
-- fixture 测试在切换前同时覆盖旧、新路径；切换后以新路径为主，旧路径只保留到退役完成。
+- Scrapy 项目先在隔离库完成 fixture 对照和 live canary，再以来源为粒度切换正式写入权。
+- 正式来源全部切换后，删除或封存旧实时入口，只保留 Scrapy 一条实时写入路径。不设计长期双入口 writer 路由。
+- 首次切换前保留旧实现作为回退点。回退使用上一个运行版本和数据库快照。
 - 回退保留已采集证据和新候选实体，不通过删除数据伪造干净回退。
 
 ## 非目标
@@ -180,11 +186,11 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 - 不让 Scrapy Pipeline 写业务库，不用 Pipeline 替代转换器。
 - 不把天气迁移为 Scrapy 项目；`open-meteo` 和 `qweather` 不建立 Spider。
 - 不为排除或延后的来源创建项目。本轮恰好 8 个项目：`ihchina`、`nzrc`、`nongmuhr`、`dialect-org`、`cass-linguistics`、`feiyiw`、`aqsc-moa`、`cnipa`。
-- 前 6 个项目做小样本联网验证，目标为 5 条列表记录和 5 条详情记录；`aqsc-moa` 与 `cnipa` 只做项目骨架、接口和 fixture 测试，不做真实文件采集。
+- 前 6 个项目做小样本联网验证，目标为 5 条列表记录和 5 条详情记录；`aqsc-moa` 与 `cnipa` 本轮只做项目骨架、接口和 fixture 测试，下一阶段再补 live 小样本。
 - `5ajob`、`zhongguoyuyan`、`cnopendata`、`open-meteo`、`qweather` 不是可执行项目。`5ajob` 不建 Scrapy 项目、不启用 live、不重新开启采集，只保留现有离线解析器和 fixture 测试；`zhongguoyuyan` 保持 `excluded`，`cnopendata` 保持 `deferred`。
 - [来源扩展候选](source-expansion.md) 中的 9 个未验证站点仍是候选，不属于本轮 8 个项目；正式登记和审核前不建立项目。
 - 不新增调度平台、代理池、验证码处理或反爬策略。
-- 不执行全量采集，不改写 Git 历史。`aqsc-moa` 与 `cnipa` 不执行真实文件采集。
+- 不执行全量采集，不改写 Git 历史。本轮 `aqsc-moa` 与 `cnipa` 不执行真实文件采集，下一阶段补 live 小样本。
 
 ## 当前验收结果
 
@@ -192,14 +198,14 @@ Pipeline 只写 `raw`、`stage` 和采集库 std 候选标准实体。它可以�
 
 | 项目 | 结果 |
 | --- | --- |
-| `ihchina` | robots 404，raw 23、stage 20、blocked 20，候选 0 |
-| `nzrc` | robots 404，raw 20、stage 19、blocked 19，候选 0 |
-| `nongmuhr` | 5 列表 + 5 详情 HTTP 200，但字段结构变化，blocked |
-| `dialect-org` | robots 404，raw 16、stage 15、blocked 15，候选 0 |
-| `cass-linguistics` | robots 404，raw 10、stage 5、blocked 5，失败 4，候选 0 |
-| `feiyiw` | robots 404，raw 20、stage 17、blocked 17，候选 0 |
-| `aqsc-moa` | fixture 骨架通过，无 live |
-| `cnipa` | fixture 骨架通过，无 live |
+| `ihchina` | robots `not-found`，raw 23、stage 20；当前代码写 blocked 20，目标口径为 deferred 20，待重跑 |
+| `nzrc` | robots `not-found`，raw 20、stage 19；当前代码写 blocked 19，目标口径为 deferred 19，待重跑 |
+| `nongmuhr` | 5 列表 + 5 详情 HTTP 200，但字段结构变化，解析真实失败，blocked |
+| `dialect-org` | robots `not-found`，raw 16、stage 15；当前代码写 blocked 15，目标口径为 deferred 15，待重跑 |
+| `cass-linguistics` | robots `not-found`，另有 4 条详情 404；当前代码写 blocked 5，目标口径为 deferred 5，失败 4，待重跑 |
+| `feiyiw` | robots `not-found`，raw 20、stage 17；当前代码写 blocked 17，目标口径为 deferred 17，待重跑 |
+| `aqsc-moa` | fixture 骨架通过，无 live；下一阶段补 live 小样本 |
+| `cnipa` | fixture 骨架通过，无 live；下一阶段补 live 小样本 |
 
 ## 框架例外
 

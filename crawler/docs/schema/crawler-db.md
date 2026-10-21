@@ -12,10 +12,10 @@
 
 1. raw 追加保存请求和文件证据，不覆盖历史响应。
 2. stage 保存来源形状和解析结果，当前实现使用中性 `stage_source_items`。
-3. std 只保存通过发布门禁的标准实体和来源关系。
+3. std 保存已归一成跨来源标准字段的候选实体和来源关系。候选状态由独立 `candidate_status` 表达，不复用业务发布状态。
 4. 每条带 URL 的记录至少有 `source_url` 和 `long_term_url`。
-5. `detail_url_status` 只允许 `direct` 或 `missing`。`direct` 必须有 `detail_url`；`missing` 必须有 `locator`。
-6. 无 direct 详情 URL 的记录只进入 raw/stage，不进入 std 和业务发布。
+5. `detail_url_status` 只允许 `direct` 或 `missing`。`direct` 必须有 `detail_url`；`missing` 必须有非空 `long_term_url` 和能定位记录的 `locator`。
+6. 没有 direct 详情 URL 的记录可以使用承载页 URL 加 locator 进入候选、业务实体和发布审核。承载页或 locator 不满足条件时写 `deferred`。
 7. 关系表与主 std 表使用同一套 URL、locator 和版权列，避免来源关系丢失。
 8. 稳定、可筛选的字段使用独立列；`extra` 只保存未建模信息。
 

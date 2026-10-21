@@ -142,7 +142,7 @@
 ## 风险与限制
 
 - 登录: 不需要登录
-- robots: `https://dialect.org.cn/robots.txt` 返回 404，`http://` 会重定向到 HTTPS；未发现可用 robots 规则，按公开页面最小频率访问
+- robots: `https://dialect.org.cn/robots.txt` 返回 404，记录为 `not-found`；`http://` 会重定向到 HTTPS。`not-found` 允许采集并写 `deferred` 候选，按公开页面最小频率访问。
 - 版权: 未发现开放许可；只保存来源元数据、短释义和列表结构，不批量复制音频或大段正文
 - 结构稳定性: Flask 页面结构简单但不稳定；音频字段是占位 URL；`region` 粒度不统一；没有独立方言名字段
 - 缺失字段: 音标与拼音混用、无音频来源和许可、无更新时间、无结构化谱系、无全量分页 API

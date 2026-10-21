@@ -18,10 +18,18 @@
 | --- | --- | --- | --- | --- |
 | `public` | 无需登录、通过 HTTP 或 Playwright 可直接访问 | 允许，记录 robots 事实并遵守频率和版权 | 按来源文档决定，通常保存元数据和必要正文 | 只发布已审核的结构化字段、短摘要和来源链接 |
 | `login-required` | 页面或接口需要登录才可访问 | 只在已明确授权且确有业务必要时，由人工控制的会话访问 | 只保存公开可见部分或明确授权的字段 | 默认不发布登录后才可见的内容 |
-| `robots-restricted` | robots 明确禁止自动采集相关路径 | 按用户确认的非商业竞赛用途低频率访问，记录 robots 事实和压力评估 | 只保存来源登记、URL、访问结论和人工核验记录 | 不发布自动采集的正文 |
+| `robots-restricted` | robots 明确禁止自动采集相关路径 | 明确 Disallow 的路径默认阻断；只有项目负责人书面批准且来源文档记录压力评估时才可按低频率执行 | 只保存来源登记、URL、访问结论和人工核验记录 | 不发布自动采集的正文 |
 | `manual-only` | 只能人工查看、人工核验或线下取得 | 不自动访问 | 只保存人工填写的元数据和核验说明 | 经人工审核后发布人工核验的字段 |
 
 访问等级是保守上限。某个来源标为 `public` 不代表可以批量转载全文，标为 `login-required` 也不代表可以保存登录后的个人数据。
+
+### robots 事实与 404 处理
+
+robots 结果固定记录为 `allowed`、`disallowed`、`not-found` 或 `unknown`。这些值是访问事实，不是候选状态。
+
+`robots.txt` 返回 404 时记录为 `not-found`。`not-found` 不阻断自动采集、raw 写入、stage 写入和候选写入，候选状态使用 `deferred`，原因写 `robots:not-found`。404 只表示未发现可读规则，不是明确授权，也不自动获得业务发布资格。
+
+403、5xx、连接失败、`unknown`、明确 Disallow、登录要求、验证码和付费墙仍按真实阻断处理。项目负责人对 `not-found` 的采集裁决只影响采集，不替代版权检查、来源审核和业务发布审核。
 
 ## 来源权利边界
 
@@ -53,11 +61,12 @@
 ## 访问判定顺序
 
 1. 读取来源文档中的 `access`、`license_or_usage` 和 `confidence`。
-2. 请求前记录目标 URL 的 robots 事实，使用实际采集 `User-Agent` 判断，并结合版权、用途和站点压力决定是否访问。
+2. 请求前记录目标 URL 的 robots 事实，使用实际采集 `User-Agent` 判断。`not-found` 按上述策略继续采集并写 `deferred` 候选；403、5xx、`unknown` 和明确 Disallow 记录原因并停止。
 3. 遇到登录、验证码、付费或访问控制即停止，记录原因，不尝试绕过。
 4. 对 `manual-only` 只登记来源与人工核验；对 `robots-restricted` 按用户确认的低频率非商业竞赛规则处理，并保留访问证据。
 5. 采集完成后把访问结论、取得时间、HTTP 状态和内容哈希写入 `raw_fetches`。
-6. 转换器只消费 `std` 层，且必须检查来源的 `access_level` 是否允许发布对应字段。
+6. 采集候选按数据完整性和真实阻断原因写为 `candidate`、`deferred` 或 `blocked`；`deferred` 不是失败，`blocked` 只用于真实阻断。
+7. 转换器只消费 `std` 层，且必须检查来源的 `access_level`、权利和发布门禁是否允许发布对应字段。
 
 ## 备选方案
 
@@ -76,7 +85,7 @@
 ## 后果
 
 - `sources.json` 中的 `access` 和 `rights_status` 共同决定调度和发布，来源文档必须给出验证时间和证据。
-- 受限来源仍然可以进入来源目录，但不会自动进入 `std` 发布链。
+- 受限来源仍然可以进入来源目录。`not-found` 来源可以写 `deferred` 候选，明确访问阻断和权利禁止不会进入可转换候选，也不会自动获得发布资格。
 - 业务库需要保留来源 URL 和导入批次，以便下架、复核和回滚。
 - 运营必须人工决定非遗可教学标记、招聘联系方式展示和方言音频发布。
 - 采集失败和合规停止都应有明确状态，不用空数组伪装成功。
@@ -87,3 +96,4 @@
 - `docs/schema/crawler-db.md`
 - `docs/schema/converter.md`
 - `docs/sources.json`
+- `docs/adr/0003-scrapy-collection-boundary.md`

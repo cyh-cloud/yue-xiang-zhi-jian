@@ -256,7 +256,7 @@
 ## 风险与限制
 
 - 登录: 公开列表和详情无需登录；联系方式需登录并完善简历，不采集登录后内容
-- robots: `http://www.nzrc.com.cn/robots.txt` 返回 404，没有可用的 robots 规则
+- robots: `http://www.nzrc.com.cn/robots.txt` 返回 404，记录为 `not-found`。允许采集并写 `deferred` 候选，404 不等于授权
 - 版权: 页面明确“未经授权不得转载”。粤乡智匠不应全文转载岗位正文，建议展示摘要并链接原详情
 - 权利标记: 记录使用 `attribution-required`，并在 `extra.rights_risk` 保留未经授权不得转载的风险说明
 - 结构稳定性: 老式 ASP.NET Web Forms，列表和详情字段依赖标签文本，结构变更风险中等

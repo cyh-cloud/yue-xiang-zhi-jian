@@ -4,7 +4,7 @@
 
 日期: 2026-10-19
 
-本文是后续爬虫实现的统一运行规则。规则以来源文档中的访问等级、版权状态和用户确认的非商业竞赛用途为准。robots 结果记录为访问事实，但不再是硬拒绝条件。
+本文是后续爬虫实现的统一运行规则。规则以来源文档中的访问等级、版权状态和项目负责人裁决为准。robots 结果记录为访问事实。`not-found` 不阻断采集，明确禁止仍按真实阻断处理。
 
 ## 基本流程
 
@@ -17,11 +17,12 @@
 ## robots
 
 - 每次运行前按实际 User-Agent 获取并解析 robots。
-- robots 明确禁止的路径可以按用户确认的非商业竞赛用途进入低频率采集，但必须记录 robots 事实和站点压力评估。
-- robots 返回 404 不等于授权。没有可读规则时降低频率并遵守站点版权声明。
+- robots 明确禁止的路径默认阻断。只有项目负责人书面批准且来源文档记录站点压力评估时，才可按低频率执行。
+- robots 返回 404 记录为 `not-found`。`not-found` 允许继续采集和写 raw/stage，候选写 `deferred`，原因 `robots:not-found`，并降低频率、遵守站点版权声明。
+- `not-found` 不等于授权，也不自动获得业务发布资格。
 - `zhongguoyuyan.cn` 因版权不允许使用数据而标记 `excluded`，不采集正文。
 - `5ajob` 的 robots 对普通 UA 和搜索引擎 UA 规则不同，必须按实际 UA 判断。
-- robots 读取失败、连接被重置或返回 HTML 错误页时记录失败原因，不把失败当允许。
+- robots 返回 403、5xx、连接失败或无法解析时记录 `unknown` 或错误事实并阻断候选，不把失败当允许。
 
 ## 登录
 
@@ -139,4 +140,12 @@
 
 ## 发布门禁
 
-没有可直接打开的长期单条详情 URL 的记录，只留在 raw/stage，不进入 std 或业务发布。动态查询行、聚合数据集和临时签名地址只进入人工对账或 raw 证据。
+发布使用直接详情 URL 或承载页 URL 加 locator 的机械规则：
+
+- `detail_url_status=direct`：`detail_url` 必须非空。
+- `detail_url_status=missing`：长期承载页 URL 必须非空，locator 必须能定位到该条记录。
+- 承载页或 locator 缺失时写 `deferred`。
+- 承载页 URL 不得伪装成详情 URL。
+- 临时签名地址只进入 `fetch_url` 或 raw 证据。
+
+候选状态固定为 `candidate`、`deferred`、`blocked`。数据完整但当前暂不使用时写 `deferred`，不要写 `blocked`。

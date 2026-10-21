@@ -34,12 +34,13 @@ python tools/check_architecture.py
 
 ## 2. 详情 URL 可直达
 
-- 每条样本的详情 URL 能直接打开单条记录。
-- 只给站点首页、列表首页、公司首页或搜索页不算详情 URL。
+- 每条样本的详情 URL 能直接打开单条记录，或提供可长期打开的承载页 URL 和非空 locator。
+- 只给站点首页、列表首页、公司首页或搜索页不算直接详情 URL，但公告页、数据集页和检索详情页可以作为承载页 URL。
+- `detail_url_status=missing` 时，承载页 URL 必须能重新打开，locator 必须能定位到同一记录。
 - `cnipa` 的检索详情页可直达；签名 PDF URL 只进 raw，不写长期字段。
 - `ihchina` 使用 `/project_details/{id}.html`，`5ajob` 使用 canonical 岗位 URL。
 - 详情 URL 规范化后保留原始查询参数，去掉无意义跟踪参数。
-- 重新访问详情 URL 后仍能定位同一记录。
+- 重新访问详情 URL 或承载页 URL 后仍能定位同一记录。
 
 ## 3. DOM 选择器非空
 
@@ -196,7 +197,7 @@ python -m crawler.run aqsc-moa --mode xlsx --database crawler/data/crawler-audit
 python -m crawler.run cnipa --mode pdf --database crawler/data/crawler-audit.db --pdf-root crawler/tests/fixtures/evidence/cnipa
 ```
 
-两条命令都必须返回 `status='succeeded'`；AQSC 公开合成样本应发现 8 行，CNIPA 公开合成 PDF 应发现 2 行。附件行保留在 raw/stage，没有直接详情 URL 时 `written_count=0` 且 `skipped_count` 等于发现行数。
+两条命令都必须返回 `status='succeeded'`；AQSC 公开合成样本应发现 8 行，CNIPA 公开合成 PDF 应发现 2 行。附件行保留在 raw/stage，并写入公告承载页和非空 locator。没有直接详情 URL 不是阻断条件；承载页或 locator 缺失时才写 `deferred`，不得发布。
 
 ## ihchina 3610 实测
 

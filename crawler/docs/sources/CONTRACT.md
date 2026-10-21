@@ -87,11 +87,11 @@
 | 字段 | 含义 |
 | --- | --- |
 | `source_url` | 发现该记录或文件的页面 URL，或本次实际请求 URL。 |
-| `long_term_url` | 公告页、数据集页、检索详情页等可长期打开的 URL。 |
-| `detail_url` | 单条记录详情 URL，仅在有直接详情页时填写。 |
-| `detail_url_status` | `direct` 或 `missing`；missing 时必须保存 locator。 |
+| `long_term_url` | 承载页 URL，是公告页、数据集页、检索详情页或其他能长期打开并展示记录上下文的页面。没有直接详情 URL 时，它就是给人跳转和回溯的来源页面。 |
+| `detail_url` | 单条记录的直接详情 URL，仅在确实存在单条详情页时填写。 |
+| `detail_url_status` | `direct` 或 `missing`。direct 必须有 `detail_url`；missing 必须有非空 `long_term_url` 和能定位记录的 `locator`。 |
 | `fetch_url` | 临时签名 URL、短期下载地址或本次抓取地址，不进入长期字段。 |
-| `locator` | 附件名、工作表名、页码、行号、表名或查询条件，用于定位无单条详情页的记录。 |
+| `locator` | 在工作表、PDF、HTML 列表或 JSON 响应中定位记录的信息，例如 `sheet=产品; row=12`、`page=3; table=1; row=8`、列表条目锚点或 `list[12]`。locator 不只限于 CSS 选择器。 |
 
 版权状态按来源默认、记录级覆盖：
 
@@ -102,20 +102,29 @@
 | `attribution_text` | 署名文本。 |
 | `rights_evidence_url` | 版权声明或授权证据 URL。 |
 
-`assumed-noncommercial-user-risk` 只用于明确不能公开使用、但用户接受非商业竞赛风险的来源或记录，并在 `extra` 记录风险接受说明。该标记不表示来源授权。
-## 详情 URL 与业务发布
+来源级默认值从来源注册表注入。Item 的权利字段默认不预填具体值。记录级显式值优先于来源级默认值，包括显式 `False`。合并时判断记录级字段是否为 `None`，不能用 `or` 把显式 `False` 覆盖成来源级 `True`。
 
-业务发布的硬规则：一条来源记录没有可直接打开的长期详情 URL 时，不得进入业务发布。
+`assumed-noncommercial-user-risk` 只用于明确不能公开使用、但用户接受非商业竞赛风险的来源或记录，并在 `extra` 记录风险接受说明。该标记不表示来源授权。
+## 详情 URL、承载页 URL 与业务发布
+
+定义只保留一处：
+
+- 详情 URL 是单条记录自己的直接详情页。
+- 承载页 URL 是长期打开后能看到该记录上下文的公告页、数据集页、检索详情页或查询结果页，对应 `long_term_url`。
+- locator 是在承载页或附件中定位该条记录的信息。它不是只限 CSS 选择器。
 
 | 情形 | 处理 |
 | --- | --- |
-| 有单条长期详情页 | 可以作为业务发布的来源 URL。 |
-| 只有列表页或查询结果页 | 不得作为单条记录的详情 URL。 |
-| 只有动态查询行，没有行级详情页 | 只留在 raw/stage，不进入 std 或业务发布。 |
-| 只有附件行 | 只有在公告详情页可作为长期入口且记录可定位到附件行时，才可发布。 |
+| 有单条长期详情页 | `detail_url` 填写，`detail_url_status=direct`，可以作为业务发布来源 URL。 |
+| 没有单条详情页，但有长期承载页 | `detail_url=null`，`detail_url_status=missing`，`long_term_url` 必须非空，locator 必须能定位记录。可以进入候选、业务实体和发布审核。 |
+| 只有列表页或查询结果页 | 只有当 URL 可长期重新打开且 locator 能定位同一记录时，才能作为承载页 URL。否则写 `deferred`。 |
+| 只有动态查询行 | 可以关联承载页 URL 和行级 locator。没有稳定承载页或 locator 时写 `deferred`，不进入业务发布。 |
+| 只有附件行 | 公告页或数据集页作为承载页 URL，附件行号、工作表名或页码进入 locator；满足权利和审核条件时可以发布。 |
 | 只有临时签名下载地址 | 不进入长期字段；只保存取得时间、文件哈希和获取方式。 |
 
-动态查询和聚合数据集尤其适用本规则。`aqsc-moa` 的动态查询行没有单条详情页时，只能关联公告详情和附件行；`cnopendata` 没有行级详情 URL 时，只登记公开元数据，不形成业务记录。
+没有直接详情 URL 的记录可以进入业务库，也可以在权利和审核条件满足时发布。不得把承载页 URL 伪装成详情 URL，也不得把 `detail_url_status=missing` 写成 `direct`。
+
+`aqsc-moa` 的动态查询行和附件行、`cnipa` 的 PDF 产品行都应使用公告页或检索详情页作为承载页，并保留行号或页码 locator。`cnopendata` 没有稳定承载页或行级 locator 时只登记公开元数据，不形成业务记录。
 
 ## 字段映射
 
@@ -131,7 +140,8 @@
 | --- | --- |
 | `file_name` | 本地文件名。 |
 | `source_url` | 可复核的原始文件 URL。 |
-| `detail_url` | 文件所属公告或详情页。 |
+| `long_term_url` | 文件所属公告页、数据集页或检索详情页，作为承载页 URL。 |
+| `detail_url` | 文件或记录自己的直接详情 URL，没有时写空。 |
 | `content_type` | 文件类型。 |
 | `size` | 字节数。 |
 | `sha256` | 文件内容哈希。 |

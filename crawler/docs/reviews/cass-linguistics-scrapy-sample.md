@@ -2,7 +2,7 @@
 
 日期: 2026-10-21
 
-验收结论: blocked
+验收结论: blocked（当前代码尚未按新口径重跑）
 
 运行结果: partial
 
@@ -29,16 +29,17 @@
 - raw: 10
 - stage: 5
 - 候选标准实体: 0
-- blocked: 5
+- 当前代码 blocked: 5
+- 目标口径 deferred: 5
 - failed/failure_count: 4
 - failure_reason: 4 条详情返回 HTTP 404
 
 ## 失败摘要
 
-`http://ling.cass.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。采集侧准入按保守策略阻断 5 条候选，阻断原因统一为 `robots:not-found`。另有 4 条详情返回 HTTP 404，计入 `failure_count`，所以运行结果是 `partial`；验收结论仍是 `blocked`，因为本次没有可发布候选。只访问 `ling.cass.cn` 公开页面，没有请求登录后语料资源。
+`http://ling.cass.cn/robots.txt` 返回 `404`，共享 robots 事实为 `not-found`。按最新裁决，`robots:not-found` 不阻断采集和采集库写入；raw、stage 保留，这 5 条候选应写为 `deferred`，原因 `robots:not-found`。当前分支的 blocked 5 是现有代码按旧 robots 策略产生的计数，尚未按新口径重跑。另有 4 条详情返回 HTTP 404，计入 `failure_count`，所以运行结果是 `partial`。404 仍不表示获得授权。只访问 `ling.cass.cn` 公开页面，没有请求登录后语料资源。
 
 证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-cass-783a606ae8334c5db6d8077f477abc6b\download`。
 
 ## 重试条件
 
-站点提供可确认的 robots 允许规则，或项目负责人对 `not-found` 作出明确书面策略裁决后，重跑 5 条列表加 5 条详情。
+项目负责人已裁决 `not-found` 不阻断采集。解除条件改为：按新口径重跑 5 条列表加 5 条详情，确认候选状态为 `deferred`，并保留 `robots:not-found` 原因。

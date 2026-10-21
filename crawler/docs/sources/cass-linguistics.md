@@ -128,7 +128,7 @@
 ## 风险与限制
 
 - 登录: 公开文章无需登录；`汉语方言语法特征语料库` 的检索与例句需要注册登录，属于 `login-required`
-- robots: `http://ling.cass.cn/robots.txt` 返回 404；HTTPS robots 请求连接被重置。按公开页面、低频率、学术用途访问
+- robots: `http://ling.cass.cn/robots.txt` 返回 404，记录为 `not-found`；HTTPS robots 请求连接被重置，记录为 `unknown`。HTTP not-found 允许采集并写 `deferred` 候选；HTTPS unknown 按真实阻断处理。按公开页面、低频率、学术用途访问
 - 版权: 页面明确写“中国社会科学院语言研究所版权所有”；论文、期刊和出版物正文不得全文转载到业务库
 - 结构稳定性: 门户模板和 `TRS_Editor` 正文可定位，但列表相对路径跨栏目，需 `urljoin`；部分新闻链接指向 `cssn.cn` 或微信，需按来源域名分流
 - 缺失字段: 无公开方言词条 API；无结构化 29 个方言点/711 句数据；无统一发布时间字段（需从标签行解析）

@@ -38,12 +38,13 @@
 
 ## 失败摘要
 
-10 条详情均返回 `200`，但 `#project_L` 容器不存在，`parse_job_detail` 访问字段容器时触发 `AttributeError: 'NoneType' object has no attribute 'select'`。验收结论是 `blocked`，因为本次没有可发布候选；运行报告状态是 `failed`，因为 10 次解析异常都计入 `failure_count`。这不是 robots 合规阻断，也不能把导航菜单的 `li` 当作岗位字段。
+10 条详情均返回 `200`，但实现使用的 `#project_L` 容器不存在，`parse_job_detail` 访问字段容器时触发 `AttributeError: 'NoneType' object has no attribute 'select'`。这是代码和文档沿用了未经验证的旧结构，属于真实解析失败。运行报告状态是 `failed`，因为 10 次解析异常都计入 `failure_count`；候选状态是 `blocked`，因为数据不完整。这不是 robots 合规阻断，也不能把导航菜单的 `li` 当作岗位字段。
 
 证据位置：`C:\Users\lixKR\AppData\Local\Temp\crawler-live-nongmuhr-2907e74ff22a4579bd820034a29d05e0\download`。
 
 ## 解除条件
 
-- 重新定位详情页岗位字段容器和标签结构。
-- 用新结构重新跑 5 条详情，确认至少标题、地点、有效期、招聘人数和发布日期可读。
+- 先重新抓取真实列表页和至少 5 条详情页，记录实际 DOM、HTTP 状态和取得时间。
+- 用真实结构更新 `crawler/docs/sources/nongmuhr.md`，在验证前不得把 `#project_L` 继续写成权威选择器。
+- 根据更新后的文档修改 parser 和 fixture，再重跑 5 条列表加 5 条详情，确认至少标题、地点、有效期、招聘人数和发布日期可读。
 - 在此之前只保留离线 fixture 和接口测试结论，不报告 live 成功。

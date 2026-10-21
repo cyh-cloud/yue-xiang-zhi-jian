@@ -61,6 +61,6 @@
 ## 2026-10-20 修复复核
 
 - `pdf` 模式现在遍历 `pdf_root` 中所有已映射公告 PDF，不再只取第 687 号文件；每份 PDF 独立生成 raw 文件证据和产品行 locator。
-- 公告详情页作为 `long_term_url`，产品行保持 `detail_url_status=missing` 且只进入 raw/stage。
+- 公告详情页作为 `long_term_url`，产品行保持 `detail_url_status=missing`，页码和序号作为 locator；按最新口径可以进入候选和发布审核，承载页或 locator 缺失时写 `deferred`。
 - 公开 fixture 是 `synthetic-announcement-687.pdf`，2 页、2 条示例产品行，覆盖解析路径但不复制原始附件。第 89、539 号及全量 537 公告的 PDF 表格重建仍为 `deferred`，解除条件是补齐可复核 fixture 或完成真实全量运行。
 - 国家知识产权局 HTML 公告附件解析路径没有离线 fixture，保持 `deferred`，不声称已验证。

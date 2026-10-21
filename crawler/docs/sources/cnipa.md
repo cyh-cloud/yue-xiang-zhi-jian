@@ -263,7 +263,7 @@
 ## 风险与限制
 
 - 登录: 未发现登录要求。检索页有免责声明弹窗，关闭或接受后可正常查询。
-- robots: `https://www.cnipa.gov.cn/robots.txt` 返回 404；`https://ggfw.cnipa.gov.cn/robots.txt` 和 `/dlbzsq/robots.txt` 返回 HTML 单页应用，不是有效 robots 文件。按公开政府信息访问，仍应限速并避免高并发。
+- robots: `https://www.cnipa.gov.cn/robots.txt` 返回 404，记录为 `not-found`；`https://ggfw.cnipa.gov.cn/robots.txt` 和 `/dlbzsq/robots.txt` 返回 HTML 壳页，记录为 `unknown`。`not-found` 允许采集并写 `deferred` 候选；`unknown` 按真实阻断处理，不把 HTML 壳页当作允许规则。所有域仍应限速并避免高并发。
 - 版权: 页面标注“版权所有：国家知识产权局”，未发现开放许可。采集库保存原文用于事实核验，业务库只发布结构化字段、短摘要和原文链接。
 - 结构稳定性: 产品级列表接口未在页面源码中直接出现，来自前端网络请求，升级后可能改名。国家知识产权局栏目列表可作为备用发现入口。
 - 签名过期: PDF URL 约 5 小时过期，不能写入长期字段或作为详情 URL。
@@ -296,9 +296,9 @@
 
 - 2026-10-20 通过本地第 687 号 PDF 生成产品行证据，保留页码和序号 locator。
 - 公告级长期 URL 使用 `https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541`，签名 PDF URL 不进入长期字段。
-- 同一公告覆盖多个产品，产品行没有单条详情 URL，因此 `detail_url=null`、`detail_url_status=missing`、`publish_status=blocked`，只作为 raw/stage 证据。
-- 转换器 dry-run 会跳过这些产品行，`inserted_count` 不包含它们。
-- 当前 PDF 文字层在 Windows 终端显示为乱码，启发式解析只能作为 raw/stage 的低置信度证据，不进入 std 或业务发布。
+- 同一公告覆盖多个产品，产品行没有单条详情 URL，因此 `detail_url=null`、`detail_url_status=missing`。公告详情页或检索详情页作为长期承载页 URL，PDF 页码和序号进入 locator。承载页和 locator 完整时可以进入候选和发布审核；缺失时写 `deferred`。旧口径中的 `publish_status=blocked` 不再作为候选判断。
+- 本轮只完成 fixture、骨架和接口验证。下一阶段必须执行 live 小样本，覆盖公告和 PDF 下载、表格解析、文件哈希、页码和序号 locator、承载页 URL、missing 详情状态和 `deferred` 候选。
+- 当前 PDF 文字层在 Windows 终端显示为乱码，启发式解析只能作为低置信度候选，必须经过发布审核，不能直接发布。
 - `pdf` 模式遍历所有已映射的本地 PDF，每份文件独立保存 raw 文件和产品行 locator；不再只处理第 687 号。
-- 全量 537 条公告、PDF 表格重建和扫描件 OCR 仍未完成。解除条件是补齐真实 PDF fixture 或完成全量运行、OCR 抽样和产品级对账。
-- 国家知识产权局 HTML 公告详情和附件链接解析没有离线 fixture，保持 `deferred`，不声称已验证。
+- 全量 537 条公告、PDF 表格重建和扫描件 OCR 仍未完成。解除条件是完成 live 小样本、补齐真实 PDF fixture 或完成全量运行、OCR 抽样和产品级对账。
+- 国家知识产权局 HTML 公告详情和附件链接解析没有离线 fixture，保持 `deferred`，不声称已验证。下一阶段 live 小样本必须先补这一类证据。
