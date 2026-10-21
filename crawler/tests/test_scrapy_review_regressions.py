@@ -131,8 +131,8 @@ class ProjectFixtureReplayTest(unittest.TestCase):
             2,
             0,
             "std_jobs",
-            "validity_days",
-            90,
+            "deadline_at",
+            "2026-12-31",
         ),
         (
             "dialect-org",

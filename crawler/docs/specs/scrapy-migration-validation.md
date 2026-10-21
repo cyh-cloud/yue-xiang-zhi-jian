@@ -21,7 +21,7 @@
 | --- | --- | --- | --- | --- |
 | ihchina | 通过 | 2 页列表 + 20 详情，robots `not-found`；历史 live 写 blocked 20，代码口径已改为 deferred 20，尚未重跑 | partial | blocked |
 | nzrc | 通过 | 19 详情，robots `not-found`；历史 live 写 blocked 19，代码口径已改为 deferred 19，尚未重跑 | partial | blocked |
-| nongmuhr | 通过 | 10 详情 HTTP 200，但详情解析 10 次失败，候选 0 | failed（failure_count 10） | blocked |
+| nongmuhr | 通过 | 10 详情 HTTP 200，真实结构复验通过；raw 11、stage 10、候选 10 | succeeded（failure_count 0） | approved |
 | dialect-org | 通过 | 15 详情，robots `not-found`；历史 live 写 blocked 15，代码口径已改为 deferred 15，尚未重跑 | partial | blocked |
 | cass-linguistics | 通过 | 9 详情，其中 4 条 404；robots `not-found`；历史 live 写 blocked 5，代码口径已改为 deferred 5，尚未重跑 | partial（failure_count 4） | blocked |
 | feiyiw | 通过 | 17 详情，robots `not-found`；历史 live 写 blocked 17，代码口径已改为 deferred 17，尚未重跑 | partial | blocked |
@@ -47,7 +47,7 @@
 ## 未关闭问题
 
 - 上方 live 计数是代码口径修订前的实际运行结果。`ihchina`、`nzrc`、`dialect-org`、`cass-linguistics`、`feiyiw` 的 robots 404 现在按代码契约保留 raw 和 stage，并把候选写为 `deferred`，原因 `robots:not-found`。这 5 个来源尚未重跑 live，因此验收结论仍保留为 `blocked`，不能宣称新口径已完成联网验证。
-- `nongmuhr` 详情页当前 HTML 不再匹配已登记字段结构，10 次详情解析均触发 `AttributeError`，raw 已保留但没有 stage 和候选。这是解析真实失败，应保持 `blocked`。解除条件是重新定位详情字段并重跑 5 条详情。
+- `nongmuhr` 已于 2026-10-21 按真实列表和 5 条详情重新校验，旧 `#project_L` 选择器已移除。Scrapy live 运行得到 raw 11、stage 10、候选 10，failure_count 0；本票据的解析阻断已解除。
 - `cass-linguistics` 另有 4 条详情返回 404，未写成成功样本。
 - `aqsc-moa` 和 `cnipa` 本轮只完成 fixture、骨架和接口验证。下一阶段必须补 live 小样本，覆盖附件下载、XLSX 或 PDF 解析、哈希、locator、承载页 URL、missing 详情状态和 `deferred` 候选。
 
