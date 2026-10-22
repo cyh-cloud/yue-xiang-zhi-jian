@@ -119,6 +119,7 @@ class RawEvidenceMiddleware:
     def process_response(self, request, response, spider):
         if request.meta.get("dont_obey_robotstxt"):
             return response
+        self._ensure_request_locator(request)
         is_http_error = response.status >= 400
         body = response.body
         file_name = request.meta.get("file_name") or Path(
@@ -151,7 +152,7 @@ class RawEvidenceMiddleware:
                     else "missing"
                 ),
                 fetch_url=request.url,
-                locator=request.meta.get("locator") or request.url,
+                locator=request.meta.get("locator"),
                 body=body,
                 content_type=response.headers.get(
                     "Content-Type", b"application/octet-stream"
@@ -176,6 +177,7 @@ class RawEvidenceMiddleware:
                 declared_size=declared_size,
                 metadata={
                     "file_name": file_name or "response.bin",
+                    "file_request": bool(request.meta.get("file_name")),
                     "http_error": is_http_error,
                     "observed_body_bytes": len(response.body),
                     "robots_status_code": request.meta.get(
@@ -199,6 +201,7 @@ class RawEvidenceMiddleware:
     def process_exception(self, request, exception, spider):
         if request.meta.get("dont_obey_robotstxt"):
             return None
+        self._ensure_request_locator(request)
         run_id = request.meta.get("run_id") or getattr(spider, "run_id", None)
         if not run_id:
             raise RuntimeError("request is missing the crawl run_id")
@@ -225,6 +228,7 @@ class RawEvidenceMiddleware:
         )
         metadata = {
             "file_name": error_file_name,
+            "file_request": bool(request.meta.get("file_name")),
             "robots_status_code": request.meta.get(
                 "robots_status_code"
             ),
@@ -260,7 +264,7 @@ class RawEvidenceMiddleware:
                     else "missing"
                 ),
                 fetch_url=request.url,
-                locator=request.meta.get("locator") or request.url,
+                locator=request.meta.get("locator"),
                 body=b"",
                 content_type="",
                 status_code=None,
@@ -284,3 +288,8 @@ class RawEvidenceMiddleware:
         )
         request.meta["raw_evidence_id"] = raw_id
         return None
+
+    @staticmethod
+    def _ensure_request_locator(request):
+        if not str(request.meta.get("locator") or "").strip():
+            request.meta["locator"] = "locator:missing"

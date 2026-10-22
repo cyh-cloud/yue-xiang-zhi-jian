@@ -59,6 +59,7 @@ class CollectionRuntimeTest(unittest.TestCase):
             "final_url": "https://example.test/1",
             "body": b"<html>fixture</html>",
             "content_type": "text/html",
+            "locator": "fixture:1",
             "run_id": "run-1",
             "robots_decision": "allowed",
             "request_headers": {
@@ -287,7 +288,7 @@ class CollectionRuntimeTest(unittest.TestCase):
         self.assertEqual(row[0], "oversize")
         self.assertIn("exceeds", row[1])
         self.assertEqual(row[2], "")
-        self.assertEqual(fetch, (0, None, None))
+        self.assertEqual(fetch, (0, None, "example.test/OVERSIZE.md"))
 
     def test_runtime_does_not_import_business_or_converter(self):
         source = (

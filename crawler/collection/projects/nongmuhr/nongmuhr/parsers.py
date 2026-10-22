@@ -54,6 +54,8 @@ _PROVINCES = (
     "澳门",
 )
 _PROVINCE_SUFFIXES = ("特别行政区", "自治区", "省", "市")
+_CITY_SUFFIXES = ("自治州", "地区", "盟", "市")
+_COUNTY_SUFFIXES = ("自治县", "县", "区", "旗")
 
 
 def _text(node):
@@ -169,9 +171,7 @@ def _normalized_location(value, *, fallback_region=None, source):
     fallback_province, _ = _province_prefix(fallback_region)
     if province is None:
         province = fallback_province
-    remainder = remainder.lstrip("省市")
-    city = remainder or None
-    county = city if city and city.endswith(("县", "区", "旗")) else None
+    city, county = _split_city_county(remainder)
     return {
         "location_raw": raw,
         "province": province,
@@ -182,6 +182,23 @@ def _normalized_location(value, *, fallback_region=None, source):
             "company_region": fallback_region,
         },
     }
+
+
+def _split_city_county(remainder):
+    compact = _SPACE.sub("", remainder or "")
+    if not compact:
+        return None, None
+    match = re.match(
+        r"^(.+?(?:自治州|地区|盟|市))(.+)$",
+        compact,
+    )
+    if match:
+        return match.group(1), match.group(2)
+    if compact.endswith(_CITY_SUFFIXES):
+        return compact, None
+    if compact.endswith(_COUNTY_SUFFIXES):
+        return None, compact
+    return None, None
 
 
 def _text_value(value):

@@ -71,5 +71,11 @@ def write_candidate(conn, item, *, now):
         ),
         now=now,
     )
-    upsert_job_relations(conn, job_id, item, now=now)
+    upsert_job_relations(
+        conn,
+        job_id,
+        item,
+        now=now,
+        require_location=True,
+    )
     return job_id

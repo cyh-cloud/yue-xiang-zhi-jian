@@ -9,6 +9,9 @@ from pathlib import Path
 from scrapy.crawler import CrawlerProcess
 from scrapy.settings import Settings
 
+from crawler.collection.shared.crawler_collection.exit_codes import (
+    exit_code_for_status,
+)
 from crawler.collection.shared.crawler_collection.run_id import new_run_id
 
 from . import settings as project_settings
@@ -90,7 +93,7 @@ def main(argv=None):
             ensure_ascii=False,
         )
     )
-    return 0
+    return exit_code_for_status(report.get("status"))
 
 
 if __name__ == "__main__":

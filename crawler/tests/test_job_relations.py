@@ -287,6 +287,53 @@ class JobRelationWriteTest(unittest.TestCase):
             conn.close()
         self.assertEqual(counts, (0, 0, 0))
 
+    def test_nzrc_missing_location_rolls_back_complete_candidate(self):
+        item = _job_item(
+            extra={
+                "company_name": "示例农业公司",
+                "location_raw": None,
+                "province": None,
+                "city": None,
+                "county": None,
+            },
+        )
+        runtime = CollectionRuntime(
+            database_path=self.db_path,
+            download_root=Path(self.tmp.name) / "downloads",
+            registry_path=Path("crawler/docs/sources.json"),
+            candidate_writer=write_nzrc_candidate,
+        )
+        raw_id = runtime.persist_raw(
+            runtime.evidence_from_fixture(
+                source_id="nzrc",
+                body=b"<html>job</html>",
+                request_url="https://example.test/jobs/8235500.html",
+                content_type="text/html",
+                run_id="nzrc-run-1",
+            )
+        )
+
+        with self.assertRaisesRegex(ValueError, "job location is required"):
+            runtime.write_item(
+                {**item, "mode": "fixture"},
+                raw_evidence_id=raw_id,
+            )
+
+        conn = self.database.connect()
+        try:
+            counts = tuple(
+                conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in (
+                    "stage_source_items",
+                    "std_jobs",
+                    "std_job_sources",
+                    "std_job_locations",
+                )
+            )
+        finally:
+            conn.close()
+        self.assertEqual(counts, (0, 0, 0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()

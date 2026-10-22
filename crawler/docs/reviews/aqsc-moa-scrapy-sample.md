@@ -25,12 +25,12 @@ run_id: `crawler-132-aqsc-live-20261021`
 - 附件取得时间: `2026-10-21 23:05:34 Asia/Shanghai`
 - robots: `http://www.aqsc.agri.cn/robots.txt` 返回 `403`，结论 `unknown`
 
-公告页发现和附件链接解析成功，XLSX 下载被 WAF 403 阻断。`raw_files` 保存的 `.xlsx` 文件是 403 错误响应，MIME 为 `text/html`，不是有效 XLSX。真实 Spider 将记录写成 blocked 证据，没有把 403 页面当作附件正文，也没有尝试绕过访问限制。
+公告页发现和附件链接解析成功，XLSX 下载被 WAF 403 阻断。当前运行保留了 403 响应的错误诊断，但不会把它保存为有效附件正文：`raw_fetches` 记录 403 状态和错误信息，附件对应的 `raw_files` 仅记录 `download_status=http_error` 的文件级元数据，`file_path` 和 `sha256` 为空，MIME 仍如实记录为 `text/html`。真实 Spider 将记录写成 blocked 证据，没有把 403 页面当作 XLSX，也没有尝试绕过访问限制。
 
 ## 计数
 
 - raw: 3
-- raw 附件文件: 1 个 403 错误响应，不是有效 XLSX
+- raw_files 错误诊断: 1 条 `download_status=http_error`，不是有效 XLSX
 - stage: 1
 - 候选标准实体: 0
 - blocked: 1
