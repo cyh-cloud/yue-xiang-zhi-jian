@@ -29,20 +29,59 @@ from datetime import datetime
 from flask import Blueprint, jsonify, request
 
 from core.app_factory import BASE_DIR
-from core.permissions import TEACHER, require_capability
+from core.permissions import STUDENT, SUPER_ADMIN, require_capability
 from core.session import get_session_user
 from shared.training_status import training_status_label
-from db_domains import notifications, teaching
+from shared.upload_limits import (
+    MAX_UPLOAD_BYTES,
+    MAX_UPLOAD_MEGABYTES,
+    MODEL_3D_EXTENSIONS,
+)
+from db_domains import notifications, reviews as reviews_db, teaching
 from db_domains import courses as courses_db
+from db_domains import students as students_db
 
-CAPABILITIES_USED = ('notification.read',)
+CAPABILITIES_USED = ('notification.read', 'review.read')
 
 teaching_support_bp = Blueprint('teaching_support', __name__)
 
-# 3D 模型上传：允许的文件格式（仅常见 3D 格式）
-_MODEL_3D_EXTS = ('glb', 'gltf', 'obj', 'fbx', 'stl', 'dae', 'ply', 'usdz')
-# 单个模型文件大小上限 50MB
-_MODEL_3D_MAX_BYTES = 50 * 1024 * 1024
+# 3D 模型上传：允许的文件格式来自共享层，前端提示取同一份定义。
+_MODEL_3D_EXTS = MODEL_3D_EXTENSIONS
+MODEL_3D_FORMAT_MESSAGE = (
+    "不支持的文件格式，仅支持 " + "/".join(MODEL_3D_EXTENSIONS)
+)
+# 单个模型文件大小上限，与应用级上传上限共用同一常量。
+_MODEL_3D_MAX_BYTES = MAX_UPLOAD_BYTES
+
+
+def _teacher_scope(user=None):
+    current = user or get_session_user() or {}
+    if current.get('role') == SUPER_ADMIN:
+        return None
+    return current.get('username') or ''
+
+
+def _course_owner_error(course_id):
+    course = courses_db.get_course(course_id)
+    if not course:
+        return jsonify({"success": False, "message": "课程不存在"}), 404
+    scope = _teacher_scope()
+    if scope is not None and course.get('teacher_id') != scope:
+        return jsonify({"success": False, "message": "只能管理自己的课程"}), 403
+    return None
+
+
+def _attach_review_fields(rows, content_type):
+    """给内容所有者的列表补上最近一次审核结论与驳回理由。"""
+    latest = reviews_db.get_latest_reviews_by_content(
+        content_type, [row['id'] for row in rows],
+    )
+    for row in rows:
+        review = latest.get(row['id'])
+        row['review_comment'] = (review or {}).get('review_comment') or ''
+        row['reviewed_by'] = (review or {}).get('reviewed_by') or ''
+        row['reviewed_at'] = (review or {}).get('reviewed_at') or ''
+    return rows
 
 
 # ==================== 通知公告 ====================
@@ -50,7 +89,7 @@ _MODEL_3D_MAX_BYTES = 50 * 1024 * 1024
 @teaching_support_bp.route('/api/teacher/announcements', methods=['GET'])
 @require_capability('teaching.read', anonymous=401)
 def get_announcements():
-    announcements = teaching.get_announcements()
+    announcements = teaching.get_announcements(teacher_id=_teacher_scope())
     return jsonify({"success": True, "announcements": announcements})
 
 
@@ -64,10 +103,16 @@ def create_announcement():
     pinned = 1 if data.get('pinned') else 0
     if not title or not content:
         return jsonify({"success": False, "message": "请填写标题和内容"})
-    aid = teaching.create_announcement(title, content, category, pinned)
+    user = get_session_user()
+    scope = _teacher_scope(user)
+    teacher_id = teaching.GLOBAL_TEACHER_ID if scope is None else scope
+    aid = teaching.create_announcement(
+        title, content, category, pinned, teacher_id=teacher_id,
+    )
     # 自动给所有学员发通知
     notifications.create_notification_for_all_students(
-        'announcement', f'新{category}', title, 'announcement', aid
+        'announcement', f'新{category}', title, 'announcement', aid,
+        teacher_id=None if scope is None else scope,
     )
     return jsonify({"success": True, "message": "发布成功", "id": aid})
 
@@ -75,7 +120,8 @@ def create_announcement():
 @teaching_support_bp.route('/api/teacher/announcements/<int:ann_id>', methods=['DELETE'])
 @require_capability('teaching.manage', anonymous=401)
 def delete_announcement(ann_id):
-    if teaching.delete_announcement(ann_id):
+    if teaching.delete_announcement(ann_id, teacher_id=_teacher_scope()):
+        notifications.delete_notifications_by_link('announcement', ann_id)
         return jsonify({"success": True, "message": "删除成功"})
     return jsonify({"success": False, "message": "未找到通知"})
 
@@ -90,7 +136,17 @@ def delete_announcement(ann_id):
 @teaching_support_bp.route('/api/student/announcements', methods=['GET'])
 def get_my_announcements():
     """获取通知公告列表（学员可见）"""
-    announcements = teaching.get_announcements(limit=30)
+    user = get_session_user()
+    if not user or user.get('role') != STUDENT:
+        return jsonify({"success": True, "announcements": []})
+    teacher_id = students_db.get_teacher_id_for_student_account(
+        user['username']
+    )
+    if not teacher_id:
+        return jsonify({"success": True, "announcements": []})
+    announcements = teaching.get_announcements(
+        limit=30, teacher_id=teacher_id,
+    )
     return jsonify({"success": True, "announcements": announcements})
 
 
@@ -114,6 +170,16 @@ def grade_submission():
     # 取提交上下文以发送通知：学员是谁、这条提交挂在哪个作业上。
     # 走 v_submission_context（提交 JOIN 作业），域路由不自己写 SQL。
     sub = teaching.get_submission_context(submission_id)
+    scope = _teacher_scope()
+    if sub and scope is not None:
+        owner = students_db.get_teacher_id_for_student_account(
+            sub['student_id']
+        )
+        if owner != scope:
+            return jsonify({
+                "success": False,
+                "message": "只能批改自己名册学员的提交",
+            }), 403
     if teaching.grade_submission(submission_id, score, feedback):
         if sub:
             notifications.create_notification(sub['student_id'], 'grade', '实训已批改', f'得分：{score}', 'assignment', sub['assignment_id'])
@@ -130,7 +196,7 @@ def teacher_get_trainings():
     批改仍走既有 /api/teacher/assignments/grade，会给学员发站内通知。
     """
     out = []
-    for r in teaching.get_all_trainings():
+    for r in teaching.get_all_trainings(teacher_id=_teacher_scope()):
         detail = {}
         try:
             detail = json.loads(r.get('content') or '{}')
@@ -180,7 +246,7 @@ def teacher_get_trainings():
 @teaching_support_bp.route('/api/teacher/analytics', methods=['GET'])
 @require_capability('teaching.read', anonymous=401)
 def get_analytics():
-    data = teaching.get_analytics_data()
+    data = teaching.get_analytics_data(teacher_id=_teacher_scope())
     return jsonify({"success": True, "analytics": data})
 
 
@@ -189,9 +255,13 @@ def get_analytics():
 @teaching_support_bp.route('/api/teacher/courses', methods=['GET'])
 @require_capability('course.read')
 def teacher_get_courses():
-    user = get_session_user()
-    course_list = courses_db.get_courses(teacher_id=user['username'], published_only=False)
-    return jsonify({"success": True, "courses": course_list})
+    course_list = courses_db.get_courses(
+        teacher_id=_teacher_scope(), published_only=False,
+    )
+    return jsonify({
+        "success": True,
+        "courses": _attach_review_fields(course_list, 'course'),
+    })
 
 
 @teaching_support_bp.route('/api/teacher/courses', methods=['POST'])
@@ -209,7 +279,9 @@ def teacher_create_course():
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>', methods=['PUT'])
 @require_capability('course.manage')
 def teacher_update_course(course_id):
-    user = get_session_user()
+    err = _course_owner_error(course_id)
+    if err:
+        return err
     data = request.get_json()
     courses_db.update_course(course_id, **{k: v for k, v in data.items()
         if k in ('title', 'description', 'category', 'cover_url')})
@@ -219,7 +291,9 @@ def teacher_update_course(course_id):
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>', methods=['DELETE'])
 @require_capability('course.manage')
 def teacher_delete_course(course_id):
-    user = get_session_user()
+    err = _course_owner_error(course_id)
+    if err:
+        return err
     courses_db.delete_course(course_id)
     return jsonify({"success": True, "message": "删除成功"})
 
@@ -227,7 +301,11 @@ def teacher_delete_course(course_id):
 # ==================== 课程素材 ====================
 
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>/materials', methods=['GET'])
+@require_capability('course.read')
 def teacher_get_materials(course_id):
+    err = _course_owner_error(course_id)
+    if err:
+        return err
     materials = courses_db.get_course_materials(course_id)
     return jsonify({"success": True, "materials": materials})
 
@@ -235,7 +313,9 @@ def teacher_get_materials(course_id):
 @teaching_support_bp.route('/api/teacher/courses/<int:course_id>/materials', methods=['POST'])
 @require_capability('course.manage')
 def teacher_add_material(course_id):
-    user = get_session_user()
+    err = _course_owner_error(course_id)
+    if err:
+        return err
     if 'file' not in request.files:
         return jsonify({"success": False, "message": "请选择文件"}), 400
     f = request.files['file']
@@ -261,7 +341,12 @@ def teacher_add_material(course_id):
 @teaching_support_bp.route('/api/teacher/materials/<int:mat_id>', methods=['DELETE'])
 @require_capability('course.manage')
 def teacher_delete_material(mat_id):
-    user = get_session_user()
+    owner = courses_db.get_course_material_owner(mat_id)
+    if owner is None:
+        return jsonify({"success": False, "message": "素材不存在"}), 404
+    scope = _teacher_scope()
+    if scope is not None and owner != scope:
+        return jsonify({"success": False, "message": "只能管理自己的课程素材"}), 403
     filepath = courses_db.delete_course_material(mat_id)
     if filepath:
         full = os.path.join(BASE_DIR, filepath)
@@ -277,10 +362,13 @@ def teacher_delete_material(mat_id):
 def teacher_get_models_3d():
     user = get_session_user()
     # 教师只看自己上传的；其他持 course.read 的角色看全部
-    teacher_id = user['username'] if user['role'] == TEACHER else None
+    teacher_id = _teacher_scope(user)
     models = courses_db.get_models_3d(teacher_id=teacher_id,
                                     published_only=False)
-    return jsonify({"success": True, "models": models})
+    return jsonify({
+        "success": True,
+        "models": _attach_review_fields(models, 'model_3d'),
+    })
 
 
 @teaching_support_bp.route('/api/teacher/models-3d', methods=['POST'])
@@ -288,14 +376,26 @@ def teacher_get_models_3d():
 def teacher_create_model_3d():
     user = get_session_user()
     if 'file' not in request.files:
-        return jsonify({"success": False, "message": "请选择模型文件"}), 400
+        return jsonify({
+            "success": False,
+            "code": "empty_file",
+            "message": "请选择模型文件",
+        }), 400
     f = request.files['file']
     if not f.filename:
-        return jsonify({"success": False, "message": "文件名为空"}), 400
+        return jsonify({
+            "success": False,
+            "code": "empty_file",
+            "message": "文件名为空",
+        }), 400
     # 文件类型校验：仅允许常见 3D 模型格式
     ext = os.path.splitext(f.filename)[1].lower().lstrip('.')
     if ext not in _MODEL_3D_EXTS:
-        return jsonify({"success": False, "message": "不支持的文件格式，仅支持 glb/gltf/obj/fbx/stl/dae/ply/usdz"}), 400
+        return jsonify({
+            "success": False,
+            "code": "unsupported_format",
+            "message": MODEL_3D_FORMAT_MESSAGE,
+        }), 400
     title = request.form.get('title', f.filename)
     description = request.form.get('description', '')
     craft_type = request.form.get('craft_type', '')
@@ -305,12 +405,23 @@ def teacher_create_model_3d():
     os.makedirs(os.path.dirname(os.path.join(BASE_DIR, filepath)), exist_ok=True)
     save_full = os.path.join(BASE_DIR, filepath)
     f.save(save_full)
-    # 记录真实文件大小（上限 50MB，超限删除并拒绝）
+    # 记录真实文件大小（上限来自共享常量，超限删除并拒绝）
     file_size = os.path.getsize(save_full) if os.path.exists(save_full) else 0
+    if file_size == 0:
+        os.remove(save_full)
+        return jsonify({
+            "success": False,
+            "code": "empty_file",
+            "message": "文件为空，请重新选择",
+        }), 400
     if file_size > _MODEL_3D_MAX_BYTES:
         if os.path.exists(save_full):
             os.remove(save_full)
-        return jsonify({"success": False, "message": "文件过大，模型文件不能超过 50MB"}), 400
+        return jsonify({
+            "success": False,
+            "code": "file_too_large",
+            "message": "文件过大，模型文件不能超过 %dMB" % MAX_UPLOAD_MEGABYTES,
+        }), 400
     model_id = courses_db.create_model_3d(title, description, craft_type,
                                          filepath, f.filename, file_size, user['username'])
     return jsonify({"success": True, "id": model_id, "message": "3D模型上传成功，等待审核"})
@@ -319,6 +430,19 @@ def teacher_create_model_3d():
 @teaching_support_bp.route('/api/teacher/models-3d/<int:model_id>', methods=['DELETE'])
 @require_capability('course.manage', anonymous=401)
 def teacher_delete_model_3d(model_id):
+    user = get_session_user()
+    target = courses_db.get_model_3d_by_id(model_id)
+    if not target:
+        return jsonify({
+            "success": False,
+            "message": "模型不存在",
+        }), 404
+    scope = _teacher_scope(user)
+    if scope is not None and target.get('teacher_id') != scope:
+        return jsonify({
+            "success": False,
+            "message": "只能删除自己上传的模型",
+        }), 403
     filepath = courses_db.delete_model_3d(model_id)
     if filepath:
         full = os.path.join(BASE_DIR, filepath)

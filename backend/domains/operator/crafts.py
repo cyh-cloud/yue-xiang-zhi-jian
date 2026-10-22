@@ -34,8 +34,7 @@ from db_domains import crafts as crafts_db
 from domains.operator.routes import json_body, ok, fail, run_write
 
 # 运营域读 craft 能力域，写侧与 craft.manage 对应（声明供机械检查判权）。
-# 注意 craft.manage 还含 teacher：教师也能维护技艺内容（T01 能力表）。
-CAPABILITIES_USED = ('craft.manage',)
+CAPABILITIES_USED = ('craft.content.manage',)
 
 _MAX_TEXT = 500
 _MAX_TITLE = 60
@@ -74,12 +73,12 @@ def register_crafts_routes(bp):
     # ---- 技艺 ----
 
     @bp.route('/api/operator/crafts', methods=['GET'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_crafts():
         """技艺列表，带步骤数与采购条目数，供后台判断「这门技艺填全了没有」。"""
         crafts = []
-        for row in crafts_db.get_crafts():
-            craft = dict(row)
+        for summary in crafts_db.get_crafts():
+            craft = crafts_db.get_craft_row(summary['id']) or dict(summary)
             craft['step_count'] = len(crafts_db.get_craft_steps(craft['id']))
             craft['item_count'] = len(
                 crafts_db.get_craft_purchase_items(craft['id']))
@@ -88,7 +87,7 @@ def register_crafts_routes(bp):
         return ok(crafts=crafts)
 
     @bp.route('/api/operator/crafts', methods=['POST'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_create():
         data = json_body()
         craft_id = _text(data.get('id'))
@@ -106,7 +105,7 @@ def register_crafts_routes(bp):
         return run_write(crafts_db.create_craft, craft_id, name, **fields)
 
     @bp.route('/api/operator/crafts/<craft_id>', methods=['PUT'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_update(craft_id):
         data = json_body()
         fields = _fields(data, ('name', 'origin', 'history', 'level'))
@@ -115,19 +114,19 @@ def register_crafts_routes(bp):
         return run_write(crafts_db.update_craft, craft_id, **fields)
 
     @bp.route('/api/operator/crafts/<craft_id>', methods=['DELETE'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_delete(craft_id):
         return run_write(crafts_db.delete_craft, craft_id)
 
     # ---- 步骤 ----
 
     @bp.route('/api/operator/crafts/<craft_id>/steps', methods=['GET'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_steps(craft_id):
         return ok(steps=crafts_db.get_craft_steps(craft_id))
 
     @bp.route('/api/operator/crafts/<craft_id>/steps', methods=['POST'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_step_create(craft_id):
         data = json_body()
         title = _text(data.get('title'), _MAX_TITLE)
@@ -140,7 +139,7 @@ def register_crafts_routes(bp):
         return run_write(crafts_db.create_craft_step, craft_id, title, **fields)
 
     @bp.route('/api/operator/crafts/steps/<int:step_id>', methods=['PUT'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_step_update(step_id):
         data = json_body()
         fields = _fields(data, ('title', 'desc', 'tips'))
@@ -149,7 +148,7 @@ def register_crafts_routes(bp):
         return run_write(crafts_db.update_craft_step, step_id, **fields)
 
     @bp.route('/api/operator/crafts/steps/<int:step_id>', methods=['DELETE'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_step_delete(step_id):
         return run_write(crafts_db.delete_craft_step, step_id)
 
@@ -157,13 +156,13 @@ def register_crafts_routes(bp):
 
     @bp.route('/api/operator/crafts/<craft_id>/purchase-categories',
               methods=['GET'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_categories(craft_id):
         return ok(categories=crafts_db.get_craft_purchase_categories(craft_id))
 
     @bp.route('/api/operator/crafts/<craft_id>/purchase-categories',
               methods=['POST'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_category_create(craft_id):
         data = json_body()
         key = _text(data.get('key'), _MAX_TITLE)
@@ -177,7 +176,7 @@ def register_crafts_routes(bp):
 
     @bp.route('/api/operator/crafts/<craft_id>/purchase-categories/<key>',
               methods=['PUT'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_category_update(craft_id, key):
         data = json_body()
         fields = _fields(data, ('label', 'desc'))
@@ -188,21 +187,21 @@ def register_crafts_routes(bp):
 
     @bp.route('/api/operator/crafts/<craft_id>/purchase-categories/<key>',
               methods=['DELETE'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_category_delete(craft_id, key):
         return run_write(crafts_db.delete_craft_purchase_category, craft_id, key)
 
     # ---- 采购指南：条目 ----
 
     @bp.route('/api/operator/crafts/<craft_id>/purchase-items', methods=['GET'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_items(craft_id):
         category_key = _text(request.args.get('category_key'))
         return ok(items=crafts_db.get_craft_purchase_items(
             craft_id, category_key or None))
 
     @bp.route('/api/operator/crafts/<craft_id>/purchase-items', methods=['POST'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_item_create(craft_id):
         data = json_body()
         category_key = _text(data.get('category_key'), _MAX_TITLE)
@@ -220,7 +219,7 @@ def register_crafts_routes(bp):
 
     @bp.route('/api/operator/crafts/purchase-items/<int:item_id>',
               methods=['PUT'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_item_update(item_id):
         data = json_body()
         fields = _fields(data, ('name', 'price', 'spec', 'tip', 'where'))
@@ -230,14 +229,14 @@ def register_crafts_routes(bp):
 
     @bp.route('/api/operator/crafts/purchase-items/<int:item_id>',
               methods=['DELETE'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_purchase_item_delete(item_id):
         return run_write(crafts_db.delete_craft_purchase_item, item_id)
 
     # ---- 采购指南：预算 ----
 
     @bp.route('/api/operator/crafts/<craft_id>/budget', methods=['GET'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_budget(craft_id):
         budget = crafts_db.get_craft_budget(craft_id)
         if budget is None:
@@ -245,7 +244,7 @@ def register_crafts_routes(bp):
         return ok(budget=budget)
 
     @bp.route('/api/operator/crafts/<craft_id>/budget', methods=['PUT'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_budget_update(craft_id):
         """预算一门技艺一行，PUT 即「写入 / 覆盖」，没有 POST 与 DELETE。
 
@@ -260,12 +259,12 @@ def register_crafts_routes(bp):
     # ---- 视频教学 ----
 
     @bp.route('/api/operator/crafts/<craft_id>/videos', methods=['GET'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_videos(craft_id):
-        return ok(videos=crafts_db.get_craft_videos(craft_id))
+        return ok(videos=crafts_db.get_craft_videos_for_editor(craft_id))
 
     @bp.route('/api/operator/crafts/<craft_id>/videos', methods=['POST'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_video_create(craft_id):
         data = json_body()
         bvid = _text(data.get('bvid'), _MAX_TITLE)
@@ -279,7 +278,7 @@ def register_crafts_routes(bp):
         return run_write(crafts_db.create_craft_video, craft_id, bvid, **fields)
 
     @bp.route('/api/operator/crafts/videos/<int:video_id>', methods=['PUT'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_video_update(video_id):
         data = json_body()
         fields = _fields(data, _VIDEO_TEXT_FIELDS)
@@ -289,7 +288,7 @@ def register_crafts_routes(bp):
         return run_write(crafts_db.update_craft_video, video_id, **fields)
 
     @bp.route('/api/operator/crafts/videos/<int:video_id>', methods=['DELETE'])
-    @require_capability('craft.manage')
+    @require_capability('craft.content.manage')
     def operator_craft_video_delete(video_id):
         return run_write(crafts_db.delete_craft_video, video_id)
 

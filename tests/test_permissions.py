@@ -115,6 +115,7 @@ class PermissionMatrixTest(unittest.TestCase):
             self.assertFalse(can('operator', capability),
                              'operator 不应持有 %s' % capability)
         for capability in ('farming.manage', 'pest.manage', 'craft.manage',
+                           'craft.content.manage',
                            'dialect.manage', 'recruit.manage', 'case.manage'):
             self.assertTrue(can('operator', capability),
                             'operator 应持有 %s' % capability)

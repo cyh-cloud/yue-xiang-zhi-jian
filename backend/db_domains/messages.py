@@ -52,9 +52,15 @@ def get_messages(user1_id, user2_id, limit=50):
     conn = get_connection()
     rows = conn.execute(
         """SELECT * FROM messages
-           WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)
+           WHERE ((sender_id = ? AND receiver_id = ?) OR
+                  (sender_id = ? AND receiver_id = ?))
+             AND NOT (
+                 (sender_id = ? AND sender_cleared = 1) OR
+                 (receiver_id = ? AND receiver_cleared = 1)
+             )
            ORDER BY created_at DESC LIMIT ?""",
-        (user1_id, user2_id, user2_id, user1_id, limit)
+        (user1_id, user2_id, user2_id, user1_id,
+         user1_id, user1_id, limit)
     ).fetchall()
     conn.close()
     return [dict(r) for r in reversed(rows)]
@@ -95,7 +101,8 @@ def get_inbox(user_id):
         """SELECT m.* FROM messages m
            WHERE m.id IN (
                SELECT MAX(id) FROM messages
-               WHERE sender_id = ? OR receiver_id = ?
+               WHERE (sender_id = ? AND sender_cleared = 0) OR
+                     (receiver_id = ? AND receiver_cleared = 0)
                GROUP BY CASE WHEN sender_id = ? THEN receiver_id ELSE sender_id END
            )
            ORDER BY m.created_at DESC""",
@@ -152,6 +159,23 @@ def mark_all_messages_read(user_id):
     conn.execute(
         "UPDATE messages SET is_read = 1 WHERE receiver_id = ? AND is_read = 0",
         (user_id,)
+    )
+    conn.commit()
+    conn.close()
+
+
+def clear_read_messages(user_id):
+    """Hide already-read messages from this user's inbox and conversations."""
+    conn = get_connection()
+    conn.execute(
+        "UPDATE messages SET receiver_cleared = 1 "
+        "WHERE receiver_id = ? AND is_read = 1",
+        (user_id,),
+    )
+    conn.execute(
+        "UPDATE messages SET sender_cleared = 1 "
+        "WHERE sender_id = ? AND is_read = 1",
+        (user_id,),
     )
     conn.commit()
     conn.close()

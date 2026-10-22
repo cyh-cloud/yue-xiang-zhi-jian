@@ -1,0 +1,80 @@
+# 粤乡智匠 SPA + API 反向代理模板。
+# 通过 `python tools/render_nginx_config.py --output <path>` 渲染后使用。
+
+worker_processes auto;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile      on;
+    tcp_nopush    on;
+    keepalive_timeout 65;
+
+    server {
+        listen {{LISTEN_PORT}};
+        server_name _;
+
+        # 前端构建产物
+        root {{PROJECT_DIR}}/frontend/dist;
+        index index.html;
+
+        # 覆盖完整 multipart 请求；单文件 50MB 上限由 Flask 业务路由校验。
+        client_max_body_size {{MAX_REQUEST_MEGABYTES}}m;
+
+        # 带 hash 的构建资源可长期缓存
+        location /assets/ {
+            try_files $uri =404;
+            add_header Cache-Control "public, max-age=31536000, immutable";
+        }
+
+        # 用户上传与固定图片/模型由 nginx 直接发送
+        location /uploads/ {
+            alias {{PROJECT_DIR}}/uploads/;
+            try_files $uri =404;
+            add_header Cache-Control "public, max-age=604800";
+        }
+
+        location /images/ {
+            alias {{PROJECT_DIR}}/images/;
+            try_files $uri =404;
+            add_header Cache-Control "public, max-age=604800";
+        }
+
+        # AI 流式接口：关闭代理缓冲，避免 tokens 被整块缓冲。
+        location /api/agriculture/ask/stream {
+            proxy_pass http://127.0.0.1:{{PROXY_PORT}};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering off;
+            proxy_read_timeout 120s;
+        }
+
+        # 业务 API
+        location /api/ {
+            proxy_pass http://127.0.0.1:{{PROXY_PORT}};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_buffering on;
+        }
+
+        # SPA history fallback。静态目录与 API 必须先于该规则匹配。
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        # 入口 HTML 不长期缓存，避免发布后仍拿到旧资源引用。
+        location = /index.html {
+            add_header Cache-Control "no-cache";
+        }
+    }
+}

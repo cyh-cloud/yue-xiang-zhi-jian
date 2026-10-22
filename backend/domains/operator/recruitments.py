@@ -69,7 +69,7 @@ def register_recruitments_routes(bp):
             item['source_count'] = len(
                 recruitments_db.get_recruitment_sources(item['key']))
             recruitments.append(item)
-        return ok(recruitments=recruitments)
+        return ok(recruitments=recruitments, categories=list(_CATEGORIES))
 
     @bp.route('/api/operator/recruitments', methods=['POST'])
     @require_capability('recruit.manage')

@@ -21,6 +21,7 @@ from flask import jsonify, request
 
 from core.session import get_session_user
 from domains.agriculture.routes import agriculture_bp
+from shared.review_freshness import is_review_current
 from shared.solar_terms import solar_terms_of_month
 from db_domains import farming, notifications
 # 本域读 farming（公开），并在农事提醒到期时写 notification。写别人的域要显式
@@ -104,6 +105,8 @@ def get_farming_calendar(product_id):
     for t in tasks:
         md = t.get('task_md')
         verified = int(t.get('is_verified') or 0)
+        if verified and not is_review_current(t.get('verified_at')):
+            verified = 0
         src = source_map.get(t.get('source_key') or '')
         day = None
         date = None

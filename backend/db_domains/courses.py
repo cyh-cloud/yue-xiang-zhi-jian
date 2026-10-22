@@ -143,6 +143,18 @@ def delete_course_material(mat_id):
     return row['file_path'] if row else None
 
 
+def get_course_material_owner(mat_id):
+    """Return the owning course's teacher_id for a material, or None."""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT c.teacher_id FROM course_materials cm "
+        "JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?",
+        (mat_id,),
+    ).fetchone()
+    conn.close()
+    return row['teacher_id'] if row else None
+
+
 # ==================== 3D 模型 ====================
 
 def create_model_3d(title, description, craft_type, file_path, file_name, file_size, teacher_id, thumbnail_url=''):

@@ -11,6 +11,7 @@ import json
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if REPO_ROOT not in sys.path:
@@ -174,6 +175,30 @@ class TrainingSubmitTest(unittest.TestCase):
     def test_records_require_login(self):
         r = self.client.get('/api/ecommerce/live/records')
         self.assertEqual(r.status_code, 401)
+
+
+class LiveCommentsTest(unittest.TestCase):
+    """AI 观众评论未配置时必须快速返回可见不可用，不等待上游超时。"""
+
+    def setUp(self):
+        from app import app
+        self.app = app
+        self.app.config['TESTING'] = True
+        self.client = app.test_client()
+
+    def test_unconfigured_ai_returns_unavailable_without_upstream_call(self):
+        with patch('domains.live_training.routes.ai_configured', return_value=False), \
+                patch('domains.live_training.routes.chat_completion') as upstream:
+            response = self.client.post(
+                '/api/ecommerce/live/comments',
+                data=json.dumps({'speech': '家人们看过来', 'difficulty': '新手'}),
+                content_type='application/json',
+            )
+        self.assertEqual(response.status_code, 503)
+        body = json.loads(response.data)
+        self.assertFalse(body['success'])
+        self.assertEqual(body['code'], 'ai_unavailable')
+        upstream.assert_not_called()
 
 
 if __name__ == '__main__':

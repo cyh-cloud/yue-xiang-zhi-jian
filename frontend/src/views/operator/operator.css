@@ -1,0 +1,293 @@
+/*
+ * Operator page and form styles. Shared backoffice primitives remain in
+ * components.css; shell layout and role themes remain in backoffice.css.
+ */
+
+.operator-overdue-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.operator-overdue-criterion {
+  margin: -4px 0 14px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--bo-accent-soft);
+  color: var(--bo-muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.operator-overdue-columns section {
+  padding: 15px;
+  border: 1px solid var(--bo-card-border);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--bo-card-bg) 92%, var(--bo-page-bg));
+}
+
+.operator-overdue-columns header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.operator-overdue-columns h3,
+.operator-overdue-columns p {
+  margin: 0;
+}
+
+.operator-overdue-columns h3 {
+  font-size: 0.86rem;
+}
+
+.operator-overdue-columns a {
+  color: var(--bo-accent);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.operator-overdue-columns ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.operator-overdue-columns li {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: var(--bo-accent-soft);
+}
+
+.operator-overdue-columns li strong {
+  font-size: 0.78rem;
+}
+
+.operator-overdue-columns li span,
+.operator-overdue-columns li small,
+.operator-overdue-columns p {
+  color: var(--bo-muted);
+  font-size: 0.7rem;
+  line-height: 1.45;
+}
+
+.operator-overview-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--bo-muted);
+  font-size: 0.82rem;
+}
+
+.operator-craft-budget {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.5fr) minmax(130px, 0.5fr) minmax(220px, 1.4fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--bo-card-border);
+  background: color-mix(in srgb, var(--bo-accent-soft) 55%, transparent);
+}
+
+.operator-craft-budget div {
+  display: grid;
+  gap: 3px;
+}
+
+.operator-craft-budget small {
+  color: var(--bo-muted);
+  font-size: 0.68rem;
+}
+
+.operator-craft-budget strong {
+  color: var(--bo-text);
+  font-size: 0.9rem;
+}
+
+.operator-craft-budget p {
+  margin: 0;
+  color: var(--bo-muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.operator-farming .operator-tabs,
+.operator-pest .operator-tabs,
+.operator-crafts .operator-tabs,
+.operator-dialects .operator-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--bo-card-border);
+}
+
+.operator-cases .operator-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 15px;
+}
+
+.operator-farming .operator-tabs button,
+.operator-pest .operator-tabs button,
+.operator-crafts .operator-tabs button,
+.operator-dialects .operator-tabs button,
+.operator-cases .operator-tabs button {
+  min-height: 32px;
+  padding: 5px 13px;
+  border: 1px solid var(--bo-input-border);
+  border-radius: 999px;
+  background: var(--bo-card-bg);
+  color: var(--bo-text);
+  font: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.operator-farming .operator-tabs button.active,
+.operator-pest .operator-tabs button.active,
+.operator-crafts .operator-tabs button.active,
+.operator-dialects .operator-tabs button.active,
+.operator-cases .operator-tabs button.active {
+  border-color: var(--bo-accent);
+  background: var(--bo-accent);
+  color: #fff;
+}
+
+.operator-farming .operator-filter-check,
+.operator-pest .operator-filter-check,
+.operator-recruitments .operator-filter-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  color: var(--bo-muted);
+  font-size: 0.76rem;
+}
+
+.operator-farming .operator-filter-check input,
+.operator-pest .operator-filter-check input,
+.operator-recruitments .operator-filter-check input {
+  width: auto;
+}
+
+.operator-crafts tr.is-selected,
+.operator-dialects tr.is-selected {
+  background: var(--bo-accent-soft);
+}
+
+.operator-recruitments .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.operator-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2600;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(6, 18, 12, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.operator-dialog {
+  width: min(720px, calc(100vw - 48px));
+}
+
+.operator-dialog-form {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+}
+
+.operator-dialog-form textarea {
+  width: 100%;
+  min-height: 90px;
+  padding: 9px 10px;
+  border: 1px solid var(--bo-input-border);
+  border-radius: 8px;
+  background: var(--bo-input-bg);
+  color: var(--bo-text);
+  font: inherit;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.operator-dialog-form textarea:focus {
+  border-color: var(--bo-accent);
+  box-shadow: 0 0 0 3px var(--bo-accent-soft);
+  outline: none;
+}
+
+.operator-field-hint {
+  color: var(--bo-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.operator-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--bo-input-border);
+  border-radius: 9px;
+}
+
+.operator-checkboxes legend {
+  padding: 0 5px;
+  color: var(--bo-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.operator-checkboxes label,
+.operator-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.operator-checkboxes input,
+.operator-checkbox input {
+  width: auto;
+}
+
+.operator-dialog-actions {
+  padding: 4px 0 0;
+}
+
+@media (max-width: 900px) {
+  .operator-overdue-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .operator-craft-budget {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .operator-craft-budget p {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .operator-farming .backoffice-filterbar {
+    align-items: stretch;
+  }
+}

@@ -53,7 +53,8 @@
   理由：45 条时一次拉完可行，数据涨到成百上千条时不可行，
   而该接口是唯一一个「一次拉全量再前端筛」的接口。
 - 去掉 Vercel 部署。serverless 无持久盘，本项目也不适合 512MB / 10 秒限制。
-  改为自托管单机部署，Flask 裸跑 + `threaded=True`，静态文件继续由 Flask 伺服。
+  改为自托管单机部署，Flask 裸跑 + `threaded=True`。部署层后续由 ADR 0003 收口：
+  nginx 伺服 SPA 与媒体，Flask 负责 API 与上传写入。
 
 ## ADR 0001 的修订
 

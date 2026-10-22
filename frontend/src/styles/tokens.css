@@ -1,0 +1,253 @@
+/*
+ * Global semantic tokens. Component and page rules consume these values;
+ * light, dark, and large-text behavior is expressed here only.
+ */
+
+:root {
+  /* Brand palette */
+  --color-brand: #1f5e43;
+  --color-brand-strong: #123a2a;
+  --color-brand-mid: #2f6b4f;
+  --color-brand-soft: #4a8a6a;
+  --color-brand-pale: #8fc0a5;
+  --color-brand-tint: #eaf3ed;
+  --color-brand-tint-strong: #dcefe3;
+
+  /* Accent palette */
+  --color-accent-gold: #d9a227;
+  --color-accent-gold-strong: #a87a15;
+  --color-accent-gold-soft: #efc75e;
+  --color-accent-gold-tint: #fbefd2;
+  --color-accent-clay: #a9673a;
+  --color-accent-clay-soft: #c88a5e;
+  --color-accent-clay-tint: #f3e4d8;
+  --color-accent-indigo: #4a6fa5;
+  --color-accent-indigo-strong: #2e4a75;
+  --color-accent-indigo-tint: #e6eaf2;
+  --gradient-brand: linear-gradient(135deg, #1f5e43, #2f6b4f);
+  --gradient-ink: linear-gradient(135deg, #14261f 0%, #14261f 50%, #0b1a14 100%);
+  --gradient-hero: linear-gradient(160deg, #0b1a14 0%, #14261f 30%, #0e2019 60%, #0b1a14 100%);
+
+  /* Surfaces */
+  --surface-canvas: #f7f8f6;
+  --surface-raised: #ffffff;
+  --surface-muted: #f2f4f1;
+  --surface-inverse: #14261f;
+  --surface-inverse-strong: #08120e;
+
+  /* Text */
+  --color-text-primary: #1c1c1c;
+  --color-text-secondary: #5c6660;
+  --color-text-muted: #8b968f;
+  --color-text-inverse: #ffffff;
+
+  /* Borders and focus */
+  --border-default: #e2e6e0;
+  --border-subtle: #eef0ec;
+  --focus-ring-color: rgba(31, 94, 67, 0.5);
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+  /* Component-state surfaces derived from semantic brand and status tokens. */
+  --state-success-bg: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  --state-error: #b3382f;
+  --state-error-bg: color-mix(in srgb, var(--state-error) 12%, transparent);
+  --state-error-border: color-mix(
+    in srgb,
+    var(--state-error) 24%,
+    transparent
+  );
+  --state-info-bg: color-mix(
+    in srgb,
+    var(--color-accent-gold) 12%,
+    transparent
+  );
+  --state-info-text: var(--color-accent-gold-strong);
+  /* Backoffice primitives get neutral defaults here; role roots override. */
+  --bo-accent-soft: color-mix(in srgb, var(--color-brand-mid) 12%, transparent);
+  --bo-card-bg: var(--surface-raised);
+  --bo-card-border: var(--border-default);
+  --bo-text: var(--color-text-primary);
+  --bo-muted: var(--color-text-secondary);
+  --bo-input-bg: var(--surface-raised);
+  --bo-input-border: var(--border-default);
+  --bo-danger: #b3382f;
+  --bo-success: #1f6b42;
+  --bo-status-error-text: var(--bo-danger);
+  --bo-accent: var(--color-brand-mid);
+  --bo-accent-strong: var(--color-brand);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 20px;
+  --space-5: 28px;
+  --space-6: 40px;
+  --space-7: 56px;
+
+  /* Radii */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius: 16px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.06);
+  --shadow-xl: 0 12px 40px rgba(0,0,0,0.1), 0 24px 60px rgba(0,0,0,0.08);
+
+  /* Layering */
+  --z-base: 0;
+  --z-content: 1;
+  --z-navigation: 1000;
+  --z-dropdown: 1200;
+  --z-overlay: 1500;
+  --z-modal: 2000;
+  --z-toast: 2500;
+  --z-skip-link: 3000;
+  --z-emergency: 9999;
+
+  /* Typography */
+  --font-family-display: 'SF Pro Display', 'PingFang SC', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-family-ui: "PingFang SC", "Noto Sans SC", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family-serif: 'Noto Serif SC', 'Songti SC', 'STSong', 'SimSun', serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-size-root: 100%;
+  --font-size-body: 1rem;
+  --line-height-body: 1.7;
+  --letter-spacing-body: -0.01em;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.35rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-3xl: 3rem;
+
+  /* Motion */
+  --duration-fast: 0.15s;
+  --duration-normal: 0.3s;
+  --duration-slow: 0.5s;
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-in-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --transition: var(--duration-normal) var(--ease-out);
+
+  /*
+   * Breakpoints are canonical values. Media queries keep matching literals
+   * until a build-time custom-media layer can consume these tokens.
+   */
+  --breakpoint-xs: 480px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 720px;
+  --breakpoint-lg: 768px;
+  --breakpoint-xl: 1024px;
+  --breakpoint-2xl: 1200px;
+  --breakpoint-content: 900px;
+
+  /* Viewport */
+  --vh: 1vh;
+
+  /* Compatibility aliases for active legacy consumers. */
+  --brand: var(--color-brand);
+  --brand-deep: var(--color-brand-strong);
+  --brand-mid: var(--color-brand-mid);
+  --brand-soft: var(--color-brand-soft);
+  --brand-pale: var(--color-brand-pale);
+  --brand-tint: var(--color-brand-tint);
+  --brand-tint-2: var(--color-brand-tint-strong);
+  --gold: var(--color-accent-gold);
+  --gold-deep: var(--color-accent-gold-strong);
+  --gold-soft: var(--color-accent-gold-soft);
+  --gold-tint: var(--color-accent-gold-tint);
+  --clay: var(--color-accent-clay);
+  --clay-soft: var(--color-accent-clay-soft);
+  --clay-tint: var(--color-accent-clay-tint);
+  --indigo: var(--color-accent-indigo);
+  --indigo-deep: var(--color-accent-indigo-strong);
+  --indigo-tint: var(--color-accent-indigo-tint);
+  --pa: var(--color-brand);
+  --pa-tint: var(--color-brand-tint);
+  --bg-primary: var(--surface-canvas);
+  --bg-secondary: var(--surface-raised);
+  --bg-tertiary: var(--surface-muted);
+  --bg-dark: var(--surface-inverse);
+  --bg-darker: var(--surface-inverse-strong);
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-muted: var(--color-text-muted);
+  --text-white: var(--color-text-inverse);
+  --accent-blue: var(--color-brand);
+  --accent-blue-light: var(--color-brand-soft);
+  --accent-green: var(--color-brand-mid);
+  --accent-green-dark: var(--color-brand);
+  --gradient-main: var(--gradient-brand);
+  --gradient-dark: var(--gradient-ink);
+  --border: var(--border-default);
+  --border-light: var(--border-subtle);
+  --font: var(--font-family-display);
+  --app-font: var(--font-family-ui);
+  --font-serif: var(--font-family-serif);
+}
+
+[data-theme="dark"] {
+  --color-brand: #8fc0a5;
+  --color-brand-strong: #c6e0d1;
+  --color-brand-mid: #6fb894;
+  --color-brand-pale: #2f6b4f;
+  --color-brand-tint: #1e3329;
+  --color-brand-tint-strong: #24402f;
+  --color-accent-gold: #efc75e;
+  --color-accent-gold-strong: #d9a227;
+  --color-accent-gold-soft: #a87a15;
+  --color-accent-gold-tint: #3a2f14;
+  --color-accent-clay: #c88a5e;
+  --color-accent-clay-tint: #382a20;
+  --color-accent-indigo: #85a8d8;
+  --color-accent-indigo-strong: #b5cee8;
+  --color-accent-indigo-tint: #1f2b3c;
+  --surface-canvas: #10201a;
+  --surface-raised: #1b2c25;
+  --surface-muted: #26382f;
+  --surface-inverse: #08120e;
+  --surface-inverse-strong: #040a07;
+  --color-text-primary: #eef2ef;
+  --color-text-secondary: #b6c7bd;
+  --color-text-muted: #8b9c92;
+  --border-default: #3d5147;
+  --border-subtle: #26382f;
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.3), 0 10px 15px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.4), 0 20px 48px rgba(0,0,0,0.5);
+  --shadow-xl: 0 20px 25px rgba(0,0,0,0.5), 0 40px 60px rgba(0,0,0,0.6);
+  --accent-blue-light: var(--color-brand-strong);
+  --state-success-bg: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  --state-error: #f09595;
+  --state-error-bg: color-mix(in srgb, var(--state-error) 12%, transparent);
+  --state-error-border: color-mix(
+    in srgb,
+    var(--state-error) 32%,
+    transparent
+  );
+  --bo-card-bg: #1b2c25;
+  --bo-card-border: #33473d;
+  --bo-text: #e4ebe6;
+  --bo-muted: #9aaca1;
+  --bo-input-bg: #10201a;
+  --bo-input-border: #4a5b52;
+  --bo-danger: #f09595;
+  --bo-success: #8fd3ae;
+  --bo-status-error-text: #f28b82;
+}
+
+html[data-large-text] {
+  --font-size-root: 18px;
+  --font-size-body: 1.05rem;
+  --line-height-body: 1.75;
+}

@@ -211,6 +211,22 @@ class CommunityDomainTest(_CommunityCase):
             self.assertFalse(body['success'])
             self.assertEqual(body['message'], '标题和内容不能为空')
 
+    def test_create_discussion_rejects_overlong_title_and_content(self):
+        sid = self._login()
+        cases = (
+            ({'title': '长' * 81, 'content': '正文'},
+             '标题过长，请控制在 80 字以内', 'title_too_long'),
+            ({'title': '标题', 'content': '长' * 5001},
+             '帖子内容过长，请控制在 5000 字以内', 'content_too_long'),
+        )
+        for payload, message, code in cases:
+            response = self._post_json('/api/discussions', payload, sid)
+            self.assertEqual(response.status_code, 400, payload['title'][:10])
+            body = json.loads(response.data)
+            self.assertFalse(body['success'])
+            self.assertEqual(body['message'], message)
+            self.assertEqual(body['code'], code)
+
     def test_create_discussion_then_read_back(self):
         title = 'T09发布后读回%s' % len(self._created_ids)
         disc_id = self._create_discussion(title)
@@ -269,6 +285,18 @@ class CommunityDomainTest(_CommunityCase):
             self.assertEqual(response.status_code, 400, payload)
             self.assertEqual(json.loads(response.data),
                              {"success": False, "message": "参数不完整"})
+
+    def test_add_comment_rejects_overlong_content(self):
+        disc_id = self._create_discussion('T12评论长度')
+        sid = self._login()
+        response = self._post_json('/api/comments', {
+            'target_type': 'discussion', 'target_id': disc_id,
+            'content': '长' * 1001}, sid)
+        self.assertEqual(response.status_code, 400)
+        body = json.loads(response.data)
+        self.assertFalse(body['success'])
+        self.assertEqual(body['message'], '评论过长，请控制在 1000 字以内')
+        self.assertEqual(body['code'], 'content_too_long')
 
     def test_add_comment_shows_up_in_discussion_detail(self):
         disc_id = self._create_discussion('T09评论入详情')

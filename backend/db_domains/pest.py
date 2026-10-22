@@ -32,6 +32,7 @@ T14 补上写侧（运营后台），读侧口径一条不动。写侧守住同�
 import json
 
 from db_connection import get_connection
+from shared.review_freshness import REVIEW_STALE_DAYS
 
 # 本模块的数据归属这个能力域。backend/core/permissions.py 的 CAPABILITIES 与
 # tools/check_architecture.py（T02 起按能力表判权）都以此为准：谁 import 本模块，
@@ -51,10 +52,6 @@ _CROP_WRITABLE = ('name', 'icon', 'summary', 'sort_order')
 _SOURCE_WRITABLE = ('name', 'org', 'doc_type', 'doc_no', 'date', 'url', 'sort_order')
 _IMAGE_WRITABLE = ('file', 'credit', 'license', 'caption', 'source_url',
                    'shot_date', 'note')
-
-# 复核过期阈值（天）。与 farming.REVIEW_STALE_DAYS 同口径：半年按 365/2 取整，
-# 不按 30*6，否则 2 月核的到 8 月就该重核，比「半年」短了 12 天。
-REVIEW_STALE_DAYS = 183
 
 # 作物列表的排序键：与切换前 PEST_CROP_ORDER 一致（迁移脚本按它写 sort_order）
 _CROPS_SQL = "SELECT * FROM pest_crops ORDER BY sort_order, id"
@@ -189,6 +186,19 @@ def get_pest_source_map():
     finally:
         conn.close()
     return {row['key']: _source_dict(row) for row in rows}
+
+
+def get_pest_sources():
+    """运营维护所需的完整来源行，含 sort_order；公开接口继续用 source_map。"""
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM pest_sources ORDER BY sort_order, key").fetchall()
+        return [dict(row) for row in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
 
 
 def _source_keys_by_entry(conn):

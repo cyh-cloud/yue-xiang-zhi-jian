@@ -34,7 +34,7 @@ $p.Id | Set-Content -LiteralPath (Join-Path $root 'data\server.pid')
 "pid=$($p.Id)"
 Start-Sleep -Seconds 3
 try {
-    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$port/index.html" -UseBasicParsing -TimeoutSec 8
+    $r = Invoke-WebRequest -Uri "http://127.0.0.1:$port/api/health" -UseBasicParsing -TimeoutSec 8
     "health=$($r.StatusCode)"
 } catch {
     "health FAILED: $($_.Exception.Message)"

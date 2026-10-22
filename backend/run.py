@@ -29,6 +29,20 @@ if sys.platform == 'win32':
 # 默认服务端口。.env 里 PORT 留空 / 删行 / 填非法值时回落到这里。
 DEFAULT_PORT = 5000
 
+
+def startup_url(port):
+    """Return the URL the launcher opens.
+
+    Flask no longer serves the SPA at ``/``. In development the API health
+    endpoint is the meaningful Flask-owned page; the SPA is served by Vite or
+    nginx separately.
+    """
+    configured = (os.getenv('STARTUP_URL') or '').strip()
+    if configured:
+        return configured
+    return f'http://localhost:{port}/api/health'
+
+
 def resolve_port():
     """解析服务端口，返回 (port, source)。source 为 'config' 或 'default'，仅用于启动信息展示。
 
@@ -53,7 +67,7 @@ def resolve_port():
 def open_browser():
     """在浏览器中打开应用"""
     time.sleep(2)
-    webbrowser.open(f'http://localhost:{resolve_port()[0]}')
+    webbrowser.open(startup_url(resolve_port()[0]))
 
 def main():
     port, port_source = resolve_port()
@@ -71,8 +85,8 @@ def main():
     print("   - 💼 就业对接：技能证书、人才匹配、创业支持")
     print()
     print("📊 服务信息:")
-    print(f"   - 本地地址: http://localhost:{port}")
-    print(f"   - API文档: http://localhost:{port}/api/health")
+    print(f"   - API健康检查: {startup_url(port)}")
+    print("   - SPA开发地址: http://localhost:5173")
     print(f"   - 农技问答: http://localhost:{port}/api/agriculture/ask")
     print("=" * 50)
     if port_source == 'config':
@@ -95,9 +109,10 @@ def main():
     os.makedirs(os.path.join(repo_paths.REPO_ROOT, 'data'), exist_ok=True)
     os.makedirs(os.path.join(repo_paths.REPO_ROOT, 'uploads'), exist_ok=True)
 
-    # 在新线程中打开浏览器
-    browser_thread = threading.Thread(target=open_browser, daemon=True)
-    browser_thread.start()
+    # Flask 只提供 API 与媒体，默认打开其健康检查页；SPA 由 Vite/nginx 提供。
+    if os.getenv('OPEN_BROWSER', '1').strip().lower() not in ('0', 'false', 'no', 'off'):
+        browser_thread = threading.Thread(target=open_browser, daemon=True)
+        browser_thread.start()
 
     # 启动Flask应用
     try:

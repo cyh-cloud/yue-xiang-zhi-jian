@@ -15,6 +15,7 @@ from shared.live_reading import live_cjk, live_speed_score
 from shared.copywriting import copy_score
 from shared.options import category_option_list
 from shared.resume_state import user_has_resume
+from shared.review_freshness import REVIEW_STALE_DAYS, is_review_current
 from shared.training_status import training_status_label
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     'copy_score',
     'category_option_list',
     'user_has_resume',
+    'REVIEW_STALE_DAYS', 'is_review_current',
     'training_status_label',
 ]

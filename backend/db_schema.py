@@ -77,6 +77,7 @@ SCHEMA_SQL = """
         CREATE TABLE IF NOT EXISTS students (
             id TEXT PRIMARY KEY,
             user_id TEXT DEFAULT '',
+            teacher_id TEXT NOT NULL DEFAULT '',
             name TEXT NOT NULL,
             class_name TEXT DEFAULT '',
             direction TEXT DEFAULT '',
@@ -88,6 +89,7 @@ SCHEMA_SQL = """
 
         CREATE TABLE IF NOT EXISTS announcements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            teacher_id TEXT NOT NULL DEFAULT '',
             title TEXT NOT NULL,
             content TEXT NOT NULL,
             category TEXT DEFAULT '通知',
@@ -127,6 +129,8 @@ SCHEMA_SQL = """
             receiver_id TEXT NOT NULL,
             content TEXT NOT NULL,
             is_read INTEGER DEFAULT 0,
+            sender_cleared INTEGER NOT NULL DEFAULT 0,
+            receiver_cleared INTEGER NOT NULL DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now','localtime')),
             extra TEXT NOT NULL DEFAULT '{}'
         );
@@ -154,6 +158,7 @@ SCHEMA_SQL = """
             source  TEXT NOT NULL,
             ref_id  TEXT NOT NULL,
             read_at TEXT DEFAULT (datetime('now','localtime')),
+            dismissed_at TEXT DEFAULT NULL,
             extra TEXT NOT NULL DEFAULT '{}',
             PRIMARY KEY (user_id, source, ref_id)
          );
@@ -889,6 +894,15 @@ def apply_schema(cursor):
         if col not in existing_cols:
             cursor.execute(f"ALTER TABLE job_listings ADD COLUMN {col} {typedef}")
 
+    # 扩展 resumes 表结构：旧库没有预留 extra 列，AI 参与段落需要落到这里。
+    resume_cols = {
+        row[1] for row in cursor.execute("PRAGMA table_info(resumes)").fetchall()
+    }
+    if resume_cols and 'extra' not in resume_cols:
+        cursor.execute(
+            "ALTER TABLE resumes ADD COLUMN extra TEXT NOT NULL DEFAULT '{}'"
+        )
+
     # 扩展 farming_tasks 表结构（兼容既有数据库：CREATE TABLE IF NOT EXISTS 不会补列）
     farming_cols = {row[1] for row in cursor.execute("PRAGMA table_info(farming_tasks)").fetchall()}
     farming_new_cols = {
@@ -899,6 +913,63 @@ def apply_schema(cursor):
     for col, typedef in farming_new_cols.items():
         if farming_cols and col not in farming_cols:
             cursor.execute("ALTER TABLE farming_tasks ADD COLUMN %s %s" % (col, typedef))
+
+    # 教师归属迁移：旧库没有 teacher_id。演示库里的既有名册与公告属于
+    # teacher_demo；若该账号存在则一次性认领，保证演示数据升级后仍可用。
+    # 新写入的 teacher_id 不会被后续启动改写。
+    for _tbl in ('students', 'announcements'):
+        _cols = {
+            row[1]
+            for row in cursor.execute("PRAGMA table_info(%s)" % _tbl).fetchall()
+        }
+        if _cols and 'teacher_id' not in _cols:
+            cursor.execute(
+                "ALTER TABLE %s ADD COLUMN teacher_id TEXT NOT NULL DEFAULT ''"
+                % _tbl
+            )
+        if _cols:
+            cursor.execute(
+                "UPDATE %s SET teacher_id = 'teacher_demo' "
+                "WHERE COALESCE(teacher_id, '') = '' "
+                "AND EXISTS (SELECT 1 FROM users "
+                "WHERE username = 'teacher_demo' AND role = 'teacher')"
+                % _tbl
+            )
+
+    # 清除已读：旁路表记录 dismissed_at，消息表按收发双方分别记录清除。
+    # 两者都只影响该用户自己的列表，不删除共享业务记录。
+    read_cols = {
+        row[1] for row in cursor.execute(
+            "PRAGMA table_info(notification_reads)"
+        ).fetchall()
+    }
+    if read_cols and 'dismissed_at' not in read_cols:
+        cursor.execute(
+            "ALTER TABLE notification_reads ADD COLUMN dismissed_at TEXT DEFAULT NULL"
+        )
+    message_cols = {
+        row[1] for row in cursor.execute("PRAGMA table_info(messages)").fetchall()
+    }
+    for _col in ('sender_cleared', 'receiver_cleared'):
+        if message_cols and _col not in message_cols:
+            cursor.execute(
+                "ALTER TABLE messages ADD COLUMN %s INTEGER NOT NULL DEFAULT 0"
+                % _col
+            )
+
+    # 3D 模型审核详情是对外契约的一部分，历史库缺 extra 时补回并重建
+    # SELECT * 视图；SQLite 的视图列集在建视图时展开，不会自动跟随 ALTER。
+    model_cols = {
+        row[1] for row in cursor.execute("PRAGMA table_info(models_3d)").fetchall()
+    }
+    if model_cols and 'extra' not in model_cols:
+        cursor.execute(
+            "ALTER TABLE models_3d ADD COLUMN extra TEXT NOT NULL DEFAULT '{}'"
+        )
+        cursor.execute("DROP VIEW IF EXISTS v_reviewable_models")
+        cursor.execute(
+            "CREATE VIEW v_reviewable_models AS SELECT * FROM models_3d"
+        )
 
     # 扩展 farming_tasks / pest_entries：补 verified_by / verified_at
     # （ADR 0002 / REFACTOR-PLAN 4.5）。这是既有 is_verified 的必然延伸：

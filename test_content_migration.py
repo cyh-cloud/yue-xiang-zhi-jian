@@ -207,6 +207,19 @@ class IdempotenceTest(IsolatedMigrationTest):
 class BaselineLibraryTest(IsolatedMigrationTest):
     """基线库：从灌过库的实例起的接口输出与现库一致。"""
 
+    def test_make_baseline_does_not_mutate_the_source_database(self):
+        """--make-baseline 只迁移临时副本，源库内容必须保持逐字节不变。"""
+        import hashlib
+
+        def digest(path):
+            with open(path, 'rb') as handle:
+                return hashlib.sha256(handle.read()).hexdigest()
+
+        before = digest(self.db_file)
+        self.make_baseline_library()
+        self.assertEqual(digest(self.db_file), before,
+                         '--make-baseline 改写了源库，必须只迁移临时副本')
+
     def test_api_output_matches_the_live_database(self):
         """跑过迁移的库与基线库，同一批接口的输出逐字节一致。"""
         result = self.run_migration()

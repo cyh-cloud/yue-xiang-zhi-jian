@@ -34,6 +34,12 @@ STUDENT = 'student'
 # （例如 3D 模型列表只列本人上传的），它按身份收窄结果，不是权限判定。
 TEACHER = 'teacher'
 
+# 超级管理员在教师端读侧可跨教师查看；写侧仍由各路由自己的能力与归属规则决定。
+SUPER_ADMIN = 'super_admin'
+
+# 企业账号的字面量。消息收件人边界按企业与投递关系收窄。
+ENTERPRISE = 'enterprise'
+
 # ---- 能力表 ----
 # 键是能力，值是持有它的角色；空元组表示公开。表是唯一真相源：新增一个能力域只要
 # 在这里加一行，不触碰任何路由文件。
@@ -55,6 +61,9 @@ CAPABILITIES = {
     # 手工技艺：技艺、步骤、采购指南
     'craft.read': (),
     'craft.manage': ('teacher', 'operator', 'super_admin'),
+    # 运营后台对技艺内容的维护权。teacher 保留历史 craft.manage 契约，
+    # 但 /api/operator/crafts/* 只认这条更窄的能力，不因契约恢复而获得内容后台。
+    'craft.content.manage': ('operator', 'super_admin'),
     # 方言知识：方言、短语、快捷问题
     'dialect.read': (),
     'dialect.manage': ('operator', 'super_admin'),
@@ -142,12 +151,13 @@ def capabilities_for_role(role):
     给前端的「这个角色能做什么」清单，让导航与按钮按能力显隐，不必在前端复制
     一份能力表（那会是第二份真相，改一处漏一处）。未登录或未知角色返回空列表。
 
-    只列 manage 侧的能力：`.read` 大多是公开元组（空 = 谁都能读），把它下发给
-    前端只会让「显隐」退化成「全部显示」，没有判断价值。
+    只排除 `.read`：它们大多是公开元组（空 = 谁都能读），下发给前端只会让
+    「显隐」退化成「全部显示」。非 `.read` 的显式能力必须全部下发，
+    包括命名不带 `.manage` 后缀的 `review.moderate`。
     """
     return sorted(
         capability for capability, holders in CAPABILITIES.items()
-        if capability.endswith('.manage') and role in holders
+        if not capability.endswith('.read') and holders and role in holders
     )
 
 
@@ -190,6 +200,7 @@ def require_capability(capability, anonymous=403):
 
 
 __all__ = [
-    'ROLES', 'OPERATOR', 'STUDENT', 'TEACHER', 'CAPABILITIES', 'can',
+    'ROLES', 'OPERATOR', 'STUDENT', 'TEACHER', 'SUPER_ADMIN', 'ENTERPRISE',
+    'CAPABILITIES', 'can',
     'capabilities_for_role', 'is_student', 'require_capability',
 ]

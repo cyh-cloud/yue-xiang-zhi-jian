@@ -145,6 +145,17 @@ def set_job_application_status(app_id, status):
     conn.close()
 
 
+def get_application_owner_enterprise(app_id):
+    """投递所属岗位的企业账号，用于企业端写操作前的归属校验。"""
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT jl.enterprise_id FROM job_applications ja "
+        "JOIN job_listings jl ON jl.id = ja.job_id WHERE ja.id = ?",
+        (app_id,)).fetchone()
+    conn.close()
+    return row['enterprise_id'] if row else None
+
+
 def get_enterprise_stats(enterprise_id):
     """企业岗位统计：走 v_enterprise_job_stats（两表 JOIN + 分组计数）。
 
@@ -246,8 +257,7 @@ def get_job_by_id(job_id):
 
 
 #### 企业岗位分类（学员端下拉 + 条数统计的口径来源）####
-# ⚠️ 必须与 index.html 里 `#emp-category-filter` 的静态 <optgroup label="企业招聘岗位"> 保持一致
-#    （静态项只是老后端/无脚本时的回退）。这里刻意把「当前 0 条」的分类也列出来，
+# ⚠️ 必须与 Vue 就业页的企业招聘分类下拉保持一致。这里刻意把「当前 0 条」的分类也列出来，
 #    前端会标成「（暂无）」—— 直接把死分类从下拉里藏掉，反而让人以为平台不支持这类岗位。
 ENTERPRISE_JOB_CATEGORIES = ['农业技术', '电商运营', '手工工艺', '乡村旅游', '物流仓储']
 
@@ -523,6 +533,15 @@ def get_resume(user_id):
         d['experience'] = json.loads(d.get('experience') or '[]')
     except Exception:
         d['experience'] = []
+    try:
+        extra = json.loads(d.get('extra') or '{}')
+    except Exception:
+        extra = {}
+    sections = extra.get('ai_sections') if isinstance(extra, dict) else []
+    d['ai_sections'] = [
+        section for section in (sections if isinstance(sections, list) else [])
+        if section in ('self_eval', 'skills', 'experience')
+    ]
     return d
 
 def save_resume(user_id, data):
@@ -570,15 +589,40 @@ def save_resume(user_id, data):
     conn.close()
     return get_resume(user_id)
 
-def mark_resume_ai_used(user_id):
-    """把简历标记为「使用过 AI 辅助」。前端据此如实提示，不隐瞒 AI 参与。"""
+def mark_resume_ai_used(user_id, section=None):
+    """把简历标记为「使用过 AI 辅助」，并记录参与段落。
+
+    `ai_sections` 存在既有 resumes.extra JSON 字段中，不新增表结构。
+    前端刷新后仍能逐段标注哪些内容经过 AI 辅助。
+    """
     conn = get_connection()
-    row = conn.execute("SELECT id FROM resumes WHERE user_id = ?", (user_id,)).fetchone()
+    row = conn.execute(
+        "SELECT id, extra FROM resumes WHERE user_id = ?", (user_id,)
+    ).fetchone()
     if row:
-        conn.execute("UPDATE resumes SET ai_used = 1, updated_at = datetime('now','localtime') "
-                     "WHERE user_id = ?", (user_id,))
+        try:
+            extra = json.loads(row['extra'] or '{}')
+        except Exception:
+            extra = {}
+        if not isinstance(extra, dict):
+            extra = {}
+        sections = extra.get('ai_sections')
+        if not isinstance(sections, list):
+            sections = []
+        if section and section not in sections:
+            sections.append(section)
+        extra['ai_sections'] = sections
+        conn.execute(
+            "UPDATE resumes SET ai_used = 1, extra = ?, "
+            "updated_at = datetime('now','localtime') WHERE user_id = ?",
+            (json.dumps(extra, ensure_ascii=False), user_id),
+        )
     else:
-        conn.execute("INSERT INTO resumes (user_id, ai_used) VALUES (?, 1)", (user_id,))
+        extra = {'ai_sections': [section] if section else []}
+        conn.execute(
+            "INSERT INTO resumes (user_id, ai_used, extra) VALUES (?, 1, ?)",
+            (user_id, json.dumps(extra, ensure_ascii=False)),
+        )
     conn.commit()
     conn.close()
 
@@ -631,3 +675,18 @@ def get_job_application_ids(user_id):
     ).fetchall()
     conn.close()
     return [str(r[0]) for r in rows]
+
+
+def has_applied_to_enterprise(user_id, enterprise_id):
+    """Whether this learner has an application to any job owned by the enterprise."""
+    if not user_id or not enterprise_id:
+        return False
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT 1 FROM job_applications ja "
+        "JOIN job_listings jl ON jl.id = ja.job_id "
+        "WHERE ja.user_id = ? AND jl.enterprise_id = ? LIMIT 1",
+        (user_id, enterprise_id),
+    ).fetchone()
+    conn.close()
+    return row is not None

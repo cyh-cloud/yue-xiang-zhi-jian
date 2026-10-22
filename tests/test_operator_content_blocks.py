@@ -6,7 +6,7 @@
 
 1. 四块内容经接口增删改后，前台接口立即返回新值，无需重启；
 2. 学员打 /api/operator/* 返回 401 或 403；
-3. craft.manage 含 teacher：教师能进技艺后台，但进不了招募后台（能力边界）；
+3. 手工与方言维护只给运营与超管，教师进不了技艺后台；
 4. 拆平入库的数据按原形状组装回前台（采购指南三层嵌套、案例四个子数组）；
 5. 派生字段不可编辑：招募公告的 status / days_left / starts_in 由当天日期算。
 
@@ -116,6 +116,30 @@ class OperatorBlocksTestBase(unittest.TestCase):
 
 class OperatorCraftsWriteTest(OperatorBlocksTestBase):
     """手工技艺：技艺、步骤、采购分类、采购条目、预算的增删改。"""
+
+    def test_editor_list_exposes_all_editable_fields_and_video_order(self):
+        """后台列表必须带齐编辑表单所需字段，避免保存时把未知列写回默认值。"""
+        sid = self._login()
+        try:
+            crafts_response = self.client.get(
+                '/api/operator/crafts', headers=self._headers(sid))
+            self.assertEqual(crafts_response.status_code, 200)
+            craft = next(
+                item for item in json.loads(crafts_response.data)['crafts']
+                if item['id'] == 'embroidery')
+            for key in ('history', 'level', 'sort_order'):
+                self.assertIn(key, craft)
+
+            videos_response = self.client.get(
+                '/api/operator/crafts/embroidery/videos',
+                headers=self._headers(sid))
+            self.assertEqual(videos_response.status_code, 200)
+            videos = json.loads(videos_response.data)['videos']
+            self.assertTrue(videos)
+            for key in ('view_count', 'like_count', 'sort_order'):
+                self.assertIn(key, videos[0])
+        finally:
+            self._cleanup_sessions(sid)
 
     def test_operator_can_create_update_and_delete_a_craft(self):
         """技艺增删改闭环，前台列表与详情立即跟着变。"""
@@ -346,6 +370,22 @@ class OperatorCraftsWriteTest(OperatorBlocksTestBase):
 class OperatorDialectsWriteTest(OperatorBlocksTestBase):
     """方言知识：方言、短语、快捷问题的增删改。"""
 
+    def test_editor_list_exposes_features_counts_and_sort_order(self):
+        """方言编辑表单需要数组形式的特色标签与排序，而不是只读摘要。"""
+        sid = self._login()
+        try:
+            response = self.client.get(
+                '/api/operator/dialects', headers=self._headers(sid))
+            self.assertEqual(response.status_code, 200)
+            dialect = next(
+                item for item in json.loads(response.data)['dialects']
+                if item['id'] == 'cantonese')
+            self.assertIsInstance(dialect['features'], list)
+            self.assertIn('sort_order', dialect)
+            self.assertEqual(dialect['feature_count'], len(dialect['features']))
+        finally:
+            self._cleanup_sessions(sid)
+
     def test_operator_can_create_update_and_delete_a_dialect(self):
         """方言增删改闭环，前台列表与详情立即跟着变。"""
         sid = self._login()
@@ -469,6 +509,19 @@ class OperatorDialectsWriteTest(OperatorBlocksTestBase):
 
 class OperatorRecruitmentsWriteTest(OperatorBlocksTestBase):
     """招募公告：公告与来源的增删改。"""
+
+    def test_recruitment_list_exposes_the_category_whitelist(self):
+        """后台分类选项由后端白名单下发，前端不复制一份会漂移的常量。"""
+        sid = self._login()
+        try:
+            response = self.client.get(
+                '/api/operator/recruitments', headers=self._headers(sid))
+            self.assertEqual(response.status_code, 200, response.data)
+            body = json.loads(response.data)
+            self.assertEqual(body['categories'],
+                             list(recruitments.RECRUIT_CATEGORIES))
+        finally:
+            self._cleanup_sessions(sid)
 
     def test_operator_can_create_update_and_delete_a_recruitment(self):
         """公告增删改闭环，前台就业页的 recruitments 数组立即跟着变。"""
@@ -794,17 +847,13 @@ class OperatorBlocksAuthorizationTest(OperatorBlocksTestBase):
                 self.assertFalse(body['success'])
                 self.assertEqual(body['message'], u'权限不足')
 
-    def test_teacher_reaches_crafts_but_not_recruitments(self):
-        """验收 3：craft.manage 含 teacher，recruit.manage 不含。
-
-        能力边界是表里显式的两条（T01），这里用两个角色探针把它钉住：
-        同一只会话，进得了技艺后台、进不了招募后台。
-        """
+    def test_teacher_is_rejected_from_operator_crafts_and_recruitments(self):
+        """手工与方言维护属于运营内容后台，教师不能借 craft.manage 进入。"""
         sid = self._login(TEACHER)
         try:
             crafts_response = self.client.get(
                 '/api/operator/crafts', headers=self._headers(sid))
-            self.assertEqual(crafts_response.status_code, 200, crafts_response.data)
+            self.assertEqual(crafts_response.status_code, 403, crafts_response.data)
 
             recruitments_response = self.client.get(
                 '/api/operator/recruitments', headers=self._headers(sid))
@@ -812,12 +861,18 @@ class OperatorBlocksAuthorizationTest(OperatorBlocksTestBase):
             self.assertEqual(json.loads(recruitments_response.data)['message'],
                              u'权限不足')
 
-            # 写侧同样分界：教师能建技艺，建不了公告
+            # 写侧同样拒绝，避免教师绕过只读页面直接改内容。
+            craft_write = self._post('/api/operator/crafts', {
+                'id': 'teacher-should-not-create', 'name': u'教师不该能建',
+            }, sid)
+            self.assertEqual(craft_write.status_code, 403, craft_write.data)
             write = self._post('/api/operator/recruitments', {
                 'key': 'teacher-should-not-create', 'title': u'教师不该能建',
             }, sid)
             self.assertEqual(write.status_code, 403, write.data)
         finally:
+            self._sql("DELETE FROM crafts WHERE id = ?",
+                      ('teacher-should-not-create',))
             self._sql("DELETE FROM recruitments WHERE key = ?",
                       ('teacher-should-not-create',))
             self._cleanup_sessions(sid)
@@ -849,32 +904,6 @@ class OperatorBlocksAuthorizationTest(OperatorBlocksTestBase):
         finally:
             self._cleanup_sessions(sid)
 
-
-class OperatorPageBlocksTest(OperatorBlocksTestBase):
-    """运营后台页面本身：四块的容器与新建入口都在。"""
-
-    def test_operator_page_carries_all_six_content_blocks(self):
-        """六块内容都有可渲染的容器，不是只剩四个占位文案。"""
-        body = self.client.get('/operator.html').data.decode('utf-8')
-        for page in ('farming', 'pest', 'crafts', 'dialects', 'recruitments', 'cases'):
-            self.assertIn('id="page-%s"' % page, body)
-        # 四块各自的列表容器：没有它们，写接口通了也看不到内容
-        for container in ('craft-rows', 'dialect-rows', 'recruit-rows', 'case-rows',
-                          'craft-detail-rows', 'dialect-detail-rows',
-                          'recruit-source-rows', 'case-detail-rows'):
-            self.assertIn('id="%s"' % container, body)
-        # 新建入口：每块至少一个
-        for button in ('craft-new', 'dialect-new', 'recruit-new', 'case-new'):
-            self.assertIn('id="%s"' % button, body)
-        # 占位样式已退役
-        self.assertNotIn('operator-todo', body)
-
-    def test_page_scripts_reference_the_new_endpoints(self):
-        """页面脚本打的是本票新增的接口路径，不是还指向占位。"""
-        body = self.client.get('/operator.html').data.decode('utf-8')
-        for path in ('/api/operator/crafts', '/api/operator/dialects',
-                     '/api/operator/recruitments', '/api/operator/cases'):
-            self.assertIn(path, body, '页面没有引用 %s' % path)
 
 if __name__ == '__main__':
     unittest.main()

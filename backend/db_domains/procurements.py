@@ -101,7 +101,7 @@ def delete_procurement(proc_id):
 # 用户拍板：政府端「新闻资讯」整块去掉。
 # 依据（实测）：`news_articles` 的**唯一消费者就是政府端那一个页面** ——
 #   · 写入只有 `/api/government/news`（POST，仅 government 角色）；
-#   · 公开的 `/api/resources/news` + `/<id>` 虽然存在，但 script.js / index.html **零调用**
+#   · 公开的 `/api/resources/news` + `/<id>` 虽然存在，但旧前端 **零调用**
 #     → 学员端 / 教师端 / 管理端 / 企业端**没有任何入口**能看到资讯，
 #       也就是说政务人员发出去的资讯只有他自己看得见（纯单向黑洞）。
 # 故连同 4 条政府端路由 + 2 条公开路由 + 下面 5 个函数一并移除。

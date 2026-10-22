@@ -302,7 +302,8 @@ class AppFactoryTest(unittest.TestCase):
     def test_factory_builds_usable_app(self):
         from core.app_factory import create_app
         fresh = create_app()
-        self.assertEqual(fresh.config['MAX_CONTENT_LENGTH'], 16 * 1024 * 1024)
+        from shared.upload_limits import MAX_REQUEST_BYTES
+        self.assertEqual(fresh.config['MAX_CONTENT_LENGTH'], MAX_REQUEST_BYTES)
         # 工厂只管创建与装配，路由挂在入口文件上，所以未注册路由返回 404
         self.assertEqual(fresh.test_client().get('/api/health').status_code, 404)
 

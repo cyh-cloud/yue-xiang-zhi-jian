@@ -22,6 +22,9 @@ CAPABILITIES_USED = ('notification.read', 'message.read')
 
 notifications_bp = Blueprint('notifications', __name__)
 
+DEFAULT_LIST_LIMIT = 20
+MAX_LIST_LIMIT = 200
+
 
 @notifications_bp.route('/api/notifications', methods=['GET'])
 def get_notifications():
@@ -30,7 +33,9 @@ def get_notifications():
     _, err = messages_self_guard(user_id)
     if err:
         return err
-    notifications = notifications_db.get_notifications(user_id)
+    limit = request.args.get('limit', DEFAULT_LIST_LIMIT, type=int)
+    limit = max(1, min(limit, MAX_LIST_LIMIT))
+    notifications = notifications_db.get_notifications(user_id, limit=limit)
     return jsonify({"success": True, "notifications": notifications})
 
 
@@ -63,8 +68,20 @@ def get_notification_read_state():
     return jsonify({
         "success": True,
         "refs": {
-            "system_announcement": notifications_db.get_read_refs(user_id, 'system_announcement'),
-            "job_application": notifications_db.get_read_refs(user_id, 'job_application')
+            "system_announcement": notifications_db.get_read_refs(
+                user_id, 'system_announcement', include_dismissed=False
+            ),
+            "job_application": notifications_db.get_read_refs(
+                user_id, 'job_application', include_dismissed=False
+            )
+        },
+        "dismissed": {
+            "system_announcement": notifications_db.get_dismissed_refs(
+                user_id, 'system_announcement'
+            ),
+            "job_application": notifications_db.get_dismissed_refs(
+                user_id, 'job_application'
+            )
         }
     })
 
@@ -109,6 +126,9 @@ def clear_read_notifications():
     if err:
         return err
     notifications_db.clear_read_notifications(user_id)
+    messages.clear_read_messages(user_id)
+    notifications_db.clear_read_refs(user_id, 'job_application')
+    notifications_db.clear_read_refs(user_id, 'system_announcement')
     return jsonify({"success": True})
 
 

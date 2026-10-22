@@ -2,7 +2,7 @@
 
 基于 AI 实训的农村本土人才赋能平台，覆盖农业技能培训、电商运营实训、手工技艺传承、虚拟实训沙盒、本土资源库、就业对接与教学管理等模块，服务学员、教师、企业、政府、运营与管理员等角色。
 
-后端按领域拆分为独立模块，领域之间不直接依赖（见 `docs/adr/0001-backend-domain-split.md`）。
+后端按领域拆分为独立模块，领域之间的数据访问按能力判定（见 `docs/adr/0001-backend-domain-split.md` 与 `docs/adr/0002-content-into-database.md`）。
 
 ## 访问与审核
 
@@ -25,7 +25,7 @@ _Avoid_: 模块、服务、分层
 _Avoid_: common、utils、helpers、base
 
 **领域路由模块**:
-承载一个领域全部 HTTP 接口的 Blueprint。领域路由模块之间禁止互相 import，跨领域需求经共享层或显式窄接口满足。
+承载一个领域全部 HTTP 接口的 Blueprint。领域路由模块之间不直接 import；跨领域数据访问按 `core/permissions.py` 的能力判定，并经共享层、显式窄接口或数据层接口满足。
 _Avoid_: controller、handler、view、endpoint 文件
 
 **审核状态变更入口**:
@@ -51,5 +51,9 @@ _Avoid_: 审核、审批、内容审核（那是审核门禁，针对发布前�
 ## 部署
 
 **自托管单机部署**:
-项目当前唯一的部署形态。Flask 进程裸跑、默认多线程，静态文件由同一个进程伺服，SQLite 库落在仓库根的 `data/` 下。没有反向代理、没有多 worker、没有容器编排。
+项目当前唯一的部署形态。nginx 伺服 Vue SPA 构建产物、`/uploads/` 与 `/images/`，并把 `/api/*` 反向代理到 Flask；Flask 裸跑、默认多线程，负责业务 API 与上传写入，SQLite 库落在仓库根的 `data/` 下。没有多 worker、没有容器编排。
 _Avoid_: serverless、Vercel、FaaS、函数计算
+
+**旧前端只读参照**:
+`legacy/reference/` 中保存的迁移前多页面前端与旧测试套件，只用于行为核对，不参与构建、运行或测试。
+_Avoid_: 旧站运行模式、legacy 前端入口

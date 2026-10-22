@@ -180,6 +180,25 @@ class SuperAdminUserManagementTest(_DbCleanupMixin):
         self.assertIn('超级管理员', body['message'])
         self.assertEqual(users.get_user_by_id('admin_demo')['role'], 'super_admin')
 
+    def test_update_user_rejects_invalid_role_and_status(self):
+        self._create_user('__t17invalid')
+        for payload in ({'role': 'owner'}, {'status': 'deleted'}):
+            r = self._json('PUT', '/api/admin/users/__t17invalid', payload,
+                           session_id=self.sessions['admin'])
+            self.assertEqual(r.status_code, 400, payload)
+            self.assertFalse(json.loads(r.data)['success'])
+        target = users.get_user_by_id('__t17invalid')
+        self.assertEqual(target['role'], 'student')
+        self.assertEqual(target['status'], 'active')
+
+    def test_update_user_cannot_suspend_current_account(self):
+        r = self._json('PUT', '/api/admin/users/admin_demo',
+                       {'status': 'suspended'},
+                       session_id=self.sessions['admin'])
+        self.assertEqual(r.status_code, 400)
+        self.assertIn('当前登录', json.loads(r.data)['message'])
+        self.assertEqual(users.get_user_by_id('admin_demo')['status'], 'active')
+
     def test_suspend_and_restore_account(self):
         self._create_user('__t17suspend')
         r = self._json('POST', '/api/admin/users/__t17suspend/status',
@@ -546,6 +565,19 @@ class SuperAdminAnnouncementAndModerationTest(_DbCleanupMixin):
         self.assertEqual(comment.status_code, 200, comment.data)
         comment_id = json.loads(comment.data)['id']
 
+        moderation = self.client.get(
+            '/api/admin/content',
+            headers=self._headers(self.sessions['admin']))
+        self.assertEqual(moderation.status_code, 200, moderation.data)
+        moderation_body = json.loads(moderation.data)
+        self.assertIn(disc_id, [row['id'] for row in moderation_body['discussions']])
+        self.assertIn(comment_id, [row['id'] for row in moderation_body['comments']])
+        self.assertEqual(
+            self.client.get(
+                '/api/admin/content',
+                headers=self._headers(self.sessions['student'])).status_code,
+            403)
+
         for name in ('gov', 'enterprise', 'teacher', 'student'):
             self.assertEqual(self.client.delete(
                 '/api/admin/comments/%d' % comment_id,
@@ -555,6 +587,10 @@ class SuperAdminAnnouncementAndModerationTest(_DbCleanupMixin):
                                headers=self._headers(self.sessions['admin']))
         self.assertEqual(r.status_code, 200)
         self.assertIn('已删除违规评论', json.loads(r.data)['message'])
+
+        detail = json.loads(self.client.get(
+            '/api/discussions/%d' % disc_id).data)
+        self.assertEqual(detail['discussion']['comment_count'], 0)
 
         r = self.client.delete('/api/admin/discussions/%d' % disc_id,
                                headers=self._headers(self.sessions['admin']))
@@ -566,6 +602,14 @@ class SuperAdminAnnouncementAndModerationTest(_DbCleanupMixin):
         self.assertNotIn(comment_id, [c['id'] for c in comments])
         discussions = json.loads(self.client.get('/api/discussions').data)['discussions']
         self.assertNotIn(disc_id, [d['id'] for d in discussions])
+
+    def test_moderation_delete_rejects_unknown_rows(self):
+        self.assertEqual(self.client.delete(
+            '/api/admin/comments/999999',
+            headers=self._headers(self.sessions['admin'])).status_code, 404)
+        self.assertEqual(self.client.delete(
+            '/api/admin/discussions/999999',
+            headers=self._headers(self.sessions['admin'])).status_code, 404)
 
 
 class GovernmentDomainTest(_DbCleanupMixin):
@@ -711,6 +755,52 @@ class EnterpriseDomainTest(_DbCleanupMixin):
             self.assertEqual(r.status_code, 403, name)
         self.assertEqual(self.client.delete(
             '/api/enterprise/jobs/%d' % job_id).status_code, 403)
+
+    def test_cannot_update_other_enterprises_job_or_application(self):
+        job_id = self._create_job('__T17归属校验岗位__')
+        conn = get_connection()
+        conn.execute("UPDATE job_listings SET review_status='approved' WHERE id=?",
+                     (job_id,))
+        conn.commit()
+        conn.close()
+        self._json('POST', '/api/employment/apply',
+                   {'user_id': 'student_demo', 'job_id': job_id},
+                   session_id=self.sessions['student'])
+        conn = get_connection()
+        app_id = conn.execute(
+            "SELECT id FROM job_applications WHERE job_id=?", (job_id,)
+        ).fetchone()[0]
+        conn.close()
+
+        username = '__t17other'
+        registered = self._json('POST', '/api/auth/register', {
+            'username': username,
+            'password': '123456',
+            'name': 'T17其他企业',
+            'role': 'enterprise',
+            'company_name': 'T17其他企业',
+        })
+        self.assertEqual(registered.status_code, 200, registered.data)
+        other_session = self._login(username)
+
+        r = self._json('PUT', '/api/enterprise/jobs/%d' % job_id,
+                       {'title': '__T17越权改题__'},
+                       session_id=other_session)
+        self.assertEqual(r.status_code, 404)
+        self.assertIn('无权操作', json.loads(r.data)['message'])
+        self.assertEqual(
+            employment.get_job_by_id(job_id)['title'], '__T17归属校验岗位__')
+
+        r = self._json('PUT', '/api/enterprise/applications/%d' % app_id,
+                       {'status': 'approved'}, session_id=other_session)
+        self.assertEqual(r.status_code, 404)
+        self.assertIn('无权操作', json.loads(r.data)['message'])
+        conn = get_connection()
+        status = conn.execute(
+            "SELECT status FROM job_applications WHERE id=?", (app_id,)
+        ).fetchone()[0]
+        conn.close()
+        self.assertEqual(status, 'pending')
 
     def test_enterprise_routes_role_boundary(self):
         job_id = self._create_job()

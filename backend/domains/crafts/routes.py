@@ -14,7 +14,7 @@ craft_purchase_categories / craft_purchase_items / craft_budgets 五张表，
 
 - 列表项的难度分级 level：取 crafts.level。该列在库里是空串（T05 灌库时未迁该值），
   运营后台补上等级后这里立即生效；补之前列表角标整排消失，这是如实呈现，不兜底；
-- 详情响应的 videos：库里没有视频表（前端 script.js 的视频教学区读它），
+- 详情响应的 videos：库里没有视频表（旧前端视频教学区曾读它），
   因此**不再下发这个键**。前端 renderCraftVideo 对空数组的处理是收起整块，
   不会留空壳，属于「没有数据就不显示」而非坏档。
 """
