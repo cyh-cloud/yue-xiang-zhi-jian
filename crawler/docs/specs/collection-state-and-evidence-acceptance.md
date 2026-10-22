@@ -4,7 +4,7 @@
 
 日期: 2026-10-22
 
-基线提交: `d6e57ae`
+基线提交: `b5be9ea`
 
 本记录完成 issue #135 的最终集成、旧实时入口退役和全量回归。实现验收已完成，GitHub issue 与子票据保持 OPEN，符合本规格“不关闭任何 issue”的约束。
 
@@ -99,7 +99,7 @@ live 证据沿用稳定归档，没有改写索引口径。2026-10-21 的 8 次�
 
 | 检查 | 结果 |
 | --- | --- |
-| crawler 全量单测 | 231 tests，OK |
+| crawler 全量单测 | 258 tests，OK |
 | schema 与 contract | `test_schema_contract`、`test_candidate_state_schema`、`check_contracts.py` 通过 |
 | Python 静态 | `tools/check_python.py` 通过，448 个文件 |
 | 架构检查 | `tools/check_architecture.py` 通过，21 个领域路由目录、16 个共享层模块 |
@@ -116,7 +116,7 @@ live 证据沿用稳定归档，没有改写索引口径。2026-10-21 的 8 次�
 - `cass-linguistics` 有 4 条详情 404。解除条件是列表链接指向的详情恢复，或来源审核确认这些记录已下线并从样本口径排除。
 - `cnipa` 只验证 www 公告页和第一份 PDF。`ggfw` 签名 PDF 路径继续保持 unknown robots 约束，扩大范围前需单独复核。
 - `nzrc`、`dialect-org`、`cass-linguistics`、`feiyiw`、`cnipa` 的 robots not-found 只表示没有可读规则，不构成发布授权。
-- 8 个项目当前 `scrapy check` 为 0 contracts。该命令证明项目可加载，不证明 Spider 行为；行为回归由 231 项单测和项目 fixture replay 覆盖。
+- 8 个项目当前 `scrapy check` 为 0 contracts。该命令证明项目可加载，不证明 Spider 行为；行为回归由 258 项单测和项目 fixture replay 覆盖。
 - live 证据归档时间为 2026-10-21，本次未刷新索引。任何后续 live 成功或失败都必须重新运行并生成新归档，不能复用本记录覆盖旧结论。
 - 子票据和验收 issue 保持 OPEN。关闭动作由有权限的负责人按 tracker 流程执行，不属于本分支。
 - 回滚依赖上一个应用版本和数据库快照。不得恢复旧双 writer，也不得删除已采集 raw、stage 和候选证据。
