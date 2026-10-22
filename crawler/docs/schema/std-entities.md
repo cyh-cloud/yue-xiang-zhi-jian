@@ -189,7 +189,7 @@ publish: draft | reviewed | published | blocked
 
 - 只承载公开岗位，不承载简历、求职者或个人隐私。
 - 过期岗位标记失效，不物理删除。
-- 业务目标固定为 `recruitment_postings`，不写 `job_listings` 或 `recruitments`。
+- 当前 jobs 最小链路写入现有 `recruitments` 和 `recruitment_sources`，不写 `job_listings`；`recruitment_postings` 仍作为后续独立岗位索引表的建议目标。
 
 ### `std_job_sources`
 

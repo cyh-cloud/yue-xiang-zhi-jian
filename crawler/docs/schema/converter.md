@@ -21,7 +21,7 @@
 
 1. 创建 `import_batches`，状态先为 `running`。
 2. 逐实体计算自然键并选择主值。
-3. dry-run 阶段只生成字段计划、来源关系和 `import_batch_items` 对象映射，不写业务表；真实写入在后续票据启用。
+3. dry-run 阶段只生成字段计划、来源关系和 `import_batch_items` 对象映射，不写业务表；显式真实写入按内容域策略落业务行。
 4. 记录 `input_count`、`inserted_count`、`updated_count`、`skipped_count`、`conflict_count`、`failed_count`。
 5. 以 `succeeded`、`partial` 或 `failed` 结束。存在冲突或单条失败时不得写 `succeeded`。
 
@@ -74,7 +74,7 @@
 
 ### `jobs`
 
-`std_jobs` 转 `recruitment_postings`，来源转 `recruitment_posting_sources`。过期岗位标 `expired`，不物理删除。只写公开岗位，不写 `job_listings` 和 `recruitments`。
+`std_jobs` 转 `recruitments`，来源转 `recruitment_sources`。过期岗位在计划中标 `expired`，不物理删除。只写公开岗位，不写 `job_listings`。业务 key 为 `job-<source_id>-<source_item_id>`，业务行先以 `extra.publish_status=draft` 和 `extra.review_status=pending_review` 落库，不伪造审核通过。
 
 ### `dialects`
 
@@ -95,4 +95,4 @@
 7. 批次回滚只撤销未人工修改的结果。
 8. 天气请求不产生批次和业务行。
 
-当前实现冻结了 dry-run 转换器、真实 `batch_id`、冲突落库和 dry-run 回滚。真实业务库写入、人工字段锁和跨库快照仍为 deferred，不在本轮修改现有后端或业务库。
+当前实现冻结了 dry-run 转换器、真实 `batch_id`、冲突落库和 dry-run 回滚。`jobs` 已启用显式真实写入，使用现有 `recruitments` / `recruitment_sources`，不修改后端接口和业务库 schema。人工字段锁通过 `extra.manual_fields` 实现，跨库快照和成功批次业务回滚仍为 deferred。

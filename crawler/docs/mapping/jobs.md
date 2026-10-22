@@ -4,12 +4,12 @@
 
 日期: 2026-10-19
 
-本文覆盖全国农业与乡村招聘岗位。只写新增建议表 `recruitment_postings` 和 `recruitment_posting_sources`，不写现有 `job_listings`，也不写现有 `recruitments`。
+本文覆盖全国农业与乡村招聘岗位。当前最小可用链路写现有 `recruitments` 和 `recruitment_sources`，不写 `job_listings`。新增建议表 `recruitment_postings` 和 `recruitment_posting_sources` 保留为后续独立岗位索引方案。
 
 ## 边界
 
 - `job_listings` 是企业站内岗位，支持站内申请和审核，不是公开采集目标。
-- `recruitments` 是平台策展的公开招聘公告，已有独立来源表，不接收外部岗位爬虫数据。
+- `recruitments` 是现有公开招聘表。本阶段把 `candidate` 岗位以 `draft` / `pending_review` 状态写入，批次、来源和版权证据保存在 `extra` 与 `recruitment_sources.extra`。
 - `recruitment_postings` 是建议新增的公开岗位索引表，用于筛选和跳转原站，不支持站内投递。
 - `recruitment_posting_sources` 保存每个岗位的来源、快照哈希和抓取状态。
 - 不采集个人简历、求职者信息、登录后联系方式、投递记录或任何个人隐私。
@@ -79,7 +79,7 @@
 - 标题或正文命中农业、畜牧、水产、植保、农艺、作物、种子、肥料、饲料、兽药等词时通过。
 - 纯行政、财务、前台、销售岗位只有与农业岗位职责或农业专业要求相关时才纳入。
 - 每条纳入和排除都保留 `is_agriculture_related` 的判定依据摘要。
-- 截止日期早于采集日的记录标记 `is_expired=1`，不删除。
+- 截止日期早于采集日的记录在转换计划中标记 `expired`，不删除。
 
 ## 落层
 
@@ -87,8 +87,8 @@
 | --- | --- | --- |
 | 列表和详情 HTML、Ajax 公开响应 | raw | 不进入业务库 |
 | 单来源列表行和详情字段 | stage，一来源一表 | 不直接进入业务库 |
-| 统一岗位字段 | std | `recruitment_postings` 建议新增 |
-| 来源快照、HTTP 状态、哈希 | std | `recruitment_posting_sources` 建议新增 |
+| 统一岗位字段 | std | `recruitments`（当前最小链路） |
+| 来源快照、HTTP 状态、哈希 | std | `recruitment_sources`（当前最小链路） |
 | 个人简历和登录后数据 | 不采集 | 不进入业务库 |
 
 ## 已知缺口
