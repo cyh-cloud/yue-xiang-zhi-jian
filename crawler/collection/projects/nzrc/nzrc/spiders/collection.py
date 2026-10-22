@@ -6,7 +6,14 @@ from crawler.collection.shared.crawler_collection.items import (
 from crawler.collection.shared.crawler_collection.spiders import (
     CollectionSpiderMixin,
 )
-from ..parsers import parse_job_detail, parse_job_list
+from ..parsers import (
+    default_max_pages,
+    page_count,
+    pagination_form,
+    parse_job_detail,
+    parse_job_list,
+    unique_items,
+)
 
 
 class NzrcSpider(CollectionSpiderMixin, scrapy.Spider):
@@ -15,8 +22,16 @@ class NzrcSpider(CollectionSpiderMixin, scrapy.Spider):
     allowed_domains = ["www.nzrc.com.cn"]
     start_urls = ["http://www.nzrc.com.cn/career_seek.html"]
 
+    def __init__(self, max_pages=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_pages = page_count(
+            int(max_pages) if max_pages is not None else default_max_pages()
+        )
+        self._seen_items = set()
+
     def parse(self, response):
-        for item in parse_job_list(response):
+        items = parse_job_list(response)
+        for item in unique_items(items, self._seen_items):
             yield scrapy.Request(
                 item["detail_url"],
                 callback=self.parse_detail,
@@ -29,6 +44,16 @@ class NzrcSpider(CollectionSpiderMixin, scrapy.Spider):
                     ),
                     "locator": item.get("locator") or item["detail_url"],
                 },
+            )
+        page = int(response.meta.get("page", 1))
+        if page < self.max_pages:
+            action, payload = pagination_form(response, page + 1)
+            yield scrapy.FormRequest(
+                action,
+                formdata=payload,
+                callback=self.parse,
+                dont_filter=True,
+                meta={"page": page + 1},
             )
 
     def parse_detail(self, response, list_item):

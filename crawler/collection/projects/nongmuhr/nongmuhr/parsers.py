@@ -9,6 +9,8 @@ from bs4 import BeautifulSoup
 
 
 BASE_URL = "http://nongmuhr.com/"
+LIST_PATH = "Employ.aspx"
+DEFAULT_MAX_PAGES = 20
 _SPACE = re.compile(r"\s+")
 _LOCATION_SPLIT = re.compile(r"[|｜]")
 _INVALID_LOCATIONS = frozenset({"不限", "不限地点", "全国"})
@@ -111,6 +113,35 @@ def _int_text(value):
 def _job_id(url):
     query = parse_qs(urlparse(url).query)
     return (query.get("id") or query.get("Id") or [None])[0]
+
+
+def list_page_url(page):
+    if page < 0:
+        raise ValueError("page must be non-negative")
+    return (
+        f"{BASE_URL}{LIST_PATH}"
+        f"?pubtime=-1&experience=-1&page={page}"
+    )
+
+
+def page_count(max_pages=DEFAULT_MAX_PAGES):
+    if max_pages < 1:
+        raise ValueError("max_pages must be at least 1")
+    return int(max_pages)
+
+
+def default_max_pages():
+    return DEFAULT_MAX_PAGES
+
+
+def unique_items(items, seen=None):
+    seen = seen if seen is not None else set()
+    for item in items:
+        item_id = str(item.get("source_item_id") or "").strip()
+        if not item_id or item_id in seen:
+            continue
+        seen.add(item_id)
+        yield item
 
 
 def _description(soup):

@@ -8,7 +8,14 @@ from crawler.collection.shared.crawler_collection.items import (
 from crawler.collection.shared.crawler_collection.spiders import (
     CollectionSpiderMixin,
 )
-from ..parsers import parse_job_detail, parse_job_list
+from ..parsers import (
+    default_max_pages,
+    list_page_url,
+    page_count,
+    parse_job_detail,
+    parse_job_list,
+    unique_items,
+)
 
 
 class NongmuhrSpider(CollectionSpiderMixin, scrapy.Spider):
@@ -16,6 +23,22 @@ class NongmuhrSpider(CollectionSpiderMixin, scrapy.Spider):
     source_id = "nongmuhr"
     allowed_domains = ["nongmuhr.com"]
     start_urls = ["http://nongmuhr.com/Employ.aspx"]
+
+    def __init__(self, max_pages=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_pages = page_count(
+            int(max_pages) if max_pages is not None else default_max_pages()
+        )
+        self._seen_items = set()
+
+    def start_requests(self):
+        for page in range(self.max_pages):
+            yield scrapy.Request(
+                list_page_url(page),
+                callback=self.parse,
+                dont_filter=page > 0,
+                meta={"page": page},
+            )
 
     def parse(self, response):
         try:
@@ -30,7 +53,7 @@ class NongmuhrSpider(CollectionSpiderMixin, scrapy.Spider):
                 locator=f"list={response.url}",
             )
             return
-        for item in items:
+        for item in unique_items(items, self._seen_items):
             yield scrapy.Request(
                 item["detail_url"],
                 callback=self.parse_detail,

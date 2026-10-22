@@ -9,6 +9,9 @@ from bs4 import BeautifulSoup
 
 
 BASE_URL = "http://www.nzrc.com.cn/"
+LIST_PATH = "career_seek.html"
+DEFAULT_MAX_PAGES = 10
+EVENT_TARGET = "ctl00$ContentPlaceHolder1$AspNetPager1"
 
 
 def _text(node):
@@ -29,6 +32,60 @@ def _int_field(label, container):
         return None
     match = re.search(r"\d+", value)
     return int(match.group(0)) if match else None
+
+
+def form_fields(response):
+    soup = BeautifulSoup(response.text, "html.parser")
+    fields = {}
+    for node in soup.select(
+        'input[type="hidden"][name], select[name], textarea[name]'
+    ):
+        name = node.get("name")
+        if not name:
+            continue
+        if node.name == "select":
+            selected = node.select_one("option[selected]")
+            if selected is None:
+                selected = node.select_one("option")
+            value = selected.get("value") if selected else ""
+        else:
+            value = node.get("value", "")
+        fields[name] = value or ""
+    return fields
+
+
+def pagination_form(response, page, fields=None):
+    if page < 1:
+        raise ValueError("nzrc page must be at least 1")
+    payload = dict(fields if fields is not None else form_fields(response))
+    payload["__EVENTTARGET"] = EVENT_TARGET
+    payload["__EVENTARGUMENT"] = str(page)
+    form = BeautifulSoup(response.text, "html.parser").select_one("form")
+    action = urljoin(
+        response.url or BASE_URL,
+        form.get("action") if form is not None else LIST_PATH,
+    )
+    return action, payload
+
+
+def page_count(max_pages=DEFAULT_MAX_PAGES):
+    if max_pages < 1:
+        raise ValueError("max_pages must be at least 1")
+    return int(max_pages)
+
+
+def default_max_pages():
+    return DEFAULT_MAX_PAGES
+
+
+def unique_items(items, seen=None):
+    seen = seen if seen is not None else set()
+    for item in items:
+        item_id = str(item.get("source_item_id") or "").strip()
+        if not item_id or item_id in seen:
+            continue
+        seen.add(item_id)
+        yield item
 
 
 def parse_job_list(response):

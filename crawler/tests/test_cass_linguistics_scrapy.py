@@ -13,7 +13,14 @@ PROJECT_ROOT = (
 )
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from cass_linguistics.parsers import parse_article_detail, parse_article_list
+from cass_linguistics.parsers import (
+    DEFAULT_MAX_PAGES,
+    list_page_url,
+    page_count,
+    parse_article_detail,
+    parse_article_list,
+    unique_items,
+)
 from cass_linguistics.spiders.collection import CassLinguisticsSpider
 
 
@@ -35,6 +42,45 @@ DETAIL_HTML = """
 
 
 class CassLinguisticsScrapyTest(unittest.TestCase):
+    def test_pagination_urls_cover_all_18_pages(self):
+        self.assertEqual(
+            list_page_url(0),
+            "http://ling.cass.cn/news/bensuo/",
+        )
+        self.assertEqual(
+            list_page_url(1),
+            "http://ling.cass.cn/news/bensuo/index_1.html",
+        )
+        self.assertEqual(
+            list_page_url(17),
+            "http://ling.cass.cn/news/bensuo/index_17.html",
+        )
+        self.assertEqual(DEFAULT_MAX_PAGES, 18)
+        self.assertEqual(page_count(), 18)
+        self.assertEqual(CassLinguisticsSpider(max_pages=99).max_pages, 18)
+        with self.assertRaises(ValueError):
+            page_count(0)
+
+    def test_unique_items_stops_duplicate_ids_across_pages(self):
+        seen = set()
+        first = list(
+            unique_items(
+                [{"source_item_id": "1"}, {"source_item_id": "2"}],
+                seen,
+            )
+        )
+        second = list(
+            unique_items(
+                [{"source_item_id": "1"}, {"source_item_id": "3"}],
+                seen,
+            )
+        )
+        self.assertEqual(
+            [item["source_item_id"] for item in first + second],
+            ["1", "2", "3"],
+        )
+        self.assertEqual(list(unique_items([{}, {"source_item_id": ""}])), [])
+
     def test_list_parser_keeps_public_article_links(self):
         response = HtmlResponse(
             url="http://ling.cass.cn/news/bensuo/",

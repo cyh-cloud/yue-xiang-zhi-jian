@@ -9,10 +9,40 @@ from bs4 import BeautifulSoup
 
 
 BASE_URL = "http://ling.cass.cn/"
+LIST_PATH = "news/bensuo/"
+LAST_PAGE_INDEX = 17
+DEFAULT_MAX_PAGES = LAST_PAGE_INDEX + 1
 
 
 def _text(node):
     return node.get_text(" ", strip=True) if node else None
+
+
+def list_page_url(page):
+    if page < 0:
+        raise ValueError("page must be non-negative")
+    suffix = "" if page == 0 else f"index_{page}.html"
+    return urljoin(BASE_URL, LIST_PATH + suffix)
+
+
+def page_count(max_pages=DEFAULT_MAX_PAGES):
+    if max_pages < 1:
+        raise ValueError("max_pages must be at least 1")
+    return int(max_pages)
+
+
+def default_max_pages():
+    return DEFAULT_MAX_PAGES
+
+
+def unique_items(items, seen=None):
+    seen = seen if seen is not None else set()
+    for item in items:
+        item_id = str(item.get("source_item_id") or "").strip()
+        if not item_id or item_id in seen:
+            continue
+        seen.add(item_id)
+        yield item
 
 
 def parse_article_list(response):
