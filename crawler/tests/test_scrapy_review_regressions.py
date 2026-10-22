@@ -1091,6 +1091,7 @@ class RuntimeRegressionTest(unittest.TestCase):
             "final_url": "https://example.test/1",
             "body": b"<html>fixture</html>",
             "content_type": "text/html",
+            "locator": "test-request",
             "run_id": "run-1",
             "robots_decision": "allowed",
         }
@@ -1324,6 +1325,7 @@ class SiteCandidateMappingTest(unittest.TestCase):
                     final_url="https://example.test/item/1",
                     body=b"fixture",
                     content_type="text/html",
+                    locator="test-request",
                     run_id=f"{source_id}-run",
                     robots_decision="allowed",
                 )

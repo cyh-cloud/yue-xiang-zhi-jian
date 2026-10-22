@@ -78,7 +78,7 @@ class RawEvidence:
         ).strip():
             raise ValueError("detail_url is required when status is direct")
         if self.detail_url_status == "missing" and not (
-            self.locator or self.request_url
+            self.locator or ""
         ).strip():
             raise ValueError("locator is required when status is missing")
 

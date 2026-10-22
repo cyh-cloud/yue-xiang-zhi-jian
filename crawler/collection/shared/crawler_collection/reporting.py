@@ -345,7 +345,7 @@ class RunReportExtension:
                         "direct" if detail_url else "missing"
                     ),
                     "fetch_url": request.url,
-                    "locator": meta.get("locator") or request.url,
+                    "locator": meta.get("locator"),
                     "run_id": meta.get("run_id") or spider.run_id,
                     "mode": self.settings.get(
                         "COLLECTION_RUN_MODE", "live"

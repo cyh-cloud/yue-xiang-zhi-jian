@@ -190,7 +190,7 @@ class CollectionRuntime:
         )
         source_url = evidence.source_url or evidence.request_url
         long_term_url = evidence.long_term_url or source_url
-        locator = evidence.locator or evidence.request_url
+        locator = evidence.locator
         retrieved_at = evidence.retrieved_at or _now()
         started_at = evidence.started_at or retrieved_at
         conn = self.database.connect()

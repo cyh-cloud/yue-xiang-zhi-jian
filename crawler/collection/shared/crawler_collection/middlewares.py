@@ -152,7 +152,7 @@ class RawEvidenceMiddleware:
                     else "missing"
                 ),
                 fetch_url=request.url,
-                locator=request.meta.get("locator") or request.url,
+                locator=request.meta.get("locator"),
                 body=body,
                 content_type=response.headers.get(
                     "Content-Type", b"application/octet-stream"
@@ -264,7 +264,7 @@ class RawEvidenceMiddleware:
                     else "missing"
                 ),
                 fetch_url=request.url,
-                locator=request.meta.get("locator") or request.url,
+                locator=request.meta.get("locator"),
                 body=b"",
                 content_type="",
                 status_code=None,
@@ -292,4 +292,4 @@ class RawEvidenceMiddleware:
     @staticmethod
     def _ensure_request_locator(request):
         if not str(request.meta.get("locator") or "").strip():
-            request.meta["locator"] = "request:missing-locator"
+            request.meta["locator"] = "locator:missing"
