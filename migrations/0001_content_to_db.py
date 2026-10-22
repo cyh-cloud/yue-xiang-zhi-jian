@@ -139,7 +139,7 @@ def main(argv=None):
 
 
 def make_baseline(db_path, output=None, force=False):
-    """生成基线库：跑完迁移的库另存一份，删掉迁移记录，让它可以被再次迁移。
+    """生成基线库：迁移临时副本后另存一份，不写回源库。
 
     为什么删掉 schema_migrations：基线库是「新环境的起点」，不是「已迁移完的库」。
     留着记录会让任何在它上面跑迁移的尝试直接跳过，新环境就永远拿不到后续迁移。
@@ -148,23 +148,29 @@ def make_baseline(db_path, output=None, force=False):
     """
     import shutil
     import sqlite3
+    import tempfile
 
-    target = output or os.path.join(REPO_ROOT, 'data', 'baseline.db')
+    target = os.path.abspath(output or os.path.join(REPO_ROOT, 'data', 'baseline.db'))
     if os.path.abspath(target) == os.path.abspath(db_path):
         raise SystemExit('基线库不能覆盖目标库：%s' % target)
 
-    log = migrate(db_path, force=force)
-    if log is None:
-        print('目标库 %s 已迁移过，直接复制为基线库。' % db_path)
-    else:
-        print('目标库 %s 已清理脏数据。' % db_path)
+    # 迁移会写 schema 和脏数据清理记录。先把源库复制到临时目录，所有写操作
+    # 都落在副本上，data/yuexiang.db 作为受控业务快照始终只读。
+    with tempfile.TemporaryDirectory(prefix='yuexiang-baseline-') as temp_dir:
+        staged = os.path.join(temp_dir, 'source.db')
+        shutil.copyfile(db_path, staged)
+        log = migrate(staged, force=force)
+        if log is None:
+            print('源库副本 %s 已迁移过，直接复制为基线库。' % db_path)
+        else:
+            print('源库副本 %s 已清理脏数据。' % db_path)
 
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    for suffix in ('', '-wal', '-shm', '-journal'):
-        candidate = target + suffix
-        if os.path.exists(candidate):
-            os.remove(candidate)
-    shutil.copyfile(db_path, target)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        for suffix in ('', '-wal', '-shm', '-journal'):
+            candidate = target + suffix
+            if os.path.exists(candidate):
+                os.remove(candidate)
+        shutil.copyfile(staged, target)
 
     # 基线库是「迁移前的形状」：去掉 WAL 附属文件与迁移记录，让后续迁移能在它上面跑。
     conn = sqlite3.connect(target)

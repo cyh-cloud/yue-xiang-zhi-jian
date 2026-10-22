@@ -57,10 +57,20 @@ def seed_demo_accounts(cursor):
                        (uid, '广绣工艺师', 'locked'))
 
     # 学员
-    cursor.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                   ('STU001', 'student_demo', '张小明', '2024春季班', '荔枝种植', 85, 'active'))
-    cursor.execute("INSERT INTO students (id, user_id, name, class_name, direction, progress, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                   ('STU002', '', '李小红', '2024春季班', '电商运营', 62, 'active'))
+    cursor.execute(
+        "INSERT INTO students "
+        "(id, user_id, teacher_id, name, class_name, direction, progress, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ('STU001', 'student_demo', 'teacher_demo', '张小明',
+         '2024春季班', '荔枝种植', 85, 'active'),
+    )
+    cursor.execute(
+        "INSERT INTO students "
+        "(id, user_id, teacher_id, name, class_name, direction, progress, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ('STU002', '', 'teacher_demo', '李小红',
+         '2024春季班', '电商运营', 62, 'active'),
+    )
 
 
 def ensure_demo_accounts(cursor):

@@ -268,7 +268,7 @@ def register_pest_routes(bp):
     @bp.route('/api/operator/pest/sources', methods=['GET'])
     @require_capability('pest.manage')
     def operator_pest_sources():
-        return ok(sources=list(pest_db.get_pest_source_map().values()))
+        return ok(sources=pest_db.get_pest_sources())
 
     @bp.route('/api/operator/pest/sources', methods=['POST'])
     @require_capability('pest.manage')

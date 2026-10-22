@@ -20,12 +20,31 @@
 
 from flask import Blueprint, jsonify, request
 
+from core.session import get_session_user
 from shared.options import category_option_list
 from shared.resume_state import user_has_resume
 from db_domains import certificates, employment, points
 from db_domains import recruitments as recruitments_db
 
 employment_bp = Blueprint('employment', __name__)
+
+
+def _session_identity(requested_user_id=''):
+    """就业个人状态只能以会话用户身份读写。
+
+    请求体里的 user_id 只用于兼容旧调用：如果传了就必须与当前会话一致；
+    没传时直接采用会话用户，避免客户端通过替换 user_id 读写他人数据。
+    """
+    user = get_session_user()
+    if not user:
+        return None, (jsonify({"success": False, "message": "请先登录"}), 401)
+    requested = str(requested_user_id or '').strip()
+    if requested and requested != user['username']:
+        return None, (jsonify({
+            "success": False,
+            "message": "无权访问他人的求职资料",
+        }), 403)
+    return user['username'], None
 
 
 @employment_bp.route('/api/employment/jobs', methods=['GET'])
@@ -118,22 +137,35 @@ def get_similar_jobs(job_id):
 
 @employment_bp.route('/api/employment/certificates/<user_id>', methods=['GET'])
 def get_certificates(user_id):
+    user_id, err = _session_identity(user_id)
+    if err:
+        return err
     certs = certificates.get_certificates(user_id)
     return jsonify({"success": True, "certificates": certs})
 
 
 @employment_bp.route('/api/employment/points/<user_id>', methods=['GET'])
 def get_points(user_id):
+    user_id, err = _session_identity(user_id)
+    if err:
+        return err
     pts = points.get_points(user_id)
     return jsonify({"success": True, "points": pts['balance'], "history": pts['history']})
 
 
 @employment_bp.route('/api/employment/exchange', methods=['POST'])
 def exchange_points():
-    data = request.get_json()
-    user_id = data.get('user_id')
-    item = data.get('item', '商品')
+    data = request.get_json(silent=True) or {}
+    user_id, err = _session_identity(data.get('user_id'))
+    if err:
+        return err
+    item = str(data.get('item') or '商品').strip()[:100] or '商品'
     cost = data.get('cost', 0)
+    if isinstance(cost, bool) or not isinstance(cost, int) or cost <= 0:
+        return jsonify({
+            "success": False,
+            "message": "兑换积分必须为正整数",
+        }), 400
 
     new_balance = points.update_points(user_id, -cost, f"兑换{item}")
     if new_balance == -1:
@@ -144,11 +176,13 @@ def exchange_points():
 @employment_bp.route('/api/employment/apply', methods=['POST'])
 def apply_job():
     """申请职位"""
-    data = request.get_json()
-    user_id = data.get('user_id')
+    data = request.get_json(silent=True) or {}
     job_id = data.get('job_id')
+    user_id, err = _session_identity(data.get('user_id'))
+    if err:
+        return err
 
-    if not user_id or not job_id:
+    if not job_id:
         return jsonify({"success": False, "message": "参数不完整"})
 
     result = employment.apply_for_job(user_id, job_id)
@@ -168,6 +202,9 @@ def apply_job():
 
 @employment_bp.route('/api/employment/applications/<user_id>', methods=['GET'])
 def get_user_applications(user_id):
+    user_id, err = _session_identity(user_id)
+    if err:
+        return err
     status_filter = request.args.get('status', '')
     apps = employment.get_user_applications(user_id, status_filter)
     return jsonify({"success": True, "applications": apps})
@@ -175,16 +212,21 @@ def get_user_applications(user_id):
 
 @employment_bp.route('/api/employment/applications/<user_id>/counts', methods=['GET'])
 def get_application_counts(user_id):
+    user_id, err = _session_identity(user_id)
+    if err:
+        return err
     counts = employment.get_application_counts(user_id)
     return jsonify({"success": True, "counts": counts})
 
 
 @employment_bp.route('/api/employment/save', methods=['POST'])
 def save_job():
-    data = request.get_json()
-    user_id = data.get('user_id')
+    data = request.get_json(silent=True) or {}
     job_id = data.get('job_id')
-    if not user_id or not job_id:
+    user_id, err = _session_identity(data.get('user_id'))
+    if err:
+        return err
+    if not job_id:
         return jsonify({"success": False, "message": "参数不完整"})
     success = employment.save_job(user_id, job_id)
     if success:
@@ -194,10 +236,12 @@ def save_job():
 
 @employment_bp.route('/api/employment/save', methods=['DELETE'])
 def unsave_job():
-    data = request.get_json()
-    user_id = data.get('user_id')
+    data = request.get_json(silent=True) or {}
     job_id = data.get('job_id')
-    if not user_id or not job_id:
+    user_id, err = _session_identity(data.get('user_id'))
+    if err:
+        return err
+    if not job_id:
         return jsonify({"success": False, "message": "参数不完整"})
     employment.unsave_job(user_id, job_id)
     return jsonify({"success": True, "message": "已取消收藏"})
@@ -205,11 +249,17 @@ def unsave_job():
 
 @employment_bp.route('/api/employment/saved/<user_id>', methods=['GET'])
 def get_saved_jobs(user_id):
+    user_id, err = _session_identity(user_id)
+    if err:
+        return err
     saved_ids = employment.get_saved_jobs(user_id)
     return jsonify({"success": True, "saved_ids": saved_ids})
 
 
 @employment_bp.route('/api/employment/stats/<user_id>', methods=['GET'])
 def get_employment_stats(user_id):
+    user_id, err = _session_identity(user_id)
+    if err:
+        return err
     stats = employment.get_employment_stats(user_id)
     return jsonify({"success": True, "stats": stats})

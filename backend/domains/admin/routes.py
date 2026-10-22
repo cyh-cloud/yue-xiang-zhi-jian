@@ -16,7 +16,7 @@
 
 from flask import Blueprint, jsonify, request
 
-from core.permissions import require_capability
+from core.permissions import ROLES, require_capability
 from core.session import get_session_user
 from db_domains import announcements, community, content, courses, employment
 from db_domains import users as users_db
@@ -24,7 +24,8 @@ from db_domains import reviews as reviews_db
 
 
 # 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
-CAPABILITIES_USED = ('user.read', 'review.read', 'course.read', 'case.read')
+CAPABILITIES_USED = ('user.read', 'review.read', 'course.read', 'case.read',
+                     'community.read')
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -98,13 +99,21 @@ def admin_update_user(user_id):
     if not target:
         return jsonify({"success": False, "message": "用户不存在"}), 404
 
+    new_role = data.get('role')
+    if new_role is not None and new_role not in ROLES:
+        return jsonify({"success": False, "message": "角色无效"}), 400
+    new_status = data.get('status')
+    if new_status is not None and new_status not in ('active', 'suspended'):
+        return jsonify({"success": False, "message": "状态只能是 active 或 suspended"}), 400
+    if user_id == user['username'] and new_status == 'suspended':
+        return jsonify({"success": False, "message": "不能停用当前登录的账号"}), 400
+
     # 末位 super_admin 不能被降级。
     # ⚠️ 这条守卫放在 PUT 而不是 DELETE 才有意义：DELETE 要求操作者本人就是
     #    super_admin，于是 count_super_admins() 恒 >= 1，「最后一个超管」只可能是
     #    操作者自己，而自删已被前面拦掉 —— DELETE 里那条守卫实际不可触发。
     #    真正能把全站最后一个超管搞没的路径是**改角色**：把 admin_demo 的 role
     #    从 super_admin 改成别的，此后没有任何账号能进管理端，且无法自恢复。
-    new_role = data.get('role')
     if (new_role is not None and new_role != 'super_admin'
             and target.get('role') == 'super_admin'
             and users_db.count_super_admins() <= 1):
@@ -113,7 +122,7 @@ def admin_update_user(user_id):
             "message": "系统必须保留至少一个超级管理员，不能把最后一个超级管理员改成其他角色"}), 400
 
     ok = users_db.update_user_by_admin(user_id,
-        name=data.get('name'), role=new_role, status=data.get('status'),
+        name=data.get('name'), role=new_role, status=new_status,
         phone=data.get('phone'), email=data.get('email'))
     if not ok:
         return jsonify({"success": False, "message": "用户不存在"}), 404
@@ -301,11 +310,30 @@ def admin_delete_system_announcement(ann_id):
 
 # ---- 内容监管 ----
 
+@admin_bp.route('/api/admin/content', methods=['GET'])
+@require_capability('community.manage')
+def admin_get_moderation_content():
+    """讨论帖与评论的统一监管列表。
+
+    读取仍归社区域；本路由只把两类待监管内容聚合给超管后台，避免前端
+    为每条讨论帖分别请求一次评论列表。
+    """
+    discussions, total = community.get_discussions(page=1, page_size=200)
+    comments = community.get_moderation_comments(limit=200)
+    return jsonify({
+        "success": True,
+        "discussions": discussions,
+        "comments": comments,
+        "total": total,
+    })
+
+
 @admin_bp.route('/api/admin/comments/<int:comment_id>', methods=['DELETE'])
 @require_capability('community.manage')
 def admin_delete_comment(comment_id):
     user = get_session_user()
-    community.soft_delete_comment(comment_id, user['username'])
+    if not community.soft_delete_comment(comment_id, user['username']):
+        return jsonify({"success": False, "message": "评论不存在"}), 404
     return jsonify({"success": True, "message": "已删除违规评论"})
 
 
@@ -313,5 +341,6 @@ def admin_delete_comment(comment_id):
 @require_capability('community.manage')
 def admin_delete_discussion(disc_id):
     user = get_session_user()
-    community.soft_delete_discussion(disc_id)
+    if not community.soft_delete_discussion(disc_id):
+        return jsonify({"success": False, "message": "帖子不存在"}), 404
     return jsonify({"success": True, "message": "已删除违规帖子"})

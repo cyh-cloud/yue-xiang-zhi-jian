@@ -21,8 +21,10 @@ sys.path.insert(0, BACKEND)
 
 
 def main():
-    tmp = tempfile.mkdtemp(prefix="t11_probe_")
-    db = os.path.join(tmp, "yuexiang.db")
+    provided_db = os.environ.get("YUEXIANG_DB")
+    tmp = None if provided_db else tempfile.mkdtemp(prefix="t11_probe_")
+    db = provided_db or os.path.join(tmp, "yuexiang.db")
+    os.makedirs(os.path.dirname(os.path.abspath(db)), exist_ok=True)
     shutil.copy(os.path.join(REPO, "data", "yuexiang.db"), db)
 
     from db_connection import get_connection
@@ -113,11 +115,21 @@ def main():
 
     # 批改链路：自造一条提交，打批改接口，回读分数与通知
     conn = get_connection()
+    conn.execute(
+        "DELETE FROM assignment_submissions WHERE assignment_id IN "
+        "(SELECT id FROM assignments WHERE title = '__T11批改作业__')"
+    )
+    conn.execute("DELETE FROM assignments WHERE title = '__T11批改作业__'")
+    conn.execute(
+        "INSERT INTO assignments (title, description, direction) "
+        "VALUES ('__T11批改作业__', 'desc', 'ecommerce')"
+    )
     assignment = conn.execute(
-        "SELECT id FROM assignments ORDER BY id LIMIT 1").fetchone()
+        "SELECT id FROM assignments WHERE title = '__T11批改作业__'"
+    ).fetchone()
     conn.execute(
         "INSERT INTO assignment_submissions (assignment_id, student_id, content)"
-        " VALUES (?, 'STU001', '{}')", (assignment["id"],))
+        " VALUES (?, 'student_demo', '{}')", (assignment["id"],))
     conn.commit()
     submission = conn.execute(
         "SELECT id, student_id, assignment_id FROM assignment_submissions"
@@ -138,6 +150,7 @@ def main():
         " WHERE user_id = ? AND type = 'grade' ORDER BY id DESC LIMIT 1",
         (submission["student_id"],)).fetchone()
     conn.execute("DELETE FROM assignment_submissions WHERE id = ?", (submission["id"],))
+    conn.execute("DELETE FROM assignments WHERE id = ?", (assignment["id"],))
     conn.execute("DELETE FROM notifications WHERE type = 'grade' AND content = '得分：91'")
     conn.commit()
     conn.close()
@@ -191,7 +204,8 @@ def main():
     out["doomed_review"] = reviews_db.get_review_by_content("job", doomed)
 
     print(json.dumps(out, ensure_ascii=False, sort_keys=True, default=str))
-    shutil.rmtree(tmp, ignore_errors=True)
+    if tmp:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 def _post_read_one(client, session, ref_id):

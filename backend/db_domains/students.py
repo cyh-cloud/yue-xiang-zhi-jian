@@ -27,39 +27,48 @@ CAPABILITY = 'student'
 # （成因与现场见 tests/concurrency.py 的说明）。
 # students.id 是 TEXT 主键，最大号必须按数值比：字符串序下 STU1000 小于 STU999。
 _INSERT_STUDENT_SQL = (
-    "INSERT INTO students (id, user_id, name, class_name, direction, progress, status) "
+    "INSERT INTO students (id, user_id, teacher_id, name, class_name, direction, progress, status) "
     "VALUES (("
     "    SELECT 'STU' || printf('%03d', "
     "           COALESCE(MAX(CAST(SUBSTR(id, 4) AS INTEGER)), 0) + 1) "
     "      FROM students WHERE id GLOB 'STU[0-9]*'"
-    "), ?, ?, ?, ?, 0, 'active') RETURNING id"
+    "), ?, ?, ?, ?, ?, 0, 'active') RETURNING id"
 )
 
 
-def get_students(search=None):
+def get_students(search=None, teacher_id=None):
     """获取学员列表（按学号稳定排序）。
 
     ⚠️ 必须 ORDER BY：名册行的 rowid 会因删除/重建而变化，不加排序时
     教师端列表的展示顺序会「看起来随机」。
     """
     conn = get_connection()
+    sql = "SELECT * FROM students WHERE 1=1"
+    params = []
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
     if search:
-        rows = conn.execute("SELECT * FROM students WHERE name LIKE ? OR id LIKE ? OR direction LIKE ? "
-                            "ORDER BY id",
-                            (f'%{search}%', f'%{search}%', f'%{search}%')).fetchall()
-    else:
-        rows = conn.execute("SELECT * FROM students ORDER BY id").fetchall()
+        sql += " AND (name LIKE ? OR id LIKE ? OR direction LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%', f'%{search}%'])
+    sql += " ORDER BY id"
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def get_student(student_id):
+def get_student(student_id, teacher_id=None):
     """获取单个学员"""
     conn = get_connection()
-    row = conn.execute("SELECT * FROM students WHERE id = ?", (student_id,)).fetchone()
+    sql = "SELECT * FROM students WHERE id = ?"
+    params = [student_id]
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    row = conn.execute(sql, params).fetchone()
     conn.close()
     return dict(row) if row else None
 
-def add_student(name, class_name, direction, user_id=''):
+def add_student(name, class_name, direction, user_id='', teacher_id=''):
     """添加学员（只写名册行）。
 
     ⚠️ 名册行与平台账号是**两套数据**：不传 user_id 就只是一行名册记录，
@@ -75,7 +84,8 @@ def add_student(name, class_name, direction, user_id=''):
         conn = get_connection()
         try:
             row = conn.execute(_INSERT_STUDENT_SQL,
-                               (user_id or '', name, class_name, direction)).fetchone()
+                               (user_id or '', teacher_id or '',
+                                name, class_name, direction)).fetchone()
             conn.commit()
             return row['id']
         except (sqlite3.IntegrityError, sqlite3.OperationalError):
@@ -102,23 +112,35 @@ def get_roster_name_for(user_id):
     return row['name'] if row else None
 
 
-def get_roster_rows_for_completion():
+def get_roster_rows_for_completion(teacher_id=None):
     """学员域窄接口：名册行的 id / 姓名 / 方向 / 账号 / 状态，供完成度统计拼装。"""
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT id, name, direction, user_id, status FROM students ORDER BY id").fetchall()
+    sql = "SELECT id, name, direction, user_id, status FROM students WHERE 1=1"
+    params = []
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    sql += " ORDER BY id"
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
-def get_linked_student_user_ids():
+def get_linked_student_user_ids(teacher_id=None):
     """学员域窄接口：名册中已关联平台账号的 user_id 列表（username 语义）。
 
     通知域群发时据此取收件人，不再自己读 students 表。
     """
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT user_id FROM students WHERE user_id IS NOT NULL AND user_id != ''").fetchall()
+    sql = (
+        "SELECT user_id FROM students "
+        "WHERE user_id IS NOT NULL AND user_id != ''"
+    )
+    params = []
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [r['user_id'] for r in rows]
 
@@ -156,13 +178,18 @@ def get_linkable_student_accounts():
     from db_domains.users import get_linked_student_accounts
     return [a for a in get_linked_student_accounts() if a['username'] not in taken]
 
-def set_student_account(student_id, username):
+def set_student_account(student_id, username, teacher_id=None):
     """把名册行关联到平台账号；username 为空串 = 解除关联。
 
     返回 (是否成功, 提示语)。所有校验都在这里做，调用方不必重复判断。
     """
     conn = get_connection()
-    row = conn.execute("SELECT id FROM students WHERE id = ?", (student_id,)).fetchone()
+    sql = "SELECT id FROM students WHERE id = ?"
+    params = [student_id]
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    row = conn.execute(sql, params).fetchone()
     if not row:
         conn.close()
         return False, '未找到学员'
@@ -185,10 +212,16 @@ def set_student_account(student_id, username):
     conn.close()
     return True, (f'已关联账号 {username}' if username else '已解除账号关联')
 
-def update_student(student_id, name=None, class_name=None, direction=None, progress=None, status=None):
+def update_student(student_id, name=None, class_name=None, direction=None,
+                   progress=None, status=None, teacher_id=None):
     """编辑学员信息"""
     conn = get_connection()
-    student = conn.execute("SELECT * FROM students WHERE id = ?", (student_id,)).fetchone()
+    sql = "SELECT * FROM students WHERE id = ?"
+    params = [student_id]
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    student = conn.execute(sql, params).fetchone()
     if not student:
         conn.close()
         return False
@@ -216,14 +249,41 @@ def update_student(student_id, name=None, class_name=None, direction=None, progr
     conn.close()
     return True
 
-def delete_student(student_id):
+def delete_student(student_id, teacher_id=None):
     """删除学员"""
     conn = get_connection()
-    result = conn.execute("DELETE FROM students WHERE id = ?", (student_id,))
+    sql = "DELETE FROM students WHERE id = ?"
+    params = [student_id]
+    if teacher_id is not None:
+        sql += " AND teacher_id = ?"
+        params.append(teacher_id)
+    result = conn.execute(sql, params)
     conn.commit()
     deleted = result.rowcount > 0
     conn.close()
     return deleted
+
+
+def get_teacher_id_for_student_account(username):
+    """已关联学员账号的教师 username；未关联或不存在返回空串。"""
+    if not username:
+        return ''
+    conn = get_connection()
+    row = conn.execute(
+        "SELECT teacher_id FROM students WHERE user_id = ? LIMIT 1",
+        (username,),
+    ).fetchone()
+    conn.close()
+    return (row['teacher_id'] or '') if row else ''
+
+
+def is_student_linked_to_teacher(username, teacher_id):
+    """该学员账号是否属于指定教师的名册。"""
+    return bool(
+        username
+        and teacher_id
+        and get_teacher_id_for_student_account(username) == teacher_id
+    )
 
 
 # ==================== 通知公告 ====================

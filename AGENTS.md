@@ -19,21 +19,24 @@
 - 端到端：`cd e2e; npx playwright test`
 - 架构机械检查：`python tools/check_architecture.py`
 - Python 静态检查：`python tools/check_python.py`
-- 启动：`python backend/run.py`（自托管单机部署：Flask 裸跑 + 多线程，静态文件由同一进程伺服）
+- 启动 API：`python backend/run.py`；启动前端：`cd frontend; npm run dev`
+- 生产部署：`cd frontend; npm run build` 后由 nginx 伺服 `frontend/dist`，并把 `/api/*` 代理到 Flask；Windows 本地用 `python tools/nginx_runtime.py --check` 与 `python tools/nginx_control.py start|smoke|stop`
 - 用一份可弃数据库跑 e2e：由 `e2e/serve.py` 自动处理，`YUEXIANG_DB` 指向临时库
 
 ## 后端结构
 
-后端代码全部在 `backend/` 下，前端文件与 `data/`、`uploads/`、`.env`、`requirements.txt` 留在仓库根。一个领域一个蓝图，共享层不感知任何具体领域。领域之间的数据访问按权限判定，不再以「不得 import」一禁了之（ADR 0002 修订了 ADR 0001 的这条）。改后端前先读 `docs/adr/0001-backend-domain-split.md`（边界与裁决）与 `docs/adr/0002-content-into-database.md`（内容落库），再看 `GLOSSARY.md` 的「后端结构」一节（术语）。
+后端代码全部在 `backend/`，活动前端全部在 `frontend/`；`data/`、`uploads/`、`.env`、`requirements.txt` 留在仓库根。一个领域一个蓝图，共享层不感知任何具体领域。领域之间的数据访问按权限判定，不再以「不得 import」一禁了之（ADR 0002 修订了 ADR 0001 的这条）。改后端前先读 `docs/adr/0001-backend-domain-split.md`（边界与裁决）与 `docs/adr/0002-content-into-database.md`（内容落库），再看 `GLOSSARY.md` 的「后端结构」一节（术语）。
 
 - `backend/app.py`：入口。创建应用 + 健康检查探针 + 启动。业务路由不在这里。
 - `backend/core/`：应用工厂、会话与角色鉴权、限流、统一错误响应。
 - `backend/ai/`：上游模型调用的唯一出口。
-- `backend/shared/`：零领域状态的纯函数与纯配置（节气、朗读评分、文案评分、作物白名单、实训状态标签等）。
+- `backend/shared/`：零领域状态的纯函数与纯配置（节气、朗读评分、文案评分、作物白名单、实训状态标签、上传上限等）。
 - `backend/db_domains/`：按领域切分的数据访问层，一个领域一个模块。
 - `backend/db_connection.py` / `db_schema.py` / `db_seed_accounts.py`：数据层基础设施与演示账号播种。
 - `backend/db_init.py`：启动编排（建表、补列、清废弃表、空库灌演示账号）。内容不在这里播种。
 - `backend/domains/`：领域路由蓝图，一个领域一个目录。
+- `frontend/`：Vue 3 + TypeScript 单页应用源码，构建产物为 `frontend/dist/`。
+- `deploy/`：nginx 等部署层配置，不承载业务逻辑。
 - `backend/core/permissions.py`：全站唯一的「角色到能力」映射，路由鉴权走它，不写角色名比较。
 - `backend/repo_paths.py`：路径唯一基准，`REPO_ROOT` 指向**仓库根**（不是 backend/），因为 `data/`、`uploads/`、`.env` 都在仓库根。
 

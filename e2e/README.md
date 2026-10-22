@@ -1,26 +1,18 @@
-# 粤乡智匠 E2E（Playwright）
+# 粤乡智匠 E2E 启动器
 
-以后端功能性 bug 排查为主的端到端测试。每次对一份全新种子库自起 Flask（127.0.0.1:5057），不碰真实 `data/yuexiang.db`。
+活动 Playwright 测试位于 `frontend/e2e/`，由 `frontend/playwright.config.ts` 和
+`frontend/playwright.backend-unavailable.config.ts` 驱动。本目录只保留两者共用的
+真实 Flask 启动器与临时目录清理脚本。
 
-## 运行
+`serve.py` 每次从 `data/baseline.db` 复制一份临时库，启动真实 Flask，并由测试静态
+入口伺服构建后的 `frontend/dist`、代理 `/api`、`/uploads/` 与 `/images/`。旧多页面
+前端模式已删除，不再接受 `E2E_FRONTEND=legacy`。
 
-- 首次：`npm install` 然后 `npx playwright install chromium`
-- 跑：`npx playwright test`
+运行入口：
 
-## 结构
+```powershell
+cd frontend
+npm run test:e2e
+```
 
-- `serve.py`：每次启动删旧库、从 `data/baseline.db` 复制一份、再跑 `init_db()` 补演示账号，最后起 Flask。库路径由环境变量 `YUEXIANG_DB` 指定（见 `backend/db_connection.py` 的开关）。T10 起 `init_db()` 只建表补列加灌演示账号，不写内容行，所以基线库是 e2e 拿到内容的唯一途径。
-- `playwright.config.js`：用 webServer 拉起 `serve.py` 并等 `/api/health`；把 `AI_API_KEY` 置空，使 AI 接口返 503，便于稳定断言。
-- `specs/`：
-  - `ownership.spec.js` 越权矩阵（各端点 × 各登录态）
-  - `notifications-idor.spec.js` 通知越权（当前应失败 = 缺陷在；修复后转绿）
-  - `review-gate.spec.js` 案例审核门禁
-  - `messages.spec.js` 消息状态机 + 护栏
-  - `smoke.spec.js` / `portals-smoke.spec.js` 前端加载巡查（无 5xx、无未捕获异常）
-- `findings/`：运行产出的证据与 `BUG-REPORT.md`。
-
-## 说明
-
-- 通知越权用例当前**故意失败**，用于固化缺陷；修好应转绿。
-- 前端默认连 `localhost:5000`，测试用 `page.addInitScript` 注入 `window.APP_CONFIG.apiBaseUrl` 指向同源 5057。
-- AI 流程契约测试待 `.env` 配置（见 `docs/ai-setup.md`）或接本地 mock 后补充。
+基线库缺失时依赖内容的用例会明确失败，不会退化成假绿。

@@ -1,0 +1,840 @@
+/*
+ * Shared component layer. These primitives are consumed by two or more real
+ * public surfaces and inherit color, surface, and state from root tokens.
+ * Backoffice-only primitives live in backoffice.css.
+ */
+
+/* Tags */
+.tag,
+.message-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tag {
+  padding: 3px 10px;
+  background: var(--bo-accent-soft);
+  color: var(--bo-accent);
+  font-size: 0.7rem;
+}
+
+.message-tag {
+  margin-left: 6px;
+  padding: 1px 7px;
+  vertical-align: middle;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.message-tag-announcement {
+  background: var(--color-accent-indigo-tint);
+  color: var(--color-accent-indigo-strong);
+}
+
+.message-tag-job,
+.message-tag-grade {
+  background: var(--color-accent-gold-tint);
+  color: var(--color-accent-gold-strong);
+}
+
+.message-tag-interaction {
+  background: var(--color-brand-tint);
+  color: var(--color-brand-strong);
+}
+
+.message-tag-system,
+.message-tag-farming_reminder {
+  background: var(--surface-muted);
+  color: var(--color-text-muted);
+}
+
+/* Shared page-panel header used by ecommerce and crafts training panels. */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.panel-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-text-primary);
+  font-family: "Microsoft YaHei", "SimHei", "Heiti SC", "PingFang SC", sans-serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.panel-header h3.card-section-title {
+  color: var(--color-text-primary);
+  font-family: "Microsoft YaHei", "SimHei", "Heiti SC", "PingFang SC", sans-serif;
+}
+
+.panel-header .icon-btn {
+  color: var(--color-text-secondary);
+}
+
+.panel-header .icon-btn:hover {
+  background: var(--surface-canvas);
+  color: var(--color-text-primary);
+}
+
+/* Resume content card shared by the employment editor and enterprise detail. */
+.resume-block {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.resume-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+/* Empty, loading, and error states */
+.error-state {
+  background: var(--state-error-bg);
+  color: var(--bo-status-error-text);
+}
+
+.loading-state,
+.error-state {
+  text-align: center;
+}
+
+.loading-state p,
+.error-state p {
+  font-size: 0.85rem;
+}
+
+.error-state {
+  padding: var(--space-6);
+  border: 1px solid var(--state-error-border);
+  border-radius: var(--radius);
+}
+
+.error-state i {
+  display: block;
+  margin-bottom: 12px;
+  font-size: 2rem;
+}
+
+.error-state .btn {
+  margin-top: 16px;
+}
+
+/* Message center */
+.message-center-wrap {
+  position: relative;
+}
+
+.message-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: var(--z-dropdown);
+  display: none;
+  width: 380px;
+  max-height: 520px;
+  overflow: hidden;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+.message-dropdown.show {
+  display: flex;
+}
+
+.message-dropdown-header,
+.message-dropdown-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.message-dropdown-header h4 {
+  color: var(--color-text-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.message-dropdown-actions,
+.message-dropdown-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.message-dropdown-actions button {
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.message-dropdown-actions button:hover {
+  background: var(--bo-accent-soft);
+  color: var(--bo-accent);
+}
+
+/* The unread count stays an alert affordance even in dark and role themes. */
+.message-unread-jump,
+.message-unread-jump:hover,
+[data-theme="dark"] .message-unread-jump {
+  min-width: 22px;
+  padding: 5px 8px;
+  border-radius: 11px;
+  background: var(--state-error);
+  color: var(--color-text-inverse);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.message-dropdown-tabs {
+  padding: 8px 12px 0;
+}
+
+.message-tab-btn {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: var(--font-family-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.message-tab-btn:hover {
+  background: var(--surface-muted);
+  color: var(--color-text-primary);
+}
+
+.message-tab-btn.active {
+  border-bottom: 2px solid var(--bo-accent);
+  background: var(--surface-muted);
+  color: var(--bo-accent);
+}
+
+.message-dropdown-body {
+  flex: 1;
+  max-height: 340px;
+  overflow-y: auto;
+  padding: 4px 0;
+  overscroll-behavior: contain;
+}
+
+.message-empty {
+  padding: 40px 20px;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+.message-empty i {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--color-brand-soft);
+  font-size: 1.5rem;
+}
+
+.message-empty p {
+  margin: 0;
+}
+
+.message-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.message-item:hover {
+  background: var(--surface-muted);
+}
+
+.message-item.unread {
+  border-left-color: var(--bo-accent);
+  background: var(--bo-accent-soft);
+}
+
+.message-item.is-clickable:focus-visible {
+  outline: 2px solid var(--bo-accent);
+  outline-offset: -2px;
+}
+
+.message-item-icon,
+.message-item-avatar {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.message-item-icon {
+  color: var(--color-text-inverse);
+}
+
+.message-item-icon.type-announcement {
+  background: var(--color-accent-indigo);
+}
+
+.message-item-icon.type-grade {
+  background: var(--bo-status-error-text);
+}
+
+.message-item-icon.type-system {
+  background: var(--color-text-muted);
+}
+
+.message-item-icon.type-job {
+  background: var(--color-accent-gold-strong);
+}
+
+.message-item-icon.type-interaction {
+  background: var(--color-brand-mid);
+}
+
+.message-item-avatar {
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--color-text-muted);
+}
+
+.message-item-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.message-item-title {
+  overflow: hidden;
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-item.unread .message-item-title {
+  font-weight: 700;
+}
+
+.message-item-preview {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-item-time {
+  margin-top: 2px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.message-item.has-reply {
+  padding-bottom: 8px;
+}
+
+.message-reply-btn {
+  margin-top: 6px;
+  padding: 3px 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--bo-accent);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.message-reply-btn:hover,
+.message-dropdown-footer button:hover {
+  opacity: 0.8;
+}
+
+.message-dropdown-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 0;
+  text-align: center;
+}
+
+.message-dropdown-footer button {
+  border: 0;
+  background: transparent;
+  color: var(--bo-accent);
+  cursor: pointer;
+  font-family: var(--font-family-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.message-dropdown-footer button i {
+  margin-right: 4px;
+}
+
+.notif-detail {
+  font-size: 0.92rem;
+}
+
+.notif-detail .message-tag {
+  margin-left: 0;
+}
+
+.notif-detail-body {
+  margin-top: 14px;
+  color: var(--color-text-primary);
+  line-height: 1.75;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notif-detail-time {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.notif-detail-time i {
+  margin-right: 6px;
+}
+
+.conversation-modal {
+  display: flex;
+  height: 400px;
+  flex-direction: column;
+}
+
+.conversation-messages {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.message-bubble {
+  max-width: 75%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.message-bubble.mine {
+  align-self: flex-end;
+  border-bottom-right-radius: var(--space-1);
+  background: var(--bo-accent);
+  color: var(--color-text-inverse);
+}
+
+.message-bubble.theirs {
+  align-self: flex-start;
+  border-bottom-left-radius: var(--space-1);
+  background: var(--surface-muted);
+  color: var(--color-text-primary);
+}
+
+.message-bubble-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-bubble-time {
+  margin-top: 4px;
+  font-size: 0.68rem;
+  opacity: 0.7;
+}
+
+.message-bubble.mine .message-bubble-time {
+  text-align: right;
+}
+
+.conversation-input {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.conversation-input input {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  outline: none;
+  background: var(--surface-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-ui);
+  font-size: 0.88rem;
+}
+
+.conversation-input input:focus {
+  border-color: var(--bo-accent);
+  box-shadow: 0 0 0 3px var(--bo-accent-soft);
+}
+
+.conversation-send {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--gradient-brand);
+  color: var(--color-text-inverse);
+  cursor: pointer;
+  font-size: 0.95rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.conversation-send:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.conversation-send:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+  .message-dropdown {
+    width: calc(100vw - 32px);
+    right: -8px;
+  }
+}
+
+/* Shared comment rows used by the public community and live simulation. */
+.comment-item {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: var(--text-sm);
+}
+
+.comment-item strong { color: var(--accent-green); }
+
+/* Global tokens live in tokens.css. */
+[data-theme="dark"] .icon-btn:hover { background: rgba(255,255,255,0.08); }
+[data-theme="dark"] .card-section { background: var(--bg-secondary); border-color: var(--border); }
+[data-theme="dark"] .btn-outline { background: var(--bg-secondary); color: var(--text-primary); border-color: var(--border); }
+[data-theme="dark"] .btn-outline:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+[data-theme="dark"] .modal-content { background: var(--bg-secondary); }
+[data-theme="dark"] .form-group input, [data-theme="dark"] .form-group select { background: #1b2c25; border-color: #33473d; color: var(--text-primary); }
+[data-theme="dark"] .detail-modal .modal-content { background: var(--bg-secondary); }
+
+/* Global reset and base elements live in base.css. */
+/* ==================== Buttons ==================== */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    white-space: nowrap;
+    text-decoration: none;
+}
+.btn-primary {
+    background: var(--accent-blue);
+    color: white;
+    box-shadow: 0 2px 8px rgba(31,94,67,0.15);
+}
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(31,94,67,0.25);
+}
+.btn-outline {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+}
+.btn-outline:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
+.btn-success { background: var(--accent-green); color: white; }
+.btn-success:hover { background: var(--accent-green-dark); transform: translateY(-1px); }
+.btn-text { background: none; color: var(--accent-blue); padding: 6px 12px; }
+.btn-text:hover { background: rgba(31,94,67,0.06); }
+.btn-sm { padding: 7px 14px; font-size: 0.8rem; }
+.btn-lg { padding: 14px 28px; font-size: 1rem; border-radius: var(--radius); }
+
+/* Button tactile feedback, Apple-style press */
+.btn:active, .btn-primary:active, .btn-outline:active, .btn-success:active {
+    transform: scale(0.98) translateY(0);
+    transition-duration: 0.1s;
+}
+
+/* Global focus treatment lives in base.css. */
+
+/* ==================== Sections ==================== */
+.section-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-blue);
+    margin-bottom: 12px;
+}
+.section-title {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 500;
+    color: var(--text-primary);
+    letter-spacing: -0.025em;
+    margin-bottom: 16px;
+    line-height: 1.1;
+}
+.section-desc {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    max-width: 540px;
+    margin-bottom: 56px;
+    line-height: 1.6;
+    font-weight: 400;
+}
+
+/* ==================== Main Content ==================== */
+.tab-content {
+    display: none;
+    padding: 80px 0 120px;
+    transition: opacity 0.3s var(--ease-out);
+    contain: content; /* 隔离布局/样式重算范围 */
+}
+.tab-content.active {
+    display: block;
+    contain: content;
+}
+/* 不可见Tab内的卡片跳过渲染 */
+.tab-content:not(.active) .card-section {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 300px;
+}
+
+/* ==================== Card Sections ==================== */
+.card-section {
+    margin-bottom: 72px;
+}
+.card-section-title {
+    font-size: 1.35rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 28px;
+    letter-spacing: -0.01em;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.card-section-title i { color: var(--accent-blue); font-size: 1rem; }
+
+/* ==================== Modal ==================== */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1500;
+}
+.modal-content {
+    background: var(--bg-secondary);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-xl);
+    animation: fadeInUp 0.3s ease;
+}
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-light);
+}
+.modal-header h2,
+.modal-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-xs);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+.modal-close:hover { background: var(--bg-primary); color: var(--text-primary); }
+.modal-body { padding: 24px; }
+.detail-modal .modal-content { max-width: 600px; }
+.detail-modal .modal-body { max-height: 60vh; overflow-y: auto; line-height: 1.8; color: var(--text-secondary); font-size: 0.9rem; }
+
+/* ==================== Animations ==================== */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Conversation dialogs keep scrolling inside the message region. */
+.detail-modal .modal-content.conv-modal {
+    max-width: 520px;
+    max-height: 82vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.detail-modal .modal-content.conv-modal .modal-header {
+    flex-shrink: 0;
+    padding: 16px 20px;
+}
+.detail-modal .modal-content.conv-modal .modal-body {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
+    padding: 0;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+/* 暗色模式适配 */
+[data-theme="dark"] .detail-modal .modal-content.conv-modal .conversation-messages { background: var(--bg-primary); }
+
+/* ==================== Utility Classes ==================== */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ==================== Theme Toggle ==================== */
+.theme-toggle {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-xs);
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+    font-size: 0.9rem;
+}
+.theme-toggle:hover { background: rgba(0,0,0,0.05); color: var(--text-primary); }
+[data-theme="dark"] .theme-toggle:hover { background: rgba(255,255,255,0.08); }
+
+
+/* ==================== Responsive ==================== */
+@media (max-width: 768px) {
+    .tab-content { padding: 50px 0 60px; }
+    .modal-content { max-width: 95%; margin: 10px; }
+}
+
+/* ==================== 必填标记 ==================== */
+.required { color: #ef4444; }
+
+/* ============================================================
+   岭南青绿 · 视觉升级
+   批次2 首页骨架 / 批次3 板块色彩编码 / 批次4 大字模式
+   ============================================================ */
+
+/* 板块内元素跟随板块色 */
+.tab-content .section-label {
+    color: var(--pa);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.tab-content .section-label::before {
+    content: '';
+    width: 22px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--pa);
+    flex: none;
+}
+.tab-content .card-section-title i { color: var(--pa); }
+.tab-content .section-title::after {
+    content: '';
+    display: block;
+    width: 56px;
+    height: 3px;
+    border-radius: 3px;
+    background: var(--pa);
+    margin-top: 18px;
+}
+.tab-content .btn-primary { background: var(--pa); box-shadow: 0 2px 8px var(--pa-soft); }
+.tab-content .btn-primary:hover { box-shadow: 0 6px 18px var(--pa-soft); }
+.tab-content .btn-text { color: var(--pa); }
+
+/* 板块头部卡片：左侧色条呼应板块身份 */
+.tab-content .card-section > .card-section-title {
+    padding-left: 14px;
+    border-left: 3px solid var(--pa);
+}

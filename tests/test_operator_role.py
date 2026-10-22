@@ -249,13 +249,14 @@ class ExistingRolesUnchangedTest(unittest.TestCase):
                            if c.endswith('.read') and len(holders) == len(ROLES)}
         expected = {
             'student': set(),
-            'teacher': {'craft.manage', 'course.read', 'course.manage',
+            'teacher': {'course.read', 'course.manage', 'craft.manage',
                         'teaching.read', 'teaching.manage'},
             'enterprise': {'job.manage'},
             'government': {'case.manage', 'policy.manage'},
             # 公开能力（farming/pest/craft/dialect/recruit/case/policy 的 .read）
             # 对任何角色都放行，不属于「显式授予」，因此不列在这里。
             'super_admin': {'farming.manage', 'pest.manage', 'craft.manage',
+                            'craft.content.manage',
                             'dialect.manage', 'recruit.manage', 'case.manage',
                             'course.read', 'teaching.read',
                             'teaching.manage', 'user.manage', 'review.moderate',
@@ -267,6 +268,13 @@ class ExistingRolesUnchangedTest(unittest.TestCase):
             with self.subTest(role=role):
                 self.assertEqual(granted, wanted,
                                  '%s 的能力集合变了' % role)
+
+    def test_teacher_keeps_legacy_craft_manage_without_operator_content_access(self):
+        from core.permissions import can
+
+        self.assertTrue(can('teacher', 'craft.manage'))
+        self.assertFalse(can('teacher', 'craft.content.manage'))
+        self.assertTrue(can('operator', 'craft.content.manage'))
 
     def test_existing_roles_still_get_their_expected_status_codes(self):
         """五个既有角色打管理端探针的状态码与 T13 之前一致。"""
@@ -322,15 +330,20 @@ class CapabilityTableConsistencyTest(unittest.TestCase):
         """下发给前端的能力清单与能力表逐条一致（单一真相源的守门测试）。"""
         from core.permissions import CAPABILITIES, can, capabilities_for_role
         granted = capabilities_for_role('operator')
-        # 只列 manage 侧：.read 大多是公开元组，下发给前端会让「显隐」退化成
+        # 只排除 .read：公开读能力下发给前端会让「显隐」退化成
         # 「全部显示」，没有判断价值（见 capabilities_for_role 的 docstring）。
         self.assertEqual(set(granted),
                          {c for c, holders in CAPABILITIES.items()
-                          if 'operator' in holders and c.endswith('.manage')})
+                          if 'operator' in holders and not c.endswith('.read')})
         self.assertNotIn('user.manage', granted)
         self.assertNotIn('review.moderate', granted)
         for capability in granted:
             self.assertTrue(can('operator', capability))
+        self.assertIn(
+            'review.moderate',
+            capabilities_for_role('super_admin'),
+            'admin review routes require review.moderate in the frontend list',
+        )
         self.assertEqual(capabilities_for_role(None), [])
 
 

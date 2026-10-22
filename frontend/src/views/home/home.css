@@ -1,0 +1,298 @@
+/*
+ * Home page domain styles. The public shell owns navigation and chrome; this
+ * file owns the hero, stat rail, and the home-to-agriculture transition.
+ */
+
+.hero {
+  position: relative;
+  display: flex;
+  min-height: 92vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding-top: 72px;
+  background: var(--gradient-hero);
+}
+
+/* Preserve the legacy iOS viewport-height override. */
+.hero {
+  min-height: calc(var(--vh, 1vh) * 100);
+}
+
+.hero-particles {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-content);
+}
+
+.hero-grid-lines {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-content);
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(217, 162, 39, 0.12), transparent 46%),
+    radial-gradient(circle at 82% 18%, rgba(143, 192, 165, 0.12), transparent 42%);
+  background-size: 100% 100%, 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  z-index: var(--z-content);
+  height: 200px;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 200' preserveAspectRatio='none'%3E%3Cpath d='M0,86 C240,38 480,118 720,82 C960,46 1200,110 1440,66 L1440,200 L0,200 Z' fill='%232f6b4f' fill-opacity='0.45'/%3E%3Cpath d='M0,124 C260,84 520,150 780,116 C1020,86 1240,140 1440,108 L1440,200 L0,200 Z' fill='%231f5e43' fill-opacity='0.7'/%3E%3Cpath d='M0,158 C300,132 560,172 820,150 C1060,130 1260,164 1440,146 L1440,200 L0,200 Z' fill='%23123a2a'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 800px;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.hero-badge {
+  display: inline-block;
+  margin-bottom: 24px;
+  padding: 6px 16px;
+  border: 1px solid rgba(217, 162, 39, 0.4);
+  border-radius: var(--radius-full);
+  background: rgba(217, 162, 39, 0.16);
+  color: var(--gold-soft);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.hero-title {
+  margin-bottom: 20px;
+  color: white;
+  font-size: clamp(2.5rem, 5.5vw, 4.5rem);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.15;
+}
+
+.hero-subtitle {
+  max-width: 600px;
+  margin: 0 auto 36px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  line-height: 1.7;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+.hero-stats {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-top: 80px;
+  padding: 24px 48px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(16px);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column-reverse;
+  text-align: center;
+}
+
+.stat-number {
+  display: block;
+  background: linear-gradient(135deg, #efc75e, #d9a227);
+  background-clip: text;
+  color: transparent;
+  font-size: 2rem;
+  font-weight: 500;
+  line-height: 1.2;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.stat-label {
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.hero .btn-primary {
+  background: var(--gold);
+  color: #14261f;
+  font-weight: 500;
+  box-shadow: 0 4px 18px rgba(217, 162, 39, 0.3);
+}
+
+.hero .btn-primary:hover {
+  background: var(--gold-soft);
+  box-shadow: 0 8px 26px rgba(217, 162, 39, 0.38);
+}
+
+.scroll-nav-hint {
+  position: absolute;
+  bottom: 26px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  transform: translateX(-50%);
+  transition: opacity 0.3s var(--ease-out);
+}
+
+@media print {
+    .hero {
+        display: none !important;
+    }
+}
+
+.scroll-nav-hint i {
+  font-size: 1rem;
+  animation: scrollNavBounce 1.8s var(--ease-in-out) infinite;
+}
+
+.scroll-nav-hint-gone .scroll-nav-hint {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@keyframes portalSwipeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
+}
+
+@keyframes portalSwipeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scrollNavBounce {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(6px);
+  }
+}
+
+.scroll-nav-leaving .hero {
+  pointer-events: none;
+  animation: portalSwipeOut 0.42s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.scroll-nav-entering .tab-content.active {
+  animation: portalSwipeIn 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-large-text] .stat-number {
+  font-size: 2.3rem;
+}
+
+[data-large-text] .stat-label {
+  font-size: 0.95rem;
+}
+
+[data-large-text] .hero-subtitle {
+  font-size: 1.25rem;
+}
+
+[data-large-text] .scroll-nav-hint {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .hero-stats {
+    gap: 24px;
+    padding: 20px 32px;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero {
+    min-height: 80vh;
+  }
+
+  .hero-title {
+    font-size: 2rem;
+  }
+
+  .hero-stats {
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .stat-divider {
+    width: 40px;
+    height: 1px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-nav-hint i {
+    animation: none;
+  }
+
+  .scroll-nav-leaving .hero,
+  .scroll-nav-entering .tab-content.active {
+    animation-duration: 0.01ms;
+  }
+}

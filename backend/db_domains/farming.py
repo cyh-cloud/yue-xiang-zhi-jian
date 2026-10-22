@@ -11,6 +11,7 @@ domains/agriculture/calendar_data.py 移入，一并列在 __all__ 里。
 
 import sqlite3
 from db_connection import get_connection
+from shared.review_freshness import REVIEW_STALE_DAYS
 
 # 本模块的数据归属这个能力域。backend/core/permissions.py 的 CAPABILITIES
 # 与 tools/check_architecture.py（T02 起按能力表判权）都以此为准：谁 import
@@ -82,7 +83,8 @@ def get_farming_categories():
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT key, label FROM farming_categories ORDER BY sort_order, key").fetchall()
+            "SELECT key, label, color, sort_order FROM farming_categories "
+            "ORDER BY sort_order, key").fetchall()
     except sqlite3.OperationalError:
         rows = []          # 旧库尚未建表时降级为空
     finally:
@@ -286,11 +288,6 @@ _PHASE_FIELDS = ('product_id', 'name', 'start_month', 'end_month', 'color',
 _PRODUCT_FIELDS = ('name', 'icon', 'summary', 'region', 'sort_order', 'is_active')
 _SOURCE_FIELDS = ('name', 'org', 'doc_type', 'doc_no', 'url', 'sort_order')
 _CATEGORY_FIELDS = ('label', 'color', 'sort_order')
-
-# 复核过期阈值（天）。「半年前核的、该重新核了」按 183 天算：半年按 365/2 取整，
-# 不按 30*6，否则 2 月核的到 8 月就该重核，比「半年」短了 12 天。
-REVIEW_STALE_DAYS = 183
-
 
 def _pick(fields, allowed):
     """按白名单挑出要写的列。None 表示「不碰这一列」，与「置空」是两件事。"""

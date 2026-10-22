@@ -1,0 +1,114 @@
+/*
+ * Government page domain styles for the dashboard, policy management, and
+ * policy publishing. Shared primitives remain in components.css; backoffice
+ * shell layout and role tokens remain in backoffice.css.
+ */
+
+.government-case-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.government-case-chips span {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--bo-accent-soft);
+  color: var(--bo-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.government-policy-list {
+  display: grid;
+  gap: 12px;
+}
+
+.government-policy-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.government-policy-card > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.government-policy-card > header > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.government-policy-card h2 {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.government-policy-category {
+  background: var(--bo-accent-soft);
+  color: var(--bo-accent-strong);
+}
+
+.government-policy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  color: var(--bo-muted);
+  font-size: 0.74rem;
+  line-height: 1.55;
+}
+
+.government-policy-preview {
+  margin: 0;
+  color: var(--bo-muted);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.government-policy-card .backoffice-row-actions {
+  min-width: 0;
+}
+
+.government-policy-form-page {
+  max-width: 1040px;
+}
+
+.government-policy-form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.government-policy-form .backoffice-field textarea {
+  width: 100%;
+  min-height: 84px;
+  padding: 9px 10px;
+  border: 1px solid var(--bo-input-border);
+  border-radius: 8px;
+  background: var(--bo-input-bg);
+  color: var(--bo-text);
+  font: inherit;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.government-policy-form .backoffice-field textarea:focus {
+  border-color: var(--bo-accent);
+  box-shadow: 0 0 0 3px var(--bo-accent-soft);
+  outline: none;
+}
+
+.government-policy-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

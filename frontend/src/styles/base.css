@@ -1,0 +1,119 @@
+/*
+ * Global base layer. This file owns reset, root element foundations, shared
+ * focus treatment, reduced motion, and cross-component base conventions.
+ */
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  margin: 0;
+  background: var(--surface-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-root);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+body,
+#app {
+  min-height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  min-width: 1280px;
+  min-height: 100vh;
+  flex-direction: column;
+  background: var(--surface-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: var(--letter-spacing-body);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+img {
+  max-width: 100%;
+}
+
+:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-xs);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  border-radius: var(--radius-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  body {
+    background: var(--surface-raised);
+    color: black;
+  }
+}
+
+/* Global utility classes. */
+.is-hidden { display: none !important; }
+.is-flex { display: flex !important; }
+.is-block { display: block !important; }
+
+/* Print visibility rules. */
+/* ==================== Print ==================== */
+@media print {
+    .modal-overlay { display: none !important; }
+    .tab-content { display: block !important; padding: 20px 0; page-break-inside: avoid; opacity: 1 !important; transform: none !important; }
+    .card-section { page-break-inside: avoid; }
+}
+
+/* Global large-text foundations (moved from components.css). */
+html[data-large-text] .btn { padding: 12px 22px; font-size: 1rem; min-height: 50px; }
+html[data-large-text] .btn-sm { padding: 10px 18px; font-size: 0.95rem; min-height: 46px; }
+html[data-large-text] .btn-lg { padding: 16px 32px; font-size: 1.12rem; min-height: 58px; }
+html[data-large-text] .icon-btn { width: 46px; height: 46px; min-height: 46px; font-size: 1.1rem; }
+html[data-large-text] table { font-size: 1rem; }
+html[data-large-text] th,
+html[data-large-text] td { padding: 14px 16px; }
+html[data-large-text] .badge { font-size: 0.85rem; }
+@media (max-width: 480px) {
+  .nav-item,
+  .btn,
+  .icon-btn { min-height: 44px; min-width: 44px; }
+}

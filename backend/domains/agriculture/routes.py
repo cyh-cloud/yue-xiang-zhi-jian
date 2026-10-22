@@ -306,7 +306,7 @@ def get_agriculture_suggestions():
     AI 不可用时明确不给建议（空列表），不再退到一份静态问题清单
     （REFACTOR-PLAN 4.2）：那六条问题是写死在代码里的内容，既覆盖不到全部
     8 个作物，也会让人误以为平台在回答。前端拿不到建议时按当前作物渲染
-    通用问句（script.js 的 QA_GENERIC_QUESTIONS），这才是「不可用」的如实呈现。
+    通用问句，这才是「不可用」的如实呈现。
     """
     product = request.args.get('product', 'lychee')
     now = time.time()
