@@ -5,18 +5,23 @@
 > 适用 mattpocock-skills v1.3.1。
 
 ## Project
-基于 AI 实训的农村本土人才赋能平台：Flask 单体后端 + 多页面前端，服务学员、教师、企业、政府与管理员五类角色。后端已按领域拆分，改代码前先读下面的「后端结构」。
+基于 AI 实训的农村本土人才赋能平台：Flask 单体后端 + Vue 单页面前端，服务学员、教师、企业、政府、运营与超级管理员六类角色。后端已按领域拆分，改代码前先读下面的「后端结构」。
 
 团队协作：`backend/` 与数据库属于受保护范围；前端小功能可在当前分支提交，涉及后端接口或数据库结构时先读 `docs/team/README.md`。现有 ADR 只读，所有任务遵循，任何成员不得修改、重命名、移动或删除；实现与裁决冲突时停止并上报项目负责人。详见 `docs/team/adr-constitution.md`。
+
+## 团队协作
+
+默认由前端开发者负责前端交付。`backend/` 与数据库属于受保护范围，其他成员先读 `docs/team/README.md`，按其中的讨论与功能分支流程执行。新功能先讨论并记录范围；纯前端小功能可在当前分支直接提交和推送。涉及后端接口或数据库结构时，从 `main` 新开功能分支，只在已确认范围内修改。
+
+`docs/adr/` 是开发宪法，所有任务遵循。现有 ADR 只读，任何成员不得修改、重命名、移动或删除；实现与裁决冲突时停止并上报项目负责人。详见 `docs/team/adr-constitution.md`。
 
 ## Commands
 
 只写非标准命令，标准命令 agent 自己找得到。
 
 - 安装依赖：`pip install -r requirements.txt`
-- 全仓单测（需应用基线数据库，不属于 crawler 验收）：`python -m unittest discover -s . -p "test_*.py" -t .`
-- crawler 验收：`python -m unittest discover -s crawler/tests -p "test_*.py" -t .`
-- 端到端：`cd e2e; npx playwright test`
+- 单测：`python -m unittest discover -s . -p "test_*.py" -t .`
+- 端到端：`cd frontend; npm run test:e2e`
 - 架构机械检查：`python tools/check_architecture.py`
 - Python 静态检查：`python tools/check_python.py`
 - 启动 API：`python backend/run.py`；启动前端：`cd frontend; npm run dev`
@@ -69,6 +74,9 @@ tracker 与标签词汇见 `docs/agents/`；grilling 的提问纪律与阶段边
 | 团队开发规范 | `docs/team/README.md` |
 | 领域词汇 | `GLOSSARY.md`（多上下文先读 `GLOSSARY-MAP.md`） |
 | 开发宪法（ADR，只读） | `docs/adr/` |
+| 前端重构规格 | `docs/frontend-vue-rebuild-spec.md` |
+| CSS 样式归属与视觉矩阵 | `docs/css-style-ownership.md`、`docs/css-visual-regression.md` |
+| 旧前端只读参照 | `legacy/reference/` |
 | tracker / 标签 / 领域文档配置 | `docs/agents/` |
 | 项目技能 | `.agents/skills/`（入口：`docs/team/project-skills.md`） |
 | 编码规范（审查期读取） | `CODING_STANDARDS.md` |
