@@ -186,6 +186,7 @@ class CollectionStateRuntimeTest(unittest.TestCase):
             "final_url": "https://example.test/1",
             "body": b"<html>fixture</html>",
             "content_type": "text/html",
+            "locator": "fixture:1",
             "run_id": "run-state",
             "robots_decision": "allowed",
         }
@@ -301,7 +302,7 @@ class CollectionStateRuntimeTest(unittest.TestCase):
                 "deferred",
                 "carrier:missing",
                 "https://example.test/1",
-                "https://example.test/1",
+                "locator:missing",
             ),
         )
 

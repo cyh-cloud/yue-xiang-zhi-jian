@@ -833,7 +833,7 @@ class RawEvidenceRegressionTest(unittest.TestCase):
         self.assertIsNone(fetch[1])
         self.assertEqual(fetch[2], 0)
         self.assertIsNone(fetch[3])
-        self.assertIsNone(fetch[4])
+        self.assertTrue(fetch[4].endswith("OVERSIZE.md"))
         self.assertEqual(fetch[5], "not-found")
         self.assertIn("104857601", fetch[6])
         self.assertEqual(file_row[0], "oversize")
@@ -1367,7 +1367,13 @@ class SiteCandidateMappingTest(unittest.TestCase):
                 "nzrc",
                 "nzrc",
                 "nzrc",
-                {"company_name": "示例公司", "salary_raw": "5000"},
+                {
+                    "company_name": "示例公司",
+                    "salary_raw": "5000",
+                    "location_raw": "广东",
+                    "province": "广东",
+                    "city": "广州",
+                },
                 "std_jobs",
                 "company_name",
                 "示例公司",

@@ -22,6 +22,7 @@ from .robots import RobotsFact
 
 
 DEFAULT_MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
+MISSING_LOCATOR = "locator:missing"
 
 
 def _now():
@@ -98,6 +99,8 @@ class CollectionRuntime:
                 and int(status_code) >= 400
             )
         )
+        file_request = bool(evidence.metadata.get("file_request"))
+        diagnostic_file = diagnostic_error and file_request
         oversize = not diagnostic_error and (
             bool(evidence.metadata.get("oversize"))
             or len(body) > self.max_download_bytes
@@ -229,7 +232,7 @@ class CollectionRuntime:
                         else len(body)
                     ),
                     digest,
-                    file_path if save_body else None,
+                    file_path,
                     1 if save_body else 0,
                     access_level,
                     rights_status,
@@ -246,7 +249,7 @@ class CollectionRuntime:
                 ),
             )
             raw_id = cursor.lastrowid
-            if save_body or oversize:
+            if save_body or oversize or diagnostic_file:
                 raw_file_sql, raw_file_params = _insert_sql(
                     "raw_files",
                     {
@@ -268,7 +271,7 @@ class CollectionRuntime:
                             evidence.fetch_url or evidence.request_url
                         ),
                         "final_url": evidence.final_url,
-                        "file_path": file_path,
+                        "file_path": file_path or "",
                         "file_name": file_name,
                         "mime_type": (
                             evidence.content_type
@@ -282,7 +285,10 @@ class CollectionRuntime:
                         ),
                         "sha256": digest or "",
                         "access_level": access_level,
-                        "download_status": download_status,
+                        "download_status": (
+                            download_status
+                            or ("http_error" if diagnostic_file else None)
+                        ),
                         "oversize_note": oversize_note,
                         "media_metadata": json.dumps(
                             evidence.metadata, ensure_ascii=False
@@ -310,7 +316,20 @@ class CollectionRuntime:
         payload.update(resolve_rights(payload, source))
         if not payload.get("rights_status"):
             payload["rights_status"] = "unknown"
+        if (
+            payload.get("detail_url_status") == "missing"
+            and not str(payload.get("locator") or "").strip()
+        ):
+            payload["locator"] = MISSING_LOCATOR
+            payload["candidate_status"] = "deferred"
+            payload["candidate_reason"] = (
+                payload.get("candidate_reason") or "locator:missing"
+            )
         payload = validate_item(payload)
+        missing_locator = (
+            payload["detail_url_status"] == "missing"
+            and payload["locator"] == MISSING_LOCATOR
+        )
         now = payload.get("retrieved_at") or _now()
         payload["retrieved_at"] = now
         conn = self.database.connect()
@@ -390,13 +409,6 @@ class CollectionRuntime:
                     and not payload.get("detail_url")
                 ):
                     payload["detail_url_status"] = "missing"
-                if (
-                    payload["detail_url_status"] == "missing"
-                    and not payload.get("locator")
-                ):
-                    payload["locator"] = (
-                        payload.get("fetch_url") or payload["source_url"]
-                    )
             payload["title"] = (
                 payload.get("title") or payload["source_item_id"]
             )
@@ -465,10 +477,13 @@ class CollectionRuntime:
                 ),
             )
             payload["candidate_status"] = (
-                decision.status if decision.allowed else "blocked"
+                "deferred"
+                if missing_locator
+                else (decision.status if decision.allowed else "blocked")
             )
             payload["candidate_reason"] = (
-                decision.reason
+                payload.get("candidate_reason")
+                or decision.reason
                 or (
                     "admission:blocked"
                     if payload["candidate_status"] == "blocked"

@@ -189,6 +189,83 @@ class NongmuhrScrapyTest(unittest.TestCase):
             "company_region",
         )
 
+    def test_location_splits_real_county_without_copying_city(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                "<td>工作地点：</td><td>宜春市</td>",
+                "<td>工作地点：</td><td>贵州省贵阳市南明区</td>",
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        item = parse_job_detail(response)
+
+        self.assertEqual(
+            item["extra"]["location_raw"],
+            "贵州省贵阳市南明区",
+        )
+        self.assertEqual(item["extra"]["province"], "贵州省")
+        self.assertEqual(item["extra"]["city"], "贵阳市")
+        self.assertEqual(item["extra"]["county"], "南明区")
+
+    def test_province_only_location_keeps_province_and_empty_city_county(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                "<td>工作地点：</td><td>宜春市</td>",
+                "<td>工作地点：</td><td>贵州省</td>",
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        item = parse_job_detail(response)
+
+        self.assertEqual(item["extra"]["location_raw"], "贵州省")
+        self.assertEqual(item["extra"]["province"], "贵州省")
+        self.assertIsNone(item["extra"]["city"])
+        self.assertIsNone(item["extra"]["county"])
+
+    def test_unparseable_location_keeps_raw_and_requires_review(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                "<td>工作地点：</td><td>宜春市</td>",
+                "<td>工作地点：</td><td>远程办公</td>",
+            ).replace(
+                "公司性质：外资/合资企业 所在地区:江西",
+                "公司性质：外资/合资企业",
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        item = parse_job_detail(response)
+
+        self.assertEqual(item["extra"]["location_raw"], "远程办公")
+        self.assertIsNone(item["extra"]["province"])
+        self.assertIsNone(item["extra"]["city"])
+        self.assertIsNone(item["extra"]["county"])
+        self.assertEqual(
+            item["extra"]["location_normalization"]["status"],
+            "partial",
+        )
+        self.assertTrue(
+            item["extra"]["location_normalization"]["requires_review"]
+        )
+
+    def test_current_detail_structure_without_title_container_is_blocked(self):
+        response = HtmlResponse(
+            url="http://nongmuhr.com/EmployView.aspx?Id=13553",
+            body=DETAIL_HTML.replace(
+                '<div id="joblist"><div class="joblistonelf">设备工程师</div>',
+                '<div id="joblist">',
+            ).encode("utf-8"),
+            encoding="utf-8",
+        )
+
+        with self.assertRaisesRegex(ValueError, "job title"):
+            parse_job_detail(response)
+
     def test_missing_location_marks_job_blocked(self):
         response = HtmlResponse(
             url="http://nongmuhr.com/EmployView.aspx?Id=13553",

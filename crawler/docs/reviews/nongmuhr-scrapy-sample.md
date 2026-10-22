@@ -6,6 +6,8 @@
 
 运行结果: succeeded
 
+证据范围: live 外部证据，公开 fixture 仅覆盖 2 条详情
+
 ## 实际重跑
 
 - run_id: `nongmuhr-3b01c369718c47d2a690284f939a5791`
@@ -25,6 +27,8 @@
 - `div.fontover_hide.width_105`
 
 ## 详情
+
+本节 10 条结论来自 2026-10-21 的 live 外部运行，不是公开 fixture 回放结论。仓库内 `crawler/tests/fixtures/evidence/nongmuhr/` 只覆盖 2 条脱敏详情；live 证据保留在仓库外的归档目录。
 
 以下 10 条详情均返回 `200`，Content-Type 为 `text/html; charset=utf-8`：
 
