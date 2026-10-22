@@ -118,7 +118,7 @@ git diff --check
 - 冲突记录保留双方值、来源 URL、取得时间和原因。
 - 人工修改字段不被自动覆盖。
 - 导入批次可以统计成功、跳过、冲突、失败，并可撤销未被人工修改的结果。
-- `job_listings` 和 `recruitments` 未被公开岗位采集写入。
+- jobs 真实写入显式启用后，只允许 `candidate` 岗位 upsert 到 `recruitments` 和 `recruitment_sources`；`job_listings` 仍不被公开岗位采集写入。
 - `crafts`、`dialects` 的现有展示契约未被破坏。
 
 ## 11. 审核结论

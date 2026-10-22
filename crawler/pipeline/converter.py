@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-from . import database, source_registry
+from . import business_write, database, source_registry
 from .publication import evaluate_publication
 
 
@@ -310,7 +310,13 @@ def _job_plan(conn, batch, source_priorities, registry):
         batch.get("source_ids") or [],
         batch.get("std_entity_ids") or [],
     )
+    candidate_rows = [
+        row for row in rows if row.get("candidate_status") == "candidate"
+    ]
+    candidate_skipped = len(rows) - len(candidate_rows)
+    rows = candidate_rows
     rows, skipped = _publishable_rows(rows, source_priorities, registry)
+    skipped += candidate_skipped
     groups = {}
     for row in rows:
         natural_key = (
@@ -344,6 +350,10 @@ def _job_plan(conn, batch, source_priorities, registry):
             )
         projected.append(
             {
+                "business_key": (
+                    f"job-{primary['source_id']}-"
+                    f"{primary.get('source_item_id') or ''}"
+                ),
                 "source_id": primary["source_id"],
                 "source_item_id": primary.get("source_item_id") or "",
                 "source_url": primary["source_url"],
@@ -351,10 +361,12 @@ def _job_plan(conn, batch, source_priorities, registry):
                 "title_raw": primary.get("title_raw") or primary["title"],
                 "company_name": primary.get("company_name") or "",
                 "company_url": primary.get("company_url") or "",
+                "company_industry": primary.get("company_industry") or "",
                 "location_raw": primary.get("location_raw") or "",
                 "province": primary.get("province") or "",
                 "city": primary.get("city") or "",
                 "employment_type": primary.get("employment_type") or "",
+                "headcount": primary.get("headcount"),
                 "salary_raw": primary.get("salary_raw") or "",
                 "education_raw": primary.get("education_raw") or "",
                 "experience_raw": primary.get("experience_raw") or "",
@@ -515,6 +527,20 @@ def _resolve_database_path(batch, crawler_database_path):
     )
 
 
+def _resolve_business_database_path(batch, business_database_path):
+    path = (
+        business_database_path
+        or batch.get("business_database_path")
+        or os.environ.get("YUEXIANG_DB")
+    )
+    if not path:
+        raise ValueError(
+            "business database path is required for real writes; "
+            "pass business_database_path or set YUEXIANG_DB"
+        )
+    return Path(path)
+
+
 def _db_value(value):
     if value is None or isinstance(value, (str, int, float)):
         return value
@@ -612,24 +638,96 @@ def _persist_batch_items(conn, batch_id, domain, entity_plan, created_at):
         )
 
 
+def _persist_job_write_items(conn, batch_id, domain, items, created_at):
+    for item in items:
+        conn.execute(
+            """
+            INSERT INTO import_batch_items (
+                batch_id, content_domain, target_table, target_key,
+                operation, status, source_id, source_item_id,
+                content_hash, created_at, extra
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                batch_id,
+                domain,
+                item["target_table"],
+                item["target_key"],
+                item["operation"],
+                item["status"],
+                item.get("source_id"),
+                item.get("source_item_id"),
+                item.get("content_hash"),
+                created_at,
+                json.dumps(item.get("extra") or {}, ensure_ascii=False),
+            ),
+        )
+
+
+def _persist_job_conflicts(conn, batch_id, domain, conflicts, created_at):
+    for conflict in conflicts:
+        conn.execute(
+            """
+            INSERT INTO import_conflicts (
+                batch_id, content_domain, target_table, target_key,
+                target_field, existing_value, incoming_value,
+                existing_source_id, existing_source_url, incoming_source_id,
+                incoming_source_url, existing_retrieved_at,
+                incoming_retrieved_at, reason, resolution, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unresolved', ?)
+            """,
+            (
+                batch_id,
+                domain,
+                conflict["target_table"],
+                conflict["target_key"],
+                conflict["field"],
+                _db_value(conflict.get("existing_value")),
+                _db_value(conflict.get("incoming_value")),
+                conflict.get("existing_source_id"),
+                conflict.get("existing_source_url"),
+                conflict.get("incoming_source_id"),
+                conflict.get("incoming_source_url"),
+                conflict.get("existing_retrieved_at"),
+                conflict.get("incoming_retrieved_at"),
+                conflict["reason"],
+                created_at,
+            ),
+        )
+
+
 def run_batch(
     domain,
     batch,
     *,
     crawler_database_path=None,
+    business_database_path=None,
     source_registry_path=None,
 ):
     _validate(domain, batch)
-    if batch.get("dry_run", True) is not True:
-        raise NotImplementedError("only dry_run batches are implemented")
+    dry_run = batch.get("dry_run", True)
+    if not isinstance(dry_run, bool):
+        raise ValueError("batch.dry_run must be a boolean")
+    if dry_run is False and domain != "jobs":
+        raise NotImplementedError(
+            "real business writes are implemented only for jobs"
+        )
 
     db_path = _resolve_database_path(batch, crawler_database_path)
+    business_db_path = (
+        None
+        if dry_run
+        else _resolve_business_database_path(batch, business_database_path)
+    )
     conn = database.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         existing = _existing_batch_result(conn, batch["batch_key"])
         if existing is not None:
             return existing
+
+        if business_db_path is not None:
+            business_write.attach_business_database(conn, business_db_path)
 
         db_sources = _load_sources(conn)
         registry = source_registry.load_registry(source_registry_path)
@@ -650,9 +748,12 @@ def run_batch(
                 batch["converter_version"],
                 json.dumps(
                     {
-                        "dry_run": True,
+                        "dry_run": dry_run,
                         "source_ids": batch.get("source_ids") or [],
                         "std_entity_ids": batch.get("std_entity_ids") or [],
+                        "business_database_path": (
+                            str(business_db_path) if business_db_path else ""
+                        ),
                     },
                     ensure_ascii=False,
                 ),
@@ -669,25 +770,60 @@ def run_batch(
         else:
             entity_plan = _dialect_plan(conn, batch, priorities, registry)
 
-        inserted = len(entity_plan["rows"])
-        skipped = entity_plan.get("skipped", 0)
-        input_count = entity_plan["input_count"] + skipped
-        conflicts = len(entity_plan["conflicts"])
-        failed = 0
-        unexplained = input_count - inserted - conflicts - failed - skipped
+        if dry_run:
+            inserted = len(entity_plan["rows"])
+            updated = 0
+            skipped = entity_plan.get("skipped", 0)
+            conflict_count = len(entity_plan["conflicts"])
+            failed = 0
+            write_items = None
+        else:
+            write_result = business_write.write_jobs(
+                conn,
+                entity_plan,
+                batch,
+                batch_id,
+                started_at,
+                registry,
+            )
+            inserted = write_result.inserted_count
+            updated = write_result.updated_count
+            skipped = (
+                entity_plan.get("skipped", 0) + write_result.skipped_count
+            )
+            conflict_count = len(write_result.conflicts)
+            failed = 0
+            write_items = write_result.items
+
+        skipped_by_gate = entity_plan.get("skipped", 0)
+        input_count = entity_plan["input_count"] + skipped_by_gate
+        unexplained = (
+            input_count - inserted - updated - conflict_count - failed - skipped
+        )
         if unexplained:
             skipped += unexplained
-        status = "partial" if conflicts or failed else "succeeded"
+            input_count = (
+                entity_plan["input_count"] + skipped_by_gate
+            )
+        status = "partial" if conflict_count or failed else "succeeded"
 
-        _persist_conflicts(conn, batch_id, domain, entity_plan, started_at)
-        _persist_batch_items(
-            conn, batch_id, domain, entity_plan, started_at
-        )
+        if dry_run:
+            _persist_conflicts(conn, batch_id, domain, entity_plan, started_at)
+            _persist_batch_items(
+                conn, batch_id, domain, entity_plan, started_at
+            )
+        else:
+            _persist_job_conflicts(
+                conn, batch_id, domain, write_result.conflicts, started_at
+            )
+            _persist_job_write_items(
+                conn, batch_id, domain, write_items, started_at
+            )
         conn.execute(
             """
             UPDATE import_batches SET
                 finished_at = ?, status = ?, input_count = ?,
-                inserted_count = ?, updated_count = 0, skipped_count = ?,
+                inserted_count = ?, updated_count = ?, skipped_count = ?,
                 conflict_count = ?, failed_count = ?
             WHERE id = ?
             """,
@@ -696,8 +832,9 @@ def run_batch(
                 status,
                 input_count,
                 inserted,
+                updated,
                 skipped,
-                conflicts,
+                conflict_count,
                 failed,
                 batch_id,
             ),
@@ -707,7 +844,9 @@ def run_batch(
             entity_plan["entity"]: {
                 "input_count": input_count,
                 "rows": entity_plan["rows"],
-                "conflicts": entity_plan["conflicts"],
+                "conflicts": (
+                    entity_plan["conflicts"] if dry_run else write_result.conflicts
+                ),
                 "skipped_count": skipped,
             }
         }
@@ -716,9 +855,9 @@ def run_batch(
             status=status,
             input_count=input_count,
             inserted_count=inserted,
-            updated_count=0,
+            updated_count=updated,
             skipped_count=skipped,
-            conflict_count=conflicts,
+            conflict_count=conflict_count,
             failed_count=failed,
             by_entity=by_entity,
         )
@@ -746,6 +885,12 @@ def rollback_batch(batch_id, *, crawler_database_path=None):
         batch = dict(row)
         if batch["status"] == "running":
             raise ValueError(f"batch {batch_id} is still running")
+        batch_extra = json.loads(batch.get("extra") or "{}")
+        if batch_extra.get("dry_run") is False:
+            raise ValueError(
+                "business-write batch rollback is not implemented; "
+                "no business rows were changed"
+            )
         if batch["status"] == "rolled_back":
             return RollbackResult(
                 batch_id=batch_id,
