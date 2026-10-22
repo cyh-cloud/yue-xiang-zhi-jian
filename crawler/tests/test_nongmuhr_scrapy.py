@@ -3,8 +3,12 @@ import unittest
 from scrapy.http import HtmlResponse, Request
 
 from crawler.collection.projects.nongmuhr.nongmuhr.parsers import (
+    DEFAULT_MAX_PAGES,
+    list_page_url,
+    page_count,
     parse_job_detail,
     parse_job_list,
+    unique_items,
 )
 from crawler.collection.projects.nongmuhr.nongmuhr.spiders.collection import (
     NongmuhrSpider,
@@ -89,6 +93,62 @@ DETAIL_HTML = """
 
 
 class NongmuhrScrapyTest(unittest.TestCase):
+    def test_pagination_urls_cover_expected_page_range(self):
+        self.assertEqual(
+            list_page_url(0),
+            "http://nongmuhr.com/Employ.aspx"
+            "?pubtime=-1&experience=-1&page=0",
+        )
+        self.assertEqual(
+            list_page_url(902),
+            "http://nongmuhr.com/Employ.aspx"
+            "?pubtime=-1&experience=-1&page=902",
+        )
+        self.assertEqual(DEFAULT_MAX_PAGES, 20)
+        self.assertEqual(page_count(), 20)
+        with self.assertRaises(ValueError):
+            list_page_url(-1)
+        with self.assertRaises(ValueError):
+            page_count(0)
+
+    def test_unique_items_stops_duplicate_ids_across_pages(self):
+        seen = set()
+        first = list(
+            unique_items(
+                [
+                    {"source_item_id": "1"},
+                    {"source_item_id": "2"},
+                    {"source_item_id": "1"},
+                ],
+                seen,
+            )
+        )
+        second = list(
+            unique_items(
+                [
+                    {"source_item_id": "2"},
+                    {"source_item_id": "3"},
+                ],
+                seen,
+            )
+        )
+
+        self.assertEqual(
+            [item["source_item_id"] for item in first + second],
+            ["1", "2", "3"],
+        )
+
+    def test_unique_items_skips_missing_ids(self):
+        self.assertEqual(
+            list(unique_items([{"source_item_id": ""}, {}])),
+            [],
+        )
+
+    def test_spider_accepts_bounded_max_pages(self):
+        self.assertEqual(NongmuhrSpider(max_pages=3).max_pages, 3)
+        with self.assertRaises(ValueError):
+            NongmuhrSpider(max_pages=0)
+
     def test_list_parser_extracts_current_job_row_fields(self):
         response = HtmlResponse(
             url="http://nongmuhr.com/Employ.aspx",

@@ -3,8 +3,14 @@ import unittest
 from scrapy.http import HtmlResponse
 
 from crawler.collection.projects.nzrc.nzrc.parsers import (
+    DEFAULT_MAX_PAGES,
+    EVENT_TARGET,
+    form_fields,
+    page_count,
+    pagination_form,
     parse_job_detail,
     parse_job_list,
+    unique_items,
 )
 from crawler.collection.projects.nzrc.nzrc.spiders.collection import NzrcSpider
 
@@ -40,6 +46,59 @@ DETAIL_HTML = """
 
 
 class NzrcScrapyTest(unittest.TestCase):
+    def test_form_fields_and_postback_target_are_parsed(self):
+        response = HtmlResponse(
+            url="http://www.nzrc.com.cn/career_seek.html",
+            body=b"""
+            <form method="post" action="career_seek.html">
+              <input type="hidden" name="__VIEWSTATE" value="state">
+              <input type="hidden" name="__VIEWSTATEGENERATOR" value="gen">
+              <select name="area"><option value="1">all</option></select>
+            </form>
+            """,
+            encoding="utf-8",
+        )
+
+        self.assertEqual(
+            form_fields(response),
+            {
+                "__VIEWSTATE": "state",
+                "__VIEWSTATEGENERATOR": "gen",
+                "area": "1",
+            },
+        )
+        action, payload = pagination_form(response, 2)
+        self.assertEqual(
+            action, "http://www.nzrc.com.cn/career_seek.html"
+        )
+        self.assertEqual(payload["__EVENTTARGET"], EVENT_TARGET)
+        self.assertEqual(payload["__EVENTARGUMENT"], "2")
+
+    def test_default_page_limit_and_boundaries(self):
+        self.assertEqual(DEFAULT_MAX_PAGES, 10)
+        self.assertEqual(page_count(), 10)
+        self.assertEqual(NzrcSpider(max_pages=5).max_pages, 5)
+        with self.assertRaises(ValueError):
+            pagination_form(None, 0)
+        with self.assertRaises(ValueError):
+            page_count(0)
+
+    def test_unique_items_stops_duplicate_ids_across_pages(self):
+        seen = set()
+        items = [
+            {"source_item_id": "1"},
+            {"source_item_id": "1"},
+            {"source_item_id": "2"},
+        ]
+        self.assertEqual(
+            [
+                item["source_item_id"]
+                for item in unique_items(items, seen)
+            ],
+            ["1", "2"],
+        )
+        self.assertEqual(list(unique_items([{}, {"source_item_id": ""}])), [])
+
     def test_list_parser_normalizes_job_and_company_urls(self):
         response = HtmlResponse(
             url="http://www.nzrc.com.cn/career_seek.html",
