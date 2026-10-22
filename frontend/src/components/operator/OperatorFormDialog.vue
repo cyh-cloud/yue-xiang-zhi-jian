@@ -413,4 +413,3 @@ function updateString(
     </div>
   </Teleport>
 </template>
-
