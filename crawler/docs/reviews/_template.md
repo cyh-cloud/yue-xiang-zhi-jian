@@ -4,7 +4,9 @@
 
 审核时间: `YYYY-MM-DD HH:mm Asia/Shanghai`
 
-审核结论: `approved` / `approved-with-gaps` / `blocked`
+审核结论: `approved` / `approved-with-gaps` / `blocked` / `deferred` / `excluded`
+
+权利状态: `noncommercial-permitted` / `attribution-required` / `assumed-noncommercial-user-risk` / `prohibited` / `unknown`
 
 ## 审核范围
 

@@ -6,6 +6,8 @@
 
 审核结论: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 ## 审核范围
 
 - 待审文档: `crawler/docs/sources/nzrc.md`

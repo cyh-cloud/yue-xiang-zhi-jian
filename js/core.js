@@ -277,3 +277,255 @@ function setupSelectionHandler(selector, activeClass, stateKey, callback) {
         });
     });
 }
+
+// ==================== 门户下滑转场 ====================
+// 2026-10-18 学员走查：门户页往下滑自动进入农业技能页，要平滑弹性过渡；
+// 五个板块页往上滑不回门户。规则只对 index.html（body[data-page="index"]）生效。
+//
+// 为什么用整页跳转而不是滚动劫持做「假滚动」：
+//   · 板块页是独立页面，正文远比一屏长，劫持滚轮会让用户无法正常阅读；
+//   · 门户 hero 本身就是满屏，下滑手势天然是「我要看下面的内容」。
+//
+// ⚠️ 必须监听 wheel/touch，**不能**监听 scroll：门户 hero 是 min-height:100vh 且
+//    页面没有溢出内容，scrollHeight === clientHeight，window.scrollY 恒为 0，
+//    scroll 事件一次都不触发（2026-10-18 实测）。
+// 转场由 CSS 动画（.scroll-nav-leaving/.scroll-nav-entering）承担，JS 只做判定与计时，
+// 动画时长写死在 TRANSITION_MS，两处必须一致（CSS 见 styles.css 末尾）。
+const SCROLL_NAV = {
+    TARGET: 'agriculture.html',
+    // 2026-10-18 第二轮走查：60px 太灵敏，鼠标轻碰/触控板一抖就跳走。
+    // 提到 220px（约一次明显的下滑幅度），并要求 500ms 内完成 —— 慢速滚动浏览
+    // 不会被中途劫走，快速下滑才视为「我要去下面的板块」。
+    THRESHOLD: 220,       // 累计下滑像素，低于此值视为误触/回弹
+    GESTURE_MS: 500,      // 手势时长上限：超过则视为在浏览，放弃本次触发
+    COOLDOWN_MS: 1200,    // 防止一次手势触发多次跳转
+    TRANSITION_MS: 420    // 与 styles.css 的 portalSwipeOut 时长对齐
+};
+
+function setupScrollNavigation() {
+    // 只在门户页启用：板块页需要正常滚动，绝不能被劫持
+    if (document.body.dataset.page !== 'index') return;
+    const hint = document.querySelector('.scroll-nav-hint');
+    let firedAt = 0;     // 上次触发时间，做冷却
+    let travel = 0;      // 本段手势累计下滑量（像素）
+    let startedAt = 0;   // 本段手势开始时间（用于区分「快滑」与「慢滚」）
+
+    const go = () => {
+        if (Date.now() - firedAt < SCROLL_NAV.COOLDOWN_MS) return;
+        firedAt = Date.now();
+        document.body.classList.add('scroll-nav-leaving');
+        setTimeout(() => { window.location.href = SCROLL_NAV.TARGET; }, SCROLL_NAV.TRANSITION_MS);
+    };
+
+    // dy > 0 表示向下。上滑（dy<0）立刻放弃本次手势，不允许「先上后下」凑够阈值。
+    const onMove = (dy) => {
+        if (dy < 0) { travel = 0; startedAt = 0; return; }
+        if (!startedAt) startedAt = Date.now();
+        travel += dy;
+        if (hint) document.body.classList.toggle('scroll-nav-hint-gone', travel > 20);
+        if (travel < SCROLL_NAV.THRESHOLD) return;
+        // 慢速滚动（浏览意图）不触发：只有短时间内的快速下滑才算「滑走」手势
+        if (Date.now() - startedAt > SCROLL_NAV.GESTURE_MS) { travel = 0; startedAt = 0; return; }
+        go();
+    };
+
+    // 触屏：下滑手势
+    let lastTouchY = null;
+    document.addEventListener('touchstart', (e) => {
+        lastTouchY = e.touches[0] ? e.touches[0].clientY : null;
+        travel = 0;
+        startedAt = 0;
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+        if (lastTouchY === null) return;
+        const y = e.touches[0] ? e.touches[0].clientY : lastTouchY;
+        onMove(lastTouchY - y);
+        lastTouchY = y;
+    }, { passive: true });
+    document.addEventListener('touchend', () => { lastTouchY = null; }, { passive: true });
+
+    // 桌面：滚轮向下（passive，不 preventDefault，不阻塞合成器线程）
+    let wheelArmed = false;
+    window.addEventListener('wheel', (e) => {
+        if (e.deltaY < 0) { travel = 0; wheelArmed = false; startedAt = 0; return; }
+        if (!wheelArmed) { wheelArmed = true; travel = 0; startedAt = 0; }
+        onMove(e.deltaY);
+    }, { passive: true });
+    window.addEventListener('wheelend', () => { wheelArmed = false; travel = 0; startedAt = 0; });
+
+    // 键盘也给同样待遇（无障碍：PageDown / 空格 / 下方向）
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'PageDown' || e.key === 'ArrowDown' || e.key === ' ') go();
+    });
+}
+
+// ==================== BewlyCat 风格左侧导航栏 ====================
+// 2026-10-18 学员走查：板块页左侧要一个能快速定位的侧栏，样式对标 BewlyCat
+// （E:\Project\BewlyCat 的 src/components/SideBar/SideBar.vue）。移植要点：
+//   ① 毛玻璃底 + 40px 圆钮，悬停上浮；
+//   ② 图标项悬停从右侧滑出文字标签（BewlyCat 用 Tooltip，这里用纯 CSS）；
+//   ③ 收起/展开由顶栏左侧按钮手动控制（位置与图标对齐 admin.html 的
+//      .admin-sidebar-toggle），状态存 localStorage 跨页面保持。
+// 只在板块页注入；门户页不注入，避免与 hero 全屏视觉冲突。
+//
+// 三轮走查修正记录：
+//   · 锚点必须是页面真实存在的 card-section 容器 id，图标与标题一致，不缺项；
+//   · 去掉与顶栏重复的主题/大字按钮和「本页」这类无信息量标签；
+//   · 侧栏 top 从导航栏下方开始，不再与 72px 顶栏重叠；
+//   · 去掉「自动隐藏」开关：与顶栏按钮功能重叠，且 BewlyCat 的靠近自动唤出
+//     依赖 Shadow DOM + Vue 过渡，本项目做不到，留一个半成品不如不做；
+//   · 锚点滚动定位到区块**标题**而不是容器顶边（容器有 72px margin-bottom，
+//     直接贴容器顶会把标题推到导航栏下面）。
+
+// 每页的锚点 = 该页真实存在的 card-section 容器 id（与页面里的 h3.card-section-title 一一对应）。
+// 缺项自动跳过，所以新增板块时只要在这里补一行。
+const SIDEBAR_SECTIONS = {
+    agriculture: [
+        { id: 'product-select-section',     label: '选择农产品',     icon: 'fa-tags' },
+        { id: 'farming-calendar-section',   label: '农时智能日历',   icon: 'fa-calendar' },
+        { id: 'agriculture-qa-section',     label: 'AI 农技问答',    icon: 'fa-robot' },
+        { id: 'pest-diagnosis-section',     label: '病虫害 AI 诊断', icon: 'fa-bug' },
+        { id: 'pest-guide-section',         label: '常见病虫害速查', icon: 'fa-book-medical' }
+    ],
+    ecommerce: [
+        { id: 'live-simulation',            label: '直播带货实训',   icon: 'fa-video' },
+        { id: 'copywriting-section',        label: '商品文案创作',   icon: 'fa-edit' },
+        { id: 'customer-service-section',   label: '客户服务模拟',   icon: 'fa-headset' }
+    ],
+    crafts: [
+        { id: 'craft-select-section',       label: '选择手工艺',     icon: 'fa-palette' },
+        { id: 'craft-video-section',        label: '视频教学',       icon: 'fa-video' },
+        { id: 'craft-3d-section',           label: '3D 互动教学',    icon: 'fa-cube' },
+        { id: 'materials-section',          label: '材料采购指南',   icon: 'fa-shopping-basket' }
+    ],
+    resources: [
+        { id: 'dialect-section',            label: '方言语音交互',   icon: 'fa-microphone' },
+        { id: 'cases-section',              label: '本地成功案例',   icon: 'fa-trophy' },
+        { id: 'policy-section',             label: '政策信息推送',   icon: 'fa-file-alt' }
+    ],
+    employment: [
+        // 就业页是「页签切换」而不是「一页平铺」：.emp-panel 只有 active 的可见，
+        // 其余 display:none。所以这三项除了滚动，还要先点对应的 .emp-tab 把面板切出来，
+        // 否则 scrollIntoView 对隐藏元素无效（点了没反应）。
+        { id: 'emp-jobs-panel',             label: '全部职位',       icon: 'fa-briefcase',     tab: 'jobs' },
+        { id: 'emp-resume-panel',           label: '我的简历',       icon: 'fa-file-lines',    tab: 'resume' },
+        { id: 'emp-applications-panel',     label: '我的求职',       icon: 'fa-paper-plane',   tab: 'applications' },
+        { id: 'emp-saved-panel',            label: '收藏职位',       icon: 'fa-heart',         tab: 'saved' }
+    ]
+};
+
+function buildBewlySidebar() {
+    // 门户页（index.html）不注入侧栏：hero 是满屏视觉，左侧固定条会破坏构图
+    if (document.body.dataset.page === 'index') return;
+
+    const sections = (SIDEBAR_SECTIONS[document.body.dataset.page] || [])
+        .filter(s => document.getElementById(s.id));
+    if (!sections.length) return;   // 本页没有可用锚点，不注入空壳
+
+    const bar = document.createElement('aside');
+    bar.className = 'bewly-sidebar';
+    bar.id = 'bewly-sidebar';
+    bar.setAttribute('aria-label', '页面内导航');
+    bar.innerHTML = sections.map(s => `
+        <a class="bewly-nav-item" href="#${s.id}" data-anchor="${s.id}"
+           ${s.tab ? `data-tab="${s.tab}"` : ''}
+           title="${s.label}" aria-label="${s.label}">
+            <i class="fas ${s.icon}" aria-hidden="true"></i>
+            <span class="bewly-nav-tip">${s.label}</span>
+        </a>
+    `).join('');
+    document.body.appendChild(bar);
+
+    // 锚点点击：滚到目标区块的**标题**处。
+    // ⚠️ 必须用标题而不是 card-section 容器本身：容器自带 margin-bottom:72px，
+    //    scrollIntoView(block:'start') 只把容器顶边贴到视口顶，标题会被顶到
+    //    导航栏下面去，看起来「没对准」（2026-10-18 三轮走查）。
+    bar.querySelectorAll('[data-anchor]').forEach(a => {
+        a.addEventListener('click', e => {
+            const sec = document.getElementById(a.dataset.anchor);
+            if (!sec) return;
+            e.preventDefault();
+            // 就业页是页签切换：先把对应面板切出来（隐藏面板滚动无效）
+            const tab = a.dataset.tab;
+            if (tab) {
+                const tabBtn = document.querySelector(`.emp-tab[data-emp-tab="${tab}"]`);
+                if (tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+            }
+            const title = sec.querySelector('.card-section-title, .panel-header h3, h2, h3');
+            // 就业页的面板没有标题（内容直接挂在 .emp-panel 下，标题是上方的页签栏）。
+            // 这种页面滚到页签栏，让用户看到「当前停在哪个页签」+ 面板开头，
+            // 比滚到一个没有视觉标识的容器顶边更有意义。
+            const target = title
+                || (tab ? document.querySelector('.emp-tabs') : null)
+                || sec;
+            (title || sec).scrollIntoView({
+                behavior: prefersReducedMotion ? 'auto' : 'smooth',
+                block: 'start'
+            });
+            // 页签刚切换出来时面板内容可能还没渲染完，等一帧再补一次滚动，
+            // 否则滚到的是空面板的高度、目标位置偏上。
+            if (tab) requestAnimationFrame(() => {
+                const t2 = sec.querySelector('.card-section-title, .panel-header h3, h2, h3');
+                (t2 || document.querySelector('.emp-tabs') || sec)
+                    .scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+            });
+        });
+    });
+}
+
+// 侧栏收起状态：跨页面记住用户选择
+const SIDEBAR_COLLAPSED_KEY = 'yuexiang_bewly_sidebar_collapsed';
+
+function setBewlySidebarCollapsed(collapsed) {
+    const bar = document.getElementById('bewly-sidebar');
+    if (!bar) return;
+    bar.classList.toggle('hide', collapsed);
+    const btn = document.getElementById('bewly-nav-toggle');
+    if (btn) {
+        btn.title = collapsed ? '展开侧栏' : '收起侧栏';
+        btn.setAttribute('aria-label', btn.title);
+        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+        const icon = btn.querySelector('i');
+        if (icon) icon.className = 'fas ' + (collapsed ? 'fa-angles-right' : 'fa-angles-left');
+    }
+    try { localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? '1' : '0'); } catch (e) { /* 隐私模式忽略 */ }
+}
+
+// 顶栏左侧的侧栏开关：位置与图标对齐 admin.html 的 .admin-sidebar-toggle
+// （同一个视觉语言，用户不用重新学）。纯手动控制，无自动隐藏。
+function setupBewlyNavToggle() {
+    if (document.body.dataset.page === 'index') return;
+    const nav = document.querySelector('.navbar .nav-container');
+    if (!nav || document.getElementById('bewly-nav-toggle')) return;
+
+    // 与 admin.html 完全同构：开关和徽标一起放进 .bewly-nav-left，
+    // 由 CSS 绝对定位到顶栏左侧。不直接 insertBefore 到 nav 首位的理由：
+    // 前台 .nav-container 是 space-between 布局，多一个子项会把徽标和导航项
+    // 一起挤位（2026-10-18 三轮走查实测）。
+    let left = nav.querySelector('.bewly-nav-left');
+    if (!left) {
+        left = document.createElement('div');
+        left.className = 'bewly-nav-left';
+        nav.insertBefore(left, nav.firstChild);
+    }
+
+    const btn = document.createElement('button');
+    btn.className = 'bewly-nav-toggle';
+    btn.id = 'bewly-nav-toggle';
+    btn.type = 'button';
+    btn.title = '收起侧栏';
+    btn.setAttribute('aria-label', '收起侧栏');
+    btn.setAttribute('aria-expanded', 'true');
+    btn.innerHTML = '<i class="fas fa-angles-left" aria-hidden="true"></i>';
+    left.appendChild(btn);
+
+    btn.addEventListener('click', () => {
+        const bar = document.getElementById('bewly-sidebar');
+        if (!bar) return;
+        setBewlySidebarCollapsed(!bar.classList.contains('hide'));
+    });
+
+    // 恢复上次状态
+    try { setBewlySidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1'); }
+    catch (e) { /* 隐私模式忽略 */ }
+}

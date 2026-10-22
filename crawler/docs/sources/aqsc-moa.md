@@ -6,7 +6,9 @@
 
 状态: `approved-with-gaps`
 
-验证时间: `2026-10-19 01:08 Asia/Shanghai`
+权利状态: `attribution-required`
+
+验证时间: `2026-10-21 23:05 Asia/Shanghai`
 
 ## 来源概况
 
@@ -123,6 +125,8 @@
 - 文件名前的 `P020<数字>` 是发布系统内部编号，不对应产品编号。
 - 同一公告可同时提供 `.pdf` 正文和 `.xlsx` 名单，应优先解析 XLSX；PDF 只作正文和版式核验。
 - 2024 至 2026 年不少公告把名单直接嵌入 HTML 表格，没有附件。解析器必须同时支持附件和 `.Details_con table`。
+- 名单附件只支持 `.xlsx`。发现 `.xls` 时写 `candidate_status=blocked`，原因 `file:unsupported_extension:.xls`，不得交给 `openpyxl` 误解析。
+- 同一公告同时存在 XLSX 附件和 `.Details_con table` 时，只解析 XLSX 附件；没有可用 XLSX 附件时才解析内嵌表。两条路径使用同一自然键，重复行按自然键去重。
 
 ### 附件表头
 
@@ -140,18 +144,20 @@
 联系人 | 生产规模（公顷、万头、万只、万羽等）
 ```
 
+真实公告附件包含 `联系人` 列。公开仓库只提交不含该列、不含任何联系值的合成样本；真实附件和联系人字段留在未跟踪的本地证据目录。
+
 最终公告可能使用 `获证单位`，公示阶段可能使用 `申请单位全称`。两者进入同一 `applicant_name`，同时保留来源字段名，不能把申请单位误写成已核准获证单位。
 
-## 已下载文件
+## 公开合成 fixture
 
-下载目录: `crawler/download/www.aqsc.agri.cn/`
+公开目录: `crawler/tests/fixtures/evidence/aqsc-moa/`
 
 | 文件 | 公告详情 URL | 附件 URL | 大小 | SHA-256 | 结构 |
 | --- | --- | --- | ---: | --- | --- |
-| `2025年第三批名特优新公示表.xlsx` | `http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx` | 113937 bytes | `cd0e40aa19d47a474c1242502064c40a19a0d64c73887227b61537230b88cc63` | 1 个工作表；792 行；标题 1 行、表头 1 行、数据 790 行；9 列。 |
-| `2025年第三批特质农品公示表.xlsx` | `http://www.aqsc.agri.cn/tzgg/202511/t20251128_468195.htm` | `http://www.aqsc.agri.cn/tzgg/202511/P020251128359343750170.xlsx` | 24022 bytes | `e7d927fbff2122aa22f3ac67384d4be6a58befc2a5389fe42545488bd745249a` | 3 个工作表；Sheet1 有 154 行，标题 1 行、表头 1 行、数据 152 行；7 列；Sheet2、Sheet3 为空。 |
+| `synthetic-mtyx-sample.xlsx` | `http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm` | `http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx` | 5445 bytes | `c77f3a82b228f09303188eeef30d3e4beb275405fe790624d3aca49140749924` | 1 个工作表；标题 1 行、表头 1 行、数据 4 行；8 列；无联系人列。 |
+| `synthetic-tepinongpin-sample.xlsx` | `http://www.aqsc.agri.cn/tzgg/202511/t20251128_468195.htm` | `http://www.aqsc.agri.cn/tzgg/202511/P020251128359343750170.xlsx` | 5312 bytes | `af128ce30aea149f6ce54ef9c6b4eaab5bacc5fa1a5ded35b5224ddc0bd5038f` | 1 个工作表；标题 1 行、表头 1 行、数据 4 行；6 列；无联系人列。 |
 
-两份文件均小于 100MB，均通过 ZIP 文件头 `PK\x03\x04` 和 `openpyxl` 解析验证，没有损坏。名特优新表的 790 条数据中，`县域` 有 15 条为空，其他关键字段完整；特质农品表的 152 条数据字段完整。
+两份公开文件都是确定性生成的合成样本，均通过 ZIP 文件头 `PK\x03\x04` 和 `openpyxl` 解析验证。作者、最后修改者、创建时间和 ZIP 时间戳固定为合成标记值。真实来源附件只保存在未跟踪的 `crawler/download/www.aqsc.agri.cn/`，其 790 条和 152 条规模记录用于来源复核，不进入 Git。
 
 解析时应先定位表头行，不要假设所有文件第 2 行一定是表头。可靠条件是某行同时包含 `序号`、`省份`，其后为数据行。
 
@@ -171,11 +177,10 @@
 - 附件 URL: `http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx`
 - 附件行: Sheet1 第 3 行，序号 1
 - 获证单位: 北京市平谷区果品产业服务中心
-- 联系人: 喻永强
 - 生产规模: 5933.33 公顷
 - 主要生产经营单位: 北京丽城嘉苑农业发展有限公司；北京绿农兴云智慧农业专业合作社
 - 水产标记: `aquatic=false`
-- 目标映射: `agri_certified_products` 一条名特优新记录；`agri_product_sources` 一条附件行来源记录。
+- 目标映射: 有直接详情 URL 时使用 `detail_url_status=direct`；没有时使用公告承载页 URL 加附件行或工作表行 locator，并写 `detail_url_status=missing`。两者都可进入 `std_agri_products` 和 `std_agri_product_sources`，承载页或 locator 缺失时写 `deferred`。
 
 ### 样本 2: 水产品，名特优新
 
@@ -191,7 +196,6 @@
 - 附件 URL: `http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx`
 - 附件行: Sheet1 第 12 行，序号 10
 - 获证单位: 秦皇岛市海洋和渔业局
-- 联系人: 石云海
 - 生产规模: 2036 公顷
 - 主要生产经营单位: 昌黎县振利水产养殖有限公司；昌黎县旺海水产养殖专业合作社；昌黎县川岛湾水产养殖有限公司；秦皇岛七里渔田水产养殖有限公司；秦皇岛鸿兆水产养殖有限公司
 - 水产证据: 产品名称为刺参；申请单位为海洋和渔业局；主要生产经营单位含“水产养殖”
@@ -212,7 +216,6 @@
 - 附件 URL: `http://www.aqsc.agri.cn/tzgg/202511/P020251128359343750170.xlsx`
 - 附件行: Sheet1 第 10 行，序号 8
 - 申请单位: 天津海晶博睿科技有限公司
-- 联系人: 吴昊
 - 生产规模: 2410.007 公顷
 - 水产证据: 产品名称为汪子虾，申请单位为水产相关企业
 - 水产标记: `aquatic=true`，`category=aquatic_crustacean`
@@ -316,7 +319,7 @@
 
 ## 字段映射
 
-### crawler std 层 `agri_certified_products`
+### crawler std 层 `std_agri_products`
 
 | 来源字段 | std 字段 | 类型 | 转换说明 |
 | --- | --- | --- | --- |
@@ -340,7 +343,7 @@
 | 附件行 | `source_row_no` | integer | XLSX 或 HTML 表格的物理行号。 |
 | 来源内容 | `content_sha256` | text | 公告、附件或行级规范化内容哈希。 |
 
-### crawler std 层 `agri_product_sources`
+### crawler std 层 `std_agri_product_sources`
 
 | 来源字段 | std 字段 | 类型 | 转换说明 |
 | --- | --- | --- | --- |
@@ -404,7 +407,9 @@
 
 ## 发布边界
 
-动态查询结果行没有单条长期详情 URL，不得直接进入业务发布。可保留公告详情 URL 和附件行定位作为采集证据；只有能定位到公告详情或附件行的记录，才允许进入发布审核。
+动态查询结果行和附件行没有单条详情 URL 时，使用公告详情页或数据集页作为长期承载页 URL，`detail_url=null`、`detail_url_status=missing`，并保留工作表名、行号或表格行号 locator。承载页 URL 可长期打开且 locator 能定位记录时，可以进入候选、业务实体和发布审核。承载页或 locator 缺失时写 `deferred`。不得把公告页伪装成单条详情 URL。
+
+2026-10-21 已执行 live 小样本：监管司发现页和 aqsc 公告页返回 200，公告页附件链接可解析，XLSX 下载返回 WAF 403。真实文件解析仍未完成，不能把 fixture 结果写成 live 成功。
 
 ## 数据量与更新
 
@@ -419,7 +424,7 @@
 
 - HTTPS: `www.aqsc.agri.cn` 在验证时出现证书主机名不匹配，HTTPS 返回 403 或 TLS 失败；已验证可用的主入口是 `http://www.aqsc.agri.cn/`。不要通过关闭证书校验来抓取 HTTPS。
 - 编码: aqsc 页面响应头编码不可靠，必须按 `gb18030` 解码；监管司页面实际 UTF-8。
-- robots: `www.aqsc.agri.cn/robots.txt` 返回 403，`jgs.moa.gov.cn/robots.txt` 返回 404，`mtyx.aqsc.org/robots.txt` 返回 404。没有取得明确允许规则，不能把 404 当作授权。
+- robots: `www.aqsc.agri.cn/robots.txt` 在 2026-10-19 和 2026-10-21 均返回 403，按真实阻断处理，不自动采集该域。2026-10-21 复测时公告页返回 200，附件下载返回 WAF 403。`jgs.moa.gov.cn/robots.txt` 返回 404，记录为 `not-found`，允许采集并写 `deferred` 候选，但不等于授权。跨域策略按子资源分别判断。
 - 跨站链接: 监管司和 aqsc 页面会链接 `www.moa.gov.cn`。已验证 `www.moa.gov.cn/robots.txt` 为 `User-agent:* / Disallow:/`，不要自动跨站抓取该域。
 - 登录: 三个目标入口均无需登录。查询系统会下发 `PHPSESSID`，只作匿名会话使用，不保存账号、密码、Cookie 或登录凭据。
 - 版权: 页面声明保留所有权利。只采集结构化事实字段、公告元数据和附件哈希，保留来源链接；不把公告全文或附件原样发布到业务库。
@@ -436,6 +441,7 @@
 - 未验证所有 PDF 的字段可提取性。
 - 未取得 robots 的明确许可文本，也未发现站点的开放数据许可声明。
 - 未建立完整人工水产复核集。
+- 2026-10-21 的真实 live 样本已打开 `www.aqsc.agri.cn` 公告页并解析附件链接，但 XLSX 下载被 403 阻断，未取得真实 XLSX 正文。解除条件是 robots 和附件入口在不绕过访问控制的前提下恢复可采集响应。
 
 ## 验证记录
 
@@ -459,6 +465,11 @@
 | `http://mtyx.aqsc.org/Tznp/Tezhi/index` | 200，1265 条，64 页 |
 | `http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx` | 200，113937 bytes，XLSX 文件头有效 |
 | `http://www.aqsc.agri.cn/tzgg/202511/P020251128359343750170.xlsx` | 200，24022 bytes，XLSX 文件头有效 |
+| `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm` | 2026-10-21 返回 200，50830 bytes，发现页 SHA-256 `74466176dc5730b9c95c2845c25af2401cd65270ac9dbce3e82aab65e9385929` |
+| `https://jgs.moa.gov.cn/robots.txt` | 2026-10-21 返回 404，robots 结论 `not-found` |
+| `http://www.aqsc.agri.cn/robots.txt` | 2026-10-21 返回 403，robots 结论 `unknown` |
+| `http://www.aqsc.agri.cn/tzgg/202508/t20250806_463294.htm` | 2026-10-21 返回 200，14288 bytes，SHA-256 `42ed9a89451479a2bc0784809d70d9072274432e07cf748fa47517323459d0b3` |
+| `http://www.aqsc.agri.cn/tzgg/202508/P020250821548932446299.xlsx` | 2026-10-21 返回 403，15781 bytes，WAF 阻断，SHA-256 `217778d44932469520ef613e78fcad75fad6f3b780f88d01f481981ab36d78c5` |
 
 ## 审核要求
 
@@ -466,4 +477,16 @@
 - 样本可复现: 通过，3 条样本均能定位到公告页、附件和附件行。
 - 字段映射完整: 通过，名特优新和特质农品分别映射，水产字段和来源字段均已定义。
 - 详情 URL 可直达: 通过，样本使用公告详情页，不使用首页或列表页。
-- 当前结论: `approved-with-gaps`。主要缺口是 robots 无明确规则、动态查询无单条详情、历史 PDF 和完整水产复核集尚未验证。
+- 当前结论: `approved-with-gaps`。主要缺口是主域 robots 返回 403、附件下载返回 403、动态查询无单条详情、历史 PDF 和完整水产复核集尚未验证。2026-10-21 live 已发现附件但未取得真实 XLSX。
+
+## 实现验证
+
+- 2026-10-20 的历史 fixture 切片使用已退役的旧在线入口。当前回归入口为 `python -m unittest crawler.tests.test_aqsc_moa_scrapy -v`，使用临时采集库并经过真实 Scrapy process。
+- 2026-10-21 项目级 fixture 回放改为真实 Scrapy process，经过 Spider、robots middleware、raw middleware、Pipeline 和采集运行时。回放产生 raw 5、XLSX 附件 2、stage 8、deferred 候选 8；每条候选保留工作表、行号和序号 locator。
+- 2026-10-22 文件行 `source_item_id` 改为稳定自然键：有证书号时使用证书号，缺证书号时使用批次、产品名、省份、县域和申请单位。工作表名、行号、序号继续只写 locator，文件或行重排不改变记录身份。
+- 2026-10-22 增加 `.Details_con table` 内嵌名单解析和真实结构 fixture；项目级回放覆盖“只有内嵌表”和“附件与内嵌表并存”两种路径，后者只产生附件行。
+- 2026-10-21 真实 live 小样本从监管司发现页返回 200，公告页返回 200 并解析出 XLSX 链接，附件下载返回 403。raw 保存发现页、公告页和 403 错误响应，stage 写入 1 条 blocked 记录，候选 0，failure_count 1。live 原始证据位置见 `docs/reviews/aqsc-moa-scrapy-sample.md`。
+- 100MB 上限使用声明大小 104857601 bytes 的响应验证，`raw_files.download_status=oversize`，只写 `OVERSIZE.md`，不保存正文。
+- 名特优新样本 4 行，特质农品样本 4 行；每行保留附件名、工作表、行号 locator。真实本地附件的 790 行和 152 行规模不进入公开仓库。
+- 这些行没有单条详情 URL，`detail_url=null`、`detail_url_status=missing`，使用公告页作为承载页 URL。按最新口径应写 `candidate_status=deferred`，等待 live 文件验证和发布审核；`publish_status=blocked` 是不再使用的旧候选判断。
+- 水产关键词误报词形保持 `is_aquatic=NULL`，不根据关键词自动判定为水产。

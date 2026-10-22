@@ -6,6 +6,8 @@
 
 审核结论: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 ## 审核范围
 
 - 待审文档: `crawler/docs/sources/dialect-org.md`
@@ -21,7 +23,7 @@
 | 详情页 URL | 通过 | `/dialect/1` 至 `/dialect/15` 均返回 200；`/dialect/0`、`/dialect/16` 返回 404，ID 边界成立 |
 | JSON 字段或 DOM 选择器 | 通过 | `/api/search?q=你好` 返回 1 条，`q=食饭` 返回 2 条，空 `q` 返回 `[]`；`.detail-word`、`.detail-phonetic`、`.detail-header .card-tag` 和正文段落均能定位 |
 | 样本记录 | 通过 | 样本 1 `你好 / Nǐ hǎo / 北京`、样本 2 `食饭 / Sik6 faan6 / 广东广州`、样本 3 `食饭未 / Sik6 faan6 mei6 / 广州` 均可复现；15 条总数成立 |
-| 字段映射 | 有缺口 | 词条、读音、释义和地区映射主体成立，但文档使用 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 和 `source_record_id`，与冻结 schema 的 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources`、`source_item_id` 不一致；业务表名 `dialect_lexeme_sources` 可对齐，但字段名仍需修正 |
+| 字段映射 | 通过 | 文档已统一使用 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 和 `source_item_id`，未冻结字段进入 `extra` |
 | 访问限制 | 通过 | 首页、详情和搜索无需登录；未发现需要登录的内容 |
 | 版权与用途 | 有缺口 | 页面只有“© 2026 中国方言语音库 | Powered by 造蓝科技基金 & AI测试俱乐部”，未发现开放许可或转载授权。文档写“只保存元数据、短释义和来源链接”是合理边界，但“未见许可”不能推导出可自由复制音频或大段正文 |
 | 下载记录 | 有缺口 | `/dialect/1` 的音频 URL 是占位字符串，浏览器实测 `MediaError code 4`、`networkState=3`，不能把音频算作可下载资源；8 条正文图片和 1 个占位音频均没有大小、SHA-256、取得时间和保存记录 |
@@ -32,14 +34,14 @@
 - 浏览器把占位地址规范化为 `xn--oss%20bucket-...` 形式，说明原字符串不是一个合法可用的媒体 URL。实现要检查 `audio` 的可加载性，不能只看元素是否存在。
 - `region` 粒度不统一：`广州`、`广东广州`、`广东` 并存，不能只用字符串相等建立方言点；文档已指出这一点，但没有给出可执行的归一化失败处理。
 - 首页摘要里的“上海话”“粤语”“普通话”等是释义或摘要的一部分，不是独立方言名字段；文档已标注为建议值，但业务发布时仍需人工复核。
-- 字段映射中的 std 表名和 `source_record_id` 字段与 schema 不一致，无法直接按文档建转换器。
+- 字段映射已与冻结 schema 对齐。
 - 文档没有下载记录章节，也没有解释为什么没有保存 15 个详情快照或音频元数据；这与验收清单的 SHA-256 要求不一致。占位音频不是可下载资源，不能伪造哈希或写入可用音频 URL。
 - robots 返回 404，文档已按“无规则、低频率”处理，但未记录响应大小、哈希、取得时间和“404 不等于授权”的证据链。
 - 只验证了 3 条详情字段的完整输出，其他 12 条只做了状态、标题、地区、词条和读音的可读性检查；释义和音频状态未逐条展开。
 
 ## 必须补齐
 
-- 将映射统一为 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources`，来源记录字段按 schema 使用 `source_item_id`（或明确说明 `source_record_id` 是别名）。
+- 映射已统一为 `std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources`，来源记录字段使用 `source_item_id`。
 - 在文档中明确 `/dialect/1` 的占位音频为 `invalid`，其余 14 条为 `missing`，并给出浏览器加载条件。
 - 增加 15 条详情的逐条检查表，至少包含 `id`、地区、词条、读音、释义、音频状态和详情 URL。
 - 补充详情快照、正文图片和音频占位响应的下载记录，或明确“不保存媒体，仅保存元数据和 URL”的例外及理由。

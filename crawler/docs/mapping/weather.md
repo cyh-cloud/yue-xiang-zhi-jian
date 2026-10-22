@@ -57,6 +57,12 @@
 - 不建立 std 天气表；每次请求只在内存组装运行时 DTO。
 - 业务库不保存天气快照。
 
+## 运行时实现
+
+- 中国天气网、Open-Meteo 和和风天气使用独立来源 ID，免费层和配额写在各自来源元数据中。
+- 中国天气网 DTO 由 `dataSK` 正文解析，保留 `city_code`、`observed_at`、`fetched_at` 和 `source_url`。
+- 内容版本只使用正文 `content_hash`；headers 哈希只作为单次取回证据，不参与变更判断。
+
 ## 农时提示接入点
 
 后续农时提示从 `farming_tasks`、`farming_phenophases` 和作物订阅获得任务，再按地区城市编码请求实时天气候选，在响应时组装提示:

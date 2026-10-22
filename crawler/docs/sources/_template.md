@@ -2,7 +2,9 @@
 
 来源 ID: `<source-id>`
 
-状态: `draft` / `approved` / `approved-with-gaps` / `blocked`
+状态: `draft` / `approved` / `approved-with-gaps` / `blocked` / `deferred` / `excluded`
+
+权利状态: `noncommercial-permitted` / `attribution-required` / `assumed-noncommercial-user-risk` / `prohibited` / `unknown`
 
 验证时间: `YYYY-MM-DD HH:mm Asia/Shanghai`
 

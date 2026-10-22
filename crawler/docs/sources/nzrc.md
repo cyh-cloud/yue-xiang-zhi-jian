@@ -6,6 +6,8 @@
 
 状态: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 验证时间: `2026-10-19 01:07 Asia/Shanghai`
 
 ## 来源概况
@@ -166,25 +168,25 @@
 | `h1 a[href]` | `std_jobs.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
 | `li:contains("工作地点")` | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 保留原文，拆出首个地区到 `region` |
 | `li:contains("招聘方式")` | `std_jobs.employment_type` | `recruitment_postings.employment_type` | 如 `全职` |
-| `li:contains("招聘人数")` | `std_jobs.headcount_raw` | `recruitment_postings.headcount` | 去掉 `人` 后转整数，无法解析存 null |
+| `li:contains("招聘人数")` | `std_jobs.headcount` | `recruitment_postings.headcount` | 去掉 `人` 后转整数，原文进入 `std_jobs.extra.headcount_raw`，无法解析存 null |
 | `li:contains("承诺月薪")` | `std_jobs.salary_raw` | `recruitment_postings.salary_raw` | `面议` 保持原文，不推断金额 |
 | `li:contains("学历要求")` | `std_jobs.education_raw` | `recruitment_postings.education_raw` | 直接映射 |
 | `li:contains("性别要求")` | `std_jobs.gender_requirement` | `recruitment_postings.gender_requirement` | 直接映射 |
 | `li:contains("发布日期")` | `std_jobs.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期 |
 | `li:contains("有效时间")` | `std_jobs.validity_days` | `recruitment_postings.validity_days` | 解析天数；截止日按发布日期加天数计算，并与抓取时间交叉校验 |
-| `#brief_info p` | `std_jobs.description_html` | `recruitment_postings.description` | 保留清洗后 HTML 或纯文本，移除脚本和样式 |
-| `#brief_info p` 中职责和要求 | `std_jobs.requirements_text` | `recruitment_postings.requirements` | 可按“岗位职责”“任职要求”分段 |
-| `#address` / Ajax `address` | `std_jobs.company_address` | `recruitment_postings.company_address` | 未登录为 null，不越过登录限制 |
-| `#officeuser` / Ajax `officeuser` | `std_jobs.contact_name` | `recruitment_postings.contact_name` | 未登录为 null |
-| `#fixtel` / Ajax `tel` | `std_jobs.contact_phone` | `recruitment_postings.contact_phone` | 未登录为 null；公开页有值时可保留 |
-| `#fax` / Ajax `fax` | `std_jobs.contact_fax` | `recruitment_postings.contact_fax` | 未登录为 null |
-| `#site` / Ajax `site` | `std_jobs.company_website` | `recruitment_postings.company_website` | 转绝对 URL |
-| `#postNumber` / Ajax `post` | `std_jobs.postal_code` | `recruitment_postings.postal_code` | 未登录为 null |
-| Ajax `email` | `std_jobs.contact_email` | `recruitment_postings.contact_email` | 只接收公开响应中的值，不登录提取 |
+| `#brief_info p` | `std_jobs.description` | `recruitment_postings.description` | 保留清洗后纯文本，移除脚本和样式 |
+| `#brief_info p` 中职责和要求 | `std_jobs.requirements` | `recruitment_postings.requirements` | 可按“岗位职责”“任职要求”分段 |
+| `#address` / Ajax `address` | `std_jobs.extra.company_address` | `recruitment_postings.company_address` | 未登录为 null，不越过登录限制 |
+| `#officeuser` / Ajax `officeuser` | `std_jobs.extra.public_contact_name` | `recruitment_postings.contact_name` | 未登录为 null |
+| `#fixtel` / Ajax `tel` | `std_jobs.extra.public_contact_phone` | `recruitment_postings.contact_phone` | 未登录为 null；公开页有值时可保留 |
+| `#fax` / Ajax `fax` | `std_jobs.extra.contact_fax` | `recruitment_postings.contact_fax` | 未登录为 null |
+| `#site` / Ajax `site` | `std_jobs.extra.company_website` | `recruitment_postings.company_website` | 转绝对 URL |
+| `#postNumber` / Ajax `post` | `std_jobs.extra.postal_code` | `recruitment_postings.postal_code` | 未登录为 null |
+| Ajax `email` | `std_jobs.extra.public_contact_email` | `recruitment_postings.contact_email` | 只接收公开响应中的值，不登录提取 |
 | 列表 `div.suozaidi` | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 详情缺失时回退 |
-| 列表 `div.shijian` | `std_jobs.listed_at` | `recruitment_postings.listed_at` | 详情发布日期缺失时回退 |
+| 列表 `div.shijian` | `std_jobs.extra.listed_at` | `recruitment_postings.listed_at` | 详情发布日期缺失时回退 |
 | 详情 HTML 正文 | `std_jobs.content_hash` | `recruitment_postings.content_hash` | 对规范化正文计算 SHA-256 |
-| 抓取时间 | `std_jobs.fetched_at` | `recruitment_postings.fetched_at` | 每次采集更新 |
+| 抓取时间 | `std_jobs.retrieved_at` | `recruitment_postings.retrieved_at` | 每次采集更新 |
 
 ### 粤乡智匠建议表
 
@@ -254,8 +256,9 @@
 ## 风险与限制
 
 - 登录: 公开列表和详情无需登录；联系方式需登录并完善简历，不采集登录后内容
-- robots: `http://www.nzrc.com.cn/robots.txt` 返回 404，没有可用的 robots 规则
+- robots: `http://www.nzrc.com.cn/robots.txt` 返回 404，记录为 `not-found`。允许采集并写 `deferred` 候选，404 不等于授权
 - 版权: 页面明确“未经授权不得转载”。粤乡智匠不应全文转载岗位正文，建议展示摘要并链接原详情
+- 权利标记: 记录使用 `attribution-required`，并在 `extra.rights_risk` 保留未经授权不得转载的风险说明
 - 结构稳定性: 老式 ASP.NET Web Forms，列表和详情字段依赖标签文本，结构变更风险中等
 - 搜索入口: 直接 GET `personjobsearch_list.aspx` 当前返回 404；搜索 URL 参数形态未能通过公开 GET 完整验证
 - 分页: 依赖 `__VIEWSTATE` 和 `__doPostBack`，需 Playwright 或严格会话管理
@@ -272,7 +275,7 @@
 
 ## 下载记录
 
-所有文件均小于 100MB，无需 `OVERSIZE.md`。
+所有文件均小于 100MB，无需 `OVERSIZE.md`。公开仓库只跟踪 `job-detail-8235500.html` 和 `job-detail-8240109.html` 两个合成 fixture；其余行和 `.headers` 是本地下载证据，不进入 Git。
 
 | 文件 | URL | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
@@ -280,9 +283,9 @@
 | `home.headers` | `http://www.nzrc.com.cn/` | 349 | `91CA1D8B89C83E84D28D1A087415A5885FFF48CB44A6220E05377ABA8F0A7D1C` |
 | `career-seek.html` | `http://www.nzrc.com.cn/career_seek.html` | 67346 | `98A8CD7156E0DBBCDB9334E18970FC88D864341490DFE9A9EC4F626642317E79` |
 | `career-seek.headers` | `http://www.nzrc.com.cn/career_seek.html` | 344 | `8693A865DEDD61A2E20786640A081D25F82891DB8F09E5D18DA5DA0426E2E4FC` |
-| `job-detail-8235500.html` | `http://www.nzrc.com.cn/company/jobs/8235500.html` | 22662 | `6F20645B32731B73BCB19C97B2213D7F90F8DCA9BC34AA4C3DF9A536D5390514` |
+| `job-detail-8235500.html` | `http://www.nzrc.com.cn/company/jobs/8235500.html` | 385 | `BBA750D9E49B65942BDAD7E1EAF712FCE5A11F19CB859ADFB64191CF35960308` |
 | `job-detail-8235500.headers` | `http://www.nzrc.com.cn/company/jobs/8235500.html` | 349 | `CC00B3527C2CCC811DD7513EF9ADDA722C299721629AC80FC6A61A7EEBC60D86` |
-| `job-detail-8240109.html` | `http://www.nzrc.com.cn/company/jobs/8240109.html` | 21658 | `0D7B35E6578D64C706CEEA5FBAE9E0197C1D46FCD27C1ADAE5E4FC6201310C33` |
+| `job-detail-8240109.html` | `http://www.nzrc.com.cn/company/jobs/8240109.html` | 385 | `1B3807FDEAC5FD5B4E9C68917ED3A193C6AE746CD443D77F084CE67048FE7100` |
 | `job-detail-8240109.headers` | `http://www.nzrc.com.cn/company/jobs/8240109.html` | 349 | `1B43D1CA9CDF8E18A547410AF836305C4DE7AAEDE768BE5E237DB18102FD4E70` |
 | `job-ajax-14747-8235500.json` | `http://www.nzrc.com.cn/company/Ajax.html?action=jobs&id=14747&zid=8235500` | 150 | `D18103142AA580644207E0146B6E72EF3DFF5CB82130B7A5EA99820720AFF378` |
 | `job-ajax-14747-8235500.headers` | `http://www.nzrc.com.cn/company/Ajax.html?action=jobs&id=14747&zid=8235500` | 342 | `3F545AB1C884EAF0A4E9D73B3686370A83A83034A473CAE6C4AF5CC5C9343D14` |

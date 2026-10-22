@@ -1,0 +1,19 @@
+{
+  "source_id": "aqsc-moa",
+  "items": [
+    {
+      "source_item_id": "embedded-474564",
+      "carrier_file": "details-con-embedded.html",
+      "title": "2026年第二批全国名特优新农产品公示",
+      "source_url": "http://www.aqsc.agri.cn/mtyx/tzgg/202609/t20260920_474564.htm",
+      "long_term_url": "http://www.aqsc.agri.cn/mtyx/tzgg/202609/t20260920_474564.htm",
+      "announcement_id": "474564",
+      "announcement_no": "第44号",
+      "batch": "2026年第二批",
+      "published_at": "2026-09-20",
+      "cert_type": "mingteyouxin",
+      "candidate_reason": "file-source:fixture",
+      "locator": "table=1; row=3"
+    }
+  ]
+}

@@ -6,6 +6,8 @@
 
 审核结论: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 ## 审核范围
 
 - 待审文档: `crawler/docs/sources/aqsc-moa.md`
@@ -22,21 +24,21 @@
 | 列表页与分页 | 通过（有实现缺口） | 名特优新公告 `index_4.htm` 仍有 13 条，`index_5.htm` 为 404；特质农品 `index_2.htm` 仍有 2 条，`index_3.htm` 为 404；总公告 `index_44.htm` 仍有 1 条，`index_45.htm` 为 404。监管司首屏主列表实际为 20 条，脚本声明 4 页；`index_1.htm`、`index_2.htm`、`more_1.htm`、`more_2.htm` 返回 200，`more_3.htm` 返回空列表壳 |
 | 详情页 URL | 通过 | 两份 2025 年第三批公告详情均返回 200，标题、2025-11-28 日期和附件链接可定位；2026 年第一批两份公告、2026 年第二批第 44/45 号公告均返回 200。`jgs` 详情 `t20250908_6477077.htm` 返回 200，正文外链回 aqsc。文档关于“不能凭 ID 猜详情路径”的判断成立 |
 | DOM 选择器与附件链接 | 通过 | 列表 `.News_center_con li`、`.News_center_con li a[href]`、`.News_center_con li span`、`.News_center_flip script` 均有非空结果；详情 `.Details_con h3`、`.Details_con h4`、`.Details_con #nr`、`.Details_con a[href]`、`.foot_con_text` 均有非空结果。详情附件链接实际为 `./P020...xlsx`，用 `urljoin` 后才能得到文档中的绝对 URL |
-| 下载 URL、大小与 SHA-256 | 通过 | 名特优新附件实时下载 113937 bytes，SHA-256 `cd0e40aa19d47a474c1242502064c40a19a0d64c73887227b61537230b88cc63`；本地同名文件大小与哈希完全一致。特质农品附件实时下载 24022 bytes，SHA-256 `e7d927fbff2122aa22f3ac67384d4be6a58befc2a5389fe42545488bd745249a`；本地文件完全一致。两个响应均为 XLSX Content-Type，文件头可解析 |
-| XLSX 表头、行数与工作表 | 通过 | 名特优新文件仅 `Sheet1`，792 行、9 列，标题 1 行、表头 1 行、数据 790 行；表头为“序号、省份、县域、证书编号、产品名称、获证单位、联系人、生产规模（...）、主要生产经营单位”。特质农品文件有 `Sheet1`、`Sheet2`、`Sheet3`，`Sheet1` 154 行、7 列、数据 152 行；表头为“序号、省份、县域、产品全称、申请单位全称、联系人、生产规模（...）”；`Sheet2`、`Sheet3` 为空。名特优新县域空值确为 15 条，证书编号空值 0 条 |
-| 样本 1 | 通过 | `平谷蟠桃` 位于 `Sheet1` 第 3 行、序号 1，证书 `CAQS-MTYX-20250914`，北京市/平谷区，获证单位、联系人、5933.33 公顷和两家主要生产经营单位均与文档一致 |
+| 下载 URL、大小与 SHA-256 | 通过 | 真实附件只在本地复核：名特优新 113937 bytes、特质农品 24022 bytes，哈希与来源文档一致。公开仓库改为合成 fixture：`synthetic-mtyx-sample.xlsx` 5445 bytes、SHA-256 `c77f3a82b228f09303188eeef30d3e4beb275405fe790624d3aca49140749924`；`synthetic-tepinongpin-sample.xlsx` 5312 bytes、SHA-256 `af128ce30aea149f6ce54ef9c6b4eaab5bacc5fa1a5ded35b5224ddc0bd5038f` |
+| XLSX 表头、行数与工作表 | 通过 | 真实附件表头含“联系人”，只用于本地复核；公开合成 fixture 删除该列。公开名特优新样本 4 行、8 列，公开特质农品样本 4 行、6 列，均无个人联系值、无原始作者元数据 |
+| 样本 1 | 通过 | `平谷蟠桃` 位于真实附件 `Sheet1` 第 3 行、序号 1，证书 `CAQS-MTYX-20250914`，北京市/平谷区，获证单位、5933.33 公顷和两家主要生产经营单位均与文档一致 |
 | 样本 2（水产） | 通过 | `秦皇岛刺参` 位于 `Sheet1` 第 12 行、序号 10，证书 `CAQS-MTYX-20250923`，河北省、县域为空，获证单位为秦皇岛市海洋和渔业局，生产规模 2036 公顷，五家经营单位均与文档一致。水产标记有名称与单位双重证据 |
-| 样本 3（水产） | 通过 | `长芦海晶汪子虾` 位于特质农品 `Sheet1` 第 10 行、序号 8，天津市/滨海新区，申请单位天津海晶博睿科技有限公司，联系人吴昊，生产规模 2410.007 公顷；公示表没有证书编号列，文档写 `null` 正确 |
+| 样本 3（水产） | 通过 | `长芦海晶汪子虾` 位于特质农品 `Sheet1` 第 10 行、序号 8，天津市/滨海新区，申请单位天津海晶博睿科技有限公司，生产规模 2410.007 公顷；公示表没有证书编号列，文档写 `null` 正确 |
 | 内嵌名单核验 | 通过 | 2026 年第一批名特优新页面 `.Details_con table` 有 636 条顺序数据，最后序号 636；特质农品页面有 148 条，最后序号 148。第 44 号公告有 537 条名特优新数据，第 45 号公告有 91 条特质农品数据，与正文声明一致 |
 | 动态查询 | 通过（有稳定性缺口） | 名特优新返回 200，9038 条、452 页，末页 `p/452.html` 返回 200；特质农品 1265 条、64 页，末页 `p/64.html` 返回 200。查询表格行确无单条详情链接。`eq_dq_province` 实测按中文省份值筛选有效，按文档的 `-999` 全部值有效；数字编码筛选返回空结果，说明该字段的值域需要按页面选项使用 |
-| 字段映射 | 有缺口 | 附件字段到产品名、地区、申请主体、证书、生产规模、经营单位、来源行号和哈希的映射成立，特质农品缺证书编号时写 `null` 也正确。但来源文档使用 `agri_certified_products`、`agri_product_sources`，冻结的采集库 schema 使用的是 `std_agri_products`、`std_agri_product_sources`；来源文档没有把两者关系写清，不能作为可直接实现的 std 契约 |
+| 字段映射 | 通过 | 附件字段映射成立；来源文档已区分采集库 `std_agri_products`、`std_agri_product_sources` 与业务建议表，特质农品缺证书编号时写 `null` |
 | 访问限制 | 通过（有 robots 缺口） | aqsc、jgs、动态查询匿名可访问；aqsc 设置 `SF_cookie_*`，jgs 设置 WAF Cookie，查询系统设置 `PHPSESSID`，均不需要账号登录。aqsc robots 返回 403，jgs 与 mtyx robots 返回 404；`www.moa.gov.cn/robots.txt` 返回 `User-agent:* / Disallow:/`，不能跨站自动抓取 |
 | 版权与用途 | 通过 | aqsc 页脚明确为“网站保留所有权利，未经允许不得复制、镜像”，jgs 页脚明确为“网站保留所有权，未经允许不得复制镜像”。文档将用途限定为结构化事实、公告元数据、哈希与来源回链，未把全文或附件原样写入业务库，符合页面声明 |
-| 下载记录 | 通过 | 仅有两个 XLSX，最大 113937 bytes，均远低于 100MB；下载目录为 `crawler/download/www.aqsc.agri.cn/`，无需 `OVERSIZE.md`。文档列出的 URL、大小和 SHA-256 均可复算 |
+| 下载记录 | 通过 | 公开仓库只有两个合成 XLSX，最大 5445 bytes，均远低于 100MB；真实附件留在未跟踪的 `crawler/download/www.aqsc.agri.cn/`，无需 `OVERSIZE.md` |
 
 ## 发现的问题
 
-- 来源文档的 std 表名与冻结 schema 不一致：文档写 `agri_certified_products`、`agri_product_sources`，冻结 schema 写 `std_agri_products`、`std_agri_product_sources`，且两套字段不是一一同名。当前来源映射只能审到“业务建议表”，不能直接审到“crawler std 层契约”。
+- 来源文档已把采集库 std 契约和业务建议表分开。
 - 文档把监管司栏目写成“15 条一页”，但本次实际首屏列表为 20 条；脚本 `countPage=4`，`more_3.htm` 是空列表壳。分页条目数应写成“首屏 20 条；`index_1`、`index_2` 为后续页；`more_*` 是辅助片段”，或明确该栏目不作为当前主入口。
 - 文档声明目标页面“未返回可用的 `ETag` 或 `Last-Modified`”，但本轮两个 XLSX 响应分别返回了 `ETag` 和 `Last-Modified`。这不影响附件哈希主策略，但表述应限定为 HTML 列表/详情页，不能覆盖附件。
 - 动态查询文档给出 `eq_dq_province` 的 `-999` 全部值，但未说明非全部筛选应使用页面选项中的中文省份值；实测数字编码返回空表。实现按数字编码传参会静默丢失数据。
@@ -47,7 +49,7 @@
 
 ## 必须补齐
 
-- 在来源文档中把 crawler std 表改为冻结 schema 的 `std_agri_products`、`std_agri_product_sources`，并逐字段说明与业务建议表 `agri_certified_products`、`agri_product_sources` 的对应关系；或者明确来源文档只负责业务建议映射，std 契约另文定义。
+- 已使用冻结 schema 的 `std_agri_products`、`std_agri_product_sources`，业务建议表保留独立命名。
 - 修正监管司分页事实：首屏 20 条，`index_1.htm`、`index_2.htm` 为后续页，`more_1.htm` 至 `more_3.htm` 为片段；把总公告、专项公告和监管司的每页条数分开写。
 - 把 `ETag`/`Last-Modified` 的缺口限定到 HTML 列表或详情页；附件明确记录本轮返回的 `ETag` 和 `Last-Modified`，同时保留 SHA-256 作为最终一致性依据。
 - 给 `eq_dq_province` 写明值域来源：使用页面 `<select>` 的中文省份值或 `-999`；不要把数字行政区代码写成可用参数。
@@ -61,3 +63,18 @@
 - robots 的 403/404 无法确认许可，建议在调度器接入前按实际 User-Agent 和站点联系渠道复核，而不是把 404 当作允许。
 - 水产 68/10 条关键词候选只是筛查量；后续应建立人工复核集，尤其处理 `鲅鱼圈鸡蛋`、`安溪毛蟹`、`仪征紫菜薹`、贝母、丹参、鱼腥草等误报。
 - 两份附件的县域空值、联系人占位符和旧 PDF OCR 可在转换器实现前再做质量抽样。
+
+## 2026-10-21 live Scrapy 复核
+
+- fixture 回放已经通过真实 Spider、robots middleware、raw middleware、Pipeline 和采集运行时，产生 raw 5、XLSX 附件 2、stage 8、deferred 候选 8。
+- 真实 live 从 `https://jgs.moa.gov.cn/rzde/202509/t20250908_6477077.htm` 返回 200 并发现 aqsc 公告页，公告页返回 200 并解析出 XLSX 链接，附件下载返回 403，未取得有效 XLSX。
+- live 计数为 raw 3、stage 1、blocked 1、deferred 0、候选 0、failure_count 1。robots 403 和附件 403 都保留为真实访问事实。
+- 结论保持 `blocked`，解除条件是主域 robots、公告页和附件入口恢复可采集响应。详见 `docs/reviews/aqsc-moa-scrapy-sample.md`。
+
+## 2026-10-22 最终审查修复
+
+- 公告解析顺序固定为 XLSX 附件优先、`.Details_con table` 兜底；附件与内嵌表并存时只产生附件行，同一自然键在解析阶段去重。
+- 文件行 `source_item_id` 改为证书号，或 `batch + product_name + province + county + applicant`；sheet、row、seq 继续只进入 locator，重排 fixture 已验证身份不变。
+- `.xls` 明确写 `blocked`，原因 `file:unsupported_extension:.xls`，不交给 `openpyxl` 误解析。
+- `allowed_domains` 从 `sources.json` 派生，manifest 承载链接、详情链接和附件链接在发请求前校验。
+- 新增真实结构内嵌表 fixture、附件优先级 fixture、项目级 Scrapy 回放和重排回归。

@@ -1,112 +1,225 @@
 {
   "version": 1,
-  "generated_at": "2026-10-19T00:00:00+08:00",
+  "generated_at": "2026-10-20T00:00:00+08:00",
   "contract": "sources/CONTRACT.md",
   "sources": [
     {
       "id": "ihchina",
       "name": "中国非物质文化遗产网",
-      "domains": ["www.ihchina.cn"],
-      "content_domains": ["ich", "crafts"],
+      "domains": [
+        "www.ihchina.cn"
+      ],
+      "content_domains": [
+        "ich",
+        "crafts"
+      ],
       "priority": "P0",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "playwright",
       "document": "sources/ihchina.md",
-      "review": "reviews/ihchina.md"
+      "review": "reviews/ihchina.md",
+      "run_modes": [
+        "fixture",
+        "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "中国非物质文化遗产网 www.ihchina.cn",
+      "rights_evidence_url": "https://www.ihchina.cn/about/206.html"
     },
     {
       "id": "aqsc-moa",
       "name": "农业农村部农产品质量安全中心及监管司",
-      "domains": ["www.aqsc.agri.cn", "mtyx.aqsc.org", "jgs.moa.gov.cn"],
-      "content_domains": ["agri-products"],
+      "domains": [
+        "www.aqsc.agri.cn",
+        "mtyx.aqsc.org",
+        "jgs.moa.gov.cn"
+      ],
+      "content_domains": [
+        "agri-products"
+      ],
       "priority": "P0",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "http-and-files",
       "document": "sources/aqsc-moa.md",
-      "review": "reviews/aqsc-moa.md"
+      "review": "reviews/aqsc-moa.md",
+      "run_modes": [
+      "fixture",
+      "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "农业农村部农产品质量安全中心",
+      "rights_evidence_url": "http://www.aqsc.agri.cn/"
     },
     {
       "id": "cnipa",
       "name": "国家知识产权局地理标志",
-      "domains": ["www.cnipa.gov.cn", "ggfw.cnipa.gov.cn"],
-      "content_domains": ["agri-products"],
+      "domains": [
+        "www.cnipa.gov.cn",
+        "ggfw.cnipa.gov.cn"
+      ],
+      "content_domains": [
+        "agri-products"
+      ],
       "priority": "P0",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "playwright-json",
       "document": "sources/cnipa.md",
-      "review": "reviews/cnipa.md"
+      "review": "reviews/cnipa.md",
+      "run_modes": [
+      "fixture",
+      "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "国家知识产权局",
+      "rights_evidence_url": "https://www.cnipa.gov.cn/"
     },
     {
       "id": "weather",
       "name": "中国天气网",
-      "domains": ["www.weather.com.cn"],
-      "content_domains": ["weather"],
+      "domains": [
+        "www.weather.com.cn",
+        "d1.weather.com.cn",
+        "j.i8tq.com"
+      ],
+      "content_domains": [
+        "weather"
+      ],
       "priority": "P1",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
-      "verification": "playwright",
+      "verification": "runtime-fixture",
+      "rights_status": "attribution-required",
       "document": "sources/weather.md",
-      "review": "reviews/weather.md"
+      "review": "reviews/weather.md",
+      "run_modes": [],
+      "attribution_required": true,
+      "attribution_text": "中国天气网 www.weather.com.cn",
+      "rights_evidence_url": "https://www.weather.com.cn/"
     },
     {
       "id": "nzrc",
       "name": "中国农业人才网",
-      "domains": ["www.nzrc.com.cn"],
-      "content_domains": ["jobs"],
+      "domains": [
+        "www.nzrc.com.cn"
+      ],
+      "content_domains": [
+        "jobs"
+      ],
       "priority": "P1",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "playwright",
       "document": "sources/nzrc.md",
-      "review": "reviews/nzrc.md"
+      "review": "reviews/nzrc.md",
+      "run_modes": [
+        "fixture",
+        "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "中国农业人才网",
+      "rights_evidence_url": "http://www.nzrc.com.cn/"
     },
     {
       "id": "nongmuhr",
       "name": "农牧人才网",
-      "domains": ["nongmuhr.com"],
-      "content_domains": ["jobs"],
+      "domains": [
+        "nongmuhr.com"
+      ],
+      "content_domains": [
+        "jobs"
+      ],
       "priority": "P1",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "playwright",
       "document": "sources/nongmuhr.md",
-      "review": "reviews/nongmuhr.md"
+      "review": "reviews/nongmuhr.md",
+      "run_modes": [
+        "fixture",
+        "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "农牧人才网",
+      "rights_evidence_url": "http://nongmuhr.com/"
     },
     {
       "id": "5ajob",
       "name": "5A农业人才网",
-      "domains": ["www.5ajob.com"],
-      "content_domains": ["jobs"],
+      "domains": [
+        "www.5ajob.com"
+      ],
+      "content_domains": [
+        "jobs"
+      ],
       "priority": "P1",
+      "enabled": false,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "prohibited",
       "verification": "playwright",
       "document": "sources/5ajob.md",
-      "review": "reviews/5ajob.md"
+      "review": "reviews/5ajob.md",
+      "run_modes": [
+        "list-fixture"
+      ],
+      "attribution_required": false,
+      "attribution_text": "5A 农业人才网",
+      "rights_evidence_url": "http://www.5ajob.com/"
     },
     {
       "id": "dialect-org",
       "name": "中国方言库",
-      "domains": ["dialect.org.cn"],
-      "content_domains": ["dialects"],
+      "domains": [
+        "dialect.org.cn"
+      ],
+      "content_domains": [
+        "dialects"
+      ],
       "priority": "P1",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "playwright",
       "document": "sources/dialect-org.md",
-      "review": "reviews/dialect-org.md"
+      "review": "reviews/dialect-org.md",
+      "run_modes": [
+        "fixture",
+        "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "中国方言库",
+      "rights_evidence_url": "https://dialect.org.cn/"
     },
     {
       "id": "cass-linguistics",
       "name": "中国社会科学院语言研究所",
-      "domains": ["ling.cass.cn"],
-      "content_domains": ["dialects", "research"],
+      "domains": [
+        "ling.cass.cn"
+      ],
+      "content_domains": [
+        "dialects",
+        "research"
+      ],
       "priority": "P2",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "noncommercial-permitted",
       "verification": "playwright",
       "excluded_subresources": [
         {
@@ -117,16 +230,30 @@
         }
       ],
       "document": "sources/cass-linguistics.md",
-      "review": "reviews/cass-linguistics.md"
+      "review": "reviews/cass-linguistics.md",
+      "run_modes": [
+        "fixture",
+        "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "中国社会科学院语言研究所",
+      "rights_evidence_url": "http://ling.cass.cn/"
     },
     {
       "id": "cnopendata",
       "name": "CnOpenData",
-      "domains": ["www.cnopendata.com"],
-      "content_domains": ["dialects", "ich"],
+      "domains": [
+        "www.cnopendata.com"
+      ],
+      "content_domains": [
+        "dialects",
+        "ich"
+      ],
       "priority": "P2",
-      "status": "approved-with-gaps",
+      "enabled": false,
+      "status": "deferred",
       "access": "login-required",
+      "rights_status": "unknown",
       "verification": "playwright",
       "scope": "public-metadata-only",
       "excluded_subresources": [
@@ -138,31 +265,105 @@
         }
       ],
       "document": "sources/cnopendata.md",
-      "review": "reviews/cnopendata.md"
+      "review": "reviews/cnopendata.md",
+      "run_modes": [],
+      "attribution_required": false,
+      "attribution_text": "CnOpenData",
+      "rights_evidence_url": "https://www.cnopendata.com/"
     },
     {
       "id": "zhongguoyuyan",
       "name": "中国语言资源保护工程",
-      "domains": ["zhongguoyuyan.cn"],
-      "content_domains": ["dialects"],
+      "domains": [
+        "zhongguoyuyan.cn"
+      ],
+      "content_domains": [
+        "dialects"
+      ],
       "priority": "P2",
-      "status": "blocked",
+      "enabled": false,
+      "status": "excluded",
       "access": "robots-restricted",
+      "rights_status": "prohibited",
       "verification": "robots-only",
       "document": "sources/zhongguoyuyan.md",
-      "review": "reviews/zhongguoyuyan.md"
+      "review": "reviews/zhongguoyuyan.md",
+      "run_modes": [],
+      "attribution_required": false,
+      "attribution_text": "中国语言资源保护工程",
+      "rights_evidence_url": "https://zhongguoyuyan.cn/"
     },
     {
       "id": "feiyiw",
       "name": "非遗网",
-      "domains": ["www.feiyiw.cn"],
-      "content_domains": ["ich", "crafts"],
+      "domains": [
+        "www.feiyiw.cn"
+      ],
+      "content_domains": [
+        "ich",
+        "crafts"
+      ],
       "priority": "P2",
+      "enabled": true,
       "status": "approved-with-gaps",
       "access": "public",
+      "rights_status": "attribution-required",
       "verification": "playwright",
       "document": "sources/feiyiw.md",
-      "review": "reviews/feiyiw.md"
+      "review": "reviews/feiyiw.md",
+      "run_modes": [
+        "fixture",
+        "live"
+      ],
+      "attribution_required": true,
+      "attribution_text": "外研非遗网（www.feiyiw.cn）",
+      "rights_evidence_url": "https://www.feiyiw.cn/"
+    },
+    {
+      "id": "open-meteo",
+      "name": "Open-Meteo",
+      "domains": [
+        "api.open-meteo.com",
+        "open-meteo.com"
+      ],
+      "content_domains": [
+        "weather"
+      ],
+      "priority": "P1",
+      "enabled": false,
+      "status": "draft",
+      "access": "public",
+      "verification": "pending-free-tier",
+      "rights_status": "attribution-required",
+      "document": "sources/open-meteo.md",
+      "review": "reviews/open-meteo.md",
+      "run_modes": [],
+      "attribution_required": true,
+      "attribution_text": "Weather data by Open-Meteo.com",
+      "rights_evidence_url": "https://open-meteo.com/en/license"
+    },
+    {
+      "id": "qweather",
+      "name": "和风天气",
+      "domains": [
+        "devapi.qweather.com",
+        "www.qweather.com"
+      ],
+      "content_domains": [
+        "weather"
+      ],
+      "priority": "P1",
+      "enabled": false,
+      "status": "draft",
+      "access": "public",
+      "verification": "pending-free-tier",
+      "rights_status": "attribution-required",
+      "document": "sources/qweather.md",
+      "review": "reviews/qweather.md",
+      "run_modes": [],
+      "attribution_required": true,
+      "attribution_text": "和风天气 QWeather",
+      "rights_evidence_url": "https://dev.qweather.com/docs/configuration/"
     }
   ]
 }

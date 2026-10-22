@@ -6,6 +6,8 @@
 
 审核结论: `approved-with-gaps`
 
+权利状态: `prohibited`
+
 ## 审核范围
 
 - 待审文档: `crawler/docs/sources/5ajob.md`
@@ -21,31 +23,38 @@
 | 详情页 URL | 通过 | 两套 canonical 详情 URL 的 3 条样本均返回 200，可直达同一岗位；`#rjobid` 与 URL 中的职位 ID 一致 |
 | JSON 字段或 DOM 选择器 | 通过 | 未发现列表/详情 JSON API；`tr[id^="compareColor"]`、`td.joblink a`、`#zhtitle`、`#jobdetail h1`、`#rjobid`、`#jobdetail tr` 均有非空结果。`#jobexpire` 纯 HTTP 为空，Playwright 执行页面脚本后返回有效期 |
 | 样本记录 | 通过 | 样本 1 `50506`、样本 2 `50688` 的岗位、公司、地点、行业、薪资、学历、专业及正文均可复现；样本 3 `50687` 为前台接待反例，详情仍可打开但应被农业主题过滤 |
-| 字段映射 | 有缺口 | 来源字段与业务字段大体齐全，但文档使用 `std_jobs`、`std_job_sources`、`recruitment_postings`、`recruitment_posting_sources`、`region_raw` 等名称，与冻结的 `std_jobs`、`std_job_sources`、`recruitment_postings`、`recruitment_posting_sources`、`location_raw` 不一致；不能按文档直接实现 |
+| 字段映射 | 通过 | 来源文档已统一使用 `std_jobs`、`std_job_sources`、`location_raw` 和 `salary_raw`；未冻结字段进入 `extra` |
 | 访问限制 | 通过 | 列表和详情匿名可访问；投递、收藏、联系企业等登录后操作未纳入采集。文档明确排除简历和个人联系方式 |
-| 版权与用途 | 有缺口 | 首页实测明确写有“未经5ajob.com许可，不得转载本站之所有农业人才求职招聘信息及作品”，文档却写“未见明确内容授权或转载许可”。可保存必要字段、短摘要和回链，但不能把许可状态描述为未声明 |
-| 下载记录 | 有缺口 | 本次及文档均未发现需要下载的稳定附件；3 条样本详情正文和 robots 响应未记录响应体大小、SHA-256、取得时间及 raw 快照，不能通过下载校验和检查 |
+| 版权与用途 | 通过（限制明确） | 首页实测明确写有“未经5ajob.com许可，不得转载本站之所有农业人才求职招聘信息及作品”；来源与记录统一标记 `prohibited`，只保留 raw/stage 证据，不进入业务发布 |
+| 下载记录 | 通过（fixture 范围） | 列表 fixture 已按页保存 raw JSON、大小、SHA-256、取得时间和 locator；真实 250 页全量仍为 deferred |
 
 ## 发现的问题
 
-- `p251` 回绕已复现：20 条记录中 19 条与第 1 页重复。文档写了风险，但未给出可执行的终止条件和去重键，实现时容易把回绕页当作新数据继续抓取。
-- 列表页存在跨页重复，仅按页码或单页去重不足；必须按 `(source_id, job_id)` 或 canonical URL 全局去重。
-- 非农业岗位过滤的规则仍偏描述性。`前台接待` 反例成立，但文档没有给出可复现的判定证据字段或最小规则集。
+- 历史发现（已处理）：`p251` 回绕已复现；实现现按岗位 ID 和 canonical URL 去重，无新增 ID 即停止。
+- 历史发现（已处理）：跨页重复已由全局 ID 和 URL 去重覆盖。
+- 非农业岗位过滤已实现为标题、行业、描述的最小关键词规则，并保存命中字段、命中文案和排除记录；`前台接待` 反例已有测试。
 - 三份样本只有 1 条反例、2 条正面样本；对薪资、经验、学历的原文格式已覆盖，但没有覆盖“公司 hash 为空”的列表链接和已过期岗位详情。
 - 文档将纯 HTTP 的 `#jobexpire` 空值描述为“普通 HTTP 为空”，该事实成立，但实现若只使用 HTTP 会漏掉有效期，必须明确 Playwright 或脚本执行是必需步骤。
-- 字段映射使用的 std 与业务表名和冻结 schema 不一致，且 `region_raw`、`salary_text`、`source_record_id` 等字段没有全部落到 schema 的真实列名。
-- 文档的版权描述低于页面实际声明强度；这不影响低频率内部核验，但会影响能否保存正文、展示摘要和长期留存。
+- 字段映射已对齐冻结 schema，扩展字段进入 `extra`。
+- 文档已把页面声明统一为 `prohibited`；采集仅用于低频率内部核验，不进入业务发布。
 - 文档没有下载记录章节，也没有说明为什么没有下载文件、robots 响应是否只读即弃。审核只能确认“没有需要下载的附件”，不能确认“下载与哈希可复现”。
 - 只抽查了 `p2`、`p250`、`p251` 和关键词第 1、2 页，没有验证全部 250 页及每个行业/地区路径的 robots 可用性。
 
 ## 必须补齐
 
-- 将 std 映射统一为 `std_jobs`、`std_job_sources`，业务表统一为 `recruitment_postings`、`recruitment_posting_sources`；字段名按 `crawler/docs/schema/crawler-db.md` 和 `crawler/docs/schema/yuexiang-target-db.md` 对齐。
-- 把 `p250`、`p251` 的回绕边界写成明确的调度终止规则：记录末页 ID 集合，遇到已见 ID、无新增 ID 或尾页标记即停止。
-- 给出非农业过滤的最小可复核规则，至少包含标题关键词、行业白名单/黑名单、专业或正文证据，并保留判定依据。
-- 补充一条公司 hash 为空的列表链接样本，并验证其详情是否仍能打开。
-- 补充 robots 响应的大小、哈希、取得时间和保存位置，或明确 robots 仅读取不落 raw 的理由。
-- 将版权表述改为“页面声明未经许可不得转载”，并写明业务发布只用摘要、必要字段和回链。
+- 已完成：std 映射统一为 `std_jobs`、`std_job_sources`，业务表指向 `recruitment_postings`、`recruitment_posting_sources`。
+- 已完成：按岗位 ID 和 canonical URL 全局去重，遇到无新增 ID 即停止，覆盖 `p251` 回绕。
+- 已完成：农业相关性规则保留标题、行业和描述证据，并有正反例 fixture。
+- 已完成：公司 hash 为空的 canonical URL fixture。
+- 已完成离线详情解析：fixture 可带 `detail_html`，解析公司、地点、薪资、学历、描述、要求和有效期。
+- robots 真实响应哈希仍为 `deferred`，解除条件是使用最终调度 UA 完成 robots 快照并保存大小、SHA-256 和取得时间。
+- 已明确页面声明“未经许可不得转载”，来源注册表为 `prohibited`；调度器和 Scrapy 项目在发现前拒绝执行，只保留解析器离线测试。
+
+## 2026-10-20 修复复核
+
+- 来源注册表为 `prohibited`，因此离线 harness 在发现前返回 `blocked`，不创建采集库、不产生 raw/stage/std。
+- 列表过滤和详情 HTML 解析仍可在离线单元测试中验证，不作为真实运行授权。
+- 真实 250 页全量、浏览器脚本有效期和许可恢复均保持 `deferred`；解除条件是取得可复核许可并完成真实全量回放。
 
 ## 可后续处理
 

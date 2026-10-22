@@ -16,7 +16,8 @@
 - 内容域: 农业与乡村相关招聘岗位
 - 优先级: P1
 - 访问等级: `public`
-- `license_or_usage`: 未找到明确的内容授权或转载许可；只保存必要字段和可回链的详情 URL，不转载简历、联系方式或个人数据
+- 权利状态: `prohibited`
+- `license_or_usage`: 页面明确声明“未经5ajob.com许可，不得转载本站之所有农业人才求职招聘信息及作品”。只保存必要字段、短摘要和可回链的详情 URL，不进入业务发布
 - `confidence`: `medium`（列表、详情、分页、字段已实测；发布时间未提供，部分详情有效期依赖页面脚本）
 
 ## 入口
@@ -129,7 +130,7 @@
 
 - 登录: 浏览岗位详情不需要登录；投递、收藏、联系企业等操作需要登录，均不在采集范围
 - robots: `robots.txt` 禁止 `/company/`、`/personal/`、`/about/`、`/*zpt.html`、`/*product.html`、`/*contact.html`、`/*news.html`、`/chart/gern.asp`；`/job/` 未禁。对 Baidu、Google 等 UA 还禁止 `?*` 和部分 `job-s*`、`index-*` 路径。后续采集器应先检查实际 UA 的 robots 规则，并只请求未禁的列表和详情
-- 版权: 未见明确开放许可。保存原始响应仅用于内部回溯，业务展示保留来源和详情链接，不复制简历、联系方式或受限公司页
+- 版权: 页面明确保留转载权。保存原始响应仅用于内部回溯，`rights_status=prohibited`，不复制简历、联系方式或受限公司页，不进入业务发布
 - 结构稳定性: 页面是 IIS/ASP 老站，GBK 编码、两套详情 URL 并存；详情有效期由脚本注入，纯 HTTP 与浏览器结果不同
 - 缺失字段: 没有稳定发布时间；没有公开总数字段；部分列表链接公司 hash 为空（如 `companyinfo/detail//htmljob/...`）；部分岗位标题、职位 ID 需要从详情补全
 - 主题风险: 全站虽为农业人才网，仍出现“前台接待”“行政经理”“销售”等非农业岗位。必须按岗位名称、行业、专业、描述和公司业务做二次过滤，不能只靠站点域名
@@ -147,3 +148,14 @@
 - 样本可复现: 是（2 条正面样本 + 1 条反例样本）
 - 字段映射完整: 主要岗位字段已覆盖；发布时间缺失已注明
 - 详情 URL 可直达: 是
+
+## 实现验证
+
+- 2026-10-20 已实现列表 fixture 纵向切片。该来源保持 `prohibited` 且没有 Scrapy 项目，只允许通过 `python -m unittest crawler.tests.test_5ajob -v` 验证离线解析器。
+- canonical 岗位 URL 同时写入 `source_url`、`long_term_url` 和 `detail_url`；`source_item_id` 使用职位 ID。
+- 全局按职位 ID 和 canonical URL 去重。某页没有新增职位 ID 时停止，因此后续回绕页不会被继续处理。
+- 农业相关性仅使用标题、行业和描述证据，保留命中字段、命中文案、排除记录和处理页数；公司名不参与判定。
+- 权利状态使用 `prohibited`，并在 `extra.risk_acceptance` 保留“转载需 5ajob.com 许可”的来源声明。
+- 来源注册表判定为 `prohibited`，调度器和 Scrapy 项目均不得启动该来源；离线解析器测试不创建 raw/stage/std 记录。
+- 离线 fixture 可携带 `detail_html`，解析公司、地点、薪资、学历、描述、要求和有效期；该能力只用于解析器测试。
+- 测试使用本地 fixture，不访问网络。真实 250 页全量列表、脚本注入有效期和许可恢复仍为 `deferred`。

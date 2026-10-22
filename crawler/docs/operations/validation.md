@@ -4,7 +4,28 @@
 
 日期: 2026-10-19
 
-本文用于来源实现、转换器和最终交付验收。验收结论只能是 `approved`、`approved-with-gaps` 或 `blocked`。
+本文用于来源实现、转换器和最终交付验收。验收结论只能是 `approved`、`approved-with-gaps`、`blocked`、`deferred` 或 `excluded`。
+
+## Crawler 验收命令
+
+从仓库根运行，命令自包含，不依赖应用基线数据库:
+
+```powershell
+python -m unittest discover -s crawler/tests -p "test_*.py" -t .
+```
+
+通过后再运行契约和静态检查:
+
+```powershell
+python crawler/tools/check_contracts.py
+python tools/check_python.py
+python tools/check_architecture.py
+python -m crawler.tools.build_live_evidence_index --validate-only
+uv lock --check
+git diff --check
+```
+
+仓库根的全量单测 `python -m unittest discover -s . -p "test_*.py" -t .` 需要应用基线数据库 `data/baseline.db` 或等效测试数据库，不属于 crawler 验收范围。clean clone 不包含这些被忽略的数据库文件，因此不能把全量单测当作 crawler 的 clean-clone 通过证明。
 
 ## 1. URL 可访问
 
@@ -16,12 +37,13 @@
 
 ## 2. 详情 URL 可直达
 
-- 每条样本的详情 URL 能直接打开单条记录。
-- 只给站点首页、列表首页、公司首页或搜索页不算详情 URL。
+- 每条样本的详情 URL 能直接打开单条记录，或提供可长期打开的承载页 URL 和非空 locator。
+- 只给站点首页、列表首页、公司首页或搜索页不算直接详情 URL，但公告页、数据集页和检索详情页可以作为承载页 URL。
+- `detail_url_status=missing` 时，承载页 URL 必须能重新打开，locator 必须能定位到同一记录。
 - `cnipa` 的检索详情页可直达；签名 PDF URL 只进 raw，不写长期字段。
 - `ihchina` 使用 `/project_details/{id}.html`，`5ajob` 使用 canonical 岗位 URL。
 - 详情 URL 规范化后保留原始查询参数，去掉无意义跟踪参数。
-- 重新访问详情 URL 后仍能定位同一记录。
+- 重新访问详情 URL 或承载页 URL 后仍能定位同一记录。
 
 ## 3. DOM 选择器非空
 
@@ -80,7 +102,7 @@
 
 - 文件是合法 JSON。
 - 每个来源 ID 全局唯一。
-- 必需字段齐全: `id`、`name`、`domains`、`content_domains`、`priority`、`access`、`verification`、`document`、`review`。
+- 必需字段齐全: `id`、`name`、`domains`、`content_domains`、`priority`、`enabled`、`status`、`access`、`rights_status`、`attribution_required`、`attribution_text`、`rights_evidence_url`、`run_modes`、`verification`、`document`、`review`。
 - `priority` 取值在 P0、P1、P2 范围内。
 - `access` 取值在 `public`、`login-required`、`robots-restricted`、`manual-only` 范围内。
 - `document` 和 `review` 路径存在；缺失时在审核结论中明确记录为缺口。
@@ -133,7 +155,7 @@
 python -c "import json,pathlib; r=pathlib.Path('crawler/docs'); d=json.loads((r/'sources.json').read_text(encoding='utf-8')); ids=[s['id'] for s in d['sources']]; assert len(ids)==len(set(ids)); assert all((r/s[k]).exists() for s in d['sources'] for k in ('document','review')); print('sources.json OK', len(ids))"
 ```
 
-预期输出: `sources.json OK 12`。
+预期输出: `sources.json OK 14`。
 
 ```powershell
 python -c "import pathlib; r=pathlib.Path('crawler/docs'); bad=[str(p) for p in r.rglob('*.md') if chr(0x2014) in p.read_text(encoding='utf-8')]; assert not bad, bad; print('no em-dash')"
@@ -148,10 +170,38 @@ python -c "import pathlib; r=pathlib.Path('crawler/download'); fs=[p for p in r.
 预期输出包含 `over100 0`。
 
 ```powershell
-python -c "import pathlib,re; r=pathlib.Path('crawler/docs'); bad=[]; pats=['std_'+'ich_project'+r'\b','std_'+'recruitment_posting'+r'\b','std_'+'dialect_point'+r'\b','std_weather'+'_candidate','std'+r'\.[a-z_]','crawler'+r'\.std\.','stage'+r'\.[a-z_]']; [bad.append((str(p),pat)) for p in r.rglob('*.md') for pat in pats if re.search(pat,p.read_text(encoding='utf-8'))]; assert not bad,bad; print('table names OK')"
+python -c "import pathlib,re; r=pathlib.Path('crawler/docs'); bad=[]; pats=[r'\b(?:std|stage)_[a-z0-9_]+ss\b', r'\bstd_ich_project\b', r'\bstd_recruitment_posting\b', r'\bstd_dialect_point\b', r'\bstd_weather_candidate\b', r'\bstd\.[a-z_]', r'\bcrawler\.std\.', r'\bstage\.[a-z_]']; [bad.append((str(p),pat)) for p in r.rglob('*.md') for pat in pats if re.search(pat,p.read_text(encoding='utf-8'))]; assert not bad,bad; print('table names OK')"
 ```
 
 预期输出: `table names OK`。
+
+## 契约机械检查
+
+从仓库根运行：
+
+```powershell
+python crawler/tools/check_contracts.py
+```
+
+检查来源状态、std 表名、mapping 字段、URL 与版权列、问题统计、实现契约和空历史基线。任何错误都必须先修复再提交。整合 worktree 的旧历史不在这里扫描；需要同时扫描时加 `--scan-history`。
+
+```powershell
+python crawler/tools/check_history_hygiene.py
+```
+
+扫描所有可达 Git 历史中的 raw 路径、`.headers`、Cookie、Authorization、签名、私钥、HTML 隐藏表单、XLSX 联系人列、PDF 原始元数据和常见个人数据。公开分支必须使用空基线，任何命中都必须失败。
+
+## 无网络 fixture 回放
+
+公开 fixture 足以复核 P0 的附件行门禁。以下测试使用临时采集库，不访问网络：
+
+```powershell
+python -m unittest crawler.tests.test_aqsc_moa_scrapy crawler.tests.test_cnipa_scrapy -v
+```
+
+AQSC 公开合成样本应发现 8 行，CNIPA 公开合成 PDF 应发现 2 行。附件行保留在 raw/stage，并写入公告承载页和非空 locator。两条测试都必须经过真实 Scrapy process、middleware 和 Pipeline。没有直接详情 URL 不是阻断条件；承载页或 locator 缺失时才写 `deferred`，不得发布。
+
+旧在线入口 `python -m crawler.run` 已删除。`pipeline/offline_fixture.py` 只保留离线 fixture 回归，传入 `live` 会直接失败。
 
 ## ihchina 3610 实测
 

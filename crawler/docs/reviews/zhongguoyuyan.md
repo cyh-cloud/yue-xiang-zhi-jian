@@ -4,7 +4,9 @@
 
 审核时间: `2026-10-19 01:45 Asia/Shanghai`
 
-审核结论: `blocked`
+审核结论: `excluded`
+
+权利状态: `prohibited`
 
 ## 审核范围
 

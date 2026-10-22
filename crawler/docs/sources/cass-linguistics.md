@@ -6,6 +6,8 @@
 
 状态: `approved-with-gaps`
 
+权利状态: `noncommercial-permitted`
+
 验证时间: `2026-10-19 01:08 Asia/Shanghai`
 
 ## 来源概况
@@ -74,7 +76,7 @@
 - 抓取时间: `2026-10-19 01:08 Asia/Shanghai`
 - 关键字段: 标题 `汉语方言语法特征语料库`；来源 `科研处`；时间 `2023-08-16`；正文说明截至 2023-07-10 收录 29 个方言点、22 个语法范畴、711 句语法例句；外部平台 `www.dialectgrammar.com`
 - 数据性质: 研究资料/数字资源说明，不是词条明细；29 个方言点只在正文表格中出现，例句和方言说法需要注册登录后查询
-- 目标映射: 只映射到 `std_research_articles`（建议新增，尚未冻结） 与 `std_research_resources`（建议新增，尚未冻结），不映射到 `dialect_lexemes`
+- 目标映射: 文章级公开元数据映射到已冻结的 `std_research_articles`；资源目录映射到建议新增的 `std_research_resources`，不映射到 `dialect_lexemes`
 
 ### 样本 2: 多模态语言资源平台
 
@@ -90,7 +92,7 @@
 - 抓取时间: `2026-10-19 01:08 Asia/Shanghai`
 - 关键字段: 标题 `追寻语言奥秘 回应时代需求`；来源 `中国社会科学网`；时间 `2026-09-04`；正文含儿童语音、成人语音老化数据库、方言与语音实验等研究介绍
 - 数据性质: 资讯/研究报道，不是方言词条数据
-- 目标映射: `std_research_articles`（建议新增，尚未冻结） + `std_research_sources`（建议新增，尚未冻结）
+- 目标映射: 已冻结的 `std_research_articles`；`std_research_sources` 仍为建议新增，当前不写入
 
 ### 样本 4: 《方言》目录
 
@@ -98,7 +100,7 @@
 - 抓取时间: `2026-10-19 01:08 Asia/Shanghai`
 - 关键字段: 标题 `《方言》2026年第1期目录`；作者 `《方言》编辑部`；来源 `今日语言学`；时间 `2026-02-25`
 - 数据性质: 期刊目录/出版动态，不含论文全文
-- 目标映射: `std_research_articles`（建议新增，尚未冻结），只保存目录级元数据
+- 目标映射: 已冻结的 `std_research_articles`，只保存目录级元数据
 
 ## 字段映射
 
@@ -113,7 +115,7 @@
 | 正文中“29 个方言点” | `std_research_resources.item_count` | `research_resources.item_count` | 仅作为研究资源说明，不生成词条 |
 | 外部平台 URL | `std_research_resources.external_url` | `research_resources.external_url` | `www.dialectgrammar.com` 需登录，标记 `login-required` |
 
-建议自然键: `(source_id='cass-linguistics', source_item_id)`，缺少来源 ID 时退回 `source_url`；研究文章和研究资源分表，不能把资讯标题映射成方言词条。三张研究实体均为建议新增、尚未冻结，冻结前不进入转换器输入。
+建议自然键: `(source_id='cass-linguistics', source_item_id)`，缺少来源 ID 时退回 `source_url`；研究文章和研究资源分表，不能把资讯标题映射成方言词条。`std_research_articles` 已冻结并允许 fixture 写入；`std_research_sources` 和 `std_research_resources` 仍为建议新增，不进入运行时写入或转换器输入。
 
 ## 数据量与更新
 
@@ -126,7 +128,7 @@
 ## 风险与限制
 
 - 登录: 公开文章无需登录；`汉语方言语法特征语料库` 的检索与例句需要注册登录，属于 `login-required`
-- robots: `http://ling.cass.cn/robots.txt` 返回 404；HTTPS robots 请求连接被重置。按公开页面、低频率、学术用途访问
+- robots: `http://ling.cass.cn/robots.txt` 返回 404，记录为 `not-found`；HTTPS robots 请求连接被重置，记录为 `unknown`。HTTP not-found 允许采集并写 `deferred` 候选；HTTPS unknown 按真实阻断处理。按公开页面、低频率、学术用途访问
 - 版权: 页面明确写“中国社会科学院语言研究所版权所有”；论文、期刊和出版物正文不得全文转载到业务库
 - 结构稳定性: 门户模板和 `TRS_Editor` 正文可定位，但列表相对路径跨栏目，需 `urljoin`；部分新闻链接指向 `cssn.cn` 或微信，需按来源域名分流
 - 缺失字段: 无公开方言词条 API；无结构化 29 个方言点/711 句数据；无统一发布时间字段（需从标签行解析）
@@ -144,3 +146,10 @@
 - 样本可复现: 是（4 条详情样本）
 - 字段映射完整: 是；仅研究资料/资讯字段，明确不映射到方言词条
 - 详情 URL 可直达: 是
+
+## 实现验证
+
+- 公共入口: `crawler/collection/projects/cass-linguistics` 只读取已保存的公开研究详情 fixture。
+- 写入: 每条公开详情生成一条 `std_research_articles`，保留 `source_url`、`long_term_url` 和正文哈希。
+- 访问边界: `body_access=public` 才写入；`www.dialectgrammar.com` 只作为 `login-required` 子资源元数据保留，不请求、不写词条。
+- 不生成 `std_dialect_lexemes`，研究资讯不会转换成方言词条。

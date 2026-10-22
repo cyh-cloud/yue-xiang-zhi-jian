@@ -6,7 +6,13 @@
 
 状态: `approved-with-gaps`
 
-验证时间: `2026-10-19 01:06 Asia/Shanghai`
+权利状态: `attribution-required`
+
+验证时间: `2026-10-21 21:48 Asia/Shanghai`
+
+结构校验状态: `verified`
+
+> 2026-10-21 已重新抓取真实列表页和 5 条详情页。列表页返回 10 条岗位；5 条详情均返回 HTTP 200，标题、公司、地点、招聘人数、截止日期、发布时间和职位描述可读。旧 `#project_L` 选择器不存在，已从实现中移除。来源状态仍为 `approved-with-gaps`，与本次结构校验状态分开记录。
 
 ## 来源概况
 
@@ -26,7 +32,7 @@
 | --- | --- | --- | --- |
 | 首页 | `http://nongmuhr.com/` | GET | 返回 200 |
 | 列表页 | `http://nongmuhr.com/Employ.aspx` | GET | 返回 200，每页 10 条 |
-| 列表分页 | `http://nongmuhr.com/Employ.aspx?pubtime=-1&experience=-1&page={page}` | GET | `page` 从 1 开始，第二页已实测 |
+| 列表分页 | `http://nongmuhr.com/Employ.aspx?pubtime=-1&experience=-1&page={page}` | GET | `page` 从 0 开始；默认列表为 `page=0`，`page=1` 是第二页，均已实测 |
 | 岗位详情模式 | `http://nongmuhr.com/EmployView.aspx?id={job_id}` | GET | 例如 `id=13520`、`id=13519`，均返回 200 |
 | 企业详情模式 | `http://nongmuhr.com/CompanyView.aspx?Id={company_id}` | GET | 详情页公司链接，例如 `Id=2333` |
 | robots | `http://nongmuhr.com/robots.txt` | GET | 返回 200 |
@@ -39,8 +45,9 @@
 - 列表筛选参数: `txtCompany`、`txtEmploy`、`ddlIndustry`、`ddlPubtime`、`ddlExperience`、`ddlJobclass`、`ddlSalary`、`ddlEducation`、`ddlCompanyclass`、`txtGzdd`、`selArea`、`txtKeyword`
 - 页面分页参数: `pubtime=-1`、`experience=-1`、`page={page}`
 - 每页数量: 10
-- 总数字段: 页面脚本 `$("#Pagination").pagination(9026, { items_per_page: 10 })`
+- 总数字段: 2026-10-21 页面脚本 `$("#Pagination").pagination(9027, { items_per_page: 10 })`
 - 总页数: 约 903 页，由总数除以每页数量得到
+- 分页起点: 默认页是 `page=0`，`page=1` 是第二页
 - 职位搜索参数示例: 职位名称输入框 `txtEmploy`，行业下拉 `ddlIndustry`
 - 行业筛选值: `园林/园艺/花卉`、`种子/化肥/农药`、`养殖/宠物`、`兽药/动保/生物制品`、`饲料/添加剂/原料`、`水产/种苗`、`农牧机械`、`农业种植养殖`
 - 发布时间筛选: `ddlPubtime` 可取 `3`、`7`、`30`
@@ -49,7 +56,9 @@
 - 学历: `ddlEducation` 可取 `不限`、`初中`、`高中`、`中技`、`中专`、`大专`、`本科`、`硕士`、`博士`
 - 登录要求: 公开列表和详情无需登录
 
-分页链接由 `jquery.pagination.js` 生成，模板为 `?pubtime=-1&experience=-1&page=__id__`。后续采集只需保留筛选参数并替换 `page`，不需要处理 ASP.NET 的 `__VIEWSTATE`。
+分页链接由 `jquery.pagination.js` 生成，模板为 `?pubtime=-1&experience=-1&page=__id__`。`page` 从 0 开始。后续采集只需保留筛选参数并替换 `page`，不需要处理 ASP.NET 的 `__VIEWSTATE`。
+
+历史声明: 2026-10-19 前的文档曾写“`page` 从 1 开始”，该说法与页面实测不符，已废弃。当前事实以默认页 `page=0`、`page=1` 为第二页为准，审核记录保留这次修正过程。
 
 ## 字段定位
 
@@ -73,29 +82,31 @@
 | 列表公司规模 | `div.job_list_zf` 中 `公司规模：` | 例如 `100－499人` |
 | 列表公司性质 | `div.job_list_zf` 中 `公司性质：` | 例如 `私营/民营企业` |
 | 列表职位描述摘要 | 岗位块第二个 `td[height="48"]` | 带省略号，只作预览 |
-| 分页容器 | `#Pagination` | 由 `jquery.pagination.js` 接收总数 9026 |
+| 分页容器 | `#Pagination` | 2026-10-21 由 `jquery.pagination.js` 接收总数 9027 |
 
 详情页:
 
+> 以下选择器来自 2026-10-21 的真实页面复验。`#project_L` 属于已废弃的历史结构，不得继续用于实现。
+
 | 字段 | 选择器 | 说明 |
 | --- | --- | --- |
-| 岗位名称 | `#joblist .joblistonelf` | 例如 `QC`、`农资销售员` |
-| 公司名称 | `#hlCompanyName` | 文本为公司名 |
-| 公司详情 URL | `#hlCompanyName[href]` | 相对 URL `CompanyView.aspx?Id={company_id}` |
-| 工作性质 | `td:contains("工作性质：") + td` | 例如 `全职` |
-| 部门 | `td:contains("部 门：") + td` | 例如 `质量部` |
-| 招聘人数 | `td:contains("招聘人数：") + td` | 纯数字 |
-| 截止日期 | `td:contains("截止日期：") + td` | 格式 `YYYY-MM-DD` |
-| 工作经验 | `td:contains("工作经验：") + td` | 例如 `3年以上` |
-| 学历 | `td:contains("学 历：") + td` | 例如 `大专` |
-| 工作地点 | `td:contains("工作地点：") + td` | 可为多地区，以 `|` 分隔 |
-| 性别 | `td:contains("性 别：") + td` | 例如 `不限` |
-| 年龄 | `td:contains("年 龄：") + td` | 例如 `30-45` |
-| 邮箱 | `td:contains("邮 件：") + td` | 可能是模板占位符，需判定为不可用 |
-| 联系人 | `td:contains("联系人：") + td` | 公开可见时保留，不在文档转录 |
-| 联系电话 | `td:contains("联系电话：") + td` | 公开可见时保留，不在文档转录 |
-| 职位描述 | 详情页主表最后一个 `td[style*="word-break"]` | 含岗位职责和任职条件 |
-| 发布时间 | `td:contains("发布时间：") + td` | 格式 `YYYY-MM-DD` |
+| 岗位名称 | `#joblist .joblistonelf` | 文本为岗位名 |
+| 公司名称 | `#joblist #hlCompanyName` | 文本为公司名 |
+| 公司详情 URL | `#joblist #hlCompanyName[href]` | 相对 URL `CompanyView.aspx?Id={company_id}` |
+| 工作性质 | 标签 `工作性质：` 的相邻 `td` | 例如 `全职` |
+| 部门 | 标签 `部 门：` 的相邻 `td` | 例如 `设备部` |
+| 招聘人数 | 标签 `招聘人数：` 的相邻 `td` | 纯数字 |
+| 截止日期 | 标签 `截止日期：` 的相邻 `td` | 格式 `YYYY-MM-DD` |
+| 工作经验 | 标签 `工作经验：` 的相邻 `td` | 例如 `3年以上` |
+| 学历 | 标签 `学 历：` 的相邻 `td` | 例如 `高中` |
+| 工作地点 | 标签 `工作地点：` 的相邻 `td` | 可为多地区，以 `|` 分隔 |
+| 性别 | 标签 `性 别：` 的相邻 `td` | 例如 `不限` |
+| 年龄 | 标签 `年 龄：` 的相邻 `td` | 例如 `30-45` |
+| 邮箱 | 标签 `邮 件：` 的相邻 `td` | `{{EMAIL_*}}` 模板占位符不可用 |
+| 联系人 | 标签 `联系人：` 的相邻 `td` | 公开可见时保留，不在文档转录 |
+| 联系电话 | 标签 `联系电话：` 的相邻 `td` | 公开可见时保留，不在文档转录 |
+| 职位描述 | 标签 `职位描述及具体要求：` 所在行之后的第一个 `td[style*="word-break"]` | 含岗位职责和任职条件 |
+| 发布时间 | 标签 `发布时间：` 的相邻 `td` | 格式 `YYYY-MM-DD` |
 | 公司行业 | `#joblist1 td.y12x` | 文本内混合行业、规模、性质、地区 |
 | 公司介绍 | `#joblist1 td[colspan="2"]` | 公司简介 |
 
@@ -107,49 +118,21 @@
 
 ## 真实样本
 
-### 样本 1
+2026-10-21 21:47 至 21:48 Asia/Shanghai 抓取列表页和 5 条详情。列表页返回 10 条岗位，以下 5 条详情均返回 `200`，内容类型为 `text/html; charset=utf-8`。
 
-- 详情 URL: `http://nongmuhr.com/EmployView.aspx?id=13520`
-- 列表位置: `Employ.aspx` 第 1 页第 1 条
-- 抓取时间: `2026-10-19 01:04 Asia/Shanghai`
-- 岗位名称: `QC`
-- 公司: `武汉农大生物科技有限公司`
-- 工作性质: `全职`
-- 部门: `质量部`
-- 招聘人数: `1`
-- 工作经验: `3年以上`
-- 学历: `大专`
-- 工作地点: `武汉市`
-- 性别: `不限`
-- 年龄: `30-45`
-- 截止日期: `2025-11-30`
-- 发布时间: 详情页未显示独立发布时间；列表相对时间为 `3天前`
-- 正文摘要: 负责原辅材料、半成品、成品的理化和微生物检验，出具检验报告，维护留样和实验室仪器
-- 联系方式: 页面公开显示联系电话和联系人，本文档不转录；邮箱为模板占位符
-- 目标映射: `recruitment_postings`，畜牧动保企业质检岗位
+| 岗位 ID | 岗位名称 | 公司 | 地点 | 人数 | 截止日期 | 发布时间 |
+| --- | --- | --- | --- | ---: | --- | --- |
+| `13553` | 设备工程师 | 江西华裕家禽育种有限公司 | 宜春市 | 1 | 2026-07-30 | 2025-08-10 |
+| `13556` | 管培生 | 河南浪之潮农业科技有限公司 | 不限地点 | 10 | 2025-10-13 | 2025-08-12 |
+| `13555` | 推广经理 | 河南浪之潮农业科技有限公司 | 不限地点 | 10 | 2025-10-13 | 2025-08-12 |
+| `13554` | 大区经理 | 河南浪之潮农业科技有限公司 | 不限地点 | 10 | 2025-10-13 | 2025-08-12 |
+| `13561` | 出纳 | 巴里坤农牧业投资集团有限公司 | 新疆自治区 | 2 | 2025-09-30 | 2025-08-19 |
 
-### 样本 2
+详情 URL 模式为 `http://nongmuhr.com/EmployView.aspx?Id={job_id}`。五个样本的职位描述均能从 `职位描述及具体要求：` 之后的 `td[style*="word-break"]` 取得；公司行业、规模和性质从 `#joblist1 td.y12x` 取得。
 
-- 详情 URL: `http://nongmuhr.com/EmployView.aspx?id=13519`
-- 列表位置: `Employ.aspx` 第 1 页第 2 条
-- 抓取时间: `2026-10-19 01:06 Asia/Shanghai`
-- 岗位名称: `农资销售员`
-- 公司: `贵州煜恩企业管理服务有限公司`
-- 工作性质: `全职`
-- 部门: `销售事业部`
-- 招聘人数: `10`
-- 工作经验: `3年以上`
-- 学历: `大专`
-- 工作地点: `贵州省|四川省|重庆市|成都市|昆明市`
-- 性别: `不限`
-- 年龄: `28-35`
-- 截止日期: `2025-12-26`
-- 发布时间: `2025-12-23`
-- 正文摘要: 维护和开发区域客户、签订销售合同、催收销售款；要求肥料或农业行业销售 3 年以上经验，税前工资 4K-6K+
-- 联系方式: 页面公开显示联系人、电话和模板化邮箱，本文档不转录
-- 目标映射: `recruitment_postings`，农资销售岗位
+五个样本的截止日期均早于本次验证日期，列表仍展示这些岗位。实现以详情页日期为准，把列表相对刷新时间只作为发现信号。原始页面含公开联系人和联系电话，本文档和公开 fixture 不转录这些字段。
 
-两个样本的相对刷新时间与详情日期存在明显不一致，且截止日期早于验证日期。实现时以详情页日期和截止日期为准，把列表相对时间只作为发现信号，并将疑似过期记录标记为 `expired`。
+目标映射为 `recruitment_postings`。本轮只验证字段读取和采集库候选写入，不改变过期岗位的业务发布规则。
 
 ## 字段映射
 
@@ -162,11 +145,11 @@
 | `EmployView.aspx?id={id}` 中的 `id` | `std_jobs.source_item_id` | `recruitment_postings.source_item_id` | 保留字符串 |
 | 详情 URL | `std_jobs.source_url` | `recruitment_postings.source_url` | 规范化为绝对 URL，作为来源内自然键 |
 | `来源 ID = nongmuhr` | `std_jobs.source_id` | `recruitment_posting_sources.source_id` | 固定 `nongmuhr` |
-| `.joblistonelf` | `std_jobs.title` | `recruitment_postings.title` | 清理空白 |
-| `#hlCompanyName` | `std_jobs.company_name` | `recruitment_postings.company_name` | 直接映射 |
-| `#hlCompanyName[href]` | `std_jobs.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
+| `#joblist .joblistonelf` | `std_jobs.title` | `recruitment_postings.title` | 清理空白 |
+| `#joblist #hlCompanyName` | `std_jobs.company_name` | `recruitment_postings.company_name` | 直接映射 |
+| `#joblist #hlCompanyName[href]` | `std_jobs.company_url` | `recruitment_postings.company_url` | 转绝对 URL |
 | `工作性质` | `std_jobs.employment_type` | `recruitment_postings.employment_type` | 如 `全职` |
-| `部 门` | `std_jobs.department` | `recruitment_postings.department` | 直接映射 |
+| `部 门` | `std_jobs.extra.department` | `recruitment_postings.department` | 直接映射 |
 | `招聘人数` | `std_jobs.headcount` | `recruitment_postings.headcount` | 转整数 |
 | `截止日期` | `std_jobs.deadline_at` | `recruitment_postings.deadline_at` | 解析为 ISO 日期 |
 | `工作经验` | `std_jobs.experience_raw` | `recruitment_postings.experience_raw` | 保留原文，可派生 `experience_min_years` |
@@ -174,16 +157,16 @@
 | `工作地点` | `std_jobs.location_raw` | `recruitment_postings.location_raw` | 保留 `|` 分隔的原文，拆首个到 `region` |
 | `性 别` | `std_jobs.gender_requirement` | `recruitment_postings.gender_requirement` | 直接映射 |
 | `年 龄` | `std_jobs.age_requirement` | `recruitment_postings.age_requirement` | 保留区间原文 |
-| `邮 件` | `std_jobs.contact_email` | `recruitment_postings.contact_email` | 识别 `{{EMAIL_*}}` 为模板占位，置 null |
-| `联系人` | `std_jobs.contact_name` | `recruitment_postings.contact_name` | 公开值可入库，默认不公开展示 |
-| `联系电话` | `std_jobs.contact_phone` | `recruitment_postings.contact_phone` | 公开值可入库，默认不公开展示 |
-| 职位描述 `td[style*="word-break"]` | `std_jobs.description_html` | `recruitment_postings.description` | 清洗 HTML，保留职责和要求 |
+| `邮 件` | `std_jobs.extra.public_contact_email` | `recruitment_postings.contact_email` | 识别 `{{EMAIL_*}}` 为模板占位，置 null |
+| `联系人` | `std_jobs.extra.public_contact_name` | `recruitment_postings.contact_name` | 公开值可入库，默认不公开展示 |
+| `联系电话` | `std_jobs.extra.public_contact_phone` | `recruitment_postings.contact_phone` | 公开值可入库，默认不公开展示 |
+| 职位描述标题之后的 `td[style*="word-break"]` | `std_jobs.description` | `recruitment_postings.description` | 清洗 HTML，保留职责和要求 |
 | `发布时间` | `std_jobs.published_at` | `recruitment_postings.published_at` | 解析为 ISO 日期 |
 | 公司行业/规模/性质/地区 | `std_jobs.company_industry` 等 | `recruitment_postings.company_industry` 等 | 从 `#joblist1 td.y12x` 分段解析 |
-| 公司介绍 | `std_jobs.company_description` | `recruitment_postings.company_description` | 可截断为摘要，避免全文转载 |
-| 列表刷新时间 | `std_jobs.listed_relative_time` | `recruitment_postings.listed_relative_time` | 只作发现信号，不用于精确日期 |
+| 公司介绍 | `std_jobs.extra.company_description` | `recruitment_postings.company_description` | 可截断为摘要，避免全文转载 |
+| 列表刷新时间 | `std_jobs.extra.listed_relative_time` | `recruitment_postings.listed_relative_time` | 只作发现信号，不用于精确日期 |
 | 详情 HTML 正文 | `std_jobs.content_hash` | `recruitment_postings.content_hash` | 对规范化正文计算 SHA-256 |
-| 抓取时间 | `std_jobs.fetched_at` | `recruitment_postings.fetched_at` | 每次采集更新 |
+| 抓取时间 | `std_jobs.retrieved_at` | `recruitment_postings.retrieved_at` | 每次采集更新 |
 
 ### 粤乡智匠建议表
 
@@ -266,37 +249,35 @@
 - robots: `User-agent: * / Disallow:/P_ResumeView.aspx?*`，只禁止个人简历路径；岗位列表和详情未禁止
 - 个人隐私: `/P_ResumeView.aspx`、人才求职和个人简历页面不采集
 - 版权: 页面明确未经授权不得转载。业务库只保存摘要和来源链接，全文使用需授权
+- 权利标记: 记录使用 `attribution-required`，并在 `extra.rights_risk` 保留未经授权不得转载的风险说明
 - 结构稳定性: 老式 ASP.NET 表格布局，字段依赖中文标签和表格位置
-- 缺失字段: 样本 1 无独立发布时间；列表相对时间与详情日期不一致
-- 过期风险: 两个样本截止日期均已早于验证日期，首页仍可打开，需显式标记过期
+- 缺失字段: 5 个样本均能读取发布时间；列表相对时间与详情日期可能不一致，不能把相对时间当成发布时间
+- 过期风险: 5 个样本截止日期均早于本次验证日期，首页仍可打开，需显式标记过期
 - 联系方式: 部分详情页显示真实电话和联系人，可能被模板占位符替换；不得绕过登录或反爬
 - 数据质量: 列表和详情薪资、学历字段可能不一致，详情优先
 - 未验证项: 全量 903 页可达性、所有筛选参数组合、公司详情页字段、岗位下架和归档规则
+- 结构回归: 2026-10-21 已用真实列表和 5 条详情完成复验，`#project_L` 已移除；后续仍以本文的当前选择器为回归基线。
 
 ## 验证记录
 
-- 验证方式: 实际 HTTP GET 首页、`Employ.aspx`、`Employ.aspx?page=2`、两个 `EmployView.aspx` 详情和 robots
-- 验证结果: 所有目标页面返回 200；分页第二页返回 200 且岗位 ID 变化；详情字段和两个样本可复现
+- 验证方式: 2026-10-21 实际 HTTP GET `Employ.aspx`、5 条 `EmployView.aspx` 详情和 robots；列表页和详情页均返回 200
+- 验证结果: 列表页解析出 10 条岗位；5 条详情解析出标题、公司、地点、人数、截止日期、发布时间和职位描述；Scrapy live 运行写入 raw 11、stage 10、候选 10，failure_count 为 0
+- 分页验证: 历史审核确认 `page=0` 是默认页，`page=1` 是第二页；本轮未全量遍历
 - 未验证项: 筛选 POST 行为、全部页码、登录后投递、联系方式模板占位符的实际渲染规则
 
 ## 下载记录
 
-所有文件均小于 100MB，无需 `OVERSIZE.md`。
+所有文件均小于 100MB，无需 `OVERSIZE.md`。公开仓库只跟踪脱敏后的 `employ-view-13519.html` 和 `employ-view-13520.html` 结构 fixture；下表是 2026-10-21 的本地 live 证据元数据，原始 HTML 不进入 Git。
 
-| 文件 | URL | 大小 | SHA-256 |
-| --- | --- | ---: | --- |
-| `home.html` | `http://nongmuhr.com/` | 241552 | `D9A9089EA2540A8414BC9F3BB472424A9B8BEEC91083EC842E9711CDAD3C9811` |
-| `home.headers` | `http://nongmuhr.com/` | 312 | `3414652E3D4C78BE521BE1E7F48C820A6505F3243693A8026500E0796F3E2DE9` |
-| `robots.txt` | `http://nongmuhr.com/robots.txt` | 46 | `06E7E0C0C6E2CB346F78BB24B3E80288AE322169F665D7EEF9CF11678CA0B087` |
-| `robots.headers` | `http://nongmuhr.com/robots.txt` | 248 | `92993A04BC3EB9AD39D9500EDE1185CEE3B93A015DD0A05D5A954161297AD8CF` |
-| `employ-list.html` | `http://nongmuhr.com/Employ.aspx` | 93566 | `DB33A0758DDBBC8F6217609B39F99144D6C77A9BAF66039FF4586F0F1A7301B8` |
-| `employ-list.headers` | `http://nongmuhr.com/Employ.aspx` | 311 | `1728611A40823BF5F8283B514F2D0A8143292B84895167D155EF9E21A4B61209` |
-| `employ-page2.html` | `http://nongmuhr.com/Employ.aspx?pubtime=-1&experience=-1&page=2` | 93242 | `FAED08926D961AE7FE3BEE65D247F0E217FAB7D587538A1F9496F7A815237920` |
-| `employ-page2.headers` | `http://nongmuhr.com/Employ.aspx?pubtime=-1&experience=-1&page=2` | 311 | `D9BA8D3AB9F72617BAB2D259E3D7CFA320DCA87D66FAA9F8BAB6A332A62227A5` |
-| `employ-view-13520.html` | `http://nongmuhr.com/EmployView.aspx?id=13520` | 27533 | `1CD9AA3390C48A8F63DB209E832FAB9F539A8FCCF119A7A704E551CE2D65EBEA` |
-| `employ-view-13520.headers` | `http://nongmuhr.com/EmployView.aspx?id=13520` | 311 | `FFF52B8F550ED7185C7050A518F1E56523FECE3E39C108BD1CD82D4B34A2FBC5` |
-| `employ-view-13519.html` | `http://nongmuhr.com/EmployView.aspx?id=13519` | 24991 | `2D956126DAF9F5EFB6B3CD8BA76BF966C7244B8EE022663A6DE645CBBE6930A0` |
-| `employ-view-13519.headers` | `http://nongmuhr.com/EmployView.aspx?id=13519` | 311 | `66384BC2745CD35A65324479F84BF00B4F64C739D91EC67A4C1A012AE235F70F` |
+| 文件 | URL | 取得时间（Asia/Shanghai） | 大小 | SHA-256 |
+| --- | --- | --- | ---: | --- |
+| `robots.txt` | `http://nongmuhr.com/robots.txt` | 2026-10-21 21:47:14 | 46 | `06E7E0C0C6E2CB346F78BB24B3E80288AE322169F665D7EEF9CF11678CA0B087` |
+| `employ-list.html` | `http://nongmuhr.com/Employ.aspx` | 2026-10-21 21:47:14 | 93333 | `B0B9AF635BA338B992DA9875DD1E7845B319C551A92DC5A2D2CF6A76827144C5` |
+| `detail-13553.html` | `http://nongmuhr.com/EmployView.aspx?Id=13553` | 2026-10-21 21:48:02 | 24003 | `41BFEB30C5AB598EAAEFDEBD324F44C798351677025183A30578B6FC4B6798DD` |
+| `detail-13556.html` | `http://nongmuhr.com/EmployView.aspx?Id=13556` | 2026-10-21 21:48:02 | 28005 | `91A31C7670D6EF94D813D0508217977F022D1D0A2A3F681CFABDF34D84F2010F` |
+| `detail-13555.html` | `http://nongmuhr.com/EmployView.aspx?Id=13555` | 2026-10-21 21:48:02 | 28015 | `71D5B56E57FC0771B5D0518194629B889E621B3037385E5079D85ACDDB9422B5` |
+| `detail-13554.html` | `http://nongmuhr.com/EmployView.aspx?Id=13554` | 2026-10-21 21:48:02 | 28080 | `144F75D5EDF99AC33385D27C08D8E2A0F8A91C95E52AF6751FDF5FCABE5DC753` |
+| `detail-13561.html` | `http://nongmuhr.com/EmployView.aspx?Id=13561` | 2026-10-21 21:48:03 | 25764 | `3EF339AFDF69A481F836DD6DF11DFAB68CCF1A963F98B8035810523BDCE6EBCB` |
 
 ## 审核要求
 
@@ -304,3 +285,10 @@
 - 样本可复现: 是，两个详情 URL 均可直接打开
 - 字段映射完整: 是，联系方式、模板占位符和过期风险已说明
 - 详情 URL 可直达: 是
+
+## 实现验证
+
+- 2026-10-21 使用真实结构更新 parser、replay 和脱敏 fixture；旧 `#project_L` 选择器已移除。
+- 2026-10-21 Scrapy live 运行：列表 10 条，详情 10 条均解析成功，raw 11、stage 10、候选 10、failure_count 0。
+- 长期详情 URL 使用 `EmployView.aspx?Id={id}`。零基分页按本文记录，后续实现分页时从 `page=0` 开始。
+- 2026-10-22 岗位地点写入统一使用 `工作地点` 原文和 `company_region` 兜底归一化；每条岗位同时写 `std_jobs`、`std_job_sources` 和 `std_job_locations`。`不限地点` 等无可用地点文本不再静默跳过，缺少可用地点时写 `candidate_status=blocked`，原因 `location:unavailable`。

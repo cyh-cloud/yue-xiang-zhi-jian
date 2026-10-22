@@ -6,6 +6,8 @@
 
 状态: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 验证时间: `2026-10-19 01:09 Asia/Shanghai`
 
 ## 来源概况
@@ -239,7 +241,7 @@
 | `protect_unit` | `台江县非物质文化遗产保护中心` |
 | `content` | 以“申报地区或单位：贵州省台江县”开头，含 HTML 实体编码的正文 |
 - 页面证据: 详情页 HTTP `200`，标题为“苗族古歌 - 中国非物质文化遗产网·中国非物质文化遗产数字博物馆”；`.article-mod2 .t_head .h30` 返回“苗族古歌”，`.article-mod2 .table .p` 返回 8 个键值，`.article-mod2 .text .p` 纯文本长度 541
-- 目标映射: `ich_projects` 主记录；`ich_inheritors` 5 条；`ich_related_items` 3 条；`ich_media_links` 仅在有图片或视频时写入
+- 目标映射: `std_ich_projects` 主记录；`std_ich_inheritors` 5 条；`std_ich_related_items` 3 条；`std_ich_media_links` 仅在有图片或视频时写入
 
 ### 样本 2：来自详情页
 
@@ -266,13 +268,13 @@
 | 相关资讯 | 无区块 |
 | 相关学术 | 无区块 |
 - 辅助样本: 传承人 `王安江`，`https://www.ihchina.cn/ccr_detail/716.html`，HTTP `200`，序号 `01-0001`，性别男，出生日期 `1935.11`，民族苗族，类别民间文学，项目编号 `Ⅰ-1`，项目名称苗族古歌，申报地区或单位贵州省台江县
-- 目标映射: `ich_projects` 主记录；`ich_inheritors` 1 条；`ich_related_items` 3 条；`ich_media_links` 仅在正文或页头存在图片、视频时写入
+- 目标映射: `std_ich_projects` 主记录；`std_ich_inheritors` 1 条；`std_ich_related_items` 3 条；`std_ich_media_links` 仅在正文或页头存在图片、视频时写入
 
 ## 字段映射
 
 ### crawler std 层建议实体
 
-`ich_projects`
+`std_ich_projects`
 
 | 来源字段 | std 字段 | 转换说明 |
 | --- | --- | --- |
@@ -402,13 +404,15 @@
 ## 风险与限制
 
 - 登录: 未发现登录要求。列表接口、项目详情、传承人、资讯、学术和版权声明均匿名返回 `200`；本次未保存任何账号、密码或 Cookie
-- robots: `https://www.ihchina.cn/robots.txt` 返回 `404`，站点没有可读取的 robots 规则。不能把 404 解释为明确授权，采集仍需遵守版权声明、合理频率和不影响服务的原则
+- robots: `https://www.ihchina.cn/robots.txt` 返回 `404`，记录为 `not-found`。允许采集并写 `deferred` 候选，404 不等于明确授权，采集仍需遵守版权声明、合理频率和不影响服务的原则
 - 版权: 站内明确限制商业用途和未授权修改。业务库只发布基础资料和必要摘要，全文、图片和音视频保留在采集库并标注来源；对外展示必须显示“中国非物质文化遗产网”或 `www.ihchina.cn`
 - 结构稳定性: `/project` 是前端壳页，列表依赖 AJAX；详情页关联区块按内容条件渲染，样本 `23632` 缺少资讯和学术区块；`rx_time` 和 `content` 含 HTML 片段；项目序号、编号、内部编号和详情 ID 语义不同
 - 缺失字段: 列表接口没有独立的“公布年份”和“批次”字段，只能从 `rx_time` 拆分；没有完整省、市、县名称，只能从 `province` 展示名和行政区划代码推导；`modified` 不是公布日期
 - 口径风险: 省略 `category_id` 返回 4234 条，不能直接当作 3610 子项；同一项目名的多条子项不能按标题去重
 - 关联资源风险: 相关资讯和相关学术每块最多展示 5 条，页面未提供该区块的完整分页，不能保证覆盖全部关联资源。独立资讯和学术列表可作为后续补全入口
 - 图片防盗链或跨域: 正文图片和视频可能存在相对路径、外链或播放限制，下载前需实际请求并记录状态
+- 已验证项:
+  - 2026-10-20 的历史全量发现记录为 3610 个子项、`std_ich_projects` 3610 行、唯一 ID 3610、0 失败。该记录使用已退役的旧在线入口，仅作历史证据，当前实时入口为 Scrapy 项目。
 - 未验证项:
   - 未验证 3610 个详情页是否全部可打开，也未全量统计各详情页关联区块数量
   - 未验证传承人独立列表是否覆盖项目详情中出现的全部传承人

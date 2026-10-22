@@ -6,7 +6,9 @@
 
 状态: `approved-with-gaps`
 
-验证时间: `2026-10-19 01:09 Asia/Shanghai`
+权利状态: `attribution-required`
+
+验证时间: `2026-10-21 23:05 Asia/Shanghai`
 
 ## 来源概况
 
@@ -24,7 +26,7 @@
 | 用途 | URL | 方法 | 说明 |
 | --- | --- | --- | --- |
 | 栏目首页 | `https://www.cnipa.gov.cn/col/col1388/index.html` | GET | 地理标志专题，链接检索系统、公告与文件 |
-| 产品认定公告列表 | `https://www.cnipa.gov.cn/col/col1400/index.html` | GET | 41 条，分页参数 `uid=4536&pageNum=1..3`，每页 15 条 |
+| 产品认定公告列表 | `https://www.cnipa.gov.cn/col/col1400/index.html` | GET | 41 条、3 页、每页 15 条；前端 jpage 分页，必须执行页面脚本或点击分页器，纯 `pageNum` 请求仍返回第 1 页 |
 | 产品初步认定公告列表 | `https://www.cnipa.gov.cn/col/col1399/index.html` | GET | 栏目首页提供入口，本次未作为主采集入口 |
 | 公告详情模式 | `https://www.cnipa.gov.cn/art/{yyyy}/{m}/{d}/art_1400_{article_id}.html` | GET | 正文、发布时间、公告号、落款日期和附件链接 |
 | 附件下载 | `https://www.cnipa.gov.cn/module/download/downfile.jsp?classid=0&showname={name}.pdf&filename={hash}.pdf` | GET | 通常不需要临时签名，适合作为长期来源页 |
@@ -110,9 +112,9 @@
 
 | 字段 | 选择器 | 说明 |
 | --- | --- | --- |
-| 公告列表项 | `.ulist li` | 国家知识产权局栏目列表 |
+| 公告列表行 | `.ulist li:has(a)` | 只取包含标题锚点的行，排除分页数字 |
 | 公告标题 | `.ulist li a` | 标题文本 |
-| 公告日期 | `.ulist li span` | `YYYY-MM-DD` |
+| 公告日期 | `.ulist li span` | `YYYY-MM-DD`，与标题按同一行配对 |
 | 分页总数 | `.lucidity_pgToolbar span` | 第一处是总条数 |
 | 公告详情标题 | `.index_title` | 详情页标题 |
 | 公告发布时间 | `.index_time` | 国家知识产权局站点的发布日期 |
@@ -126,15 +128,19 @@
 | 文件名 | URL | 类型 | 大小 | 结构 |
 | --- | --- | --- | --- | --- |
 | `国家知识产权局关于对临晋江石榴等58个产品予以地理标志产品认定的公告（第687号）.pdf` | 通过 `detail?id=541` 获取签名 URL，路径为 `/qlrtp/objfile/bhxxpt/dbsbhz/UpLoadFile/approval/20260803/...pdf` | PDF | 1,174,529 bytes | 199 页；第 1 页公告正文，第 2-28 页左右为附件 1 产品表，第 29 页起为附件 2 保护要求 |
+| `1. 临晋江石榴等58个地理标志产品公告信息.pdf` | `https://www.cnipa.gov.cn/module/download/downfile.jsp?classid=0&showname=1.%20%E4%B8%B4%E6%99%8B%E6%B1%9F%E7%9F%B3%E6%A6%B4%E7%AD%8958%E4%B8%AA%E5%9C%B0%E7%90%86%E6%A0%87%E5%BF%97%E4%BA%A7%E5%93%81%E5%85%AC%E5%91%8A%E4%BF%A1%E6%81%AF.pdf&filename=3cfd39dcf464453fb750f6101910585d.pdf` | PDF | 428,298 bytes | 28 页；附件 1 产品信息表，含 58 条产品行。2026-10-21 live 样本使用该文件 |
 | `2009年第89号.pdf` | 通过 `detail?id=58` 获取签名 URL，路径为 `/qlrtp/objfile/bhxxpt/dbsbhz/UpLoadFile/approval/old/2009年第89号.pdf` | PDF | 250,603 bytes | 7 页；第 1-2 页公告正文与产品清单，第 2-7 页为 5 个产品质量技术要求 |
 | `www-cnipa-539.pdf` | `https://www.cnipa.gov.cn/module/download/down.jsp?i_ID=186731&colID=1400` | PDF | 484,164 bytes | 6 页；第 1 页公告，第 2-3 页黄骅梭子蟹保护要求 |
+
+公开仓库只提交 `crawler/tests/fixtures/evidence/cnipa/synthetic-announcement-687.pdf`，1667 bytes，SHA-256 `76a1a3c162b12f95fa48f59380dc210b4a648aab4081299f4459c3c4a6c0e47e`。该合成 PDF 有 2 页、2 条示例产品行和合成表头，作者和创建者固定为合成标记，不含原始附件元数据、签名 URL 或真实产品表。真实 687、89、539 号 PDF 留在未跟踪下载目录。
 
 ## PDF 解析
 
 - PDF URL 规律:
   - 2025 年后新公告常见 `/approval/{YYYYMMDD}/{URL编码标题}.pdf`。
   - 旧公告常见 `/approval/old/{文号}.pdf`。
-  - 两类都追加 S3 签名查询参数。
+  - 以上两类 `ggfw.cnipa.gov.cn` 路径会追加 S3 签名查询参数。
+  - `www.cnipa.gov.cn` 公告页的附件使用 `downfile.jsp` 稳定入口，不含 S3 签名参数。
 - 解析方式: `pypdf.PdfReader(path).pages[i].extract_text()` 可提取文字和表格内容。新公告表格列被逐单元格换行，需按页重建行列；旧公告正文按“一、二、三”产品段落切分更稳定。
 - 产品名称:
   - 新公告附件 1 表头为“序号 产品名称 省份 申请人 产地范围 备注”，每页重复表头。
@@ -149,8 +155,8 @@
   - 新公告以落款日期为准，例如第 687 号 PDF 落款为 `2026 年 8 月 3 日`；栏目发布日期 `2026-08-12` 不是认定日期。
   - 旧公告落款为中文日期，例如 `二〇〇九年九月二十一日`，需转成 ISO 日期。
 - 样本页结果:
-  - 第 687 号第 29 页提取到“临晋江石榴”“临猗县临晋江石榴种植专业合作社”“山西省临猗县...”。
-  - 第 687 号第 32 页提取到“莫力达瓦大豆”“莫力达瓦达斡尔族自治旗农畜产品质量安全中心”。
+  - 2026-10-21 通过 `www.cnipa.gov.cn` 公告页附件 1 重新解析第 687 号，第 1 页提取到序号 1 的“临晋江石榴”和“山西省”，第 28 页提取到序号 58 的“宁夏菜心”。
+  - `ggfw.cnipa.gov.cn` 的 199 页签名 PDF 仍是另一条文件路径，第 29 页和第 32 页的保护要求样本保留为历史验证。
   - 第 539 号第 2 页提取到“黄骅梭子蟹”“河北省沧州市黄骅市人民政府”“河北省沧州市黄骅市南排河镇”。
 
 ## 真实样本
@@ -167,7 +173,7 @@
   - 地区: 广东省珠海市斗门区
   - 产地范围: 广东省珠海市斗门区现辖行政区域内，东经 113°05′ 至 113°25′，北纬 21°59′ 至 22°25′
   - 类别: 水产
-- 目标映射: `agri_certified_products`，`cert_type=地理标志`；来源记录指向 `agri_product_sources`。
+- 目标映射: `agri_certified_products`，`cert_type=地理标志`；采集库来源关系写入 `std_agri_product_sources`。
 
 ### 样本 2: 黄骅梭子蟹（水产）
 
@@ -182,7 +188,7 @@
   - 申请机构: 河北省沧州市黄骅市人民政府
   - 产地范围: 河北省沧州市黄骅市南排河镇的沿海滩涂及近海海域
   - 类别: 水产
-- 目标映射: `agri_certified_products`，`cert_type=地理标志`；来源记录指向 `agri_product_sources`。
+- 目标映射: `agri_certified_products`，`cert_type=地理标志`；采集库来源关系写入 `std_agri_product_sources`。
 
 ### 样本 3: 临晋江石榴（普通农产品，表格解析样本）
 
@@ -197,7 +203,7 @@
   - 申请人: 临猗县临晋江石榴种植专业合作社
   - 产地范围: 山西省临猗县东张镇、耽子乡、临晋镇、嵋阳镇、北景乡、猗氏镇 6 个乡镇
   - 类别: 水果
-- 目标映射: `agri_certified_products`，`cert_type=地理标志`；来源记录指向 `agri_product_sources`。
+- 目标映射: `agri_certified_products`，`cert_type=地理标志`；采集库来源关系写入 `std_agri_product_sources`。
 
 ## 范围分类
 
@@ -211,7 +217,7 @@
 - 排除:
   - 纯工艺品: 刺绣、木雕、砚台、陶瓷、花炮等。
   - 非食品工业品: 玉石、建材、化工品、机械产品等。
-  - 排除原因保存到 `agri_product_sources.exclusion_reason` 或等价字段，保留原文名称、公告 ID 和 PDF 页码，便于复核。
+  - 排除原因保存到 `std_agri_product_sources.extra.exclusion_reason`，保留原文名称、公告 ID 和 PDF 页码，便于复核。
 - 分类方法:
   - 先按产品名称和申请人所在地建立候选。
   - 再按 PDF 中的“质量要求”“种源”“品种”“栽培管理”“养殖管理”“加工工艺”等段落判定类别。
@@ -222,10 +228,10 @@
 
 | 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| 公告 ID | `agri_product_sources.source_record_id` | `agri_product_sources.source_record_id` | 保留检索系统 ID，去掉签名参数 |
-| 公告标题 | `agri_product_sources.title` | `agri_product_sources.title` | 原样保存 |
-| 公告文号或日期 | `agri_product_sources.announcement_no` | `agri_product_sources.announcement_no` | 旧公告用 `2009年第89号`，新公告用 `第687号` |
-| 栏目发布日期 | `agri_product_sources.published_at` | `agri_product_sources.published_at` | 与认定日期分开 |
+| 公告 ID / 文件行自然键 | `std_agri_product_sources.source_item_id` | `agri_product_sources.source_item_id` | 公告元数据保留检索系统 ID；产品行使用 `batch + product_name + province + county + applicant`，去掉签名参数 |
+| 公告标题 | `std_agri_product_sources.source_title` | `agri_product_sources.source_title` | 原样保存 |
+| 公告文号或日期 | `std_agri_product_sources.announcement_no` | `agri_product_sources.announcement_no` | 旧公告用 `2009年第89号`，新公告用 `第687号` |
+| 栏目发布日期 | `std_agri_product_sources.published_at` | `agri_product_sources.published_at` | 与认定日期分开 |
 | PDF 落款日期 | `agri_certified_products.certified_at` | `agri_certified_products.certified_at` | 归一为 `YYYY-MM-DD` |
 | 产品名称 | `agri_certified_products.product_name` | `agri_certified_products.product_name` | 去掉换行和多余空格 |
 | 省份 | `agri_certified_products.province` | `agri_certified_products.province` | 附件 1 表格 |
@@ -234,8 +240,8 @@
 | 申请人或申请机构 | `agri_certified_products.applicant` | `agri_certified_products.applicant` | 附件 1 与保护要求可能不同，冲突时保留两值 |
 | 产品类别 | `agri_certified_products.category` | `agri_certified_products.category` | 按范围分类规则枚举 |
 | 认证类型 | `agri_certified_products.cert_type` | `agri_certified_products.cert_type` | 固定 `地理标志` |
-| PDF URL | `agri_product_sources.source_url` | `agri_product_sources.source_url` | 长期链接优先用国家知识产权局附件页；签名 URL 只进 raw 层 |
-| 详情页 URL | `agri_product_sources.detail_url` | `agri_product_sources.detail_url` | 检索系统详情页或国家知识产权局文章页 |
+| PDF URL | `std_agri_product_sources.source_url` | `agri_product_sources.source_url` | 长期链接优先用国家知识产权局附件页；签名 URL 只进 raw 层 |
+| 详情页 URL | `std_agri_product_sources.extra.detail_url` | `agri_product_sources.detail_url` | 检索系统详情页或国家知识产权局文章页 |
 | PDF 哈希 | `raw.files.sha256` | 不直接入库 | 用于变更检测和重跑校验 |
 
 建议目标表约束:
@@ -245,6 +251,7 @@
 - `source_id=cnipa`。
 - 同一产品多次公告时保留最新有效记录，旧公告进入来源历史。
 - 人工修改字段不自动覆盖。
+- 文件行 `source_item_id` 使用稳定自然键 `batch + product_name + province + county + applicant`。PDF 页码、页内行号和序号只进入 locator，文件内行重排不改变记录身份。
 
 ## 数据量与更新
 
@@ -259,7 +266,7 @@
 ## 风险与限制
 
 - 登录: 未发现登录要求。检索页有免责声明弹窗，关闭或接受后可正常查询。
-- robots: `https://www.cnipa.gov.cn/robots.txt` 返回 404；`https://ggfw.cnipa.gov.cn/robots.txt` 和 `/dlbzsq/robots.txt` 返回 HTML 单页应用，不是有效 robots 文件。按公开政府信息访问，仍应限速并避免高并发。
+- robots: `https://www.cnipa.gov.cn/robots.txt` 在 2026-10-21 复测仍返回 404，记录为 `not-found`；`https://ggfw.cnipa.gov.cn/robots.txt` 和 `/dlbzsq/robots.txt` 返回 200 HTML 壳页，记录为 `unknown`。`not-found` 允许采集并写 `deferred` 候选；`unknown` 按真实阻断处理，不把 HTML 壳页当作允许规则。所有域仍应限速并避免高并发。
 - 版权: 页面标注“版权所有：国家知识产权局”，未发现开放许可。采集库保存原文用于事实核验，业务库只发布结构化字段、短摘要和原文链接。
 - 结构稳定性: 产品级列表接口未在页面源码中直接出现，来自前端网络请求，升级后可能改名。国家知识产权局栏目列表可作为备用发现入口。
 - 签名过期: PDF URL 约 5 小时过期，不能写入长期字段或作为详情 URL。
@@ -274,11 +281,14 @@
 - 未验证 2026 年 8 月之后的新公告是否有新接口版本。
 - 未验证国家知识产权局栏目列表是否覆盖检索系统中的全部旧公告。
 - 未验证所有 PDF 的文字层质量；扫描版公告需要 OCR。
+- `ggfw.cnipa.gov.cn` 的签名 PDF 路径仍受 `unknown` robots 事实约束，当前 live 样本只使用 `www.cnipa.gov.cn` 的稳定附件入口。
 
 ## 验证记录
 
 - 验证方式: Playwright 打开栏目首页、产品认定公告列表、详情页和检索页；实际 HTTP 请求 `search/init`、`search/list`、`search/detail`；下载并解析 3 份 PDF。
 - 验证结果: 接口可用，分页和详情签名行为可复现，样本可打开，PDF 可解析。
+- 2026-10-21 live 样本: 公告页 `https://www.cnipa.gov.cn/art/2026/8/12/art_1400_207705.html` 返回 200，10285 bytes，SHA-256 `90b29f7f4acc8186592d67a0d8b01d5a1286fd0a55535019ad987826bd3def06`；附件 1 返回 200，428298 bytes，SHA-256 `1f6c48cddda9acb3b5da658097beb23557c413ceb67029cc9ecb877c68d66c39`。
+- 2026-10-21 robots: `www.cnipa.gov.cn/robots.txt` 返回 404，结论 `not-found`；`ggfw.cnipa.gov.cn/robots.txt` 返回 200 HTML 壳页，结论 `unknown`。
 - 未验证项: 见上节。
 
 ## 审核要求
@@ -288,3 +298,15 @@
 - 字段映射完整: 主体字段已映射，产物级全量目录需完成 PDF 表格解析后确认。
 - 详情 URL 可直达: 是。检索系统详情页可直达；签名 PDF URL 不写入长期详情字段。
 
+## 实现验证
+
+- 2026-10-20 通过本地第 687 号 PDF 生成产品行证据，保留页码和序号 locator。
+- 公告级长期 URL 使用 `https://ggfw.cnipa.gov.cn/dlbzsq/detail?id=541`，签名 PDF URL 不进入长期字段。
+- 同一公告覆盖多个产品，产品行没有单条详情 URL，因此 `detail_url=null`、`detail_url_status=missing`。公告详情页或检索详情页作为长期承载页 URL，PDF 页码和序号进入 locator。承载页和 locator 完整时可以进入候选和发布审核；缺失时写 `deferred`。旧口径中的 `publish_status=blocked` 不再作为候选判断。
+- 2026-10-21 项目级 fixture 回放改为真实 Scrapy process，经过 Spider、robots middleware、raw middleware、Pipeline 和采集运行时。回放产生 raw 3、PDF 附件 1、stage 2、deferred 候选 2。
+- 2026-10-21 真实 live 样本通过公告页发现附件 1，下载并解析 58 条产品行。raw 2、PDF 文件 1、stage 58、deferred 候选 58，候选原因 `robots:not-found`，failure_count 0。原始证据位置见 `docs/reviews/cnipa-scrapy-sample.md`。
+- PDF 文字层解析结果按 UTF-8 写入采集库；候选仍只能作为低置信度候选，必须经过发布审核，不能直接发布。
+- `pdf` 模式遍历所有已映射的本地 PDF，每份文件独立保存 raw 文件和产品行 locator；不再只处理第 687 号。
+- 2026-10-22 Spider 允许域名从 `sources.json` 派生，公告页、附件链接和 manifest 承载链接在发请求前校验；不在注册域名内的链接写 blocked Item，不发起请求。
+- 2026-10-22 文件行改用稳定自然键，并增加产品行重排 fixture 回归；重排后 locator 可以变化，`source_item_id` 保持不变。
+- 全量 537 条公告、PDF 表格重建和扫描件 OCR 仍未完成。解除条件是完成全量运行、OCR 抽样和产品级对账。

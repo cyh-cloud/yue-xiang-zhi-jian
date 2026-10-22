@@ -142,6 +142,12 @@
                 <span class="stat-label">就业对接</span>
             </div>
         </div>
+        <!-- 2026-10-18 学员走查：门户往下滑自动进入农业技能页，这里给一个可见提示。
+             下滑手势的判定在 js/core.js 的 setupScrollNavigation()，板块页不启用。 -->
+        <div class="scroll-nav-hint" aria-hidden="true">
+            <i class="fas fa-chevron-down"></i>
+            <span>下滑进入农业技能</span>
+        </div>
     </section>
 
     <main class="main-content" id="main-content" tabindex="-1">

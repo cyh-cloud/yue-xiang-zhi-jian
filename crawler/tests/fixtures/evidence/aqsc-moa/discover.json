@@ -1,0 +1,37 @@
+{
+  "source_id": "aqsc-moa",
+  "items": [
+    {
+      "source_item_id": "synthetic-mtyx-sample",
+      "file_name": "synthetic-mtyx-sample.xlsx",
+      "title": "synthetic-mtyx-sample",
+      "source_url": "http://www.aqsc.agri.cn/tzgg/202511/P020251225613822033339.xlsx",
+      "long_term_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468194.htm",
+      "detail_url": null,
+      "detail_url_status": "missing",
+      "announcement_id": "468194",
+      "announcement_no": null,
+      "batch": "2025年第三批",
+      "published_at": "2025-11-28",
+      "cert_type": "mingteyouxin",
+      "candidate_reason": "file-source:fixture",
+      "locator": "sheet=Sheet1; row=3"
+    },
+    {
+      "source_item_id": "synthetic-tepinongpin-sample",
+      "file_name": "synthetic-tepinongpin-sample.xlsx",
+      "title": "synthetic-tepinongpin-sample",
+      "source_url": "http://www.aqsc.agri.cn/tzgg/202511/P020251128359343750170.xlsx",
+      "long_term_url": "http://www.aqsc.agri.cn/tzgg/202511/t20251128_468195.htm",
+      "detail_url": null,
+      "detail_url_status": "missing",
+      "announcement_id": "468195",
+      "announcement_no": null,
+      "batch": "2025年第三批",
+      "published_at": "2025-11-28",
+      "cert_type": "tezhi_nongpin",
+      "candidate_reason": "file-source:fixture",
+      "locator": "sheet=Sheet1; row=3"
+    }
+  ]
+}

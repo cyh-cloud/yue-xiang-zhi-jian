@@ -4,7 +4,7 @@
 
 日期: 2026-10-19
 
-本文件定义 `converter` 的外部 interface。调用方只依赖 `run_batch(domain, batch)`，不直接调用自然键、去重、来源优先、冲突、发布或回滚内部步骤。
+本文件定义 `converter` 的外部 interface。调用方只依赖 `run_batch(domain, batch)`，不直接调用自然键、去重、来源优先、冲突、发布或回滚内部步骤。本地测试可通过可选关键字 `crawler_database_path` 指定采集库，生产调用使用 `CRAWLER_DB` 或默认路径。
 
 ## 外部 Interface
 
@@ -22,7 +22,7 @@ run_batch(domain, batch) -> BatchResult
 | `batch.std_entity_ids` | integer[] | 否 | 限定 std 实体，空数组表示按内容域读取全部候选 |
 | `batch.converter_version` | string | 是 | 转换器版本 |
 | `batch.target_database` | string | 是 | 目标库标识，当前为 `yuexiang` |
-| `batch.dry_run` | boolean | 否 | 只计算计划和冲突，不写业务表 |
+| `batch.dry_run` | boolean | 否 | 只计算计划和冲突，不写业务表；批次和冲突仍落采集库供审计 |
 
 ### 输出
 
@@ -43,22 +43,22 @@ run_batch(domain, batch) -> BatchResult
 
 调用 `run_batch` 后，module 固定按以下顺序执行:
 
-1. 校验 `domain` 和 `batch`，加载 `std_sources` 启用来源。
+1. 校验 `domain` 和 `batch`，加载 `sources.json` 注册表和 `std_sources` 优先级。
 2. 读取该内容域 std 实体，按实体自然键分组。
 3. 选择主值来源，计算字段计划。
-4. 读取人工字段锁和批次前快照。
-5. 执行升级写入和来源关系写入。
-6. 写冲突、统计和批次状态。
-7. 提交或回滚本次事务。
+4. 按注册表的 enabled、status、access、rights 和发布门禁筛选行。
+5. 生成 dry-run 计划、冲突、统计和批次状态。
+6. 写 `import_batches`、`import_conflicts` 和 `import_batch_items`。
+7. 提交或回滚本次 dry-run 事务。
 
-调用方不传自然键、字段优先级、SQL、表名或回滚命令。module 内部按 `std-entities.md` 和 `converter.md` 执行。
+调用方不传自然键、字段优先级、SQL、表名或回滚命令。module 内部按 `std-entities.md` 和 `converter.md` 执行。当前实现只支持 dry-run；业务库写入、人工字段锁和跨库快照仍是 deferred，解除条件是首批采集、审核和 dry-run 通过后再启用。
 
 ## 不变量
 
 - 一次调用只处理一个内容域。
 - 同一 `batch.batch_key` 重复调用不重复写入。
 - 天气不是合法 `domain`。
-- `dry_run=true` 不写业务表、批次统计和冲突表，只返回计划结果。
+- `dry_run=true` 不写业务表，但写 `import_batches`、`import_conflicts` 和计划对象映射，供审计和回滚。
 - `partial` 和 `failed` 不得伪装成 `succeeded`。
 - 人工保护字段永不自动覆盖。
 - 返回统计之和与 `input_count` 对账一致，无法归类的输入计为 `failed`。
@@ -69,7 +69,7 @@ run_batch(domain, batch) -> BatchResult
 rollback_batch(batch_id) -> RollbackResult
 ```
 
-`rollback_batch` 只接受已结束批次。输出 `rolled_back_count`、`skipped_count`、`conflict_count` 和最终状态。依赖 `import_batches` 的对象映射、人工字段锁和批次前快照。没有快照的更新不得盲删或盲还原。
+`rollback_batch` 只接受已结束批次。输出 `rolled_back_count`、`skipped_count`、`conflict_count` 和最终状态。依赖 `import_batches`、`import_batch_items`、人工字段锁和批次前快照。dry-run 批次没有业务写入，回滚只标记批次为 `rolled_back` 并保留计划对象映射；没有快照的更新不得盲删或盲还原。
 
 ## 错误模型
 
@@ -81,7 +81,7 @@ rollback_batch(batch_id) -> RollbackResult
 | 业务唯一约束冲突 | 写 `import_conflicts`，不重试覆盖 |
 | 事务提交失败 | 整体 `failed`，不返回部分计数为成功 |
 
-## 验收
+## 业务写入启用后的验收
 
 - 调用方只 import `run_batch` 和 `rollback_batch`，不直接访问内部 helper。
 - 任一批次都能按 `batch_id` 查到统计、冲突和对象映射。

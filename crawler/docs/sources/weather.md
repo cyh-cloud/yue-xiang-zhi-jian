@@ -6,6 +6,8 @@
 
 状态: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 访问等级: `public`
 
 验证时间: `2026-10-19 01:04 Asia/Shanghai`
@@ -90,10 +92,10 @@ var dataSK={"city":"101010100","cityname":"北京",...};
 
 | 字段 | 选择器 | 说明 |
 | --- | --- | --- |
-| 页面摘要 | `#hidden_title` | 样本值为 `10月18日20时 周日  晴  5/19°C` |
-| 页面更新时间 | `#fc_24h_internal_update_time` | 样本值为 `2026-10-18 18:00` |
-| 3 小时预报更新时间 | `#fc_3h_internal_update_time` | 样本值为 `2026-10-18 18:00` |
-| 7 天更新时间 | `#zs_7d_update_time` | 样本值为 `2026-10-18 20:00:00.0` |
+| 页面摘要 | `#hidden_title` | 读取 `value` 属性；本次样本为 `10月18日20时 周日  晴  5/19°C`，实时变化 |
+| 页面更新时间 | `#fc_24h_internal_update_time` | 读取 `value` 属性；本次样本为 `2026-10-18 18:00`，实时变化 |
+| 3 小时预报更新时间 | `#fc_3h_internal_update_time` | 读取 `value` 属性；本次样本为 `2026-10-18 18:00`，实时变化 |
+| 7 天更新时间 | `#zs_7d_update_time` | 读取 `value` 属性；本次样本为 `2026-10-18 20:00:00.0`，实时变化 |
 | 夜间天气 | `#today li:nth-child(1) p.wea` | 样本值为 `晴` |
 | 夜间最低温 | `#today li:nth-child(1) p.tem span` | 样本值为 `5` |
 | 白天天气 | `#today li:nth-child(2) p.wea` | 样本值为 `晴` |
@@ -200,9 +202,18 @@ var dataSK={"city":"101010100","cityname":"北京",...};
 - 验证结果: 首页、城市编码资源、北京和广州实时接口、北京当前天气页均返回 200
 - 未验证项: API 正式授权、长期稳定性、并发配额、跨网络可用性、分钟级刷新间隔
 
+## 实现验证
+
+- 运行时 DTO: `crawler/pipeline/sources/weather_sources.py` 已能从已保存的 `var dataSK=...;` 响应解析城市编码、天气、温度、观测时间和来源 URL。
+- 时间处理: `date` 与 `time` 合并为 `Asia/Shanghai` 时间；日期缺年份时按抓取时间校正跨年，并用一天的回退处理跨午夜。
+- 变更检测: `content_hash` 只对响应正文计算；headers 哈希单独保存为单次证据，不参与内容版本。
+- 短期缓存: `WeatherRuntimeCache` 默认 TTL 为 15 分钟，只缓存运行时 DTO，不写历史天气表。
+- 多来源: `weather`、`open-meteo`、`qweather` 使用独立来源 ID；本文只描述 `weather`（中国天气网），另外两个来源的入口、免费额度和署名要求分别见 `sources/open-meteo.md` 与 `sources/qweather.md`。
+- 验证测试: `python -m unittest crawler.tests.test_weather_sources -v`。
+
 ## 下载记录
 
-所有文件均小于 100MB，无需 `OVERSIZE.md`。
+所有文件均小于 100MB，无需 `OVERSIZE.md`。公开仓库只跟踪 `sk-beijing.json` 和 `sk-beijing.response-headers.txt` 两个合成 fixture；其余行是本地下载证据，不进入 Git。
 
 | 文件 | URL | 大小 | SHA-256 |
 | --- | --- | ---: | --- |
@@ -214,8 +225,8 @@ var dataSK={"city":"101010100","cityname":"北京",...};
 | `city-list.headers` | `https://j.i8tq.com/weather2020/search/city.js` | 654 | `92DD9FA0F0D4A407CECCC64A0FA9E5CFC56D4817B6964D426A31390897B4E843` |
 | `weather1d-101010100.html` | `https://www.weather.com.cn/weather1d/101010100.shtml` | 75505 | `4BCFAC3E13D136F00EA3F446877BB906434190300EB35C150AA2263D033AEBF6` |
 | `weather1d-101010100.headers` | `https://www.weather.com.cn/weather1d/101010100.shtml` | 775 | `23FD1711D1AA75FFC6E70009C9FBF73E68881DD86090161288C02AAD53D523D4` |
-| `sk-beijing.json` | `https://d1.weather.com.cn/sk_2d/101010100.html` | 373 | `0C788A9EA6056EA0D2BBE6BD3DD657D4948E2C38C238FB83870FCDE93A0448B3` |
-| `sk-beijing.headers` | `https://d1.weather.com.cn/sk_2d/101010100.html` | 246 | `18A3CC31FA3FF79DBC378F56351E1044F7682DE8C57D0EE7C5353EB80F7986EA` |
+| `sk-beijing.json` | `https://d1.weather.com.cn/sk_2d/101010100.html` | 375 | `49F02176A74963714B173EF291B36E995783563E86A0FC1FA3ACFDEC8351046B` |
+| `sk-beijing.response-headers.txt` | `https://d1.weather.com.cn/sk_2d/101010100.html` | 32 | `722AB081249AF11D22563126B6A2C04B67E9309CEE994B5F98474C5E59F1F408` |
 | `sk-guangzhou.json` | `https://d1.weather.com.cn/sk_2d/101280101.html` | 369 | `D8096FEB852F0E83E60C969A55103E0598DE18FA5CE54B94FFC9E95C8317A605` |
 | `sk-guangzhou.headers` | `https://d1.weather.com.cn/sk_2d/101280101.html` | 246 | `EC978A97007B04B230C854B8FE9E42C7F460DF8FCF6647A8F89CD1A3C34F8F11` |
 | `business-robots.txt` | `https://d1.weather.com.cn/robots.txt` | 348 | `56429DF9E952BC12EE88A4FF682E852F8FADA281E6FB416A7E6483A5E9AFEC89` |

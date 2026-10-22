@@ -1,0 +1,19 @@
+{
+  "source_id": "fixture-source",
+  "items": [
+    {
+      "source_item_id": "1",
+      "title": "Fixture source item",
+      "source_url": "https://example.test/jobs/list",
+      "long_term_url": "https://example.test/item/1",
+      "detail_url": "https://example.test/item/1",
+      "detail_url_status": "direct",
+      "publish_status": "draft",
+      "locator": "fixture item 1",
+      "rights_status": "noncommercial-permitted",
+      "attribution_required": true,
+      "attribution_text": "Example source",
+      "rights_evidence_url": "https://example.test/copyright"
+    }
+  ]
+}

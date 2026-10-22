@@ -8,6 +8,8 @@
 
 验证时间: `2026-10-19 01:10 Asia/Shanghai`
 
+权利状态: `attribution-required`
+
 ## 来源概况
 
 - 名称: 外研非遗网，非遗网-非遗商城-非物质文化遗产交易平台
@@ -163,7 +165,7 @@
 
 | 来源字段 | crawler 表.字段 | 粤乡智匠建议表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| `article_id` | `stage_feiyiw_articles.source_record_id` | 建议新增 `crafts.source_record_id` | 本站自然键，优先于标题 |
+| `article_id` | `stage_feiyiw_articles.source_item_id` | 建议新增 `crafts.extra.source_item_id` | 本站自然键，优先于标题 |
 | 详情 URL | `stage_feiyiw_articles.source_url` | 建议新增 `crafts.source_url` | 规范化为绝对 URL |
 | `cate_id` | `stage_feiyiw_articles.category_id` | 建议新增 `crafts.source_category_id` | 来源分类 ID |
 | 面包屑分类 | `stage_feiyiw_articles.category_name` | 建议新增 `crafts.source_category` | 如“非遗大数据” |
@@ -181,12 +183,12 @@
 | `.article-detail` HTML | `raw.page.content` | 不适用 | 采集库 raw 层保留用于回溯 |
 | 正文内容哈希 | `raw.page.sha256` | 建议新增 `crafts.content_hash` | 用于变更检测 |
 
-### std 层建议
+### std 层
 
-建议使用或新增以下标准实体：
+使用以下已冻结标准实体：
 
-- `std_ich_articles`（建议新增，尚未冻结）: `source_id`、`source_item_id`、`source_url`、`category_id`、`category_name`、`title`、`published_at`、`body_text`、`content_hash`、`retrieved_at`
-- `std_ich_projectss`: 只有从正文抽出并经过官方核验的项目事实才写入。字段包括项目名称、类别、地区、级别、批准时间原文、保护单位、项目编号和来源 URL。
+- `std_ich_articles`：字段定义见 `schema/std-entities.md#std_ich_articles`，本文只记录来源差异。
+- `std_ich_projects`: 只有从正文抽出并经过官方核验的项目事实才写入。字段包括项目名称、类别、地区、级别、批准时间原文、保护单位、项目编号和来源 URL。
 - `craft_evidence`: 用于把补充文章挂到经过人工确认的技艺实体，保留 `confidence`、`review_status` 和 `source_url`，避免补充来源直接覆盖官方事实。
 
 ### 粤乡智匠表
@@ -209,8 +211,8 @@
 ## 风险与限制
 
 - 登录: 列表和文章详情无需登录即可查看。会员、购买、订单、收藏等需登录内容不在采集范围。
-- robots: `https://www.feiyiw.cn/robots.txt` 返回 HTTP 404，没有可用的 robots 规则。404 不等于授权，实施前应保留核查记录并遵守合理限速。
-- 版权: 免责声明说明内容由用户供稿或互联网公开信息整理，站方不保证权属。不得默认拥有全文再发布权，业务库只保存审核后的必要字段或短摘要。
+- robots: `https://www.feiyiw.cn/robots.txt` 返回 HTTP 404，记录为 `not-found`。允许采集并写 `deferred` 候选，404 不等于授权，仍需保留核查记录并遵守合理限速。
+- 版权: 免责声明说明内容由用户供稿或互联网公开信息整理，站方不保证权属。记录使用 `attribution-required`，并在 `extra.rights_risk` 保留权属风险；不得默认拥有全文再发布权，业务库只保存审核后的必要字段或短摘要。
 - 结构稳定性: 老式商城模板，HTML 较冗长，正文含大量内联样式。依赖文本标签和稳定 `class`，不依赖样式属性。
 - 缺失字段: 没有官方项目编号作为独立字段，部分编号只写在自然语言中；没有统一分类字段；没有结构化批准日期；不同文章模板可能缺字段。
 - 权威性: 站内“中国非遗项目名录”不是政府原始名录。项目级别、批次、编号和保护单位需和 `ihchina.cn` 或政府公告比对。
@@ -227,6 +229,14 @@
 - 未验证项: 全量文章模板覆盖率、不同 `cate_id` 的字段差异、图片和视频版权、站点更新频率、是否存在隐藏接口、历史文章删除率、转载许可。
 - 下载: 无。没有保存页面、图片、音频、视频或其他文件。
 
+## 实现验证
+
+- 解析入口: `crawler/collection/projects/feiyiw` 提供列表发现、详情解析和 `article_id` 规范化；旧 `pipeline/sources/feiyiw.py` 只保留离线解析回归。
+- 已测行为: 公开列表按 `article_id` 去重；详情必须来自有效 `article_id` 且包含公开标题和正文；会员、购买、登录页拒绝生成文章记录。
+- 记录边界: 每条记录保留 `source_url`、`long_term_url`、`detail_url`、署名和 `rights_status`；正文标签进入 `extra.supplementary`，文章元数据写入已冻结的 `std_ich_articles`，不直接投射到 `std_ich_projects`。
+- 测试: `python -m unittest crawler.tests.test_feiyiw_scrapy -v`。
+- 未接入项: 真实网络全量运行和业务库发布仍未完成；实时写入入口为 Scrapy 项目。
+
 ## 审核要求
 
 - 入口可打开: 是
@@ -234,3 +244,8 @@
 - 字段映射完整: 公开文章字段已映射；官方事实核验和业务发布规则仍有缺口
 - 详情 URL 可直达: 是
 - 合规结论: `approved-with-gaps`，仅采公开页面和必要摘要，不采会员内容，不作为国家级名录权威来源
+
+## Scrapy 闭环
+
+- Scrapy fixture 回放已写 raw、stage 和已冻结的 `std_ich_articles`。
+- 真实网络全量运行尚未完成；转换器只把 `std_ich_articles` 当作补充资讯输入，不覆盖非遗项目事实。

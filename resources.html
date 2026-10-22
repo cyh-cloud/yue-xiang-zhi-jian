@@ -133,7 +133,7 @@
                 <p class="section-desc">方言交互支持、本地成功案例、政策信息推送</p>
 
                 <!-- 方言交互 -->
-                <div class="card-section dialect-section">
+        <div class="card-section dialect-section" id="dialect-section">
                     <h3 class="card-section-title"><i class="fas fa-microphone"></i> 方言语音交互</h3>
 
                     <div class="dialect-cards" id="dialect-cards">
@@ -221,7 +221,7 @@
                 </div>
 
                 <!-- 成功案例 -->
-                <div class="card-section">
+        <div class="card-section" id="cases-section">
                     <h3 class="card-section-title"><i class="fas fa-trophy"></i> 本地成功案例</h3>
                     <!-- 卡片内容由 loadSuccessCases() 从 /api/resources/cases 动态渲染。
                          事实源在后端 cases_data.py，此处不再写死任何案例，避免双份维护。 -->
@@ -233,7 +233,7 @@
                 </div>
 
                 <!-- 政策信息 -->
-                <div class="card-section">
+        <div class="card-section" id="policy-section">
                     <h3 class="card-section-title"><i class="fas fa-file-alt"></i> 政策信息推送</h3>
                     <div class="policy-filters">
                         <!-- 仅保留「全部」；其余分类按钮由 renderPolicyFilters() 按 /api/resources/policies

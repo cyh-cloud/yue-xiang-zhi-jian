@@ -20,22 +20,22 @@
 
 | 业务字段 | `ihchina` 来源 | crawler std 层 | 建议业务落点 | 说明 |
 | --- | --- | --- | --- | --- |
-| 项目名称 | 列表 `title` 或详情标题 | `std_ich_projects.title` | `crafts.name` | 保留原文 |
-| 正文 | 详情 `.article-mod2 .text .p` / 列表 `content` | `std_ich_projects.body_text`、`body_html` | `crafts.history` | 业务库只放审核后的基础资料或短正文 |
-| 项目编号 | 列表 `num` 或详情“项目编号：” | `std_ich_projects.project_code` | `crafts.extra.project_code` | 如 `Ⅰ-1`，不是详情 ID |
+| 项目名称 | 列表 `title` 或详情标题 | `std_ich_projects.name` | `crafts.name` | 保留原文 |
+| 正文 | 详情 `.article-mod2 .text .p` / 列表 `content` | `std_ich_projects.description_text`、`description_html` | `crafts.history` | 业务库只放审核后的基础资料或短正文 |
+| 项目编号 | 列表 `num` 或详情“项目编号：” | `std_ich_projects.ich_code` | `crafts.extra.ich_code` | 如 `Ⅰ-1`，不是详情 ID |
 | 类别 | 列表 `type` 或详情“类别：” | `std_ich_projects.category` | `crafts.extra.category` | 十类非遗类别之一 |
-| 批次 | 列表 `rx_time` 或详情“公布时间：” | `std_ich_projects.batch_label` | `crafts.extra.batch_label` | 去掉 HTML 标签，保留“第五批”等原文 |
+| 批次 | 列表 `rx_time` 或详情“公布时间：” | `std_ich_projects.announcement_batch` | `crafts.extra.announcement_batch` | 去掉 HTML 标签，保留“第五批”等原文 |
 | 类型 | 列表 `cate` 或详情“类型：” | `std_ich_projects.project_type` | `crafts.extra.project_type` | 新增项目或扩展项目 |
-| 申报地区或单位 | 列表 `unit` 或详情“申报地区或单位：” | `std_ich_projects.declared_by` | `crafts.origin` 或 `extra.declared_by` | `origin` 适合展示地名；单位名放扩展字段 |
+| 申报地区或单位 | 列表 `unit` 或详情“申报地区或单位：” | `std_ich_projects.declaration_region` | `crafts.origin` 或 `extra.declaration_region` | `origin` 适合展示地名；单位名放扩展字段 |
 | 保护单位 | 列表 `protect_unit` | `std_ich_projects.protection_unit` | `crafts.extra.protection_unit` | 可能为空 |
 | 省份 | `address` 代码结合 `province` 展示名 | `std_ich_projects.province` | `crafts.extra.province` | 有证据才拆分 |
 | 城市 | 列表 `city` 行政区划代码 | `std_ich_projects.city`、`city_code` | `crafts.extra.city`、`city_code` | 代码和名称分开 |
 | 县区 | 列表 `area` 行政区划代码 | `std_ich_projects.county`、`county_code` | `crafts.extra.county`、`county_code` | 不从展示名猜代码 |
-| 传承人 | 详情传承人表或 `/ccr_detail/{id}.html` | `std_ich_inheritor` | 新增关联建议表 | 姓名、性别、出生日期、民族、项目编号、详情 URL |
-| 相关项目 | 详情“相关项目”表 | `std_ich_related_item` | 新增关联建议表 | 有向关系，保留关系方向 |
-| 相关资讯 | 详情“相关资讯”区块 | `std_ich_article`、`std_ich_projects_article` | 建议新增资源表或只展示链接 | 区块最多 5 条，不能视为全量 |
-| 相关学术 | 详情“相关学术”区块 | `std_ich_academic`、`std_ich_projects_academic` | 建议新增资源表或只展示链接 | 保存标题、日期、URL、作者/来源 |
-| 详情 URL | `https://www.ihchina.cn/project_details/{id}.html` | `std_ich_projects.detail_url` | `crafts.extra.detail_url` | 必须可直接打开 |
+| 传承人 | 详情传承人表或 `/ccr_detail/{id}.html` | `std_ich_inheritors` | 新增关联建议表 | 姓名、性别、出生日期、民族、项目编号、详情 URL |
+| 相关项目 | 详情“相关项目”表 | `std_ich_related_items` | 新增关联建议表 | 有向关系，保留关系方向 |
+| 相关资讯 | 详情“相关资讯”区块 | `std_ich_articles`；项目关联关系待评审 | 建议新增资源表或只展示链接 | 区块最多 5 条，不能视为全量 |
+| 相关学术 | 详情“相关学术”区块 | 建议新增学术资源表（未冻结） | 建议新增资源表或只展示链接 | 保存标题、日期、URL、作者/来源 |
+| 详情 URL | `https://www.ihchina.cn/project_details/{id}.html` | `std_ich_projects.source_url` | `crafts.extra.detail_url` | 必须可直接打开 |
 | source_url | 来源详情 URL，或发现该项目的列表接口 URL | `std_ich_projects.source_url` | `crafts.extra.source_url` | 与详情 URL 分开记录发现入口 |
 | is_teachable | 当前来源没有教学步骤字段 | `std_ich_projects.is_teachable` | `crafts.extra.is_teachable` | 由运营审核或从步骤表派生，不根据正文猜测 |
 
@@ -70,8 +70,8 @@
 
 ## 自然键与转换
 
-- 建议自然键: `project_code + declared_by + title`，并以来源详情 ID 作为来源内唯一键。
-- 同名的 1557 项目聚合视图可以按 `project_code` 或规范化项目名聚合，但不能写回覆盖 3610 子项。
+- 建议自然键: `ich_code + declaration_region + name`，并以来源详情 ID 作为来源内唯一键。
+- 同名的 1557 项目聚合视图可以按 `ich_code` 或规范化项目名聚合，但不能写回覆盖 3610 子项。
 - 详情 ID 来自列表 `id`，不混用 `auto_id`、`num`、`project_num`。
 - `is_teachable` 属于业务决定，不由采集器自动置为真。
 - 正文哈希用于变更检测，不用正文哈希替代自然键。

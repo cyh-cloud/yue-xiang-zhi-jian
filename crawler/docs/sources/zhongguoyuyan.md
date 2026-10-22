@@ -4,7 +4,9 @@
 
 来源 ID: `zhongguoyuyan`
 
-状态: `blocked`
+状态: `excluded`
+
+权利状态: `prohibited`
 
 访问等级: `robots-restricted`
 
@@ -18,10 +20,10 @@
 - 内容域: 方言资源
 - 优先级: P2
 - 访问等级: `robots-restricted`
-- `license_or_usage`: 未知。页面使用条款、资源授权和音频再分发许可均未验证。
+- `license_or_usage`: 版权说明不允许使用站点数据。用户已决定将该来源排除，不采集正文、音频或接口。
 - `confidence`: 高，`robots.txt` 已实际读取且明确全站禁止抓取；低，首页正文、资源类型、字段、数量和接口均未验证。
 
-本来源只登记为受限候选。`robots.txt` 当前为 `User-agent: *`、`Disallow: /`，本轮没有请求首页、正文、音频、图片、接口或其他站内资源。
+本来源已标记为 `excluded`。`robots.txt` 当前为 `User-agent: *`、`Disallow: /`，且版权说明不允许使用数据，因此不请求首页、正文、音频、图片、接口或其他站内资源。
 
 ## 入口
 

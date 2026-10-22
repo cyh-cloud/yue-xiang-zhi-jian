@@ -6,6 +6,8 @@
 
 状态: `approved-with-gaps`
 
+权利状态: `attribution-required`
+
 验证时间: `2026-10-19 01:08 Asia/Shanghai`
 
 ## 来源概况
@@ -78,7 +80,7 @@
 - 抓取时间: `2026-10-19 01:08 Asia/Shanghai`
 - 关键字段: 地区 `北京`；词条 `你好`；读音 `Nǐ hǎo`；释义 `普通话标准发音`；页面存在 `<audio src="https://你的OSS bucket.oss-cn-hangzhou.aliyuncs.com/hello.mp3">`
 - 音频结论: 存在 `audio` 元素但地址是占位字符串，Playwright 实测 `MediaError code 4`、`networkState=3`，音频不可用
-- 目标映射: `std_dialect_pointss`（北京）+ `std_dialect_lexemes` + `std_dialect_lexeme_sources`
+- 目标映射: `std_dialect_points`（北京）+ `std_dialect_lexemes` + `std_dialect_lexeme_sources`
 
 ### 样本 2
 
@@ -102,27 +104,30 @@
 
 | 来源字段 | crawler 表.字段 | 粤乡智匠表.字段 | 转换说明 |
 | --- | --- | --- | --- |
-| 详情路径中的 `id` | `std_dialect_lexeme_sources.source_record_id` | `dialect_lexeme_sources.source_record_id` | 来源内自然键一部分 |
-| `region` | `std_dialect_pointss.region_raw` | `dialect_points.region_raw` | 保留原值，再生成规范化省/市 |
-| `region` 规范化结果 | `std_dialect_pointss.province`、`std_dialect_pointss.city` | `dialect_points.province`、`dialect_points.city` | 仅在有证据时拆分，不猜县级点 |
+| 详情路径中的 `id` | `std_dialect_lexeme_sources.source_item_id` | `dialect_lexeme_sources.source_item_id` | 来源内自然键一部分 |
+| `region` | `std_dialect_points.region_raw` | `dialect_points.region_raw` | 保留原值，再生成规范化省/市 |
+| `region` 规范化结果 | `std_dialect_points.province`、`std_dialect_points.city` | `dialect_points.province`、`dialect_points.city` | 仅在有证据时拆分，不猜县级点 |
 | `name` / `.detail-word` | `std_dialect_lexemes.lemma` | `dialect_lexemes.lemma` | 词条/词形原文 |
 | `phonetic` / `.detail-phonetic` | `std_dialect_lexemes.phonetic` | `dialect_lexemes.phonetic` | 保留来源拼写；不擅自改国际音标 |
 | 文化解读 | `std_dialect_lexemes.definition` | `dialect_lexemes.definition` | 保存短释义，保留原文 |
-| 摘要中的“粤语”“上海话”等 | `std_dialect_pointss.dialect_name` | `dialect_points.dialect_name` | 仅作建议值，需人工复核 |
+| 摘要中的“粤语”“上海话”等 | `std_dialect_points.dialect_name` | `dialect_points.dialect_name` | 仅作建议值，需人工复核 |
 | `<audio src>` | `std_dialect_lexemes.audio_url` | `dialect_lexemes.audio_url` | 只在 URL 可实际访问时写入；当前全部为 null |
 | “暂无音频录音” | `std_dialect_lexemes.audio_status` | `dialect_lexemes.audio_status` | 记为 `missing`；占位 URL 记为 `invalid` |
 | 详情 URL | `std_dialect_lexeme_sources.source_url` | `dialect_lexeme_sources.source_url` | 直接可打开 |
-| 抓取时间 | `std_dialect_lexeme_sources.fetched_at` | `dialect_lexeme_sources.fetched_at` | 每次采集更新时间 |
+| 长期 URL | `std_dialect_lexeme_sources.long_term_url` | `dialect_lexeme_sources.long_term_url` | 与详情 URL 同值，签名地址不进入此列 |
+| 详情 URL 状态 | `std_dialect_lexeme_sources.detail_url_status` | `dialect_lexeme_sources.detail_url_status` | 样本为 `direct` |
+| 版权标记 | `std_dialect_lexeme_sources.rights_status`、`attribution_required`、`attribution_text`、`rights_evidence_url` | 同名 | 当前为 `attribution-required`，风险说明写入 `extra.rights_risk` |
+| 抓取时间 | `std_dialect_lexeme_sources.retrieved_at` | `dialect_lexeme_sources.retrieved_at` | 每次采集更新时间 |
 
-建议自然键: `(source_id='dialect-org', source_record_id=id)`；跨来源去重时再用 `(dialect_point_id, lemma, source_id)` 判定词条来源，不要用词条文本单独去重，因为不同方言点存在同名词条。
+建议自然键: `(source_id='dialect-org', source_item_id=id)`；跨来源去重时再用 `(dialect_point_id, lemma, source_id)` 判定词条来源，不要用词条文本单独去重，因为不同方言点存在同名词条。
 
 ### 粤乡智匠建议表
 
 | 建议表 | 用途 | 关键字段 |
 | --- | --- | --- |
-| `dialect_points` | 方言点/地区 | `id`、`source_id`、`source_record_id`、`region_raw`、`province`、`city`、`dialect_name`、`fetched_at` |
-| `dialect_lexemes` | 词条、读音、释义、音频 | `id`、`dialect_point_id`、`lemma`、`phonetic`、`definition`、`audio_url`、`audio_status`、`fetched_at` |
-| `dialect_lexeme_sources` | 词条来源 | `lexeme_id`、`source_id`、`source_record_id`、`source_url`、`fetched_at` |
+| `dialect_points` | 方言点/地区 | `id`、`source_id`、`source_item_id`、`region_raw`、`province`、`city`、`dialect_name`、`retrieved_at` |
+| `dialect_lexemes` | 词条、读音、释义、音频 | `id`、`dialect_point_id`、`lemma`、`phonetic`、`definition`、`audio_url`、`audio_status`、`retrieved_at` |
+| `dialect_lexeme_sources` | 词条来源 | `lexeme_id`、`source_id`、`source_item_id`、`source_url`、`long_term_url`、`detail_url`、`detail_url_status`、`rights_status`、`retrieved_at` |
 
 现有 `dialect_phrases` 是前台展示表（`dialect`、`mandarin`、`pinyin`），只能作为发布目标之一，不能替代上述规范化表。不要修改现有表结构来承载来源字段。
 
@@ -137,7 +142,7 @@
 ## 风险与限制
 
 - 登录: 不需要登录
-- robots: `https://dialect.org.cn/robots.txt` 返回 404，`http://` 会重定向到 HTTPS；未发现可用 robots 规则，按公开页面最小频率访问
+- robots: `https://dialect.org.cn/robots.txt` 返回 404，记录为 `not-found`；`http://` 会重定向到 HTTPS。`not-found` 允许采集并写 `deferred` 候选，按公开页面最小频率访问。
 - 版权: 未发现开放许可；只保存来源元数据、短释义和列表结构，不批量复制音频或大段正文
 - 结构稳定性: Flask 页面结构简单但不稳定；音频字段是占位 URL；`region` 粒度不统一；没有独立方言名字段
 - 缺失字段: 音标与拼音混用、无音频来源和许可、无更新时间、无结构化谱系、无全量分页 API
@@ -155,3 +160,13 @@
 - 样本可复现: 是（3 条详情样本 + 15 条全量核验）
 - 字段映射完整: 是；方言名和音频标记为待复核/缺失
 - 详情 URL 可直达: 是
+
+## 实现验证
+
+- 运行入口: `crawler/collection/projects/dialect-org`，fixture 回放使用一条真实详情形状的 HTML，不依赖网络。
+- 已覆盖: 词条详情 URL 作为 `source_url`、`long_term_url` 和 `detail_url`；方言点、词条和来源关系的自然键；重复运行不产生重复行。
+- 音频: 占位 OSS 地址记为 `invalid`，`audio_url` 保持 `null`；无 `audio` 元素且显示“暂无音频录音”时记为 `missing`。
+- 地区: 可识别的省、市写入 `province`、`city`；无法归一时保留 `region_raw`，在 `extra.region_normalization` 标记 `unresolved` 和 `requires_review`，不补经纬度或方言系属。
+- 方言名: 来源没有独立字段，释义中的候选名称只写入 `extra.dialect_name_suggestion`，不自动写入 `dialect_name`。
+- 权利标记: 样本按记录使用 `attribution-required`，在 `extra.rights_risk` 保留“未发现开放许可、只保留短释义和来源链接”的风险说明。
+- 验证命令: `python -m unittest crawler.tests.test_dialect_org_scrapy crawler.tests.test_scrapy_review_regressions -v`。

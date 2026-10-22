@@ -11,7 +11,7 @@
 - 输入是 `std-entities.md` 定义的 std 实体和 `std_sources` 来源登记，不读 `raw_*`、`stage_*`、页面或附件。
 - 输出按内容域写入业务表，并写采集库的 `import_batches`、`import_conflicts`。
 - 天气不进入持久化转换，运行时 DTO 直接在请求或提示组装阶段使用。
-- 发布状态由人工审核流程推进。转换器只写 `draft` 或保持已有状态。
+- 采集候选状态由 `candidate_status` 表达，转换器只消费 `candidate`。`deferred` 保留在采集库等待业务需要，`blocked` 不进入转换。发布状态由人工审核流程推进，转换器只写 `draft` 或保持已有状态。
 
 ## 批次契约
 
@@ -21,7 +21,7 @@
 
 1. 创建 `import_batches`，状态先为 `running`。
 2. 逐实体计算自然键并选择主值。
-3. 按字段白名单升级写入业务表，保留来源关系和本批次对象映射。
+3. dry-run 阶段只生成字段计划、来源关系和 `import_batch_items` 对象映射，不写业务表；真实写入在后续票据启用。
 4. 记录 `input_count`、`inserted_count`、`updated_count`、`skipped_count`、`conflict_count`、`failed_count`。
 5. 以 `succeeded`、`partial` 或 `failed` 结束。存在冲突或单条失败时不得写 `succeeded`。
 
@@ -47,7 +47,16 @@
 
 ### 发布
 
-转换器写入 `draft`。发布前检查来源访问等级、许可、详情 URL、审核记录和内容域不变式。转换器不推断授权，不自动把 `draft` 升级为 `published`。
+转换器写入 `draft`。发布前检查来源访问等级、许可、详情回溯信息和审核记录。
+
+详情回溯使用以下机械规则：
+
+- `detail_url_status=direct` 时，`detail_url` 必须非空。
+- `detail_url_status=missing` 时，承载页 `long_term_url` 必须非空，`locator` 必须能定位到该条记录。
+- 两项满足时可以进入业务实体和发布审核，不要求把承载页写成详情 URL。
+- 承载页或 locator 缺失时写 `deferred`，不得发布。
+
+转换器不推断授权，不自动把 `draft` 升级为 `published`。
 
 ### 回滚
 
@@ -57,11 +66,11 @@
 
 ### `ich`
 
-`std_ich_projectss` 转 `crafts` 基础资料，先写 `draft` 和 `is_teachable=0`。传承人、相关项目和媒体只写来源关系或扩展字段，不伪造教学步骤。`is_teachable=1` 由运营补齐教学证据后设置。
+`std_ich_projects` 转 `crafts` 基础资料，先写 `draft` 和 `is_teachable=0`。传承人、相关项目和媒体只写来源关系或扩展字段，不伪造教学步骤。`is_teachable=1` 由运营补齐教学证据后设置。
 
 ### `agri`
 
-`std_agri_products` 转 `agri_certified_products`，来源转 `agri_product_sources`。三种 `cert_type` 分开升级写入，不互相合并。水产三态的 `unknown` 不降为 `false`。无详情 URL 的记录只留在 std 或排除记录中，不进入业务发布。
+`std_agri_products` 转 `agri_certified_products`，来源转 `agri_product_sources`。三种 `cert_type` 分开升级写入，不互相合并。水产三态的 `unknown` 不降为 `false`。附件行和动态查询行使用公告页或检索详情页作为承载页 URL，并保留工作表行号或 PDF 页码 locator；满足权利和审核条件时可以发布。承载页或 locator 缺失时写 `deferred`。
 
 ### `jobs`
 
@@ -69,7 +78,7 @@
 
 ### `dialects`
 
-`std_dialect_pointss`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 按自然键升级写入同名业务表。现有 `dialects`、`dialect_phrases`、`dialect_quick_questions` 不变；发布到展示表由独立映射决定。
+`std_dialect_points`、`std_dialect_lexemes`、`std_dialect_lexeme_sources` 按自然键升级写入同名业务表。现有 `dialects`、`dialect_phrases`、`dialect_quick_questions` 不变；发布到展示表由独立映射决定。
 
 ### `weather`
 
@@ -80,10 +89,10 @@
 1. 同一 std 实体重复运行不产生重复业务行。
 2. 官方来源与聚合站冲突时官方值成为主值，聚合来源关系保留。
 3. 人工修改字段后重跑导入，字段不变且写冲突。
-4. 产品 `origin_scope` 摘要参与自然键，不误合并两个地区产品。
+4. 产品 `origin_scope` 摘要参与 `merge_key`，不误合并两个地区产品。
 5. 过期招聘重跑只改状态，不写 `job_listings`。
 6. 方言同名词形在不同方言点不合并。
 7. 批次回滚只撤销未人工修改的结果。
 8. 天气请求不产生批次和业务行。
 
-本文件只定义契约和实现策略，SQL、迁移、接口和测试留给后续票据。
+当前实现冻结了 dry-run 转换器、真实 `batch_id`、冲突落库和 dry-run 回滚。真实业务库写入、人工字段锁和跨库快照仍为 deferred，不在本轮修改现有后端或业务库。

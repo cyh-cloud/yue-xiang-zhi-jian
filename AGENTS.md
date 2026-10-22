@@ -14,7 +14,8 @@
 只写非标准命令，标准命令 agent 自己找得到。
 
 - 安装依赖：`pip install -r requirements.txt`
-- 单测：`python -m unittest discover -s . -p "test_*.py" -t .`
+- 全仓单测（需应用基线数据库，不属于 crawler 验收）：`python -m unittest discover -s . -p "test_*.py" -t .`
+- crawler 验收：`python -m unittest discover -s crawler/tests -p "test_*.py" -t .`
 - 端到端：`cd e2e; npx playwright test`
 - 架构机械检查：`python tools/check_architecture.py`
 - Python 静态检查：`python tools/check_python.py`
