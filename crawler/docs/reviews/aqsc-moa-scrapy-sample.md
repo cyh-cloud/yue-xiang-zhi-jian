@@ -30,7 +30,7 @@ run_id: `crawler-132-aqsc-live-20261021`
 ## 计数
 
 - raw: 3
-- raw 附件文件: 1 条 `download_status=http_error` 的错误诊断，不是有效 XLSX
+- raw_files 错误诊断: 1 条 `download_status=http_error`，不是有效 XLSX
 - stage: 1
 - 候选标准实体: 0
 - blocked: 1

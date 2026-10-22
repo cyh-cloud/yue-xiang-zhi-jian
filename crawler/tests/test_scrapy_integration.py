@@ -111,6 +111,14 @@ class ScrapyIntegrationTest(unittest.TestCase):
             self.assertIn("live_enabled = True", text, source_id)
             self.assertIn("start_urls = []", text, source_id)
 
+    def test_aqsc_sample_describes_403_as_file_error_not_attachment(self):
+        path = ROOT / "docs" / "reviews" / "aqsc-moa-scrapy-sample.md"
+        text = path.read_text(encoding="utf-8")
+
+        self.assertIn("`download_status=http_error`", text)
+        self.assertIn("`file_path` 和 `sha256` 为空", text)
+        self.assertIn("不是有效 XLSX", text)
+
 
 class LiveExitCodeTest(unittest.TestCase):
     def test_status_exit_code_contract(self):
