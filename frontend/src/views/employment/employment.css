@@ -209,6 +209,28 @@
     margin-bottom: 10px;
 }
 .employment-dot { margin: 0 6px; color: var(--text-muted); }
+
+/* 企业认证标识：已认证用品牌绿，未认证用中性灰，不抢薪资与职位名的注意力。
+   两个都是 <span>，与公司名同行；未认证的 title 里写明「请自行核实」。 */
+.employment-verified,
+.employment-unverified {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 8px;
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    font-size: 0.72rem;
+    line-height: 1.6;
+}
+.employment-verified {
+    background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+    color: var(--color-brand);
+}
+.employment-unverified {
+    background: var(--surface-muted);
+    color: var(--text-muted);
+}
 .employment-job-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .employment-tag {
     padding: 3px 10px;

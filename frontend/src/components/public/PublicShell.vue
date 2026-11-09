@@ -18,6 +18,7 @@ const navItems = [
   { label: "电商运营", to: "/ecommerce" },
   { label: "手工传承", to: "/crafts" },
   { label: "本土资源", to: "/resources" },
+  { label: "社区讨论", to: "/community" },
   { label: "就业对接", to: "/employment" },
 ] as const;
 

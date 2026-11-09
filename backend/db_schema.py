@@ -36,6 +36,34 @@ SCHEMA_SQL = """
             extra TEXT NOT NULL DEFAULT '{}'
         );
 
+        -- 企业资质认证：一次提交一行，保留历史（重交不覆盖旧的驳回记录）。
+        -- status: pending / approved / rejected；expires_at 只对 approved 有意义。
+        -- license_file 存私有目录下的相对路径（data/qualifications/...），
+        -- 不对外直链：静态目录只放行 uploads / images，证件照必须走鉴权接口取。
+        CREATE TABLE IF NOT EXISTS enterprise_qualifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT NOT NULL,
+            company_name TEXT NOT NULL DEFAULT '',
+            credit_code TEXT NOT NULL DEFAULT '',
+            legal_person TEXT DEFAULT '',
+            contact_phone TEXT DEFAULT '',
+            address TEXT DEFAULT '',
+            industry TEXT DEFAULT '',
+            company_size TEXT DEFAULT '',
+            license_file TEXT DEFAULT '',
+            license_name TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            review_comment TEXT DEFAULT '',
+            reviewed_by TEXT DEFAULT '',
+            submitted_at TEXT DEFAULT (datetime('now','localtime')),
+            reviewed_at TEXT DEFAULT NULL,
+            expires_at TEXT DEFAULT '',
+            extra TEXT NOT NULL DEFAULT '{}'
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_enterprise_qualifications_user
+            ON enterprise_qualifications(user_id, id DESC);
+
         CREATE TABLE IF NOT EXISTS content_reviews (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             content_type TEXT NOT NULL,
@@ -321,6 +349,12 @@ SCHEMA_SQL = """
             is_deleted INTEGER DEFAULT 0,
             deleted_by TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now','localtime')),
+            -- 敏感词初筛结果：published 正常公开，pending 待人工审核，rejected 拒审。
+            -- 命中词留着供审核判断（是真违规还是词表误伤），审核人可追溯。
+            moderation_status TEXT DEFAULT 'published',
+            matched_words TEXT DEFAULT '',
+            moderated_by TEXT DEFAULT '',
+            moderated_at TEXT DEFAULT NULL,
             extra TEXT NOT NULL DEFAULT '{}'
         );
 
@@ -335,6 +369,14 @@ SCHEMA_SQL = """
             view_count INTEGER DEFAULT 0,
             comment_count INTEGER DEFAULT 0,
             created_at TEXT DEFAULT (datetime('now','localtime')),
+            -- 同 comments：pending 的帖子不进公开列表，只能经管理端审核放行。
+            moderation_status TEXT DEFAULT 'published',
+            matched_words TEXT DEFAULT '',
+            moderated_by TEXT DEFAULT '',
+            moderated_at TEXT DEFAULT NULL,
+            -- 1 = 平台预置的演示帖（前端打「演示」标）。与真实用户发帖严格区分，
+            -- 便于一键识别与清理，口径与 job_listings.is_demo 一致。
+            is_demo INTEGER DEFAULT 0,
             extra TEXT NOT NULL DEFAULT '{}'
         );
 
@@ -801,7 +843,9 @@ SCHEMA_SQL = """
         --    COALESCE 是 fail-safe：历史行 review_status 为 NULL 也按「未通过」计。
         CREATE VIEW IF NOT EXISTS v_enterprise_job_stats AS
             SELECT jl.enterprise_id as enterprise_id,
-                   SUM(CASE WHEN jl.review_status = 'approved' THEN 1 ELSE 0 END) as total_jobs,
+                   SUM(CASE WHEN jl.review_status = 'approved'
+                             AND COALESCE(jl.is_closed, 0) = 0
+                        THEN 1 ELSE 0 END) as total_jobs,
                    SUM(CASE WHEN COALESCE(jl.review_status, '') != 'approved' THEN 1 ELSE 0 END) as pending_jobs,
                    COUNT(ja.id) as total_apps
             FROM job_listings jl
@@ -847,6 +891,13 @@ def apply_schema(cursor):
     2026-10-15 起 success_cases 从「已废弃」翻回「内容落库后的正式表」
     （ADR 0002），故它出现在 DEPRECATED_TABLES 之外，不再被DROP。
     """
+    # 视图没有数据，重建零成本；而 SQLite 的 CREATE VIEW IF NOT EXISTS 不会更新
+    # 既有定义 —— 改了视图 SQL 却不重建，库上跑的还是老口径（v_enterprise_job_stats
+    # 就踩过：新增 is_closed 后「在招」仍把已关闭岗位算进去）。执行建表脚本前先全量
+    # 丢掉本模块声明过的视图，让下面那唯一一份定义永远生效。
+    for _view in re.findall(r"CREATE VIEW IF NOT EXISTS (\w+)", SCHEMA_SQL):
+        cursor.execute("DROP VIEW IF EXISTS %s" % _view)
+
     cursor.executescript(SCHEMA_SQL)
 
     # 清理已下线的废弃表。这段原先住在 database.py 的 init_db() 里，与建表定义
@@ -872,6 +923,27 @@ def apply_schema(cursor):
         if col not in user_cols:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
 
+    # 社区域：敏感词初筛的审核字段（2026-11-06）。旧库靠这一段补列，
+    # 补出来的默认值 published 让历史内容继续公开，不改变既有可见性。
+    for _tbl in ('discussions', 'comments'):
+        _cols = {row[1] for row in cursor.execute("PRAGMA table_info(%s)" % _tbl).fetchall()}
+        _new_cols = {
+            'moderation_status': "TEXT DEFAULT 'published'",
+            'matched_words': "TEXT DEFAULT ''",
+            'moderated_by': "TEXT DEFAULT ''",
+            'moderated_at': "TEXT DEFAULT NULL",
+        }
+        for _col, _typedef in _new_cols.items():
+            if _cols and _col not in _cols:
+                cursor.execute("ALTER TABLE %s ADD COLUMN %s %s"
+                               % (_tbl, _col, _typedef))
+
+    # 演示帖标记（2026-11-06）：旧讨论表没有这一列，补列让演示数据可识别。
+    _disc_cols = {row[1] for row in cursor.execute(
+        "PRAGMA table_info(discussions)").fetchall()}
+    if _disc_cols and 'is_demo' not in _disc_cols:
+        cursor.execute("ALTER TABLE discussions ADD COLUMN is_demo INTEGER DEFAULT 0")
+
     # 扩展 job_listings 表结构
     existing_cols = {row[1] for row in cursor.execute("PRAGMA table_info(job_listings)").fetchall()}
     job_new_cols = {
@@ -889,6 +961,10 @@ def apply_schema(cursor):
         # 演示岗位标记：1 = 平台预置的演示岗位（前端必须打「演示数据」角标）。
         # 与真实企业发布岗位严格区分，便于一键识别与清理。
         'is_demo': "INTEGER DEFAULT 0",
+        # 关闭标记：1 = 企业主动下架（招满 / 暂缓）。
+        # 与删除的区别是「投递记录是否保留」——关闭只是从学员端撤下，
+        # 投递与沟通记录完整留着；删除不可恢复，有投递时一律拒绝。
+        'is_closed': "INTEGER DEFAULT 0",
     }
     for col, typedef in job_new_cols.items():
         if col not in existing_cols:

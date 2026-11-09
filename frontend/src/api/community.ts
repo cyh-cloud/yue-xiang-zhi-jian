@@ -23,6 +23,8 @@ export interface Discussion {
   view_count: number;
   comment_count: number;
   created_at: string;
+  /** 1 = 平台预置的演示帖，界面上要打「演示」标。 */
+  is_demo?: number;
 }
 
 export interface DiscussionComment {
@@ -51,6 +53,10 @@ export interface CommunityMutationResponse {
   success: true;
   id: number;
   message: string;
+  /** true = 命中敏感词，已转人工审核，不会立即出现在公开列表。 */
+  pending?: boolean;
+  /** 命中的词，仅用于提示用户改哪几句。 */
+  matched?: string[];
 }
 
 export function getDiscussions(

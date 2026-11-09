@@ -255,3 +255,13 @@
     flex-direction: column;
   }
 }
+
+/* 敏感词初筛的命中词：一眼看到「为什么被拦」，方便判断是真违规还是误伤。 */
+.pending-word {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(179, 56, 47, 0.12);
+  color: var(--bo-danger);
+  font-size: 0.78rem;
+}

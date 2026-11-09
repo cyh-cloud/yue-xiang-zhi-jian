@@ -154,6 +154,19 @@
   color: #8a6509;
 }
 
+/* 演示帖标记：与真实用户发帖区分开，样式取中性灰，不抢分类标签的注意力。 */
+.community-demo {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-default);
+}
+
 .community-card-meta,
 .community-detail-meta {
   justify-content: flex-start;

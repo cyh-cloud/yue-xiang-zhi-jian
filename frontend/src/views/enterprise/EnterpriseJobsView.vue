@@ -2,9 +2,11 @@
 import { onMounted, reactive, ref } from "vue";
 
 import {
+  closeEnterpriseJob,
   createEnterpriseJob,
   deleteEnterpriseJob,
   getEnterpriseJobs,
+  reopenEnterpriseJob,
   updateEnterpriseJob,
   type EnterpriseJob,
   type EnterpriseJobInput,
@@ -51,6 +53,7 @@ const feedback = ref<{
   message: string;
 } | null>(null);
 const pendingDelete = ref<EnterpriseJob | null>(null);
+const togglingId = ref(0);
 
 const STATUS_LABELS: Record<string, string> = {
   approved: "已通过",
@@ -152,6 +155,34 @@ async function saveJob(): Promise<void> {
 
 function askDelete(job: EnterpriseJob): void {
   pendingDelete.value = job;
+}
+
+/**
+ * 关闭 / 重新开放。关闭只从学员端撤下，投递记录完整保留；
+ * 招满、暂缓招聘都该走这个动作，而不是删除（删除不可恢复）。
+ */
+async function toggleClose(job: EnterpriseJob): Promise<void> {
+  if (togglingId.value) return;
+  togglingId.value = job.id;
+  feedback.value = null;
+  try {
+    const response = job.is_closed
+      ? await reopenEnterpriseJob(job.id)
+      : await closeEnterpriseJob(job.id);
+    feedback.value = {
+      kind: response.success ? "success" : "error",
+      message: response.message || "操作完成",
+    };
+    await loadJobs();
+  } catch (requestError) {
+    feedback.value = {
+      kind: "error",
+      message:
+        requestError instanceof Error ? requestError.message : "操作失败",
+    };
+  } finally {
+    togglingId.value = 0;
+  }
 }
 
 function cancelDelete(): void {
@@ -412,6 +443,10 @@ onMounted(loadJobs);
                 >
                   {{ statusLabel(job.review_status) }}
                 </span>
+                <span
+                  v-if="job.is_closed"
+                  class="review-pill is-closed"
+                >已关闭</span>
                 <small
                   v-if="job.review_status === 'rejected' && job.review_comment"
                   class="review-reason"
@@ -430,6 +465,15 @@ onMounted(loadJobs);
                     @click="startEdit(job)"
                   >
                     编辑
+                  </button>
+                  <button
+                    v-if="job.review_status === 'approved'"
+                    type="button"
+                    class="backoffice-button is-small is-secondary"
+                    :disabled="togglingId === job.id"
+                    @click="toggleClose(job)"
+                  >
+                    {{ job.is_closed ? "重新开放" : "关闭岗位" }}
                   </button>
                   <button
                     type="button"
@@ -468,6 +512,7 @@ onMounted(loadJobs);
           <div class="backoffice-modal-body">
             <p class="backoffice-confirm-copy">
               确定删除「{{ pendingDelete.title }}」？该职位及其收藏记录会被移除，此操作不可恢复。
+              已收到投递的岗位不能删除，请改用「关闭岗位」保留投递记录。
             </p>
           </div>
           <footer class="backoffice-modal-actions">

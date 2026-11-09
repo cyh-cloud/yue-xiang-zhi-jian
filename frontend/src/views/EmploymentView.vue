@@ -1155,6 +1155,22 @@ function isIntentRegistered(key: string): boolean {
                     <span class="employment-job-salary">{{ job.salary }}</span>
                   </div>
                   <div class="employment-job-company">
+                    <span
+                      v-if="job.enterprise_verified"
+                      class="employment-verified"
+                      title="该企业已通过资质认证"
+                    >
+                      <i
+                        class="fas fa-circle-check"
+                        aria-hidden="true"
+                      />
+                      已认证
+                    </span>
+                    <span
+                      v-else
+                      class="employment-unverified"
+                      title="该企业尚未完成资质认证，请自行核实招聘信息"
+                    >未认证</span>
                     {{ job.company }}<span class="employment-dot">·</span>{{ job.location || "广东" }}<span class="employment-dot">·</span>{{ job.experience || "不限" }}<span class="employment-dot">·</span>{{ job.education || "不限" }}
                   </div>
                   <div class="employment-job-tags">

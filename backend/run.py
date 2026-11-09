@@ -120,11 +120,17 @@ def main():
         init_db()
         print("✅ 数据库初始化完成")
         from app import app
+        # 开发期自动重载：改完后端代码不用手动重启。默认关闭（调试器不跟随），
+        # 只有 start-dev.bat 设了 YX_DEV_RELOAD=1 才开。
+        # ⚠️ 没有它时最容易踩的坑：改了路由但服务没重启，新 URL 落到静态兜底，
+        #    浏览器看到的是 404「文件不存在」，而不报「路由不存在」。
+        reload_enabled = os.getenv('YX_DEV_RELOAD', '0').strip().lower() in (
+            '1', 'true', 'yes', 'on')
         app.run(
             host='0.0.0.0',
             port=port,
             debug=False,
-            use_reloader=False
+            use_reloader=reload_enabled
         )
     except KeyboardInterrupt:
         print("\n👋 感谢使用粤乡智匠！")

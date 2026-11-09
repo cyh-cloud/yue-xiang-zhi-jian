@@ -22,5 +22,6 @@ T17 从 app.py 的「超级管理员 API」区块整体迁出，URL、请求响�
 
 
 from domains.admin.routes import admin_bp
+from domains.admin import qualifications  # noqa: F401  挂载企业资质审核路由
 
 __all__ = ['admin_bp']

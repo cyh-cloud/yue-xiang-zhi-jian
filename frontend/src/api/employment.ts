@@ -19,6 +19,8 @@ export interface EnterpriseJob {
   posted_at: string;
   source_type: "enterprise";
   is_demo?: number;
+  /** 该岗位所属企业是否持有有效期内的资质认证（0/1，后端算好下发）。 */
+  enterprise_verified?: number;
 }
 
 export interface RecruitmentSource {

@@ -68,13 +68,16 @@ EXPECTED_TABLES = {
     'craft_budgets', 'craft_videos',
     # 迁移记录表（T05）：migrations/0001_content_to_db.py 靠它防重入
     'schema_migrations',
+    # 企业资质认证（2026-11-05）：一次提交一行，审核状态与有效期都在本表
+    'enterprise_qualifications',
 }
 # 36 张既有表 + 21 张新表。spec 4.4 写作「36 -> 56」，那是按
 # 「pest_entries 已存在、只补列」算的；实测现库里并没有 pest_entries
 # （病虫害内容此前只在代码常量里，从未落库），所以实际新建 21 张。
 # T10 删掉两张内容签名表（seed_meta / farming_seed_meta），故 58 - 2 = 56；
-# 再补上 craft_videos（技艺视频教学，migrations/0002_craft_videos.py），56 + 1 = 57。
-EXPECTED_TABLE_COUNT = 57
+# 再补上 craft_videos（技艺视频教学，migrations/0002_craft_videos.py），56 + 1 = 57；
+# 再补上 enterprise_qualifications（企业资质认证），57 + 1 = 58。
+EXPECTED_TABLE_COUNT = 58
 
 EXPECTED_VIEWS = {
     'v_enterprise_applications', 'v_enterprise_job_stats', 'v_home_stats',

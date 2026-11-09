@@ -409,6 +409,11 @@ function preview(value: string): string {
               {{ categoryLabel(discussion.category) }}
             </span>
             <span
+              v-if="discussion.is_demo"
+              class="community-demo"
+              title="平台预置的演示数据"
+            >演示</span>
+            <span
               v-if="discussion.is_pinned"
               class="community-pinned"
             >

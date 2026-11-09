@@ -185,6 +185,11 @@ DOMAIN_SYMBOLS = {
                 'set_pest_image', 'delete_pest_image', 'create_pest_crop',
                 'update_pest_crop', 'delete_pest_crop', 'create_pest_source',
                 'update_pest_source', 'delete_pest_source'),
+    # 企业资质认证（迁移 0003 之后新增）：提交 / 查询 / 审核 / 有效期 / 认证企业集合。
+    'qualifications.py': ('CAPABILITY', 'VALID_YEARS', 'get_by_id', 'get_latest',
+                          'status_of', 'is_verified', 'list_by_status',
+                          'count_pending', 'submit', 'review',
+                          'verified_enterprise_ids'),
 }
 
 # 基础设施侧必须对外暴露的名字。

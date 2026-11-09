@@ -20,7 +20,8 @@ from flask import Blueprint, jsonify, request
 
 from core.permissions import require_capability
 from core.session import get_session_user
-from db_domains import employment, reviews
+from db_domains import employment, qualifications, reviews
+from shared.enterprise_limits import UNVERIFIED_ACTIVE_JOB_LIMIT
 
 
 enterprise_bp = Blueprint('enterprise', __name__)
@@ -30,6 +31,7 @@ enterprise_bp = Blueprint('enterprise', __name__)
 @require_capability('job.manage')
 def enterprise_get_jobs():
     user = get_session_user()
+    verified = qualifications.is_verified(user['username'])
     rows = employment.get_enterprise_jobs(user['username'])
     jobs = []
     for r in rows:
@@ -40,6 +42,8 @@ def enterprise_get_jobs():
         review = reviews.get_review_by_content('job', d['id'])
         d['review_comment'] = (review or {}).get('review_comment') or ''
         d['reviewed_at'] = (review or {}).get('reviewed_at') or ''
+        # 企业侧也要看到自己岗位的认证标：未认证时前台会显示「未认证企业」。
+        d['enterprise_verified'] = 1 if verified else 0
         jobs.append(d)
     return jsonify({"success": True, "jobs": jobs})
 
@@ -48,6 +52,18 @@ def enterprise_get_jobs():
 @require_capability('job.manage')
 def enterprise_create_job():
     user = get_session_user()
+    # 未认证企业最多挂 1 条岗位。口径用「岗位总数」（含待审、已关闭），
+    # 不是「在招数」：编辑岗位会把状态打回 pending，用在招数计数只要编辑一下
+    # 就能把额度清零，从而无限追加（实测可复现）。
+    if not qualifications.is_verified(user['username']):
+        owned = employment.count_enterprise_jobs(user['username'])
+        if owned >= UNVERIFIED_ACTIVE_JOB_LIMIT:
+            return jsonify({
+                "success": False,
+                "code": "qualification_required",
+                "message": "未认证企业最多发布 %d 个岗位，完成资质认证后可解除限制"
+                           % UNVERIFIED_ACTIVE_JOB_LIMIT
+            }), 403
     data = request.get_json()
     job_id = employment.create_enterprise_job(
         data, user['username'], user.get('company_name', ''))
@@ -80,10 +96,42 @@ def enterprise_delete_job(job_id):
     owner = employment.get_job_owner(job_id)
     if owner != user['username']:
         return jsonify({"success": False, "message": "职位不存在或无权操作"}), 404
+    # 已收到投递的岗位不允许删除：job_applications 不会随岗位级联清理，删了会留下
+    # 孤儿记录，学员端的投递列表还会因为 INNER JOIN 而整条消失。招满请改用「关闭」。
+    applications = employment.count_job_applications(job_id)
+    if applications:
+        return jsonify({
+            "success": False,
+            "code": "has_applications",
+            "message": "该岗位已收到 %d 条投递，删除会丢失投递记录；"
+                       "请改用「关闭岗位」。" % applications
+        }), 409
     employment.delete_job_and_dependents(job_id)
     # 审核记录属 reviews 域（content_reviews 是共享表），跨域删除只走它一个入口
     reviews.delete_reviews_for('job', job_id)
     return jsonify({"success": True, "message": "删除成功"})
+
+
+@enterprise_bp.route('/api/enterprise/jobs/<int:job_id>/close', methods=['POST'])
+@require_capability('job.manage')
+def enterprise_close_job(job_id):
+    """关闭岗位：从学员端撤下，保留岗位与全部投递记录。"""
+    user = get_session_user()
+    if employment.get_job_owner(job_id) != user['username']:
+        return jsonify({"success": False, "message": "职位不存在或无权操作"}), 404
+    employment.set_job_closed(job_id, True)
+    return jsonify({"success": True, "message": "岗位已关闭，学员端不再展示"})
+
+
+@enterprise_bp.route('/api/enterprise/jobs/<int:job_id>/reopen', methods=['POST'])
+@require_capability('job.manage')
+def enterprise_reopen_job(job_id):
+    """重新开放：恢复展示。若期间账号被停用，学员端仍看不到（列表按账号状态过滤）。"""
+    user = get_session_user()
+    if employment.get_job_owner(job_id) != user['username']:
+        return jsonify({"success": False, "message": "职位不存在或无权操作"}), 404
+    employment.set_job_closed(job_id, False)
+    return jsonify({"success": True, "message": "岗位已重新开放"})
 
 
 # ---- 求购管理：2026-10-06 用户拍板「供应链求购不做」，整块下线 ----

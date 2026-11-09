@@ -63,6 +63,9 @@ OWNED_TABLES = {
     'recruitments': {'recruitments', 'recruitment_sources'},
     'content': {'success_cases', 'case_stats', 'case_milestones',
                  'case_sources', 'case_lessons'},
+    # 企业资质认证（2026-11-05）：提交、审核状态与有效期都在本表。
+    # 企业域与超管域都只经 db_domains.qualifications 读写，不各自开 SQL。
+    'qualifications': {'enterprise_qualifications'},
 }
 
 # profile_sources 不拥有任何表：它是「能力档案的取数窄接口」模块，只跨域取数
@@ -82,6 +85,20 @@ ALLOWED_FOREIGN_TABLES = {
     'users': {
         'user_sessions': '删用户时连带清理会话',
         'points': '删用户时连带清理积分',
+    },
+    # 停用企业要真正止住对外影响：岗位列表与详情都要看账号状态，
+    # 否则停用只挡住登录，岗位照旧挂在公网（2026-11-05）。
+    'employment': {
+        'users': '停用企业的岗位从学员端下线（列表/详情/投递三处同口径）',
+    },
+    # 审核队列要判断「目标内容还在不在」，否则内容删掉后残留的审核记录会变成
+    # 管理员点不进去、也驳不掉的孤儿卡片（2026-11-05 实测 48 条）。
+    # 只读 id 做存在性判断，不取任何业务字段。
+    'reviews': {
+        'job_listings': '审核队列过滤孤儿记录：岗位是否还在',
+        'courses': '审核队列过滤孤儿记录：课程是否还在',
+        'models_3d': '审核队列过滤孤儿记录：3D 模型是否还在',
+        'success_cases': '审核队列过滤孤儿记录：案例是否还在',
     },
     'profile_sources': {
         'users': '能力档案的基础资料段',

@@ -56,6 +56,43 @@ def get_enterprise_jobs(enterprise_id):
     return out
 
 
+def count_enterprise_jobs(enterprise_id):
+    """企业名下的岗位总数（任何审核状态、含已关闭）。
+
+    未认证企业的发布上限必须用这个口径。用「在招数」（approved）计数会被
+    编辑操作绕开：编辑会把 review_status 打回 pending，在招数瞬间归零，
+    于是能无限追加新岗位（实测可复现）。按总数计，只有删除或关闭才会释放额度。
+    """
+    conn = get_connection()
+    n = conn.execute("SELECT COUNT(*) FROM job_listings WHERE enterprise_id = ?",
+                     (enterprise_id,)).fetchone()[0]
+    conn.close()
+    return n
+
+
+def count_job_applications(job_id):
+    """该岗位收到的投递数。删岗位前用它判断会不会连带丢掉投递记录。"""
+    conn = get_connection()
+    n = conn.execute("SELECT COUNT(*) FROM job_applications WHERE job_id = ?",
+                     (job_id,)).fetchone()[0]
+    conn.close()
+    return n
+
+
+def set_job_closed(job_id, closed):
+    """关闭 / 重新开放一个岗位。
+
+    关闭只是从学员端撤下，岗位与投递记录完整保留；删除才是真正的销毁。
+    招满、暂缓招聘都该走关闭，而不是删除。
+    """
+    conn = get_connection()
+    cur = conn.execute("UPDATE job_listings SET is_closed = ? WHERE id = ?",
+                       (1 if closed else 0, job_id))
+    conn.commit()
+    conn.close()
+    return cur.rowcount > 0
+
+
 def create_enterprise_job(data, enterprise_id, company_name):
     """企业发布岗位。发布即 pending（审核门禁见 enterprise 域的模块文档）。"""
     conn = get_connection()
@@ -218,6 +255,23 @@ def get_job_listings():
         result.append(d)
     return result
 
+def get_job_for_review(job_id):
+    """审核侧取岗位详情：不带「已关闭 / 企业停用」的过滤。
+
+    学员端口径（get_job_by_id）会把关闭岗位当作不存在，但管理员仍要能看到
+    自己正在裁定的那条岗位 —— 否则一条「已通过后关闭」的岗位在审核列表里
+    只剩一个光秃秃的编号。
+    """
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM job_listings WHERE id = ?", (job_id,)).fetchone()
+    conn.close()
+    if not row:
+        return None
+    d = dict(row)
+    d['requirements'] = json.loads(d['requirements'])
+    return d
+
+
 def apply_for_job(user_id, job_id):
     """申请职位。
 
@@ -230,7 +284,12 @@ def apply_for_job(user_id, job_id):
     若允许对未审核/不存在的岗位申请，等于绕过了审核门禁（2026-10-06 修复）。
     """
     conn = get_connection()
-    row = conn.execute("SELECT review_status FROM job_listings WHERE id = ?", (job_id,)).fetchone()
+    row = conn.execute(
+        "SELECT jl.review_status FROM job_listings jl WHERE jl.id = ? "
+        "AND COALESCE(jl.is_closed, 0) = 0 "
+        "AND (COALESCE(jl.enterprise_id, '') = '' OR NOT EXISTS ("
+        "SELECT 1 FROM users u WHERE u.username = jl.enterprise_id "
+        "AND u.status = 'suspended'))", (job_id,)).fetchone()
     if not row or (row['review_status'] or '') != 'approved':
         conn.close()
         return 'unavailable'
@@ -245,9 +304,18 @@ def apply_for_job(user_id, job_id):
     return 'ok'
 
 def get_job_by_id(job_id):
-    """获取单条职位详情"""
+    """获取单条职位详情（学员端口径）。
+
+    已关闭的岗位、以及所属企业已被停用的岗位，对学员端等同于不存在 ——
+    与 get_job_listings_base 的过滤条件保持一致，避免「列表看不到、直链能打开」。
+    """
     conn = get_connection()
-    row = conn.execute("SELECT * FROM job_listings WHERE id = ?", (job_id,)).fetchone()
+    row = conn.execute(
+        "SELECT jl.* FROM job_listings jl WHERE jl.id = ? "
+        "AND COALESCE(jl.is_closed, 0) = 0 "
+        "AND (COALESCE(jl.enterprise_id, '') = '' OR NOT EXISTS ("
+        "SELECT 1 FROM users u WHERE u.username = jl.enterprise_id "
+        "AND u.status = 'suspended'))", (job_id,)).fetchone()
     conn.close()
     if not row:
         return None
@@ -336,7 +404,22 @@ def get_job_listings_base(keyword=None, location=None, salary_range=None):
     —— 若在这里就把 category 过滤掉，统计永远只剩当前选中项（条数全是 1）。
     """
     conn = get_connection()
-    query = "SELECT * FROM job_listings WHERE review_status = 'approved'"
+    # enterprise_verified 是「该岗位所属企业当前是否持有有效期内的资质认证」。
+    # 用 EXISTS 子查询一次算完，避免逐条回查（列表最多几十条，但一致口径更重要：
+    # 认证状态与岗位列表取的是同一时刻的库）。
+    query = ("SELECT jl.*, CASE WHEN EXISTS ("
+             "SELECT 1 FROM enterprise_qualifications q "
+             "WHERE q.user_id = jl.enterprise_id AND q.status = 'approved' "
+             "AND (q.expires_at = '' OR q.expires_at >= date('now','localtime'))"
+             ") THEN 1 ELSE 0 END AS enterprise_verified "
+             "FROM job_listings jl WHERE jl.review_status = 'approved' "
+             # 已关闭（招满 / 暂缓）的岗位从学员端撤下，但记录仍在企业侧。
+             "AND COALESCE(jl.is_closed, 0) = 0 "
+             # 账号被停用的企业，其岗位一并下线：停用要能真正止住对外影响，
+             # 不能只挡住登录、岗位照旧挂在公网上。
+             "AND (COALESCE(jl.enterprise_id, '') = '' OR NOT EXISTS ("
+             "SELECT 1 FROM users u WHERE u.username = jl.enterprise_id "
+             "AND u.status = 'suspended'))")
     params = []
     if keyword:
         query += " AND (title LIKE ? OR company LIKE ? OR description LIKE ?)"

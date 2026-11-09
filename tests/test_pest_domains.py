@@ -409,7 +409,8 @@ class PestKnowledgeTest(PestDomainTestBase):
         stats = body['stats']
         for key in ('crops', 'entries', 'with_image', 'verified'):
             self.assertIn(key, stats)
-        self.assertEqual(stats['entries'], len(body['entries']))
+        self.assertEqual(stats['entries'], body['total'],
+                         'stats.entries 是全库条数，total 是不带筛选时的同一条数')
 
     def test_crop_filter_returns_only_that_crop(self):
         response = self.client.get('/api/agriculture/pest-knowledge?crop=lychee')
@@ -489,12 +490,14 @@ class PestKnowledgeServerFilterTest(PestDomainTestBase):
         return json.loads(response.data)
 
     def test_no_params_returns_every_entry_with_the_same_fields(self):
-        """验收 1：不带参数时条目集合与字段和改动前一致，另带 total。"""
+        """验收 1：字段与改动前一致，另带 total；默认每页 50 条，limit=100 可取全。"""
         body = self._knowledge()
-        self.assertEqual(body['total'], 45)
-        self.assertEqual(len(body['entries']), 45)
+        self.assertEqual(body['total'], 69)
+        self.assertEqual(len(body['entries']), 50, '不带参数时按默认每页 50 条返回')
         self.assertEqual(len(body['crops']), 8)
-        for entry in body['entries']:
+        full = self._knowledge('?limit=100')
+        self.assertEqual(len(full['entries']), 69)
+        for entry in full['entries']:
             for key in self.FULL_ENTRY_KEYS:
                 self.assertIn(key, entry)
 
@@ -511,16 +514,16 @@ class PestKnowledgeServerFilterTest(PestDomainTestBase):
         """验收 3：limit=10 只返回 10 条，total 是筛选后总条数。"""
         page = self._knowledge('?limit=10')
         self.assertEqual(len(page['entries']), 10)
-        self.assertEqual(page['total'], 45)
+        self.assertEqual(page['total'], 69)
 
-        full = self._knowledge()
+        full = self._knowledge('?limit=100')
         self.assertEqual([e['id'] for e in page['entries']],
                          [e['id'] for e in full['entries'][:10]],
                          '第一页必须是全量顺序的前 10 条')
 
     def test_paging_through_every_page_has_no_gap_and_no_duplicate(self):
         """验收 3：翻页不重不漏 —— 逐页取完，id 序列与一次取完逐条相同。"""
-        full = self._knowledge()
+        full = self._knowledge('?limit=100')
         seen = []
         offset = 0
         pages = 0
@@ -537,12 +540,12 @@ class PestKnowledgeServerFilterTest(PestDomainTestBase):
         self.assertEqual(len(seen), len(set(seen)), '翻页有重复条目')
         self.assertEqual(seen, [entry['id'] for entry in full['entries']],
                          '翻页有遗漏或顺序与全量不一致')
-        self.assertEqual(pages, 5, '45 条按每页 10 条应是 5 页')
+        self.assertEqual(pages, 7, '69 条按每页 10 条应是 7 页')
 
     def test_offset_beyond_total_returns_an_empty_page(self):
-        body = self._knowledge('?limit=10&offset=45')
+        body = self._knowledge('?limit=10&offset=69')
         self.assertEqual(body['entries'], [])
-        self.assertEqual(body['total'], 45)
+        self.assertEqual(body['total'], 69)
 
     def test_filtered_paging_keeps_total_and_order(self):
         """带筛选翻页：total 是筛选后条数，页面是筛选结果的一段。"""
@@ -566,7 +569,7 @@ class PestKnowledgeServerFilterTest(PestDomainTestBase):
 
     def test_crop_counts_follow_the_current_filter(self):
         """crops[].count 是当前筛选条件下该作物的条数，且与按钮语义一致。"""
-        full = self._knowledge()
+        full = self._knowledge('?limit=100')
         per_crop = {}
         for entry in full['entries']:
             per_crop[entry['crop']] = per_crop.get(entry['crop'], 0) + 1
@@ -621,7 +624,7 @@ class PestKnowledgeServerFilterTest(PestDomainTestBase):
                                       '%s 没有授权图，不得补一个URL' % entry['id'])
             offset += 10
             self.assertLess(offset, 100, '翻页没有收敛，offset 失去作用了')
-        self.assertEqual(len(seen), 45)
+        self.assertEqual(len(seen), 69)
 
 
 if __name__ == '__main__':

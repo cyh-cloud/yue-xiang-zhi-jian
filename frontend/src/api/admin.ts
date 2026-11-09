@@ -132,6 +132,11 @@ export interface ModerationDiscussion {
   comment_count: number;
   is_pinned: number;
   created_at: string;
+  /** published / pending / rejected；命中敏感词的为 pending。 */
+  moderation_status?: string;
+  matched_words?: string;
+  moderated_by?: string;
+  moderated_at?: string | null;
 }
 
 export interface ModerationComment {
@@ -143,12 +148,20 @@ export interface ModerationComment {
   user_name: string;
   content: string;
   created_at: string;
+  moderation_status?: string;
+  matched_words?: string;
+  moderated_by?: string;
+  moderated_at?: string | null;
 }
 
 export interface ModerationContent {
   discussions: ModerationDiscussion[];
   comments: ModerationComment[];
   total: number;
+  /** 命中敏感词、尚未公开的内容。 */
+  pendingDiscussions: ModerationDiscussion[];
+  pendingComments: ModerationComment[];
+  pending: { discussions: number; comments: number; total: number };
 }
 
 interface AdminOverviewResponse {
@@ -182,6 +195,9 @@ interface AdminModerationResponse {
   discussions: ModerationDiscussion[];
   comments: ModerationComment[];
   total: number;
+  pending_discussions?: ModerationDiscussion[];
+  pending_comments?: ModerationComment[];
+  pending?: { discussions: number; comments: number; total: number };
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
@@ -303,11 +319,48 @@ export function deleteAdminAnnouncement(
 
 export async function getAdminModerationContent(): Promise<ModerationContent> {
   const response = await get<AdminModerationResponse>("/api/admin/content");
+  const pendingDiscussions = response.pending_discussions ?? [];
+  const pendingComments = response.pending_comments ?? [];
   return {
     discussions: response.discussions,
     comments: response.comments,
     total: response.total,
+    pendingDiscussions,
+    pendingComments,
+    pending: response.pending ?? {
+      discussions: pendingDiscussions.length,
+      comments: pendingComments.length,
+      total: pendingDiscussions.length + pendingComments.length,
+    },
   };
+}
+
+export function approveAdminDiscussion(
+  discussionId: number,
+): Promise<AdminActionResponse> {
+  return post<AdminActionResponse>(
+    `/api/admin/discussions/${discussionId}/approve`,
+  );
+}
+
+export function rejectAdminDiscussion(
+  discussionId: number,
+): Promise<AdminActionResponse> {
+  return post<AdminActionResponse>(
+    `/api/admin/discussions/${discussionId}/reject`,
+  );
+}
+
+export function approveAdminComment(
+  commentId: number,
+): Promise<AdminActionResponse> {
+  return post<AdminActionResponse>(`/api/admin/comments/${commentId}/approve`);
+}
+
+export function rejectAdminComment(
+  commentId: number,
+): Promise<AdminActionResponse> {
+  return post<AdminActionResponse>(`/api/admin/comments/${commentId}/reject`);
 }
 
 export function deleteAdminComment(

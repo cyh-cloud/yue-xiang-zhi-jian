@@ -19,13 +19,15 @@ from flask import Blueprint, jsonify, request
 from core.permissions import ROLES, require_capability
 from core.session import get_session_user
 from db_domains import announcements, community, content, courses, employment
+from db_domains import qualifications
 from db_domains import users as users_db
 from db_domains import reviews as reviews_db
+from shared.enterprise_limits import UNVERIFIED_ACTIVE_JOB_LIMIT
 
 
 # 本域读这些能力域的数据，显式声明供 tools/check_architecture.py 判权。
 CAPABILITIES_USED = ('user.read', 'review.read', 'course.read', 'case.read',
-                     'community.read')
+                     'community.read', 'notification.read')
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -223,7 +225,8 @@ def admin_get_reviews():
         if ctype == 'course':
             rd['detail'] = courses.get_course(cid)
         elif ctype == 'job':
-            rd['detail'] = employment.get_job_by_id(cid)
+            # 审核侧用不带公开展示过滤的取数：已关闭的岗位仍要能看到正文
+            rd['detail'] = employment.get_job_for_review(cid)
         elif ctype == 'model_3d':
             # 3D 模型属课程域，审核详情走 v_reviewable_models 取，域路由不直连
             rd['detail'] = courses.get_model_3d_by_id(cid)
@@ -241,10 +244,43 @@ def admin_get_reviews():
     return jsonify({"success": True, "reviews": enriched, "counts": counts, "status": status})
 
 
+def _job_approval_blocked(job_id):
+    """通过岗位审核前的复查。返回 (code, message) 或 None。
+
+    审核通过是「岗位进入在招」的唯一入口，未认证上限必须在这里再查一次：
+    只在创建时拦，企业可以先发一条、再编辑成 pending 腾出额度、继续发，
+    最后逐条通过就绕过了上限。
+    """
+    enterprise_id = employment.get_job_owner(job_id)
+    if not enterprise_id:
+        return None
+    enterprise = users_db.get_user_by_id(enterprise_id) or {}
+    if enterprise.get('status') == 'suspended':
+        return ('enterprise_suspended',
+                '该企业账号已停用，不能通过其岗位；请先恢复账号或驳回该岗位')
+    if qualifications.is_verified(enterprise_id):
+        return None
+    active = employment.get_enterprise_stats(enterprise_id)['total_jobs']
+    if active >= UNVERIFIED_ACTIVE_JOB_LIMIT:
+        return ('qualification_required',
+                '该企业未完成资质认证，已有 %d 个在招岗位、达到上限；'
+                '请先通过其企业认证，或驳回该岗位'
+                % UNVERIFIED_ACTIVE_JOB_LIMIT)
+    return None
+
+
 @admin_bp.route('/api/admin/reviews/<int:review_id>/approve', methods=['POST'])
 @require_capability('review.moderate')
 def admin_approve_review(review_id):
     user = get_session_user()
+    review = reviews_db.get_review_by_id(review_id)
+    if review is None:
+        return jsonify({"success": False, "message": "审核记录不存在"}), 404
+    if review['content_type'] == 'job':
+        blocked = _job_approval_blocked(review['content_id'])
+        if blocked:
+            return jsonify({"success": False, "code": blocked[0],
+                            "message": blocked[1]}), 409
     reviews_db.approve_review(review_id, user['username'])
     return jsonify({"success": True, "message": "已审核通过"})
 
@@ -320,12 +356,63 @@ def admin_get_moderation_content():
     """
     discussions, total = community.get_discussions(page=1, page_size=200)
     comments = community.get_moderation_comments(limit=200)
+    pending_discussions = community.get_pending_discussions(limit=200)
+    pending_comments = community.get_pending_comments(limit=200)
     return jsonify({
         "success": True,
         "discussions": discussions,
         "comments": comments,
         "total": total,
+        # 命中敏感词、尚未公开的内容。与上面的公开列表分开下发：
+        # 「待审」与「已公开」是两个动作，混在一张表里容易误删。
+        "pending_discussions": pending_discussions,
+        "pending_comments": pending_comments,
+        "pending": {
+            "discussions": len(pending_discussions),
+            "comments": len(pending_comments),
+            "total": len(pending_discussions) + len(pending_comments),
+        },
     })
+
+
+@admin_bp.route('/api/admin/discussions/<int:disc_id>/approve', methods=['POST'])
+@require_capability('community.manage')
+def admin_approve_discussion(disc_id):
+    user = get_session_user()
+    if not community.approve_discussion(disc_id, user['username']):
+        return jsonify({"success": False, "code": "not_pending",
+                        "message": "该帖不在待审核状态，请刷新后重试"}), 409
+    return jsonify({"success": True, "message": "已通过，帖子现在公开可见"})
+
+
+@admin_bp.route('/api/admin/discussions/<int:disc_id>/reject', methods=['POST'])
+@require_capability('community.manage')
+def admin_reject_discussion(disc_id):
+    user = get_session_user()
+    if not community.reject_discussion(disc_id, user['username']):
+        return jsonify({"success": False, "code": "not_pending",
+                        "message": "该帖不在待审核状态，请刷新后重试"}), 409
+    return jsonify({"success": True, "message": "已拒绝，帖子不会公开"})
+
+
+@admin_bp.route('/api/admin/comments/<int:comment_id>/approve', methods=['POST'])
+@require_capability('community.manage')
+def admin_approve_comment(comment_id):
+    user = get_session_user()
+    if not community.approve_comment(comment_id, user['username']):
+        return jsonify({"success": False, "code": "not_pending",
+                        "message": "该评论不在待审核状态，请刷新后重试"}), 409
+    return jsonify({"success": True, "message": "已通过，评论现在公开可见"})
+
+
+@admin_bp.route('/api/admin/comments/<int:comment_id>/reject', methods=['POST'])
+@require_capability('community.manage')
+def admin_reject_comment(comment_id):
+    user = get_session_user()
+    if not community.reject_comment(comment_id, user['username']):
+        return jsonify({"success": False, "code": "not_pending",
+                        "message": "该评论不在待审核状态，请刷新后重试"}), 409
+    return jsonify({"success": True, "message": "已拒绝，评论不会公开"})
 
 
 @admin_bp.route('/api/admin/comments/<int:comment_id>', methods=['DELETE'])

@@ -2,9 +2,13 @@
 import { computed, onMounted, ref } from "vue";
 
 import {
+  approveAdminComment,
+  approveAdminDiscussion,
   deleteAdminComment,
   deleteAdminDiscussion,
   getAdminModerationContent,
+  rejectAdminComment,
+  rejectAdminDiscussion,
   type ModerationComment,
   type ModerationDiscussion,
 } from "@/api/admin";
@@ -19,14 +23,22 @@ type DeleteTarget =
 
 const discussions = ref<ModerationDiscussion[]>([]);
 const comments = ref<ModerationComment[]>([]);
+const pendingDiscussions = ref<ModerationDiscussion[]>([]);
+const pendingComments = ref<ModerationComment[]>([]);
+const pendingTotal = ref(0);
 const loading = ref(true);
 const loadError = ref("");
 const feedback = ref<{ kind: FeedbackKind; message: string } | null>(null);
 const deleteTarget = ref<DeleteTarget | null>(null);
 const deleting = ref(false);
+const reviewing = ref("");
 
 const isEmpty = computed(
-  () => !discussions.value.length && !comments.value.length,
+  () =>
+    !discussions.value.length &&
+    !comments.value.length &&
+    !pendingDiscussions.value.length &&
+    !pendingComments.value.length,
 );
 const deleteTitle = computed(() => {
   if (deleteTarget.value?.kind === "discussion") return "删除讨论帖";
@@ -52,12 +64,55 @@ async function loadContent(): Promise<void> {
     const response = await getAdminModerationContent();
     discussions.value = response.discussions;
     comments.value = response.comments;
+    pendingDiscussions.value = response.pendingDiscussions;
+    pendingComments.value = response.pendingComments;
+    pendingTotal.value = response.pending.total;
   } catch (error) {
     discussions.value = [];
     comments.value = [];
+    pendingDiscussions.value = [];
+    pendingComments.value = [];
+    pendingTotal.value = 0;
     loadError.value = errorMessage(error, "内容监管列表加载失败");
   } finally {
     loading.value = false;
+  }
+}
+
+/**
+ * 通过 / 拒绝一条待审内容。
+ * 敏感词只做初筛，真正的判断在这里：命中的可能是黑产话术，也可能是被词表
+ * 误伤的正常表达（例如「农业贷款」不会命中，但「无抵押贷款」会）。
+ */
+async function review(
+  kind: "discussion" | "comment",
+  id: number,
+  action: "approve" | "reject",
+): Promise<void> {
+  const key = `${kind}-${id}-${action}`;
+  if (reviewing.value) return;
+  reviewing.value = key;
+  try {
+    const response =
+      kind === "discussion"
+        ? action === "approve"
+          ? await approveAdminDiscussion(id)
+          : await rejectAdminDiscussion(id)
+        : action === "approve"
+          ? await approveAdminComment(id)
+          : await rejectAdminComment(id);
+    feedback.value = {
+      kind: "success",
+      message: response.message || "已处理",
+    };
+    await loadContent();
+  } catch (error) {
+    feedback.value = {
+      kind: "error",
+      message: errorMessage(error, "审核失败"),
+    };
+  } finally {
+    reviewing.value = "";
   }
 }
 
@@ -110,7 +165,7 @@ onMounted(loadContent);
         <h1 data-testid="bo-page-title">
           内容监管
         </h1>
-        <span>查看并删除违规讨论帖与评论，删除结果立即影响公开页面。</span>
+        <span>命中敏感词的帖子与评论先转人工审核；已公开内容可直接删除，删除结果立即影响公开页面。</span>
       </div>
       <button
         type="button"
@@ -164,11 +219,130 @@ onMounted(loadContent);
       <BackofficeState
         kind="empty"
         title="暂无待监管内容"
-        detail="当前没有公开可见的讨论帖或评论。"
+        detail="当前没有公开可见的讨论帖或评论，也没有命中敏感词待审核的内容。"
       />
     </div>
 
     <template v-else>
+      <BackofficeCard
+        v-if="pendingTotal"
+        title="待人工审核"
+        :description="`命中敏感词的内容不会公开，审核通过后才展示；当前 ${pendingTotal} 条待处理。`"
+        flush
+      >
+        <div
+          v-if="pendingDiscussions.length"
+          class="backoffice-table-wrap"
+        >
+          <table class="backoffice-table">
+            <thead>
+              <tr>
+                <th>待审帖子</th>
+                <th>命中词</th>
+                <th>作者</th>
+                <th>提交时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="discussion in pendingDiscussions"
+                :key="`pd-${discussion.id}`"
+                data-testid="admin-pending-discussion-row"
+                :data-discussion-id="discussion.id"
+              >
+                <td>
+                  <strong>{{ discussion.title }}</strong>
+                  <small>{{ discussion.content }}</small>
+                </td>
+                <td>
+                  <span class="pending-word">{{ discussion.matched_words || "—" }}</span>
+                </td>
+                <td>{{ discussion.user_name || discussion.user_id }}</td>
+                <td>{{ discussion.created_at }}</td>
+                <td>
+                  <div class="backoffice-row-actions">
+                    <button
+                      type="button"
+                      class="backoffice-button is-small"
+                      :disabled="!!reviewing"
+                      @click="review('discussion', discussion.id, 'approve')"
+                    >
+                      通过
+                    </button>
+                    <button
+                      type="button"
+                      class="backoffice-button is-small is-danger"
+                      :disabled="!!reviewing"
+                      @click="review('discussion', discussion.id, 'reject')"
+                    >
+                      拒绝
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div
+          v-if="pendingComments.length"
+          class="backoffice-table-wrap"
+        >
+          <table class="backoffice-table">
+            <thead>
+              <tr>
+                <th>待审评论</th>
+                <th>所属讨论帖</th>
+                <th>命中词</th>
+                <th>作者</th>
+                <th>提交时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="comment in pendingComments"
+                :key="`pc-${comment.id}`"
+                data-testid="admin-pending-comment-row"
+                :data-comment-id="comment.id"
+              >
+                <td>
+                  <strong>{{ comment.content }}</strong>
+                  <small>#{{ comment.id }}</small>
+                </td>
+                <td>{{ comment.target_title || `${comment.target_type} #${comment.target_id}` }}</td>
+                <td>
+                  <span class="pending-word">{{ comment.matched_words || "—" }}</span>
+                </td>
+                <td>{{ comment.user_name || comment.user_id }}</td>
+                <td>{{ comment.created_at }}</td>
+                <td>
+                  <div class="backoffice-row-actions">
+                    <button
+                      type="button"
+                      class="backoffice-button is-small"
+                      :disabled="!!reviewing"
+                      @click="review('comment', comment.id, 'approve')"
+                    >
+                      通过
+                    </button>
+                    <button
+                      type="button"
+                      class="backoffice-button is-small is-danger"
+                      :disabled="!!reviewing"
+                      @click="review('comment', comment.id, 'reject')"
+                    >
+                      拒绝
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </BackofficeCard>
+
       <BackofficeCard
         title="讨论帖"
         :description="`共 ${discussions.length} 条公开讨论帖`"

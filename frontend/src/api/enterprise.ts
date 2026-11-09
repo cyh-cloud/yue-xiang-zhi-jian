@@ -20,6 +20,8 @@ export interface EnterpriseJob {
   reviewed_at: string;
   posted_at: string;
   is_demo?: number;
+  /** 1 = 企业主动关闭（招满/暂缓）。关闭只下架，投递记录保留。 */
+  is_closed?: number;
 }
 
 export interface EnterpriseJobInput {
@@ -115,6 +117,22 @@ export function deleteEnterpriseJob(
   jobId: number,
 ): Promise<EnterpriseJobMutationResponse> {
   return del<EnterpriseJobMutationResponse>(`/api/enterprise/jobs/${jobId}`);
+}
+
+export function closeEnterpriseJob(
+  jobId: number,
+): Promise<EnterpriseJobMutationResponse> {
+  return post<EnterpriseJobMutationResponse>(
+    `/api/enterprise/jobs/${jobId}/close`,
+  );
+}
+
+export function reopenEnterpriseJob(
+  jobId: number,
+): Promise<EnterpriseJobMutationResponse> {
+  return post<EnterpriseJobMutationResponse>(
+    `/api/enterprise/jobs/${jobId}/reopen`,
+  );
 }
 
 export async function getEnterpriseApplications(): Promise<

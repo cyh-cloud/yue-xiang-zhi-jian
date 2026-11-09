@@ -240,6 +240,11 @@ function formatTime(value: string): string {
           <div class="community-card-head">
             <span class="community-tag">{{ categoryLabel }}</span>
             <span
+              v-if="discussion.is_demo"
+              class="community-demo"
+              title="平台预置的演示数据"
+            >演示</span>
+            <span
               v-if="discussion.is_pinned"
               class="community-pinned"
             >

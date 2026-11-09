@@ -37,6 +37,8 @@ rem keep npm cache on a writable path (default one is under Program Files)
 set "npm_config_cache=%LOCALAPPDATA%\npm-cache-yx"
 rem do not let the backend pop a browser tab by itself
 set "OPEN_BROWSER=0"
+rem auto-reload backend on code changes (dev only; see backend/run.py)
+set "YX_DEV_RELOAD=1"
 
 echo python : %PY%
 echo root   : %ROOT%

@@ -35,6 +35,31 @@ data/*.db
 data/server.pid
 deploy/nginx.conf
 
+# ---- 企业资质证件照（私有，严禁提交）----
+# 营业执照属于企业敏感材料，只经鉴权接口下发；目录落在 data/ 下，
+# 静态路由对 data/ 整目录拒绝，这里再挡一层版本库。
+data/qualifications/
+
+# ---- 本地工具产物 / 一次性脚本 ----
+# 这些是排查问题时临时写的脚本与截图，不属于项目源码；混进版本库会让
+# 仓库里出现大量无上下文的 _xxx.py / _.cjs。
+.workbuddy/_*
+.workbuddy/doc_shots/
+/frontend/.vite/
+/frontend/_*.cjs
+/_*.py
+/_*.ps1
+/generated-images/
+
+# ---- 交付物产物（文档/PPT/截图，合计 100MB+）----
+# 竞赛提交的定稿放在桌面交付目录与 docs 里，中间产物不进版本库：
+# 二进制大文件一旦入库，后续每次拉取都要付这份体积。
+/output/
+/outputs/
+
+# 运行时日志
+/logs/
+
 # ---- 系统 / 编辑器 ----
 .DS_Store
 Thumbs.db

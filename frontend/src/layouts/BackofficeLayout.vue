@@ -111,6 +111,12 @@ const ROLE_CONFIG: Record<BackofficeRole, RoleConfig> = {
             capability: "job.manage",
           },
           {
+            label: "企业资质",
+            to: "/enterprise/qualification",
+            icon: "fa-certificate",
+            capability: "job.manage",
+          },
+          {
             label: "简历管理",
             to: "/enterprise/applications",
             icon: "fa-file-lines",
@@ -197,6 +203,14 @@ const ROLE_CONFIG: Record<BackofficeRole, RoleConfig> = {
             capability: "review.moderate",
           },
           {
+            label: "企业认证",
+            to: "/admin/qualifications",
+            // 图标名必须存在于 FA 6.0.0（index.html 锁的版本）。
+            // fa-shield-halved 是 6.1 才引入的，在 6.0.0 下渲染成空白 —— 已踩过。
+            icon: "fa-id-card",
+            capability: "review.moderate",
+          },
+          {
             label: "系统公告",
             to: "/admin/announcements",
             icon: "fa-bullhorn",
@@ -205,7 +219,7 @@ const ROLE_CONFIG: Record<BackofficeRole, RoleConfig> = {
           {
             label: "内容监管",
             to: "/admin/content",
-            icon: "fa-shield-halved",
+            icon: "fa-gavel",
             capability: "community.manage",
           },
         ],

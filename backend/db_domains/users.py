@@ -149,6 +149,8 @@ _OWNED_TABLES = {
     'policies': {'government_policies'},
     'courses': {'courses', 'models_3d'},
     'announcements': {'system_announcements'},
+    # 企业资质认证：属主是 db_domains.qualifications，删号判断要能数到它
+    'qualifications': {'enterprise_qualifications'},
 }
 
 # 删用户时连带清理的 (表, 列)，这些表的属主是别的域，但清理动作归 users 域。
@@ -183,6 +185,9 @@ _USER_RELATION_SPECS = [
     ("content_reviews", "reviewed_by", "处理过的审核", 'reviews'),
     ("government_policies", "author_id", "发布的政策", 'policies'),
     ("job_listings", "enterprise_id", "发布的岗位", 'employment'),
+    # ⚠️ 资质记录必须计入：它按 username 关联且没有外键，删号后同名重新注册会
+    #    直接继承上一个账号的「已认证」，连信用代码都是别人的（实测可复现）。
+    ("enterprise_qualifications", "user_id", "企业资质记录", 'qualifications'),
     ("models_3d", "teacher_id", "上传的3D模型", 'courses'),
     ("courses", "teacher_id", "创建的课程", 'courses'),
     ("system_announcements", "created_by", "发布的公告", 'announcements'),

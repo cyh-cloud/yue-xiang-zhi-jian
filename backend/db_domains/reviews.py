@@ -189,45 +189,82 @@ def get_oldest_pending_at():
     return row["t"] if row else None
 
 
+# 「目标内容还在不在」。审核队列只展示还能打开的内容：内容被删掉后残留的审核
+# 记录是孤儿，管理员点进去没有正文、也没有可驳回的对象，只会把队列灌满
+# （2026-11-05 实测：测试直接删岗位后留下 48 条无法处理的待审记录）。
+#
+# 这里直查四张内容表的 id，是审核域唯一的跨表读取，理由与代价登记在
+# tests/test_db_domain_boundaries.py 的 ALLOWED_FOREIGN_TABLES['reviews']。
+# 已下线的 procurement 一律视为孤儿（内容表早就不在了）。
+_CONTENT_ALIVE_SQL = (
+    "("
+    " (r.content_type = 'job' AND EXISTS "
+    "   (SELECT 1 FROM job_listings j WHERE j.id = r.content_id))"
+    " OR (r.content_type = 'course' AND EXISTS "
+    "   (SELECT 1 FROM courses c WHERE c.id = r.content_id))"
+    " OR (r.content_type = 'model_3d' AND EXISTS "
+    "   (SELECT 1 FROM models_3d m WHERE m.id = r.content_id))"
+    " OR (r.content_type = 'success_case' AND EXISTS "
+    "   (SELECT 1 FROM success_cases s WHERE s.id = r.content_id))"
+    " OR r.content_type NOT IN "
+    "   ('job', 'course', 'model_3d', 'success_case', 'procurement')"
+    ")"
+)
+
+
 def get_reviews_by_status(status=None, content_type=None, sort='modified'):
-    """按状态取审核记录（status 为空 = 全部）。
+    """按状态取审核记录（status 为空 = 全部）。孤儿记录不下发。
 
     sort：'modified'（默认）按最后修改时间倒序，取最近一次审核动作的
     reviewed_at；没审过、或撤销后 reviewed_at 被清空的，退回 created_at；
     'created' 按提交时间倒序。两者都用 id 兜底拆同秒戳。
     """
     conn = get_connection()
-    sql = "SELECT * FROM content_reviews WHERE 1=1"
+    sql = "SELECT r.* FROM content_reviews r WHERE " + _CONTENT_ALIVE_SQL
     params = []
     if status:
-        sql += " AND status = ?"
+        sql += " AND r.status = ?"
         params.append(status)
     if content_type:
-        sql += " AND content_type = ?"
+        sql += " AND r.content_type = ?"
         params.append(content_type)
     if sort == 'created':
-        sql += " ORDER BY created_at DESC, id DESC"
+        sql += " ORDER BY r.created_at DESC, r.id DESC"
     else:
-        sql += " ORDER BY COALESCE(reviewed_at, created_at) DESC, id DESC"
+        sql += " ORDER BY COALESCE(r.reviewed_at, r.created_at) DESC, r.id DESC"
     rows = conn.execute(sql, params).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
 
 def count_reviews_by_status(content_type=None):
-    """各状态的审核记录条数（供页签显示数量）。三个 key 恒存在，缺失补 0。"""
+    """各状态的审核记录条数（供页签显示数量）。三个 key 恒存在，缺失补 0。
+
+    口径与 get_reviews_by_status 一致：孤儿记录不计入，否则页签显示 46 条、
+    列表却是空的。
+    """
     conn = get_connection()
-    sql = "SELECT status, COUNT(*) AS n FROM content_reviews"
+    sql = ("SELECT r.status, COUNT(*) AS n FROM content_reviews r WHERE "
+           + _CONTENT_ALIVE_SQL)
     params = []
     if content_type:
-        sql += " WHERE content_type = ?"
+        sql += " AND r.content_type = ?"
         params.append(content_type)
-    sql += " GROUP BY status"
+    sql += " GROUP BY r.status"
     out = {r["status"]: r["n"] for r in conn.execute(sql, params).fetchall()}
     conn.close()
     for k in ("pending", "approved", "rejected"):
         out.setdefault(k, 0)
     return out
+
+
+def get_review_by_id(review_id):
+    """按审核记录 id 取一条。审核侧要在裁定前先看清它审的是哪条内容。"""
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM content_reviews WHERE id = ?",
+                       (review_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def get_review_by_content(content_type, content_id):

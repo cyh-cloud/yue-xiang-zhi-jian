@@ -40,10 +40,10 @@ EXPECTED_ROWS = {
     'farming_phenophases': 38,
     'farming_tasks': 123,
     'pest_crops': 8,
-    'pest_entries': 45,
-    'pest_sources': 24,
-    'pest_entry_sources': 117,
-    'pest_images': 18,
+    'pest_entries': 69,
+    'pest_sources': 25,
+    'pest_entry_sources': 191,
+    'pest_images': 29,
     'recruitments': 14,
     'recruitment_sources': 16,
     'success_cases': 5,
@@ -130,12 +130,12 @@ class ContentShapeTest(unittest.TestCase):
     # ---- 病虫害 ----
 
     def test_pest_knowledge_keeps_its_shape(self):
-        body = self._get('/api/agriculture/pest-knowledge')
+        body = self._get('/api/agriculture/pest-knowledge?limit=100')
         self.assertTrue(body['success'])
-        self.assertEqual(len(body['entries']), 45, 'pest_entries 应有 45 条')
+        self.assertEqual(len(body['entries']), 69, 'pest_entries 应有 69 条')
         self.assertEqual(len(body['crops']), 8, 'pest_crops 应有 8 个作物')
-        self.assertEqual(body['stats'], {'crops': 8, 'entries': 45,
-                                         'with_image': 18, 'verified': 0})
+        self.assertEqual(body['stats'], {'crops': 8, 'entries': 69,
+                                         'with_image': 29, 'verified': 0})
         self.assertTrue(body['disclaimer'])
         for entry in body['entries']:
             for key in ('id', 'crop', 'crop_name', 'crop_icon', 'disease', 'alias',

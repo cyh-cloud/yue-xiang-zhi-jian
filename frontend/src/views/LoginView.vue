@@ -22,6 +22,46 @@ const registerPhone = ref("");
 const registerRegion = ref("");
 const registerCompany = ref("");
 
+interface DemoAccount {
+  label: string;
+  username: string;
+  password: string;
+}
+
+// 标记当前 username/password 是否由演示填充带入，用于切到注册时清理，
+// 避免登录演示账号随 submitRegistration 一并作为注册凭据提交。
+const demoFilled = ref(false);
+
+// 与 backend/db_seed_accounts.py 的播种清单保持一致；演示前先跑
+// python backend/seed_demo.py 确保账号已灌入。
+const demoAccounts: DemoAccount[] = [
+  { label: "学员", username: "student_demo", password: "123456" },
+  { label: "教师", username: "teacher_demo", password: "123456" },
+  { label: "企业", username: "enterprise_demo", password: "123456" },
+  { label: "政府", username: "gov_demo", password: "123456" },
+  { label: "运营", username: "operator_demo", password: "123456" },
+  { label: "管理员", username: "admin_demo", password: "admin123" },
+];
+
+function fillDemoAccount(account: DemoAccount): void {
+  mode.value = "login";
+  username.value = account.username;
+  password.value = account.password;
+  errorMessage.value = "";
+  demoFilled.value = true;
+}
+
+function selectTab(tab: "login" | "register"): void {
+  mode.value = tab;
+  // 演示填充的账号/密码只服务于登录态；切到注册时清空，
+  // 否则会随 submitRegistration 一并作为注册凭据提交。
+  if (tab === "register" && demoFilled.value) {
+    username.value = "";
+    password.value = "";
+    demoFilled.value = false;
+  }
+}
+
 async function submit(): Promise<void> {
   if (!username.value.trim() || !password.value) {
     errorMessage.value = "请输入用户名和密码";
@@ -85,14 +125,14 @@ async function submitRegistration(): Promise<void> {
         <button
           type="button"
           :class="{ active: mode === 'login' }"
-          @click="mode = 'login'"
+          @click="selectTab('login')"
         >
           登录
         </button>
         <button
           type="button"
           :class="{ active: mode === 'register' }"
-          @click="mode = 'register'"
+          @click="selectTab('register')"
         >
           注册
         </button>
@@ -151,6 +191,9 @@ async function submitRegistration(): Promise<void> {
             name="company_name"
             autocomplete="organization"
           >
+          <p class="register-hint">
+            注册后请在企业中心「企业资质」提交营业执照；认证前最多发布 1 个在招岗位。
+          </p>
         </template>
         <label for="register-phone">手机号</label>
         <input
@@ -184,6 +227,25 @@ async function submitRegistration(): Promise<void> {
             : (mode === "login" ? "登录" : "注册")
         }}
       </button>
+      <div
+        v-if="mode === 'login'"
+        class="demo-accounts"
+      >
+        <p class="demo-accounts-title">
+          演示账号（点击填入）
+        </p>
+        <div class="demo-accounts-list">
+          <button
+            v-for="account in demoAccounts"
+            :key="account.username"
+            type="button"
+            class="demo-account-chip"
+            @click="fillDemoAccount(account)"
+          >
+            {{ account.label }}
+          </button>
+        </div>
+      </div>
     </form>
   </main>
 </template>

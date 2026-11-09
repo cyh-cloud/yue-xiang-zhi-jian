@@ -7,11 +7,13 @@ import {
   type EnterpriseApplication,
   type EnterpriseStats,
 } from "@/api/enterprise";
+import { getQualification, type QualificationStatus } from "@/api/qualification";
 import BackofficeCard from "@/components/backoffice/BackofficeCard.vue";
 import BackofficeState from "@/components/backoffice/BackofficeState.vue";
 
 const stats = ref<EnterpriseStats | null>(null);
 const applications = ref<EnterpriseApplication[]>([]);
+const qualification = ref<QualificationStatus | null>(null);
 const loading = ref(true);
 const error = ref("");
 
@@ -85,15 +87,18 @@ async function loadStats(): Promise<void> {
   loading.value = true;
   error.value = "";
   try {
-    const [nextStats, nextApplications] = await Promise.all([
+    const [nextStats, nextApplications, nextQualification] = await Promise.all([
       getEnterpriseStats(),
       getEnterpriseApplications(),
+      getQualification(),
     ]);
     stats.value = nextStats;
     applications.value = nextApplications;
+    qualification.value = nextQualification;
   } catch (requestError) {
     stats.value = null;
     applications.value = [];
+    qualification.value = null;
     error.value =
       requestError instanceof Error ? requestError.message : "统计加载失败";
   } finally {
@@ -163,6 +168,36 @@ onMounted(loadStats);
           <span>{{ card.label }}</span>
           <small>{{ card.detail }}</small>
         </article>
+      </div>
+    </BackofficeCard>
+
+    <BackofficeCard
+      v-if="!loading && !error && stats"
+      title="企业资质"
+      description="认证状态决定岗位发布额度与学员端的企业标识。"
+    >
+      <div
+        class="qual-strip"
+        :class="{
+          'is-ok': qualification?.verified,
+          'is-warn': qualification && !qualification.verified,
+        }"
+        data-testid="enterprise-qualification-strip"
+      >
+        <span class="qual-strip-label">
+          {{ qualification?.status_label || "未提交" }}
+        </span>
+        <span class="qual-strip-note">
+          {{ qualification?.verified
+            ? `已认证，有效期至 ${qualification?.record?.expires_at || "—"}`
+            : `未认证企业最多发布 ${qualification?.limits.unverified_active_jobs ?? 1} 个岗位` }}
+        </span>
+        <RouterLink
+          class="backoffice-button is-secondary is-small qual-strip-link"
+          to="/enterprise/qualification"
+        >
+          {{ qualification?.verified ? "查看资质" : "去认证" }}
+        </RouterLink>
       </div>
     </BackofficeCard>
 

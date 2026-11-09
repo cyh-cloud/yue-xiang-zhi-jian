@@ -254,7 +254,7 @@ class BaselineLibraryTest(IsolatedMigrationTest):
         self.assertEqual(recorded, 0, '基线库不该带迁移记录，否则后续迁移会被跳过')
         self.assertEqual(journal.lower(), 'delete',
                          '基线库应切回 DELETE，别带着 WAL 附属文件被复制')
-        self.assertEqual(counts, {'farming_tasks': 123, 'pest_entries': 45,
+        self.assertEqual(counts, {'farming_tasks': 123, 'pest_entries': 69,
                                   'recruitments': 14, 'success_cases': 5,
                                   'dialects': 3, 'crafts': 4})
 

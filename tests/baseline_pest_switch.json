@@ -1,15 +1,15 @@
 {
   "/api/agriculture/pest-knowledge": {
     "status": 200,
-    "bytes": 164049,
-    "sha256": "851eb00a18b8d79b3e41bc820891666dd194f7d7a6015a3bfc2e4f1a5013872b",
-    "sha256_ex_total": "7b89aba8d062df0b3feff0c5d17640b9ea60ea68e198b1733689a7eb8de041c3"
+    "bytes": 192242,
+    "sha256": "b2a8dac1fb393be7962e6d6f0fcd5caa8491b9e77b866401758591aa88fbafd9",
+    "sha256_ex_total": "305b41fd61ad0b63ae98da81011c2a2605fd9f4c89573bc4c4dac2907148f0a4"
   },
   "/api/agriculture/pest-knowledge?crop=lychee": {
     "status": 200,
-    "bytes": 23984,
-    "sha256": "c81a1aaf0e7b8132d1e030b4a13dc04ce6cf43a3db0a66249c7d8fe45e5b355c",
-    "sha256_ex_total": "9ac787338e2a60a62e6b0943ac2b231cb7b83f54338bb756c1ec4fbef9b89aad"
+    "bytes": 35904,
+    "sha256": "cc76cca3d35600efb2afa246fcdac2ae6c595b70f4a90aed1d4cebda64c84e18",
+    "sha256_ex_total": "dd54654855fdbf6b0243240c00f6ae2b4c6c0d45629c9306684684d98b167de8"
   },
   "/api/agriculture/pest-knowledge?crop=no-such-crop": {
     "status": 400,
@@ -19,9 +19,9 @@
   },
   "/api/agriculture/pest-knowledge?kind=pest": {
     "status": 200,
-    "bytes": 75156,
-    "sha256": "30ab3dd62c0ed9f5cd86a508be301fa7f0c52cf5b1c9ad3467386f6e0729aa03",
-    "sha256_ex_total": "7248e754d8075581f3eed6e309e4b2a62df3eb7c40d030761e7957551c7028ab"
+    "bytes": 128106,
+    "sha256": "35cda4b323b3780425d7fef99ae45116da9f46a63918a8f8019358c6f851feea",
+    "sha256_ex_total": "933af735d106dbfd868c6fb353af7c5ea3dab0a2e3033c29de61e8e21f7b49f5"
   },
   "/api/agriculture/pest-knowledge?kind=virus": {
     "status": 400,
@@ -32,8 +32,8 @@
   "/api/agriculture/pest-knowledge?q=炭疽": {
     "status": 200,
     "bytes": 18848,
-    "sha256": "272e4a41c7033c84a5d1a1fa11539bfa128cc04b8feef4c41f0b381146ab7ee8",
-    "sha256_ex_total": "e3ace87c387eaa0073d8d51f4ec781ffc879993624bd675aa79560c791e93400"
+    "sha256": "16ddd7b3f8cdde1c9518c4f483bf9d2f8aaf08b5d207846413e45136ff932113",
+    "sha256_ex_total": "175a98d07c4b6f55f03f7fb8f4c631ee8931e469f40c8f69f86d82a7408b4b82"
   },
   "POST /api/agriculture/diagnose (fallback)": {
     "body": {

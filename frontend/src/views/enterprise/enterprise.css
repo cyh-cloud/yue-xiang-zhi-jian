@@ -52,6 +52,50 @@
   color: var(--bo-danger);
 }
 
+/* 已关闭：中性灰，与「审核通过（绿）」区分开 —— 关闭是企业的主动动作，
+   不是审核结果，两者必须能一眼看开。 */
+.review-pill.is-closed {
+  margin-left: 6px;
+  background: var(--surface-muted);
+  color: var(--bo-muted);
+}
+
+/* 工作台的资质状态条：一条就够，不再堆卡片。 */
+.qual-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--bo-accent);
+  background: var(--surface-muted);
+}
+
+.qual-strip.is-ok {
+  border-left-color: var(--bo-success);
+}
+
+.qual-strip.is-warn {
+  border-left-color: var(--color-accent-gold);
+}
+
+.qual-strip-label {
+  font-weight: 700;
+  color: var(--bo-text);
+}
+
+.qual-strip-note {
+  flex: 1;
+  min-width: 200px;
+  color: var(--bo-muted);
+  font-size: 0.85rem;
+}
+
+.qual-strip-link {
+  text-decoration: none;
+}
+
 .review-reason {
   max-width: 260px;
   color: var(--bo-danger);

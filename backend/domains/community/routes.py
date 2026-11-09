@@ -16,6 +16,7 @@ from flask import Blueprint, jsonify, request
 
 from core.session import get_session_user
 from db_domains import community
+from shared import sensitive_words
 
 
 community_bp = Blueprint('community', __name__)
@@ -24,6 +25,11 @@ community_bp = Blueprint('community', __name__)
 DISCUSSION_TITLE_MAX_LEN = 80
 DISCUSSION_CONTENT_MAX_LEN = 5000
 COMMENT_CONTENT_MAX_LEN = 1000
+
+
+def _moderation_state(hits):
+    """命中敏感词 → 待审；否则直接公开。返回 (状态, 命中词串)。"""
+    return ('pending' if hits else 'published'), '、'.join(hits)
 
 
 @community_bp.route('/api/comments', methods=['GET'])
@@ -55,9 +61,20 @@ def public_add_comment():
             "code": "content_too_long",
             "message": "评论过长，请控制在 %d 字以内" % COMMENT_CONTENT_MAX_LEN,
         }), 400
-    comment_id = community.add_comment(target_type, target_id, user['username'], content)
-    return jsonify({"success": True, "id": comment_id, "message": "评论成功"})
-
+    # 命中敏感词只转人工审核，不直接拒绝：词表必然误伤（「无抵押贷款」是黑产，
+    # 「农业贷款」是正经讨论），机器不做最终裁定。
+    hits = sensitive_words.scan(content)
+    status, matched = _moderation_state(hits)
+    comment_id = community.add_comment(target_type, target_id, user['username'], content,
+                                       moderation_status=status, matched_words=matched)
+    if hits:
+        return jsonify({
+            "success": True, "id": comment_id, "pending": True, "matched": hits,
+            "message": "评论包含需人工复核的词语（%s），已提交审核，通过后展示"
+                       % sensitive_words.describe(hits),
+        })
+    return jsonify({"success": True, "id": comment_id, "pending": False,
+                    "message": "评论成功"})
 
 @community_bp.route('/api/discussions', methods=['GET'])
 def public_get_discussions():
@@ -92,8 +109,19 @@ def public_create_discussion():
             "code": "content_too_long",
             "message": "帖子内容过长，请控制在 %d 字以内" % DISCUSSION_CONTENT_MAX_LEN,
         }), 400
-    disc_id = community.create_discussion(title, content, category, user['username'])
-    return jsonify({"success": True, "id": disc_id, "message": "发布成功"})
+    hits = sensitive_words.scan(title, content)
+    status, matched = _moderation_state(hits)
+    disc_id = community.create_discussion(title, content, category, user['username'],
+                                          moderation_status=status,
+                                          matched_words=matched)
+    if hits:
+        return jsonify({
+            "success": True, "id": disc_id, "pending": True, "matched": hits,
+            "message": "帖子包含需人工复核的词语（%s），已提交审核，通过后自动展示"
+                       % sensitive_words.describe(hits),
+        })
+    return jsonify({"success": True, "id": disc_id, "pending": False,
+                    "message": "发布成功"})
 
 
 @community_bp.route('/api/discussions/<int:disc_id>', methods=['GET'])

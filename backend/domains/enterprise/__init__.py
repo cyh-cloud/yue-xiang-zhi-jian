@@ -26,5 +26,6 @@ T17 从 app.py 的「企业用户 API」区块整体迁出，URL、请求响应�
 
 
 from domains.enterprise.routes import enterprise_bp
+from domains.enterprise import qualification  # noqa: F401  挂载资质认证路由
 
 __all__ = ['enterprise_bp']

@@ -3,8 +3,13 @@
 
 票的验收第 1、2 条是「2 条病虫害接口的响应 JSON 与切换前逐字节一致」与「诊断降级路径
 在知识库有数据时结论与切换前一致」。这两条没法靠断言几个字段糊过去：pest-knowledge
-一次下发 45 条条目，每条 20 个字段，字段值来自五张表；诊断降级的 treatment /
-prevention / symptoms 又是整段文本。所以这里存的是**切换前的原始响应**：
+一次下发一整页条目（默认 50 条，库内共 69 条），每条 20 个字段，字段值来自五张表；
+诊断降级的 treatment / prevention / symptoms 又是整段文本。所以这里存的是
+**切换前的原始响应**：
+
+  0. 迁移 0003 把速查扩充到 69 条（8 个作物各补 3 条），速查六个变体的 sha256
+     由 tools/regen_pest_baseline.py 重算；诊断降级那条未动，仍是切换前的原始
+     结论，继续逐字节守住「降级匹配没有漂移」。
 
   1. tests/baseline_pest_switch.json 在切换到库之前由一次性脚本生成，记下每条
      响应的 sha256、字节数，以及诊断降级的完整 body；
@@ -41,8 +46,8 @@ BASELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 #
 # 用「排序后 JSON 的 sha256」而不是原文字节数：JSON 键序由 dict 插入顺序决定，
 # 新增一个键就会让后面所有键错位，那样比的其实是「JSON 序列化细节」而不是内容。
-# 速查的六个变体：全量 + 三个成功筛选 + 两个错误分支。全量那条覆盖
-# 45 条条目、8 个作物、18 张授权图与全部来源展开，是比对的主体。
+# 速查的六个变体：全量 + 三个成功筛选 + 两个错误分支。不带参数那条走默认每页
+# 50 条（库内共 69 条），覆盖 8 个作物、18 张授权图与全部来源展开，是比对的主体。
 KNOWLEDGE_VARIANTS = (
     ('/api/agriculture/pest-knowledge', {}),
     ('/api/agriculture/pest-knowledge', {'crop': 'lychee'}),
@@ -163,8 +168,8 @@ class PestSwitchSnapshotTest(unittest.TestCase):
         from db_domains import pest
         stats = pest.get_pest_stats()
         self.assertEqual(stats['crops'], 8, 'pest_crops 应有 8 个作物')
-        self.assertEqual(stats['entries'], 45, 'pest_entries 应有 45 条条目')
-        self.assertEqual(stats['with_image'], 18, 'pest_images 应有 18 张授权图')
+        self.assertEqual(stats['entries'], 69, 'pest_entries 应有 69 条条目')
+        self.assertEqual(stats['with_image'], 29, 'pest_images 应有 29 张授权图')
 
     def test_entries_without_authorized_photo_stay_none(self):
         """无授权实拍图的条目 image 仍为 None，不用示意图冒充真实病征。
@@ -192,7 +197,7 @@ class PestSwitchSnapshotTest(unittest.TestCase):
         blanks = {e['id']: e for e in pest.get_pest_entries()
                   if not e.get('chem_table') or not e.get('registered')}
         self.assertGreater(len(blanks), 0, '库里应当有没有用量表或登记药剂的条目')
-        response = self.client.get('/api/agriculture/pest-knowledge')
+        response = self.client.get('/api/agriculture/pest-knowledge?limit=100')
         by_id = {entry['id']: entry for entry in
                  json.loads(response.data)['entries']}
         for entry_id, entry in blanks.items():

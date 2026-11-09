@@ -656,7 +656,7 @@ function escapeHtml(value: string): string {
         >
           <i
             class="fas"
-            :class="hasAiUsed ? 'fa-wand-magic-sparkles' : 'fa-shield-halved'"
+            :class="hasAiUsed ? 'fa-wand-magic-sparkles' : 'fa-shield'"
             aria-hidden="true"
           />
           <span v-if="hasAiUsed">

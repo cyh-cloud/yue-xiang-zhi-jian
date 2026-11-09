@@ -201,6 +201,17 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: "qualification",
+        name: "enterprise-qualification",
+        component: () =>
+          import("@/views/enterprise/EnterpriseQualificationView.vue"),
+        meta: {
+          title: "企业资质",
+          capabilities: ["job.manage"],
+          defaultPath: "/enterprise/dashboard",
+        },
+      },
+      {
         path: "applications",
         name: "enterprise-applications",
         component: () =>
@@ -334,6 +345,17 @@ export const routes: RouteRecordRaw[] = [
         component: () => import("@/views/admin/AdminReviewsView.vue"),
         meta: {
           title: "内容审核",
+          capabilities: ["review.moderate"],
+          defaultPath: "/admin/dashboard",
+        },
+      },
+      {
+        path: "qualifications",
+        name: "admin-qualifications",
+        component: () =>
+          import("@/views/admin/AdminQualificationsView.vue"),
+        meta: {
+          title: "企业认证",
           capabilities: ["review.moderate"],
           defaultPath: "/admin/dashboard",
         },
