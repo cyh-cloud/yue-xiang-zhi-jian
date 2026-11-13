@@ -1,0 +1,22 @@
+# 编辑器统一配置
+# 仓库现有源码使用 CRLF（Windows 开发环境），此处保持一致，避免整文件换行的伪 diff。
+# 若将来统一迁移到 LF，需单独提交一次全量换行变更，不与功能改动混在一起。
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
