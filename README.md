@@ -54,7 +54,7 @@ AI 不是装饰：农技问答、病虫害诊断、带货话术、商品文案�
 
 <p align="center">
   <img src="docs/screenshots/01-home.jpg" alt="首页" width="49%">
-  <img src="docs/screenshots/03-agri-qa.jpg" alt="农技问答" width="49%">
+  <img src="docs/screenshots/02-agri-qa.jpg" alt="农技问答" width="49%">
 </p>
 
 <p align="center">
@@ -62,7 +62,7 @@ AI 不是装饰：农技问答、病虫害诊断、带货话术、商品文案�
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/02-pest-diagnosis.jpg" alt="病虫害智能诊断" width="78%">
+  <img src="docs/screenshots/03-pest-diagnosis.jpg" alt="病虫害智能诊断" width="74%">
 </p>
 
 <p align="center">
@@ -70,21 +70,63 @@ AI 不是装饰：农技问答、病虫害诊断、带货话术、商品文案�
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/04-live-training.jpg" alt="直播实训" width="49%">
-  <img src="docs/screenshots/05-teacher.jpg" alt="教师工作台" width="49%">
+  <img src="docs/screenshots/04-pest-guide.jpg" alt="病虫害速查" width="62%">
 </p>
 
 <p align="center">
-  <em>左：直播模拟训练（实时识别与朗读实录分析） · 右：教师工作台（名册、学情、AI 教学报告）</em>
+  <em>病虫害速查：69 条、8 类作物，支持按作物筛选与关键词检索，标注来源与授权实拍图</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/06-government.jpg" alt="政府数据大屏" width="78%">
+  <img src="docs/screenshots/05-crafts-3d.jpg" alt="非遗手工 3D 教学" width="56%">
 </p>
 
 <p align="center">
-  <em>政府工作台：政策发布情况与本地成功案例的统计口径分离，避免平台整理内容计入政府绩效</em>
+  <em>非遗手工技艺：3D 互动教学、多角度查看、视频教学与分步制作指导</em>
 </p>
+
+<p align="center">
+  <img src="docs/screenshots/06-live-training.jpg" alt="直播实训" width="78%">
+</p>
+
+<p align="center">
+  <em>直播模拟训练：实时识别话术问题，输出语速、口语化与合规评分</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/07-dialect.jpg" alt="方言语音问答" width="62%">
+</p>
+
+<p align="center">
+  <em>方言语音问答：粤语、客家话、潮汕话三语种，支持语音输入、朗读与常用短语</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/08-resume-ai.jpg" alt="AI 简历辅助" width="70%">
+</p>
+
+<p align="center">
+  <em>AI 简历辅助：只引用能力档案与实训成绩中已有的事实，不代填未发生的经历</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/09-enterprise.jpg" alt="企业工作台" width="49%">
+  <img src="docs/screenshots/10-teacher.jpg" alt="教师工作台" width="49%">
+</p>
+
+<p align="center">
+  <em>左：企业工作台（岗位、投递与简历） · 右：教师工作台（名册、学情与 AI 教学报告）</em>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/11-government.jpg" alt="政府数据大屏" width="49%">
+  <img src="docs/screenshots/12-admin.jpg" alt="管理员工作台" width="49%">
+</p>
+
+<p align="center">
+  <em>左：政府工作台（政策与案例口径分离） · 右：管理员工作台（账号、审核与内容治理）</em>
+</p>
+
 
 ## 技术架构
 
